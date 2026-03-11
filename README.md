@@ -132,5 +132,6 @@ bam-platform/
 (949) 229-0846 | dance@bamsocal.com  
 balletacademyandmovement.com
 
-**Founder:** Amanda Cobb — former professional ballerina  
+**Founder:** Amanda Cobb — former professional ballerina
 **CMS:** WordPress + Flatsome | **Studio Mgmt:** Studio Pro | **Email:** Klaviyo | **DNS:** Cloudflare
+**Framework:** Next.js 16 (TypeScript, Tailwind CSS, App Router)
