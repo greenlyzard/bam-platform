@@ -1,5 +1,5 @@
 # BAM Platform — Claude Code Context
-## Last Updated: March 2026 — 15 context files, 3,700+ lines
+## Last Updated: March 2026 — 16 context files, 4,000+ lines
 
 This is the AI development context for **Ballet Academy and Movement's** proprietary studio platform.
 
@@ -21,6 +21,7 @@ Read all files in `/docs/claude/` before beginning any work.
 | `COMPETITIVE_ANALYSIS.md` | All 11 local competitors, platform rivals, pricing intel |
 | `ACTION_PLAN.md` | Sprint-by-sprint task list with owner + AI-assist assignments |
 | `EXPANSION.md` | Readiness score formula, expansion_markets/competitor_studios schemas, target markets |
+| `SUPABASE_EMAIL_TEMPLATES.md` | Ready-to-paste branded HTML for Supabase auth emails (magic link, signup, reset, email change) |
 | `SAAS.md` | Multi-tenant architecture, payment adapter pattern, onboarding wizard |
 
 ---

@@ -30,6 +30,7 @@ const navGroups = [
     label: "Communications",
     items: [
       { label: "Announcements", href: "/admin/communications", icon: "✉" },
+      { label: "Email Templates", href: "/admin/emails", icon: "✧" },
     ],
   },
   {
