@@ -1,55 +1,61 @@
-export default function TeachLayout({
+import { SignOutButton } from "@/components/layouts/sign-out-button";
+import { TeachNav } from "@/components/layouts/teach-nav";
+import { getUser } from "@/lib/auth/guards";
+
+export default async function TeachLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const navItems = [
-    { label: "Dashboard", href: "/teach/dashboard" },
-    { label: "My Classes", href: "/teach/classes" },
-    { label: "Attendance", href: "/teach/attendance" },
-    { label: "Badges", href: "/teach/badges" },
-    { label: "Assessments", href: "/teach/assessments" },
-    { label: "Hours", href: "/teach/hours" },
-    { label: "Content", href: "/teach/content" },
-    { label: "Messages", href: "/teach/messages" },
-  ];
+  const user = await getUser();
+
+  const today = new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
 
   return (
-    <div className="min-h-screen bg-warm-white">
-      {/* Sidebar */}
-      <aside className="fixed left-0 top-0 z-30 hidden h-screen w-60 border-r border-silver bg-white sm:block">
-        <div className="flex h-14 items-center px-4 border-b border-silver">
-          <span className="font-heading text-lg font-semibold text-charcoal">
+    <div className="min-h-screen bg-cream pb-16 sm:pb-0">
+      {/* Top header */}
+      <header className="sticky top-0 z-40 border-b border-silver bg-white/80 backdrop-blur-sm">
+        <div className="flex h-14 items-center justify-between px-4 max-w-6xl mx-auto">
+          <a
+            href="/teach/dashboard"
+            className="font-heading text-lg font-semibold text-charcoal"
+          >
             Teacher Portal
-          </span>
+          </a>
+          <div className="flex items-center gap-3">
+            <span className="hidden sm:block text-sm text-slate">{today}</span>
+            {user && (
+              <span className="hidden sm:block text-sm text-slate">
+                {user.firstName ?? user.email}
+              </span>
+            )}
+            <SignOutButton />
+            <div className="h-8 w-8 rounded-full bg-lavender-light flex items-center justify-center text-xs font-semibold text-lavender-dark">
+              {user?.firstName?.[0] ?? user?.email?.[0]?.toUpperCase() ?? "?"}
+            </div>
+          </div>
         </div>
-        <nav className="flex flex-col gap-1 p-3">
-          {navItems.map((item) => (
-            <a
-              key={item.href}
-              href={item.href}
-              className="rounded-lg px-3 py-2 text-sm font-medium text-slate hover:bg-lavender-light hover:text-charcoal transition-colors"
-            >
-              {item.label}
-            </a>
-          ))}
-        </nav>
-      </aside>
+      </header>
 
-      {/* Main content */}
-      <div className="sm:ml-60">
-        <header className="sticky top-0 z-20 flex h-14 items-center border-b border-silver bg-white/80 backdrop-blur-sm px-6">
-          <p className="text-sm text-slate">
-            {new Date().toLocaleDateString("en-US", {
-              weekday: "long",
-              month: "long",
-              day: "numeric",
-              year: "numeric",
-            })}
-          </p>
-        </header>
-        <main className="p-6">{children}</main>
+      {/* Desktop sidebar nav */}
+      <div className="hidden sm:flex max-w-6xl mx-auto">
+        <aside className="w-52 shrink-0 py-6 pr-6">
+          <TeachNav />
+        </aside>
+        <main className="flex-1 py-6 min-w-0">{children}</main>
       </div>
+
+      {/* Mobile content */}
+      <main className="sm:hidden px-4 py-6">{children}</main>
+
+      {/* Bottom tab bar (mobile) */}
+      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-silver bg-white sm:hidden">
+        <TeachNav mobile />
+      </nav>
     </div>
   );
 }
