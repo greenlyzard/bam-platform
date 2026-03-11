@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Cormorant_Garamond, Montserrat } from "next/font/google";
 import "./globals.css";
 import { ChatbotWidget } from "@/components/bam/chatbot-widget";
+import { ThemeProvider } from "@/components/bam/theme-provider";
+import { getStudioSettings } from "@/lib/queries/studio-settings";
 
 const cormorant = Cormorant_Garamond({
   variable: "--font-heading",
@@ -23,17 +25,31 @@ export const metadata: Metadata = {
     "Real ballet training in a nurturing environment. San Clemente, California.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  let themePreset = "lavender-cream";
+  let customColors = {};
+  try {
+    const settings = await getStudioSettings();
+    if (settings) {
+      themePreset = settings.theme_preset;
+      customColors = settings.custom_colors ?? {};
+    }
+  } catch {
+    // Settings table may not exist yet — use defaults
+  }
+
   return (
     <html lang="en">
       <body
         className={`${cormorant.variable} ${montserrat.variable} font-body antialiased bg-cream text-charcoal`}
       >
-        {children}
+        <ThemeProvider presetId={themePreset} customColors={customColors}>
+          {children}
+        </ThemeProvider>
         <ChatbotWidget />
       </body>
     </html>

@@ -50,6 +50,12 @@ const navGroups = [
       { label: "Expansion", href: "/admin/expansion", icon: "●" },
     ],
   },
+  {
+    label: "Settings",
+    items: [
+      { label: "Theme", href: "/admin/settings/theme", icon: "◑" },
+    ],
+  },
 ];
 
 const mobileItems = [
