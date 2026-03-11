@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, Montserrat } from "next/font/google";
 import "./globals.css";
+import { ChatbotWidget } from "@/components/bam/chatbot-widget";
 
 const cormorant = Cormorant_Garamond({
   variable: "--font-heading",
@@ -33,6 +34,7 @@ export default function RootLayout({
         className={`${cormorant.variable} ${montserrat.variable} font-body antialiased bg-cream text-charcoal`}
       >
         {children}
+        <ChatbotWidget />
       </body>
     </html>
   );
