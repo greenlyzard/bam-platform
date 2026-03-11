@@ -1,11 +1,24 @@
-export default function CompliancePage() {
+import { requireAdmin } from "@/lib/auth/guards";
+import { EmptyState } from "@/components/bam/empty-state";
+
+export default async function CompliancePage() {
+  await requireAdmin();
+
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-heading font-semibold">Legal &amp; Compliance</h1>
-      <p className="text-slate">Document tracking, waivers, mandated reporter status.</p>
-      <div className="rounded-xl border border-silver bg-white p-6 text-sm text-mist">
-        Module placeholder
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-heading font-semibold text-charcoal">
+          Legal &amp; Compliance
+        </h1>
+        <p className="mt-1 text-sm text-slate">
+          Document tracking, waivers, and mandated reporter status.
+        </p>
       </div>
+      <EmptyState
+        icon="◆"
+        title="Coming soon"
+        description="Mandated reporter log, background check tracking, waiver management, and California compliance requirements will be available here."
+      />
     </div>
   );
 }
