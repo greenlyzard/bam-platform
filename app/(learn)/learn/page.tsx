@@ -1,0 +1,11 @@
+export default function LearningFeedPage() {
+  return (
+    <div className="space-y-4">
+      <h1 className="text-2xl font-heading font-semibold">Learning Feed</h1>
+      <p className="text-white/80">Swipe through technique videos, combos, and exercises.</p>
+      <div className="rounded-xl border border-white/10 bg-white/5 p-6 text-sm text-mist">
+        Module placeholder
+      </div>
+    </div>
+  );
+}
