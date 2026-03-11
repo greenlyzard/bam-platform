@@ -1,44 +1,50 @@
 import { SignOutButton } from "@/components/layouts/sign-out-button";
+import { PortalNav } from "@/components/layouts/portal-nav";
+import { getUser } from "@/lib/auth/guards";
 
-export default function PortalLayout({
+export default async function PortalLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const user = await getUser();
+
   return (
-    <div className="min-h-screen bg-cream">
+    <div className="min-h-screen bg-cream pb-16 sm:pb-0">
       {/* Top header */}
       <header className="sticky top-0 z-40 border-b border-silver bg-white/80 backdrop-blur-sm">
-        <div className="flex h-14 items-center justify-between px-4">
-          <span className="font-heading text-lg font-semibold text-charcoal">
+        <div className="flex h-14 items-center justify-between px-4 max-w-5xl mx-auto">
+          <a href="/portal/dashboard" className="font-heading text-lg font-semibold text-charcoal">
             Ballet Academy and Movement
-          </span>
+          </a>
           <div className="flex items-center gap-3">
+            {user && (
+              <span className="hidden sm:block text-sm text-slate">
+                {user.firstName ?? user.email}
+              </span>
+            )}
             <SignOutButton />
-            <div className="h-8 w-8 rounded-full bg-lavender-light" />
+            <div className="h-8 w-8 rounded-full bg-lavender-light flex items-center justify-center text-xs font-semibold text-lavender-dark">
+              {user?.firstName?.[0] ?? user?.email?.[0]?.toUpperCase() ?? "?"}
+            </div>
           </div>
         </div>
       </header>
 
-      {/* Page content */}
-      <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
+      {/* Desktop sidebar nav */}
+      <div className="hidden sm:flex max-w-5xl mx-auto">
+        <aside className="w-48 shrink-0 py-6 pr-6">
+          <PortalNav />
+        </aside>
+        <main className="flex-1 py-6 min-w-0">{children}</main>
+      </div>
+
+      {/* Mobile content */}
+      <main className="sm:hidden px-4 py-6">{children}</main>
 
       {/* Bottom tab bar (mobile) */}
       <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-silver bg-white sm:hidden">
-        <div className="flex h-14 items-center justify-around text-xs text-slate">
-          <a href="/portal/dashboard" className="flex flex-col items-center gap-1 text-lavender">
-            <span className="text-base">&#9750;</span>Home
-          </a>
-          <a href="/portal/schedule" className="flex flex-col items-center gap-1">
-            <span className="text-base">&#9783;</span>Schedule
-          </a>
-          <a href="/portal/learning" className="flex flex-col items-center gap-1">
-            <span className="text-base">&#9654;</span>Learn
-          </a>
-          <a href="/portal/billing" className="flex flex-col items-center gap-1">
-            <span className="text-base">&#9733;</span>Billing
-          </a>
-        </div>
+        <PortalNav mobile />
       </nav>
     </div>
   );
