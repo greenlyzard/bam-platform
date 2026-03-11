@@ -23,7 +23,7 @@ const navGroups = [
   {
     label: "Productions",
     items: [
-      { label: "Performances", href: "/admin/performances", icon: "♛" },
+      { label: "Productions", href: "/admin/productions", icon: "♛" },
     ],
   },
   {
