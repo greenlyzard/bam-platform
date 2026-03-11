@@ -227,7 +227,7 @@ Active seasons: Classes 2025/2026, Company 25/26, June 6th Recital, Morning Clas
 
 **Typography:**
 - Headings: Cormorant Garamond
-- UI body: Inter or DM Sans
+- UI body: Montserrat (weights 300, 400, 500, 600)
 
 **Aesthetic:** Minimal luxury ballet studio. Feminine, refined, modern. No cartoonish graphics, no generic fitness branding.
 

@@ -23,7 +23,7 @@
 | Styling | Tailwind CSS | Custom BAM design tokens in tailwind.config |
 | Components | shadcn/ui + custom | shadcn for base, custom for BAM-branded |
 | Icons | Lucide React | Stroke 1.5px, thin outline only |
-| Fonts | Cormorant Garamond + Nunito | Load via next/font/google |
+| Fonts | Cormorant Garamond + Montserrat | Load via next/font/google (300, 400, 500, 600) |
 | Animations | Framer Motion | Subtle, 200–300ms, ease-in-out |
 | Forms | React Hook Form + Zod | Validation on client + server |
 | State | Zustand (global) + React Query (server) | |

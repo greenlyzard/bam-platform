@@ -21,7 +21,7 @@ export function renderEmailHtml({
     <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 28px 0;">
       <tr>
         <td style="border-radius: 8px; background-color: #9C8BBF;">
-          <a href="${escapeHtml(buttonUrl)}" target="_blank" style="display: inline-block; padding: 14px 32px; font-family: 'Nunito', Arial, sans-serif; font-size: 15px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 8px;">
+          <a href="${escapeHtml(buttonUrl)}" target="_blank" style="display: inline-block; padding: 14px 32px; font-family: 'Montserrat', Arial, sans-serif; font-size: 15px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 8px;">
             ${escapeHtml(buttonText)}
           </a>
         </td>
@@ -40,7 +40,7 @@ export function renderEmailHtml({
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ballet Academy and Movement</title>
 </head>
-<body style="margin: 0; padding: 0; background-color: #FAF7F2; font-family: 'Nunito', Arial, sans-serif; color: #2C2C2C; -webkit-text-size-adjust: 100%;">
+<body style="margin: 0; padding: 0; background-color: #FAF7F2; font-family: 'Montserrat', Arial, sans-serif; color: #2C2C2C; -webkit-text-size-adjust: 100%;">
   <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color: #FAF7F2;">
     <tr>
       <td align="center" style="padding: 32px 16px;">

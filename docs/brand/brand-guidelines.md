@@ -67,10 +67,10 @@ Ballet Academy and Movement is the studio where serious ballet meets genuine war
 - **Style:** Serif, classical, editorial
 - **Source:** Google Fonts (free)
 
-### Body / UI Font — Inter or DM Sans
+### Body / UI Font — Montserrat
 - **Use for:** Body copy, navigation, buttons, form labels, captions
-- **Weight:** Regular (400) for body; Medium (500) for emphasis; Semibold (600) for UI labels
-- **Style:** Clean sans-serif, high readability at small sizes
+- **Weight:** Light (300) for subtle text; Regular (400) for body; Medium (500) for emphasis; Semibold (600) for UI labels
+- **Style:** Clean geometric sans-serif, high readability at small sizes
 - **Source:** Google Fonts (free)
 
 ### Hierarchy Example

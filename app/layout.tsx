@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Cormorant_Garamond, Nunito } from "next/font/google";
+import { Cormorant_Garamond, Montserrat } from "next/font/google";
 import "./globals.css";
 
 const cormorant = Cormorant_Garamond({
@@ -9,10 +9,10 @@ const cormorant = Cormorant_Garamond({
   display: "swap",
 });
 
-const nunito = Nunito({
+const montserrat = Montserrat({
   variable: "--font-body",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["300", "400", "500", "600"],
   display: "swap",
 });
 
@@ -30,7 +30,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${cormorant.variable} ${nunito.variable} font-body antialiased bg-cream text-charcoal`}
+        className={`${cormorant.variable} ${montserrat.variable} font-body antialiased bg-cream text-charcoal`}
       >
         {children}
       </body>

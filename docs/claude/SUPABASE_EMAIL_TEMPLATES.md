@@ -3,7 +3,7 @@
 Paste these into your Supabase Dashboard under **Authentication > Email Templates**.
 
 Each template uses the BAM brand layout: lavender header bar, cream background,
-Cormorant Garamond headings, Nunito body text, gold/lavender CTA button, and
+Cormorant Garamond headings, Montserrat body text, gold/lavender CTA button, and
 studio footer.
 
 > **Note:** Supabase templates use Go template syntax (`{{ .Variable }}`).
@@ -23,7 +23,7 @@ studio footer.
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sign In</title>
 </head>
-<body style="margin:0;padding:0;background-color:#FAF7F2;font-family:'Nunito',Arial,sans-serif;color:#2C2C2C;-webkit-text-size-adjust:100%;">
+<body style="margin:0;padding:0;background-color:#FAF7F2;font-family:'Montserrat',Arial,sans-serif;color:#2C2C2C;-webkit-text-size-adjust:100%;">
   <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color:#FAF7F2;">
     <tr>
       <td align="center" style="padding:32px 16px;">
@@ -49,7 +49,7 @@ studio footer.
               <table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px 0;">
                 <tr>
                   <td style="border-radius:8px;background-color:#9C8BBF;">
-                    <a href="{{ .ConfirmationURL }}" target="_blank" style="display:inline-block;padding:14px 32px;font-family:'Nunito',Arial,sans-serif;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:8px;">
+                    <a href="{{ .ConfirmationURL }}" target="_blank" style="display:inline-block;padding:14px 32px;font-family:'Montserrat',Arial,sans-serif;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:8px;">
                       Sign In
                     </a>
                   </td>
@@ -89,7 +89,7 @@ studio footer.
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Confirm Signup</title>
 </head>
-<body style="margin:0;padding:0;background-color:#FAF7F2;font-family:'Nunito',Arial,sans-serif;color:#2C2C2C;-webkit-text-size-adjust:100%;">
+<body style="margin:0;padding:0;background-color:#FAF7F2;font-family:'Montserrat',Arial,sans-serif;color:#2C2C2C;-webkit-text-size-adjust:100%;">
   <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color:#FAF7F2;">
     <tr>
       <td align="center" style="padding:32px 16px;">
@@ -115,7 +115,7 @@ studio footer.
               <table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px 0;">
                 <tr>
                   <td style="border-radius:8px;background-color:#9C8BBF;">
-                    <a href="{{ .ConfirmationURL }}" target="_blank" style="display:inline-block;padding:14px 32px;font-family:'Nunito',Arial,sans-serif;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:8px;">
+                    <a href="{{ .ConfirmationURL }}" target="_blank" style="display:inline-block;padding:14px 32px;font-family:'Montserrat',Arial,sans-serif;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:8px;">
                       Confirm Email Address
                     </a>
                   </td>
@@ -156,7 +156,7 @@ studio footer.
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Reset Password</title>
 </head>
-<body style="margin:0;padding:0;background-color:#FAF7F2;font-family:'Nunito',Arial,sans-serif;color:#2C2C2C;-webkit-text-size-adjust:100%;">
+<body style="margin:0;padding:0;background-color:#FAF7F2;font-family:'Montserrat',Arial,sans-serif;color:#2C2C2C;-webkit-text-size-adjust:100%;">
   <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color:#FAF7F2;">
     <tr>
       <td align="center" style="padding:32px 16px;">
@@ -182,7 +182,7 @@ studio footer.
               <table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px 0;">
                 <tr>
                   <td style="border-radius:8px;background-color:#9C8BBF;">
-                    <a href="{{ .ConfirmationURL }}" target="_blank" style="display:inline-block;padding:14px 32px;font-family:'Nunito',Arial,sans-serif;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:8px;">
+                    <a href="{{ .ConfirmationURL }}" target="_blank" style="display:inline-block;padding:14px 32px;font-family:'Montserrat',Arial,sans-serif;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:8px;">
                       Reset Password
                     </a>
                   </td>
@@ -223,7 +223,7 @@ studio footer.
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Email Change</title>
 </head>
-<body style="margin:0;padding:0;background-color:#FAF7F2;font-family:'Nunito',Arial,sans-serif;color:#2C2C2C;-webkit-text-size-adjust:100%;">
+<body style="margin:0;padding:0;background-color:#FAF7F2;font-family:'Montserrat',Arial,sans-serif;color:#2C2C2C;-webkit-text-size-adjust:100%;">
   <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color:#FAF7F2;">
     <tr>
       <td align="center" style="padding:32px 16px;">
@@ -249,7 +249,7 @@ studio footer.
               <table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px 0;">
                 <tr>
                   <td style="border-radius:8px;background-color:#9C8BBF;">
-                    <a href="{{ .ConfirmationURL }}" target="_blank" style="display:inline-block;padding:14px 32px;font-family:'Nunito',Arial,sans-serif;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:8px;">
+                    <a href="{{ .ConfirmationURL }}" target="_blank" style="display:inline-block;padding:14px 32px;font-family:'Montserrat',Arial,sans-serif;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:8px;">
                       Confirm Email Change
                     </a>
                   </td>

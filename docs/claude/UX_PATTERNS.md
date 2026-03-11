@@ -146,7 +146,7 @@ border: 1px solid #E8E0F0;     /* light lavender border */
 border-radius: 8px;
 padding: 12px 16px;
 background: #FFFDF9;           /* warm white */
-font-family: Nunito;
+font-family: Montserrat;
 font-size: 16px;               /* always 16px+ on mobile to prevent zoom */
 
 /* Focus state */

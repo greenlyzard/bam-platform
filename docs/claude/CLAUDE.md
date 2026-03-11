@@ -57,7 +57,7 @@ This platform must:
 1. **RLS on every Supabase table** — no exceptions
 2. **Mobile-first** for parent and student interfaces
 3. **Lavender (#9C8BBF) + Cream + Gold (#C9A84C)** color palette always
-4. **Cormorant Garamond** for display text, **Nunito** for UI
+4. **Cormorant Garamond** for display text, **Montserrat** for UI
 5. **Mandated reporter workflow** must always be visible and functional
 6. **Never expose service_role key** to client-side code
 7. **Class max = 10 students** — enforce at enrollment

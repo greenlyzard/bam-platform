@@ -329,14 +329,14 @@ function buildPreviewHtml({
 }): string {
   const btn =
     buttonText && buttonUrl
-      ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px 0;"><tr><td style="border-radius:8px;background-color:#9C8BBF;"><a href="${buttonUrl}" style="display:inline-block;padding:14px 32px;font-family:Arial,sans-serif;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:8px;">${buttonText}</a></td></tr></table>`
+      ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px 0;"><tr><td style="border-radius:8px;background-color:#9C8BBF;"><a href="${buttonUrl}" style="display:inline-block;padding:14px 32px;font-family:'Montserrat',Arial,sans-serif;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:8px;">${buttonText}</a></td></tr></table>`
       : "";
 
   const footer =
     footerText ||
     "Ballet Academy and Movement · 400-C Camino De Estrella, San Clemente, CA 92672 · (949) 229-0846";
 
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;padding:0;background:#FAF7F2;font-family:Arial,sans-serif;color:#2C2C2C;}</style></head><body>
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;padding:0;background:#FAF7F2;font-family:'Montserrat',Arial,sans-serif;color:#2C2C2C;}</style></head><body>
 <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#FAF7F2;"><tr><td align="center" style="padding:24px 12px;">
 <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:600px;">
 <tr><td style="background:#9C8BBF;padding:24px 32px;border-radius:16px 16px 0 0;text-align:center;">

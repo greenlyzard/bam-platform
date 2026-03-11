@@ -72,8 +72,8 @@ font-family: 'Cormorant Garamond', serif;
 /* Use for: hero headings, module titles, performance names */
 
 /* Body / UI */
-font-family: 'Nunito', sans-serif;
-/* Use for: body text, buttons, labels, nav */
+font-family: 'Montserrat', sans-serif;
+/* Use for: body text, buttons, labels, nav — weights 300, 400, 500, 600 */
 
 /* Monospace (data/code only) */
 font-family: 'JetBrains Mono', monospace;
