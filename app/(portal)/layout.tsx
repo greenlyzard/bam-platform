@@ -1,3 +1,5 @@
+import { SignOutButton } from "@/components/layouts/sign-out-button";
+
 export default function PortalLayout({
   children,
 }: {
@@ -12,7 +14,7 @@ export default function PortalLayout({
             Ballet Academy and Movement
           </span>
           <div className="flex items-center gap-3">
-            {/* Notification bell + avatar placeholders */}
+            <SignOutButton />
             <div className="h-8 w-8 rounded-full bg-lavender-light" />
           </div>
         </div>

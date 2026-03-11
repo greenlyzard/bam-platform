@@ -1,6 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+/**
+ * Creates a Supabase client for middleware use and refreshes the session.
+ * Call this in middleware.ts to keep auth sessions alive.
+ */
 export async function updateSession(request: NextRequest) {
   const response = NextResponse.next({ request });
 
@@ -22,7 +26,9 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  return response;
+  return { response, user, supabase };
 }
