@@ -1,9 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
-type UserRole = "super_admin" | "admin" | "teacher" | "parent" | "student";
+export type UserRole = "super_admin" | "admin" | "front_desk" | "teacher" | "parent" | "student";
 
-interface AuthUser {
+export interface AuthUser {
   id: string;
   email: string;
   role: UserRole;
@@ -62,6 +62,7 @@ export async function requireRole(
     const roleHome: Record<string, string> = {
       super_admin: "/admin/dashboard",
       admin: "/admin/dashboard",
+      front_desk: "/admin/dashboard",
       teacher: "/teach/dashboard",
       parent: "/portal/dashboard",
       student: "/portal/dashboard",
