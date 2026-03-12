@@ -8,6 +8,7 @@ const navGroups = [
     items: [
       { label: "Dashboard", href: "/admin/dashboard", icon: "⌂" },
       { label: "Seasons", href: "/admin/seasons", icon: "◈" },
+      { label: "Calendar", href: "/admin/calendar", icon: "▥" },
       { label: "Classes", href: "/admin/classes", icon: "▦" },
       { label: "Students", href: "/admin/students", icon: "♡" },
       { label: "Families", href: "/admin/families", icon: "◇" },
