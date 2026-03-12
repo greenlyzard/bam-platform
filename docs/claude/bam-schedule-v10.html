@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Classes</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --primary:#7B4FA8;--primary-dark:#5A3080;--primary-light:#9B6EC8;--primary-xlight:#EDE5F7;
+  --accent:#E8A0C0;--accent-dark:#C870A0;--accent-light:#FDF0F6;
+  --gold:#C9A96E;--gold-light:#F5EDD8;
+  --bg:#F7F4FB;--surface:#FFFFFF;--border:#E4DCF0;--border-dark:#C8B8E0;
+  --text:#1A1025;--muted:#7A6B8A;--muted-light:#A898B8;
+  --green:#2A7A4A;--green-light:#E8F6EE;--green-dark:#1A5A38;
+  --red:#C94040;--red-light:#FEE8E8;
+  --teal:#1A7A7A;--teal-light:#E5F6F6;
+  --radius:10px;--radius-lg:16px;
+  --shadow:0 2px 10px rgba(90,48,128,.07);
+  --shadow-md:0 4px 20px rgba(90,48,128,.11);
+  --shadow-lg:0 12px 40px rgba(90,48,128,.16);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Montserrat',sans-serif;font-weight:300;background:var(--bg);color:var(--text);font-size:14px;}
+.widget{max-width:1020px;margin:0 auto;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow-md);}
+.top-bar{background:var(--surface);border-bottom:2px solid var(--border);padding:14px 22px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.top-bar-title{font-family:'Cormorant Garamond',serif;font-size:21px;font-weight:400;color:var(--primary);letter-spacing:.02em;flex-shrink:0;}
+.top-bar-sep{color:var(--border-dark);flex-shrink:0;font-size:16px;}
+.top-bar-season{font-size:10px;color:var(--muted);font-weight:500;letter-spacing:.07em;text-transform:uppercase;flex-shrink:0;}
+.top-bar-spacer{flex:1;}
+.top-bar-right{display:flex;align-items:center;gap:8px;}
+.view-toggle{display:flex;border:1.5px solid var(--border-dark);border-radius:20px;overflow:hidden;}
+.vt-btn{background:none;border:none;padding:7px 13px;font-size:11px;font-weight:500;font-family:'Montserrat',sans-serif;color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:5px;transition:all .18s;white-space:nowrap;}
+.vt-btn.active{background:var(--primary);color:#fff;}
+.vt-btn:first-child{border-right:1.5px solid var(--border-dark);}
+.cart-btn{background:var(--primary);color:#fff;border:none;padding:8px 16px;border-radius:20px;font-size:11px;font-weight:600;font-family:'Montserrat',sans-serif;letter-spacing:.05em;cursor:pointer;transition:all .18s;display:flex;align-items:center;gap:6px;white-space:nowrap;}
+.cart-btn:hover{background:var(--primary-dark);}
+.cart-badge{background:var(--accent);color:var(--primary-dark);border-radius:50%;width:17px;height:17px;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+.cart-badge.hidden{display:none;}
+.tab-bar{background:var(--surface);border-bottom:3px solid var(--primary-xlight);padding:0 22px;display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;}
+.tab-bar::-webkit-scrollbar{display:none;}
+.tab{padding:14px 20px;font-size:11px;font-weight:500;font-family:'Montserrat',sans-serif;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);border:none;background:transparent;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-3px;white-space:nowrap;transition:all .18s;flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:2px;border-radius:8px 8px 0 0;}
+.tab:hover{color:var(--primary);background:var(--primary-xlight);}
+.tab.active{color:var(--primary-dark);border-bottom-color:var(--primary);font-weight:700;background:var(--primary-xlight);}
+.tab-sub{font-size:9px;font-weight:400;letter-spacing:.03em;text-transform:none;color:var(--muted-light);}
+.tab.active .tab-sub{color:var(--primary);}
+.level-strip{background:linear-gradient(135deg,#FAF7FE,var(--primary-xlight));border-bottom:1px solid var(--border);padding:11px 22px;display:flex;align-items:center;gap:12px;}
+.level-strip.hidden{display:none;}
+.ls-icon{font-size:22px;flex-shrink:0;}
+.ls-body{flex:1;}
+.ls-name-row{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:2px;}
+.ls-name{font-size:13px;font-weight:600;color:var(--primary);}
+.ls-badge{font-size:10px;font-weight:500;padding:2px 8px;border-radius:12px;}
+.ls-age{background:var(--primary);color:#fff;}
+.ls-skill{background:var(--accent);color:var(--primary-dark);}
+.ls-desc{font-size:11px;color:var(--muted);font-weight:300;line-height:1.55;}
+.banner{border-bottom:1px solid var(--border);padding:11px 22px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.banner.hidden{display:none!important;}
+.banner-new{background:linear-gradient(90deg,#FFFAF0,#FDF5FA);}
+.banner-exp{background:linear-gradient(90deg,var(--teal-light),#F0F8FF);}
+.banner-ret{background:linear-gradient(90deg,var(--primary-xlight),#F8F5FF);}
+.banner-text{flex:1;min-width:160px;font-size:11px;color:var(--muted);font-weight:300;}
+.banner-text strong{font-weight:600;}
+.banner-new .banner-text strong{color:var(--primary);}
+.banner-exp .banner-text strong{color:var(--teal);}
+.banner-ret .banner-text strong{color:var(--primary);}
+.banner-btn{border:none;padding:7px 14px;border-radius:14px;font-size:10px;font-weight:600;font-family:'Montserrat',sans-serif;cursor:pointer;transition:all .18s;white-space:nowrap;}
+.banner-new .banner-btn{background:var(--primary);color:#fff;}
+.banner-new .banner-btn:hover{background:var(--primary-dark);}
+.banner-exp .banner-btn{background:var(--teal);color:#fff;}
+.banner-exp .banner-btn:hover{background:#0F5A5A;}
+.banner-ret .banner-btn{background:var(--primary);color:#fff;}
+.banner-dismiss{background:none;border:none;color:var(--muted);cursor:pointer;font-size:17px;line-height:1;padding:2px;flex-shrink:0;}
+.filter-bar{background:var(--bg);border-bottom:1px solid var(--border);padding:9px 22px;display:flex;gap:7px;flex-wrap:wrap;align-items:center;}
+.fg{display:flex;align-items:center;gap:5px;}
+.fg-label{font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);}
+.fsel{border:1.5px solid var(--border-dark);border-radius:14px;padding:5px 24px 5px 10px;font-family:'Montserrat',sans-serif;font-size:11px;font-weight:400;color:var(--text);background:var(--surface);outline:none;cursor:pointer;transition:border-color .18s;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24'%3E%3Cpath fill='%237A6B8A' d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 7px center;}
+.fsel:focus{border-color:var(--primary);}
+.search-wrap{flex:1;min-width:140px;position:relative;}
+.search-input{width:100%;border:1.5px solid var(--border-dark);border-radius:14px;padding:6px 12px 6px 30px;font-family:'Montserrat',sans-serif;font-size:11px;font-weight:300;color:var(--text);background:var(--surface);outline:none;transition:border-color .18s;}
+.search-input:focus{border-color:var(--primary);}
+.search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--muted);pointer-events:none;}
+.filter-right{display:flex;align-items:center;gap:8px;margin-left:auto;}
+.results-count{font-size:10px;color:var(--muted);white-space:nowrap;}
+.clear-btn{font-size:10px;color:var(--primary);cursor:pointer;background:none;border:none;font-family:'Montserrat',sans-serif;font-weight:500;padding:3px 8px;border-radius:10px;transition:background .15s;}
+.clear-btn:hover{background:var(--primary-xlight);}
+.clear-btn.hidden{visibility:hidden;}
+.content{padding:16px 22px;min-height:220px;}
+.day-group{margin-bottom:16px;}
+.day-header{display:flex;align-items:center;gap:8px;margin-bottom:9px;padding-bottom:7px;border-bottom:2px solid var(--border);}
+.day-title{font-family:'Cormorant Garamond',serif;font-size:19px;font-weight:400;color:var(--text);letter-spacing:.02em;}
+.day-count{font-size:10px;font-weight:500;padding:2px 8px;background:var(--bg);color:var(--muted);border:1px solid var(--border-dark);border-radius:12px;}
+.class-card{border:1px solid var(--border);border-radius:var(--radius);padding:12px 15px;margin-bottom:7px;display:flex;align-items:center;gap:13px;background:var(--surface);transition:all .18s;}
+.class-card:hover{border-color:var(--border-dark);box-shadow:var(--shadow);}
+.class-card.selected{border-color:var(--primary);background:linear-gradient(135deg,#FDFBFF,#F5EEFF);}
+.class-card.enrolled{border-color:var(--green);background:var(--green-light);}
+.card-main{flex:1;min-width:0;}
+.card-name{font-size:13px;font-weight:600;color:var(--text);line-height:1.25;margin-bottom:3px;}
+.card-desc{font-size:11px;color:var(--muted);font-weight:300;line-height:1.5;margin-bottom:6px;}
+.card-tags{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-bottom:5px;}
+.card-meta{font-size:11px;color:var(--muted);font-weight:300;}
+.card-right{display:flex;flex-direction:column;align-items:flex-end;gap:7px;flex-shrink:0;min-width:112px;}
+.card-price{font-size:15px;font-weight:700;color:var(--primary);}
+.card-price small{font-size:10px;font-weight:300;color:var(--muted);}
+.enroll-col{display:flex;flex-direction:column;align-items:flex-end;gap:2px;}
+.enroll-bar{width:66px;height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.enroll-fill{height:100%;background:linear-gradient(90deg,var(--primary),var(--primary-light));border-radius:2px;}
+.enroll-fill.full{background:linear-gradient(90deg,var(--red),#E07070);}
+.enroll-text{font-size:9px;color:var(--muted);}
+.card-btns{display:flex;flex-direction:column;align-items:flex-end;gap:4px;}
+.learn-link{font-size:10px;color:var(--primary);background:none;border:none;cursor:pointer;font-family:'Montserrat',sans-serif;font-weight:500;text-decoration:underline;padding:0;}
+.learn-link:hover{color:var(--primary-dark);}
+.enrolled-badge{font-size:10px;font-weight:600;color:var(--green);background:var(--green-light);border:1.5px solid var(--green);padding:5px 11px;border-radius:14px;white-space:nowrap;}
+.skill-pill{font-size:9px;font-weight:700;padding:2px 7px;border-radius:9px;letter-spacing:.05em;text-transform:uppercase;}
+.pill-intro{background:#FFF8E8;color:#7A5000;border:1px solid #D4A840;}
+.pill-a{background:#E8F5EE;color:#1A6A3A;border:1px solid #70B890;}
+.pill-b{background:#E8F0F8;color:#1A3A7A;border:1px solid #7090D0;}
+.pill-c{background:#F0E8F8;color:#5A1A9A;border:1px solid #9070C8;}
+.disc-badge{font-size:9px;font-weight:500;padding:2px 7px;border-radius:9px;letter-spacing:.03em;text-transform:uppercase;}
+.disc-ballet{background:#EDE5F7;color:#5A3080;border:1px solid #C9B0E8;}
+.disc-jazz{background:#FFF3CD;color:#7D5A00;border:1px solid #F5CC6A;}
+.disc-contemporary{background:#E8F4FD;color:#1A5E8A;border:1px solid #9FD0EE;}
+.disc-hiphop{background:#FFE8F0;color:#8A1A4A;border:1px solid #F5A0C0;}
+.disc-pointe{background:#F0EBF7;color:#6A3090;border:1px solid #BFA0D8;}
+.disc-musical{background:#E8FDF0;color:#1A6A40;border:1px solid #80D8A0;}
+.disc-combo{background:#FDF0E8;color:#8A4A1A;border:1px solid #E8B080;}
+.disc-conditioning{background:#F0F4E8;color:#3A5A1A;border:1px solid #A0C070;}
+.select-btn{background:var(--primary);color:#fff;border:none;padding:8px 15px;border-radius:14px;font-size:11px;font-weight:600;font-family:'Montserrat',sans-serif;letter-spacing:.04em;cursor:pointer;transition:all .18s;white-space:nowrap;}
+.select-btn:hover{background:var(--primary-dark);}
+.select-btn.active{background:var(--green);display:flex;align-items:center;gap:5px;}
+.select-btn.active:hover{background:var(--green-dark);}
+.waitlist-btn{background:transparent;color:var(--primary);border:1.5px solid var(--primary);padding:8px 13px;border-radius:14px;font-size:11px;font-weight:500;font-family:'Montserrat',sans-serif;cursor:pointer;text-decoration:none;transition:all .18s;display:inline-block;white-space:nowrap;}
+.waitlist-btn:hover{background:var(--primary);color:#fff;}
+.cal-wrap{overflow-x:auto;padding:0 22px 16px;}
+.cal-grid{display:grid;border-left:1px solid var(--border);border-top:1px solid var(--border);min-width:500px;}
+.cal-day-hd{background:var(--primary);color:#fff;padding:9px 4px;text-align:center;font-size:11px;font-weight:600;letter-spacing:.06em;border-right:1px solid rgba(255,255,255,.2);border-bottom:2px solid var(--primary-dark);}
+.cal-day-hd.cal-time-hd{background:var(--bg);border-right:1px solid var(--border);border-bottom:2px solid var(--border);color:transparent;}
+.cal-row{display:contents;}
+.cal-time{background:var(--bg);border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:4px 6px;font-size:9px;color:var(--muted);font-weight:500;text-align:right;vertical-align:top;min-height:48px;}
+.cal-cell{border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:3px;vertical-align:top;min-height:48px;background:var(--surface);}
+.cal-cell.alt{background:#FDFBFF;}
+.cal-block{border-radius:6px;padding:4px 6px;margin-bottom:3px;cursor:pointer;transition:all .18s;border-left:3px solid transparent;font-size:10px;line-height:1.3;}
+.cal-block:hover{filter:brightness(.93);box-shadow:var(--shadow);}
+.cal-block.selected{outline:2px solid var(--green);outline-offset:1px;}
+.cal-block.enrolled{outline:2px solid var(--green);opacity:.7;}
+.cb-name{font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cb-time{font-size:9px;color:var(--muted);font-weight:300;}
+.cb-price{font-size:9px;font-weight:600;color:var(--primary);}
+.cb-ballet{background:#EDE5F7;border-left-color:#9B6EC8;}
+.cb-jazz{background:#FFF8D8;border-left-color:#E8B830;}
+.cb-contemporary{background:#E0F4FC;border-left-color:#4AADCF;}
+.cb-hiphop{background:#FFE5F0;border-left-color:#E870A0;}
+.cb-pointe{background:#F0EBF7;border-left-color:#7B4FA8;}
+.cb-musical{background:#E5FAF0;border-left-color:#40A870;}
+.cb-combo{background:#FEF0E5;border-left-color:#D87040;}
+.cb-conditioning{background:#EEF6E5;border-left-color:#70A040;}
+.cal-legend{display:flex;flex-wrap:wrap;gap:8px;padding:10px 22px;border-top:1px solid var(--border);background:var(--bg);}
+.leg-item{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--muted);}
+.leg-dot{width:10px;height:10px;border-radius:3px;}
+.empty{text-align:center;padding:44px 20px;color:var(--muted);}
+.empty-icon{font-size:34px;margin-bottom:10px;}
+.empty h3{font-family:'Cormorant Garamond',serif;font-size:19px;font-weight:400;color:var(--primary);margin-bottom:5px;}
+.empty p{font-size:11px;font-weight:300;line-height:1.6;}
+.widget-footer{border-top:1px solid var(--border);padding:12px 22px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:7px;background:var(--bg);}
+.footer-left{display:flex;flex-direction:column;gap:3px;}
+.footer-note{font-size:10px;color:var(--muted);font-weight:300;}
+.footer-terms{font-size:10px;color:var(--muted);font-weight:300;}
+.footer-terms a{color:var(--primary);text-decoration:underline;cursor:pointer;}
+.footer-contact{font-size:10px;color:var(--muted);font-weight:300;}
+.footer-contact a{color:var(--primary);text-decoration:none;font-weight:500;}
+.cart-overlay{position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:200;opacity:0;pointer-events:none;transition:opacity .3s;backdrop-filter:blur(2px);}
+.cart-overlay.open{opacity:1;pointer-events:all;}
+.cart-drawer{position:fixed;top:0;right:0;height:100vh;width:420px;max-width:96vw;background:var(--surface);z-index:201;transform:translateX(100%);transition:transform .35s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;box-shadow:-6px 0 40px rgba(90,48,128,.16);}
+.cart-drawer.open{transform:translateX(0);}
+.cart-hd{padding:17px 22px 13px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.cart-hd-title{font-family:'Cormorant Garamond',serif;font-size:21px;font-weight:400;color:var(--primary);}
+.cart-close{background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);padding:4px;line-height:1;}
+.cart-close:hover{color:var(--text);}
+.cart-body{flex:1;overflow-y:auto;padding:14px 22px;}
+.upsell{background:linear-gradient(135deg,var(--primary),var(--primary-dark));border-radius:12px;padding:15px;margin-bottom:15px;color:#fff;position:relative;overflow:hidden;}
+.upsell::after{content:"✨";position:absolute;right:13px;top:11px;font-size:24px;opacity:.3;}
+.upsell-tag{font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;background:var(--accent);color:var(--primary-dark);padding:2px 7px;border-radius:9px;display:inline-block;margin-bottom:7px;}
+.upsell-head{font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:400;margin-bottom:3px;line-height:1.2;}
+.upsell-sub{font-size:10px;opacity:.82;margin-bottom:10px;line-height:1.5;font-weight:300;}
+.upsell-math{background:rgba(255,255,255,.1);border-radius:7px;padding:8px 11px;margin-bottom:10px;}
+.upsell-row{display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;}
+.upsell-row:last-child{margin:0;}
+.upsell-row.savings{color:var(--accent);font-weight:600;}
+.upsell-row.total-r{font-weight:600;border-top:1px solid rgba(255,255,255,.18);padding-top:4px;margin-top:3px;}
+.upsell-cta{width:100%;background:var(--accent);color:var(--primary-dark);border:none;padding:9px;border-radius:18px;font-size:11px;font-weight:700;font-family:'Montserrat',sans-serif;letter-spacing:.05em;cursor:pointer;transition:all .2s;}
+.upsell-cta:hover{background:#fff;}
+.upsell-skip{background:none;border:none;color:rgba(255,255,255,.45);font-size:10px;cursor:pointer;display:block;margin:6px auto 0;font-family:'Montserrat',sans-serif;}
+.upsell-skip:hover{color:rgba(255,255,255,.75);}
+.unlimited-active{background:var(--gold-light);border:1px solid var(--gold);border-radius:9px;padding:10px 13px;margin-bottom:13px;display:flex;align-items:center;gap:9px;}
+.ua-crown{font-size:19px;}
+.ua-info{flex:1;}
+.ua-name{font-size:12px;font-weight:600;color:var(--primary);}
+.ua-sub{font-size:10px;color:var(--muted);font-weight:300;}
+.ua-price{font-size:14px;font-weight:700;color:var(--primary);}
+.ua-remove{background:none;border:none;color:var(--muted);cursor:pointer;font-size:15px;line-height:1;}
+.ua-remove:hover{color:var(--red);}
+.c-sec{font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:7px;}
+.c-sec::after{content:"";flex:1;height:1px;background:var(--border);}
+.ci{display:flex;align-items:flex-start;gap:9px;padding:10px 0;border-bottom:1px solid var(--border);}
+.ci:last-child{border-bottom:none;}
+.ci-icon{width:32px;height:32px;border-radius:7px;background:var(--primary-xlight);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;}
+.ci-info{flex:1;min-width:0;}
+.ci-name{font-size:11px;font-weight:500;color:var(--text);line-height:1.3;margin-bottom:2px;}
+.ci-meta{font-size:10px;color:var(--muted);font-weight:300;}
+.ci-actions{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;}
+.ci-price{font-size:12px;font-weight:600;color:var(--primary);white-space:nowrap;}
+.ci-remove{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;line-height:1;}
+.ci-remove:hover{color:var(--red);}
+.ci-interest-btn{font-size:9px;color:var(--muted);background:none;border:1px solid var(--border-dark);padding:3px 7px;border-radius:9px;cursor:pointer;font-family:'Montserrat',sans-serif;font-weight:500;white-space:nowrap;transition:all .15s;}
+.ci-interest-btn:hover{border-color:var(--primary);color:var(--primary);}
+.ci-interest-btn.interested{background:var(--green-light);border-color:var(--green);color:var(--green);}
+.interest-item{display:flex;align-items:flex-start;gap:9px;padding:10px 0;border-bottom:1px solid var(--border);}
+.interest-item:last-child{border-bottom:none;}
+.ii-icon{width:32px;height:32px;border-radius:7px;background:var(--gold-light);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;}
+.ii-info{flex:1;min-width:0;}
+.ii-name{font-size:11px;font-weight:500;color:var(--text);line-height:1.3;margin-bottom:2px;}
+.ii-meta{font-size:10px;color:var(--muted);font-weight:300;}
+.ii-remove{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;line-height:1;}
+.ii-remove:hover{color:var(--red);}
+.rec-section{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:13px;margin-top:14px;}
+.rec-title{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--primary);margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+.rec-title::before{content:"✨";}
+.rec-item{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);}
+.rec-item:last-child{border-bottom:none;}
+.rec-icon{font-size:20px;flex-shrink:0;}
+.rec-info{flex:1;}
+.rec-name{font-size:11px;font-weight:600;color:var(--text);margin-bottom:1px;}
+.rec-desc{font-size:10px;color:var(--muted);font-weight:300;line-height:1.4;}
+.rec-add{background:transparent;color:var(--primary);border:1.5px solid var(--primary);padding:5px 11px;border-radius:12px;font-size:10px;font-weight:600;font-family:'Montserrat',sans-serif;cursor:pointer;transition:all .18s;white-space:nowrap;}
+.rec-add:hover{background:var(--primary);color:#fff;}
+.rec-add.added{background:var(--green-light);border-color:var(--green);color:var(--green);}
+.cart-empty{text-align:center;padding:34px 14px;color:var(--muted);}
+.cart-empty-icon{font-size:34px;margin-bottom:9px;}
+.cart-empty h3{font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:400;color:var(--primary);margin-bottom:5px;}
+.cart-empty p{font-size:11px;font-weight:300;line-height:1.6;}
+.cart-footer{padding:13px 22px;border-top:1px solid var(--border);}
+.sum-row{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:4px;}
+.sum-row.total{font-size:14px;font-weight:600;color:var(--text);border-top:1px solid var(--border);padding-top:7px;margin-top:3px;}
+.sum-row.savings{color:var(--green);font-weight:500;}
+.checkout-btn{width:100%;background:var(--primary);color:#fff;border:none;padding:13px;border-radius:18px;font-size:12px;font-weight:600;font-family:'Montserrat',sans-serif;letter-spacing:.05em;cursor:pointer;transition:all .2s;margin-top:9px;margin-bottom:5px;}
+.checkout-btn:hover{background:var(--primary-dark);}
+.checkout-sub{text-align:center;font-size:10px;color:var(--muted);font-weight:300;line-height:1.5;}
+.checkout-sub a{color:var(--primary);cursor:pointer;text-decoration:underline;}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:opacity .3s;}
+.modal-overlay.open{opacity:1;pointer-events:all;}
+.modal{background:var(--surface);border-radius:18px;width:100%;max-width:540px;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-lg);}
+.modal-hd{padding:22px 22px 0;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;}
+.modal-title{font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:400;color:var(--primary);line-height:1.25;}
+.modal-close{background:none;border:none;font-size:21px;cursor:pointer;color:var(--muted);padding:4px;line-height:1;flex-shrink:0;}
+.modal-body{padding:14px 22px 22px;}
+.modal-tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px;}
+.modal-sec{margin-bottom:16px;}
+.modal-sec-title{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.modal-long{font-size:12px;color:var(--text);font-weight:300;line-height:1.65;}
+.expect-box{background:var(--primary-xlight);border-left:3px solid var(--primary);border-radius:0 var(--radius) var(--radius) 0;padding:11px 14px;}
+.expect-box p{font-size:11px;color:var(--text);font-weight:300;line-height:1.6;}
+.skills-list{display:flex;flex-wrap:wrap;gap:6px;}
+.skill-tag{background:var(--surface);border:1.5px solid var(--border-dark);border-radius:20px;padding:4px 11px;font-size:10px;font-weight:500;color:var(--text);display:flex;align-items:center;gap:5px;}
+.skill-tag::before{content:"✓";color:var(--green);font-weight:700;}
+.blocks-row{display:flex;flex-wrap:wrap;gap:0;overflow:hidden;border-radius:var(--radius);border:1px solid var(--border);}
+.block-item{flex:1;min-width:80px;padding:10px 12px;text-align:center;background:var(--surface);position:relative;}
+.block-item:not(:last-child){border-right:1px solid var(--border);}
+.block-item::after{content:"→";position:absolute;right:-8px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--muted);z-index:1;}
+.block-item:last-child::after{display:none;}
+.block-num{width:22px;height:22px;background:var(--primary);color:#fff;border-radius:50%;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;margin:0 auto 5px;}
+.block-name{font-size:10px;font-weight:500;color:var(--text);line-height:1.3;}
+.modal-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:6px;}
+.modal-select-btn{flex:1;min-width:120px;background:var(--primary);color:#fff;border:none;padding:11px;border-radius:16px;font-size:12px;font-weight:600;font-family:'Montserrat',sans-serif;cursor:pointer;transition:all .2s;text-align:center;}
+.modal-select-btn:hover{background:var(--primary-dark);}
+.modal-select-btn.active{background:var(--green);}
+.apparel-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.apparel-item{border:1.5px solid var(--border);border-radius:9px;padding:10px;text-align:center;}
+.apparel-icon{font-size:21px;margin-bottom:4px;}
+.apparel-name{font-size:11px;font-weight:500;color:var(--text);margin-bottom:2px;}
+.apparel-note{font-size:10px;color:var(--muted);font-weight:300;line-height:1.4;}
+.waiver-box{background:var(--accent-light);border:1px solid var(--accent);border-radius:9px;padding:12px;display:flex;gap:10px;}
+.waiver-icon{font-size:19px;flex-shrink:0;}
+.waiver-title{font-size:12px;font-weight:600;color:var(--primary);margin-bottom:3px;}
+.waiver-sub{font-size:10px;color:var(--muted);font-weight:300;line-height:1.5;margin-bottom:8px;}
+.waiver-btn{background:var(--primary);color:#fff;border:none;padding:8px 15px;border-radius:14px;font-size:10px;font-weight:600;font-family:'Montserrat',sans-serif;cursor:pointer;}
+.waiver-btn:hover{background:var(--primary-dark);}
+.contact-row{display:flex;gap:8px;flex-wrap:wrap;}
+.contact-btn{flex:1;min-width:110px;background:var(--primary);color:#fff;padding:9px;border-radius:14px;font-size:10px;font-weight:600;font-family:'Montserrat',sans-serif;text-align:center;text-decoration:none;display:block;}
+.terms-body{font-size:11px;color:var(--text);font-weight:300;line-height:1.7;}
+.terms-body h4{font-size:12px;font-weight:600;color:var(--primary);margin:14px 0 5px;}
+.terms-body h4:first-child{margin-top:0;}
+.terms-body ul{padding-left:16px;margin:5px 0;}
+.terms-body li{margin-bottom:3px;}
+.hidden{display:none!important;}
+@media(max-width:600px){
+  .top-bar,.tab-bar,.filter-bar,.content,.widget-footer,.cal-legend{padding-left:14px;padding-right:14px;}
+  .cal-wrap{padding:0 14px 14px;}
+  .class-card{flex-direction:column;gap:8px;}
+  .card-right{flex-direction:row;align-items:center;width:100%;justify-content:space-between;min-width:0;}
+  .cart-drawer{width:100%;max-width:100%;}
+  .blocks-row{flex-direction:column;}
+  .block-item:not(:last-child){border-right:none;border-bottom:1px solid var(--border);}
+  .block-item::after{display:none;}
+}
+</style>
+</head>
+<body>
+<div class="widget">
+
+<div class="top-bar">
+  <div class="top-bar-title" id="top-title">Class Schedule</div>
+  <div class="top-bar-sep" id="top-sep">·</div>
+  <div class="top-bar-season" id="top-season">2025–2026 Season</div>
+  <div class="top-bar-spacer"></div>
+  <div class="top-bar-right">
+    <div class="view-toggle">
+      <button class="vt-btn active" id="vt-list" onclick="setView('list')">☰ List</button>
+      <button class="vt-btn" id="vt-cal" onclick="setView('calendar')">📅 Calendar</button>
+    </div>
+    <button class="cart-btn" id="cart-open-btn" onclick="openCart()">
+      <span id="cart-btn-label">Selected</span> <span class="cart-badge hidden" id="cart-badge">0</span>
+    </button>
+  </div>
+</div>
+
+<div class="tab-bar" id="tab-bar"></div>
+<div class="level-strip hidden" id="level-strip">
+  <div class="ls-icon" id="ls-icon">🩰</div>
+  <div class="ls-body">
+    <div class="ls-name-row"><div class="ls-name" id="ls-name"></div><span class="ls-badge ls-age" id="ls-age"></span><span class="ls-badge ls-skill" id="ls-skill"></span></div>
+    <div class="ls-desc" id="ls-desc"></div>
+  </div>
+</div>
+
+<!-- Banners — shown based on userMode -->
+<div class="banner banner-new" id="banner-new">
+  <div class="banner-text"><strong>New to dance?</strong> Your first class is always free — no experience needed.</div>
+  <button class="banner-btn" onclick="openNSModal()">Get Started</button>
+  <button class="banner-dismiss" onclick="this.closest('.banner').classList.add('hidden')">×</button>
+</div>
+<div class="banner banner-exp" id="banner-exp">
+  <div class="banner-text"><strong>Experienced dancer?</strong> Let us find the right level for you — free 1-on-1 placement evaluation.</div>
+  <button class="banner-btn" onclick="openPlacementModal()">Request Evaluation</button>
+  <button class="banner-dismiss" onclick="this.closest('.banner').classList.add('hidden')">×</button>
+</div>
+<div class="banner banner-ret hidden" id="banner-ret">
+  <div class="banner-text"><strong id="banner-ret-name">Welcome back!</strong> <span id="banner-ret-msg">Ready to build your schedule for next season?</span></div>
+  <button class="banner-btn" onclick="openCart()">View My Schedule</button>
+  <button class="banner-dismiss" onclick="this.closest('.banner').classList.add('hidden')">×</button>
+</div>
+
+<div class="filter-bar">
+  <div class="fg" id="fg-age"><span class="fg-label">Age</span><select class="fsel" id="filter-age" onchange="render()"><option value="">All Ages</option><option value="0-3">0–3</option><option value="3-5">3–5</option><option value="5-9">5–9</option><option value="9-14">9–14</option><option value="12+">12+</option><option value="teen-adult">Teen/Adult</option></select></div>
+  <div class="fg" id="fg-level"><span class="fg-label">Level</span><select class="fsel" id="filter-skill" onchange="render()"><option value="">All Levels</option><option value="intro">Intro</option><option value="a">Beginner</option><option value="b">Intermediate</option><option value="c">Advanced</option></select></div>
+  <div class="fg"><span class="fg-label">Style</span><select class="fsel" id="filter-disc" onchange="render()"><option value="">All Styles</option><option value="Ballet">Ballet</option><option value="Jazz">Jazz</option><option value="Contemporary">Contemporary</option><option value="Hip Hop">Hip Hop</option><option value="Pointe">Pointe</option><option value="Musical Theater">Musical Theater</option><option value="Combo">Combo</option><option value="Conditioning">Conditioning</option></select></div>
+  <div class="fg"><span class="fg-label">Day</span><select class="fsel" id="filter-day" onchange="render()"><option value="">All Days</option><option value="Monday">Mon</option><option value="Tuesday">Tue</option><option value="Wednesday">Wed</option><option value="Thursday">Thu</option><option value="Friday">Fri</option><option value="Saturday">Sat</option></select></div>
+  <div class="search-wrap"><span class="search-icon">🔍</span><input class="search-input" type="text" id="search-input" placeholder="Search…" oninput="render()"></div>
+  <div class="filter-right"><span class="results-count" id="results-count">53 classes</span><button class="clear-btn hidden" id="clear-btn" onclick="clearFilters()">Clear all</button></div>
+</div>
+
+<div id="list-view"><div class="content" id="content"></div></div>
+<div id="cal-view" class="hidden">
+  <div class="cal-wrap"><div class="cal-grid" id="cal-grid"></div></div>
+  <div class="cal-legend" id="cal-legend"></div>
+</div>
+
+<div class="widget-footer">
+  <div class="footer-left">
+    <div class="footer-note" id="footer-note">✓ First class always free · No commitment required</div>
+    <div class="footer-terms">By enrolling you agree to our <a onclick="openTermsModal()">Enrollment Terms &amp; Cancellation Policy</a></div>
+  </div>
+  <div class="footer-contact">Questions? <a href="tel:9492290846">(949) 229-0846</a> · <a href="mailto:dance@bamsocal.com">dance@bamsocal.com</a></div>
+</div>
+</div>
+
+<!-- Cart Drawer -->
+<div class="cart-overlay" id="cart-overlay" onclick="closeCart()"></div>
+<div class="cart-drawer" id="cart-drawer">
+  <div class="cart-hd"><div class="cart-hd-title" id="cart-drawer-title">Your Selection</div><button class="cart-close" onclick="closeCart()">×</button></div>
+  <div class="cart-body" id="cart-body"></div>
+  <div class="cart-footer" id="cart-footer" style="display:none">
+    <div id="cart-summary"></div>
+    <button class="checkout-btn" id="checkout-btn" onclick="checkout()">Continue to Secure Enrollment →</button>
+    <div class="checkout-sub">🔒 Secure enrollment · <a onclick="openTermsModal()">Cancellation &amp; Billing Terms</a></div>
+  </div>
+</div>
+
+<!-- Learn More Modal -->
+<div class="modal-overlay" id="lm-overlay" onclick="if(event.target===this)closeLM()">
+  <div class="modal"><div class="modal-hd"><div class="modal-title" id="lm-title"></div><button class="modal-close" onclick="closeLM()">×</button></div><div class="modal-body" id="lm-body"></div></div>
+</div>
+
+<!-- Terms Modal -->
+<div class="modal-overlay" id="terms-overlay" onclick="if(event.target===this)closeTermsModal()">
+  <div class="modal">
+    <div class="modal-hd"><div class="modal-title">Enrollment Terms</div><button class="modal-close" onclick="closeTermsModal()">×</button></div>
+    <div class="modal-body"><div class="terms-body">
+      <h4>Billing</h4><ul><li>Monthly tuition is automatically billed on the <strong>15th of each month</strong>.</li><li>Your first class is complimentary — you will not be charged until you formally enroll.</li><li>Tuition covers the full calendar month regardless of absences.</li><li>Unlimited Classes plan: $249/month, auto-billed on the 15th.</li></ul>
+      <h4>Cancellation</h4><ul><li><strong>30 days written notice</strong> is required to cancel enrollment.</li><li>Notice must be submitted via email to <a href="mailto:dance@bamsocal.com" style="color:var(--primary)">dance@bamsocal.com</a> or in writing at the front desk.</li><li>Cancellations mid-month do not result in a prorated refund for the current billing period.</li></ul>
+      <h4>Makeups &amp; Absences</h4><ul><li>One makeup class per month may be scheduled within the same season with advance notice.</li><li>Makeups must be in an equivalent level class and are subject to availability.</li></ul>
+      <h4>Questions</h4><p style="margin-top:5px">Contact us at <a href="mailto:dance@bamsocal.com" style="color:var(--primary)">dance@bamsocal.com</a> or (949) 229-0846.</p>
+    </div></div>
+  </div>
+</div>
+
+<!-- New Student Modal -->
+<div class="modal-overlay" id="ns-overlay" onclick="if(event.target===this)closeNSModal()">
+  <div class="modal">
+    <div class="modal-hd"><div class="modal-title">Welcome —<br>Let's Get Started</div><button class="modal-close" onclick="closeNSModal()">×</button></div>
+    <div class="modal-body">
+      <div class="modal-sec"><div class="modal-sec-title">What to Wear</div>
+        <div class="apparel-grid">
+          <div class="apparel-item"><div class="apparel-icon">🩱</div><div class="apparel-name">Leotard</div><div class="apparel-note">Any solid color · Pink or lavender preferred</div></div>
+          <div class="apparel-item"><div class="apparel-icon">🩰</div><div class="apparel-name">Ballet Shoes</div><div class="apparel-note">Pink leather split-sole · Canvas for Level 2+</div></div>
+          <div class="apparel-item"><div class="apparel-icon">🩴</div><div class="apparel-name">Jazz Shoes</div><div class="apparel-note">Required for Jazz, Musical Theater &amp; Combo</div></div>
+          <div class="apparel-item"><div class="apparel-icon">👗</div><div class="apparel-name">Dance Skirt</div><div class="apparel-note">Optional · Chiffon wrap for Petites &amp; Level 1</div></div>
+        </div>
+        <div style="margin-top:9px;padding:9px 12px;background:var(--gold-light);border-radius:8px;font-size:10px;color:var(--primary-dark);line-height:1.55;">💛 Full dancewear available in the studio lobby — ask at the front desk!</div>
+      </div>
+      <div class="modal-sec"><div class="waiver-box"><div class="waiver-icon">📋</div><div><div class="waiver-title">Sign Your Waiver — 2 Minutes</div><div class="waiver-sub">All new students need a liability waiver and media release on file. Sign digitally — no printer needed.</div><button class="waiver-btn" onclick="window.open(CFG.waiverUrl,'_blank');closeNSModal()">Sign Waiver Now →</button></div></div></div>
+      <div class="modal-sec"><div class="modal-sec-title">Questions? We're Here.</div><div class="contact-row"><a href="tel:9492290846" class="contact-btn">📞 (949) 229-0846</a><a href="mailto:dance@bamsocal.com" class="contact-btn" style="background:transparent;color:var(--primary);border:1.5px solid var(--primary);">✉ Email Us</a></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Placement Evaluation Modal -->
+<div class="modal-overlay" id="pl-overlay" onclick="if(event.target===this)closePlacementModal()">
+  <div class="modal">
+    <div class="modal-hd"><div class="modal-title" style="color:var(--teal)">Class Placement Evaluation</div><button class="modal-close" onclick="closePlacementModal()">×</button></div>
+    <div class="modal-body">
+      <div style="height:4px;background:linear-gradient(90deg,var(--teal),#40B0B0);border-radius:2px;margin-bottom:16px;"></div>
+      <div class="modal-sec"><div class="modal-long">We want every dancer to start in exactly the right class. Our complimentary placement evaluation is a brief one-on-one session with a BAM instructor to assess your background, technique, and goals.</div></div>
+      <div class="modal-sec"><div class="modal-sec-title">What to Expect</div><div class="expect-box" style="border-left-color:var(--teal);background:var(--teal-light);"><p>A 15–20 minute informal session at the studio. You will move through a few exercises with an instructor — nothing to prepare, just come as you are. Completely low-pressure.</p></div></div>
+      <div class="modal-sec"><div class="modal-sec-title">Works Well For</div><div class="skills-list"><span class="skill-tag">Returning dancers re-entering after a break</span><span class="skill-tag">Dancers trained elsewhere joining BAM</span><span class="skill-tag">Adults with prior training at any level</span><span class="skill-tag">Students unsure of Level 2 vs Level 3</span><span class="skill-tag">Competition dancers seeking a second studio</span></div></div>
+      <div class="modal-sec"><div class="modal-sec-title">Schedule Your Evaluation</div>
+        <div class="contact-row"><a href="tel:9492290846" class="contact-btn" style="background:var(--teal);">📞 Call to Schedule</a><a href="mailto:dance@bamsocal.com?subject=Placement Evaluation Request" class="contact-btn" style="background:transparent;color:var(--teal);border:1.5px solid var(--teal);">✉ Email Us</a></div>
+        <div style="margin-top:10px;padding:9px 12px;background:var(--teal-light);border-radius:8px;font-size:10px;color:var(--teal);line-height:1.55;">Evaluations are free and available most weekday afternoons. We typically respond within one business day.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════
+//  CONFIG — override any of these via window.BAM_WIDGET_CONFIG = {...}
+// ══════════════════════════════════════════════════════════════════════
+const CFG = Object.assign({
+  title:"Class Schedule", season:"2025–2026 Season",
+  showTitle:true, showSeason:true,
+  checkoutUrl:"https://balletacademyandmovement.com/enroll",
+  waiverUrl:"https://balletacademyandmovement.com/waiver",
+  unlimitedPrice:249, unlimitedLabel:"Unlimited Classes",
+  unlimitedNote:"Take any class, any time, every month",
+
+  // ── userMode ──────────────────────────────────────────────────────
+  // "new"       → new/prospective families (default)
+  // "returning" → existing enrolled families (different copy, upsell focus)
+  userMode:"new",
+  studentName:"",              // e.g. "Emma" — shown in welcome-back banner
+  enrolledClassIds:[],          // class IDs already enrolled — shown as "Enrolled" badges
+  recommendedClassIds:[],       // optional: highlight these classes as "Recommended for you"
+
+  // ── Pre-filters (admin embed config) ──────────────────────────────
+  // These filter the entire class list before any tab/UI filtering.
+  // Empty array = no restriction (show all).
+  classAgeFilter:[],        // e.g. ["3-5","5-9"] — only show these age groups
+  classDiscFilter:[],       // e.g. ["Ballet","Jazz"] — only these disciplines
+  classLevelFilter:[],      // e.g. ["Petites","Level 1"] — only these levels
+  classDayFilter:[],        // e.g. ["Saturday"] — only these days
+  classSkillFilter:[],      // e.g. ["intro","a"] — only intro/beginner/etc.
+
+  // ── Embed display options ─────────────────────────────────────────
+  hideFilters:false,        // true = hide filter bar (cleaner for focused embeds)
+  hideBannerNew:false,      // true = hide "New to dance?" banner
+  hideBannerExp:false,      // true = hide "Experienced dancer?" banner
+  defaultTab:'all',         // which tab is active on load
+  defaultView:'list',       // 'list' or 'calendar'
+  embedLabel:'',            // optional subtitle e.g. "Entry Level Classes"
+
+  // ── Dynamic Tabs ──────────────────────────────────────────────────
+  // Leave null to use built-in defaults.
+  // Each tab: {key, label, sub?, ageFilter?[], levelFilter?, discFilter?, dayFilter?}
+  // Set in admin: window.BAM_WIDGET_CONFIG.tabs = [...]
+  tabs: null,
+}, window.BAM_WIDGET_CONFIG||{});
+
+// ── Apply embed display options ───────────────────────────────────────
+if(CFG.hideFilters) document.querySelector('.filter-bar').classList.add('hidden');
+if(CFG.hideBannerNew) document.getElementById('banner-new').classList.add('hidden');
+if(CFG.hideBannerExp) document.getElementById('banner-exp').classList.add('hidden');
+if(CFG.embedLabel){
+  const sep=document.getElementById('top-sep');
+  const lbl=document.createElement('span');
+  lbl.style.cssText='font-size:11px;color:var(--muted);font-weight:500;';
+  lbl.textContent=CFG.embedLabel;
+  sep.after(lbl);
+}
+
+// ── Apply userMode UI ─────────────────────────────────────────────────
+const isReturning = CFG.userMode==='returning';
+if(isReturning){
+  document.getElementById('banner-new').classList.add('hidden');
+  document.getElementById('banner-exp').classList.add('hidden');
+  document.getElementById('banner-ret').classList.remove('hidden');
+  const name = CFG.studentName ? `Welcome back, ${CFG.studentName}!` : 'Welcome back!';
+  document.getElementById('banner-ret-name').textContent = name;
+  if(CFG.enrolledClassIds.length)
+    document.getElementById('banner-ret-msg').textContent =
+      `You have ${CFG.enrolledClassIds.length} class${CFG.enrolledClassIds.length===1?'':'es'} enrolled. Add more or upgrade to Unlimited.`;
+  document.getElementById('cart-btn-label').textContent = 'My Schedule';
+  document.getElementById('cart-drawer-title').textContent = isReturning?'My Schedule':'Your Selection';
+  document.getElementById('footer-note').textContent = '✓ Changes take effect next billing cycle · Questions? Call us';
+  document.getElementById('checkout-btn').textContent = 'Submit Schedule Changes →';
+}
+if(!CFG.showTitle) {document.getElementById('top-title').classList.add('hidden');document.getElementById('top-sep').classList.add('hidden');}
+if(!CFG.showSeason||!CFG.season) {document.getElementById('top-season').classList.add('hidden');document.getElementById('top-sep').classList.add('hidden');}
+document.getElementById('top-title').textContent = CFG.title;
+document.getElementById('top-season').textContent = CFG.season;
+
+// ══════════════════════════════════════════════════════════════════════
+//  DYNAMIC TABS
+//  Admin sets CFG.tabs to fully control what shows.
+//  Default provides age-based tabs including 0–3 for future Mommy & Me.
+//  Each tab can filter by: ageFilter[], levelFilter, discFilter, dayFilter
+// ══════════════════════════════════════════════════════════════════════
+const DEFAULT_TABS = [
+  {key:'all',        label:'All Classes',  sub:''},
+  {key:'0-3',        label:'Ages 0–3',     sub:'Mommy & Me',  ageFilter:['0-3']},
+  {key:'3-5',        label:'Ages 3–5',     sub:'Petites',     ageFilter:['3-5']},
+  {key:'5-9',        label:'Ages 5–9',     sub:'Level 1–2A',  ageFilter:['5-9']},
+  {key:'9-14',       label:'Ages 9–14',    sub:'Level 2B–3',  ageFilter:['9-14']},
+  {key:'12+',        label:'Ages 12+',     sub:'Level 4',     ageFilter:['12+']},
+  {key:'teen-adult', label:'Teen / Adult', sub:'14+',         ageFilter:['teen-adult']},
+];
+
+// Hide any tab whose ageFilter has zero classes (e.g. 0-3 until classes exist)
+function getResolvedTabs(){
+  const src = CFG.tabs || DEFAULT_TABS;
+  return src.filter(t=>{
+    if(t.key==='all') return true;
+    return CLASSES.some(c=>tabMatchesClass(t,c));
+  });
+}
+
+function tabMatchesClass(tab,c){
+  if(tab.ageFilter   && !tab.ageFilter.some(a=>c.ages.includes(a)))  return false;
+  if(tab.levelFilter && c.level!==tab.levelFilter)                    return false;
+  if(tab.discFilter  && !c.discs.includes(tab.discFilter))            return false;
+  if(tab.dayFilter   && c.days!==tab.dayFilter)                       return false;
+  return true;
+}
+
+const RESOLVED_TABS = getResolvedTabs();
+
+// Build tab bar
+const tabBar = document.getElementById('tab-bar');
+RESOLVED_TABS.forEach(t=>{
+  const btn = document.createElement('button');
+  btn.className = 'tab'+(t.key==='all'?' active':'');
+  btn.dataset.key = t.key;
+  btn.innerHTML = t.label+(t.sub?`<span class="tab-sub">${t.sub}</span>`:'');
+  btn.onclick = ()=>setTab(t.key,btn);
+  tabBar.appendChild(btn);
+});
+
+// ── Tab meta (strip descriptions) ────────────────────────────────────
+const TAB_META={
+  '0-3':       {icon:'👶',name:'Ages 0–3',   age:'Mommy & Me',  skill:'Parent + Child',   desc:'Parent-and-child movement classes introducing dance concepts through play, music, and bonding. No prior experience needed — for parent or child!'},
+  '3-5':       {icon:'🌸',name:'Ages 3–5',   age:'Petites',     skill:'Introductory',     desc:'Creative movement, imaginative play, and first steps in dance. No prior experience needed.'},
+  '5-9':       {icon:'⭐',name:'Ages 5–9',   age:'Level 1–2A',  skill:'Beginner',         desc:'Building coordination and confidence through structured technique. Level 1 (ages 5–7) and Level 2A (ages 7–10).'},
+  '9-14':      {icon:'🌟',name:'Ages 9–14',  age:'Level 2B–3',  skill:'Int. – Adv.',      desc:'Expanding technique across ballet, jazz, contemporary, and more. Students develop turns, leaps, and performance readiness.'},
+  '12+':       {icon:'🏆',name:'Ages 12+',   age:'Level 4',     skill:'Advanced',         desc:'Company-level training for serious dancers. Level 4B and 4C include pointe, conditioning, and full performance repertoire.'},
+  'teen-adult':{icon:'🌺',name:'Teen/Adult', age:'Ages 14+',    skill:'All Levels',       desc:'Welcoming classes for teens and adults at any experience level. A supportive, non-competitive environment.'},
+};
+
+const DISC_CSS={Ballet:'disc-ballet',Jazz:'disc-jazz',Contemporary:'disc-contemporary','Hip Hop':'disc-hiphop',Pointe:'disc-pointe','Musical Theater':'disc-musical',Combo:'disc-combo',Conditioning:'disc-conditioning'};
+const DISC_CAL={Ballet:'cb-ballet',Jazz:'cb-jazz',Contemporary:'cb-contemporary','Hip Hop':'cb-hiphop',Pointe:'cb-pointe','Musical Theater':'cb-musical',Combo:'cb-combo',Conditioning:'cb-conditioning'};
+const DISC_ICON={Ballet:'🩰',Jazz:'✨',Contemporary:'🌊','Hip Hop':'🎤',Pointe:'🩱','Musical Theater':'🎭',Combo:'⭐',Conditioning:'💪'};
+const DISC_COLOR={Ballet:'#9B6EC8',Jazz:'#E8B830',Contemporary:'#4AADCF','Hip Hop':'#E870A0',Pointe:'#7B4FA8','Musical Theater':'#40A870',Combo:'#D87040',Conditioning:'#70A040'};
+const SKILL_PILL={intro:'pill-intro',a:'pill-a',b:'pill-b',c:'pill-c'};
+const SKILL_LABEL={intro:'Introductory',a:'Beginner',b:'Intermediate',c:'Advanced'};
+const DAY_ORDER=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+// ══════════════════════════════════════════════════════════════════════
+//  CLASS DATA
+//  ages[] supports: '0-3','3-5','5-9','9-14','12+','teen-adult'
+// ══════════════════════════════════════════════════════════════════════
+const RICH={"1": {"long": "Mini Star Ballet is the perfect first step for children ages 5\u20137 ready to explore real ballet technique. Classes focus on coordination, spatial awareness, and musical listening through structured barre exercises, center combinations, and across-the-floor patterns.", "expect": "Classes run 45 minutes. Students stand at the barre, move across the floor, and finish with a short combination at center. Expect giggling, lots of encouragement, and a few purple bows.", "skills": ["Body coordination & balance", "Following musical cues", "Basic barre positions", "Forward gallop, skip, and chass\u00e9", "Listening and focus"], "blocks": ["Position vocabulary", "Barre fundamentals", "Center work", "Creative movement"]}, "2": {"long": "Princess Ballet blends structured barre work with imaginative play for ages 3\u20135. Children explore movement through stories, character play, and simple rhythm activities. Every class ends with a performance moment where students shine.", "expect": "45-minute class. No prior experience needed. Come in comfortable clothes; leotard and ballet shoes recommended. Tears are normal the first week; big smiles are normal every week after.", "skills": ["Listening and following directions", "Basic body awareness", "Rhythm and musicality", "Balance and coordination", "Building confidence"], "blocks": ["Creative movement", "Rhythm play", "Simple barre shapes", "Performance moment"]}, "7": {"long": "Level 4B Ballet is a 90-minute technical ballet class for serious dancers at the intermediate-advanced level. Barre work is detailed and correction-focused. Center combinations are longer and more complex. Allegro and grand allegro are introduced.", "expect": "Bring ballet shoes, clean bun, and full focus. Class runs 90 minutes with no break. Teacher will give individual corrections \u2014 this is a good thing.", "skills": ["Advanced pirouette technique", "Allegro and grand allegro", "Arabesque and attitude lines", "Port de bras and \u00e9paulement", "Performance projection"], "blocks": ["Extended barre", "Adagio center", "Pirouette combinations", "Allegro sequences", "Grand allegro"]}, "9": {"long": "Level 2B+/2C Ballet builds on foundational skills and prepares students for Level 3 demands. The class introduces longer combinations, more complex footwork, and begins developing performance quality.", "expect": "60-minute class with barre, center, and across-the-floor. Students should have ballet shoes and hair in a bun. Corrections are given regularly.", "skills": ["Sustained balances", "Turns: soutenu and chain\u00e9", "Grand battement", "Jump sequences", "Musical phrasing"], "blocks": ["Barre technique", "Port de bras", "Center adagio", "Across the floor", "Short combination"]}, "11": {"long": "Level 3A is designed for students ages 9\u201314 new to formal ballet training. The curriculum is accelerated because students have greater focus and body awareness. Classes move quickly and corrections are specific.", "expect": "60-minute class. Prior dance experience is not required. Students may feel challenged at first \u2014 that is exactly the goal.", "skills": ["Ballet vocabulary and positions", "Barre coordination", "Center balance", "Basic turns", "Performance awareness"], "blocks": ["Vocabulary foundation", "Barre exercises", "Simple center", "Across the floor"]}, "17": {"long": "Teen/Adult Beginner Ballet is genuinely welcoming for anyone who has always wanted to try ballet \u2014 regardless of age or body type. The class covers fundamentals at a comfortable pace with zero pressure and lots of support.", "expect": "60-minute class. Wear comfortable workout clothes or a leotard. Ballet shoes recommended but not required for the first class. The vibe is warm and fun.", "skills": ["Basic positions and posture", "Barre balance and coordination", "Musical timing", "Simple center combinations", "Body alignment"], "blocks": ["Positions and alignment", "Barre fundamentals", "Center balance", "Short combination"]}, "20": {"long": "Ballet and Broadway Combo is a unique 75-minute class splitting time between classical ballet technique and musical theater performance skills. Students develop both technical foundation and expressive performance qualities simultaneously.", "expect": "Bring ballet shoes and jazz shoes. Class moves between disciplines. Expect to sing a little, act a little, and dance a lot.", "skills": ["Ballet barre and center", "Musical theater performance quality", "Character work and expression", "Jazz technique basics", "Confidence and stage presence"], "blocks": ["Ballet barre", "Jazz warm-up", "Musical theater combination", "Performance moment"]}, "28": {"long": "Level 4C Ballet Full Company is BAM flagship ballet class for company-level dancers. The class treats every combination as a performance opportunity. Corrections are specific, expectations are high, and growth is constant.", "expect": "90-minute class. Company uniform required. Full focus expected from the moment you walk in the door. This class is the heart of the Level 4C program.", "skills": ["Company-level pirouettes and turns", "Arabesque and grand battement lines", "Expressive port de bras", "Performance projection", "Complex allegro and grand allegro"], "blocks": ["Full barre", "Adagio and port de bras", "Pirouette combinations", "Allegro", "Grand allegro", "Reverence"]}, "30": {"long": "Level 4B Contemporary develops the expressive and technical side of contemporary dance. Students explore lyrical movement, floor work, partnering concepts, and choreographic thinking.", "expect": "60-minute class in bare feet or contemporary shoes. Expect to get on the floor, explore movement freely, and sometimes make up your own phrases.", "skills": ["Floor work and rolling technique", "Lyrical extension and line", "Weight sharing and partnering basics", "Improvisation and choreographic thinking", "Contemporary performance quality"], "blocks": ["Warm-up and release technique", "Floor work sequences", "Standing combinations", "Improvisation", "Short phrase"]}, "34": {"long": "Level 4C Contemporary pushes artistic boundaries. Students work with complex concepts including counterbalance, momentum, and spatial design. Works-in-progress choreography is regularly shared.", "expect": "45-minute focused class. This is as much about artistry as technique. Come ready to think, create, and take risks.", "skills": ["Advanced floor technique", "Counterbalance and momentum", "Spatial design and pathways", "Choreographic collaboration", "Artistic risk-taking"], "blocks": ["Release warm-up", "Technical phrase work", "Duet/group exploration", "Choreographic exercise"]}, "47": {"long": "Level 3B Intermediate Jazz develops jazz technique for intermediate dancers ages 10\u201313. The class covers isolations, turns, leaps, and longer across-the-floor combinations. Performance quality is a consistent focus.", "expect": "45-minute class. Bring jazz shoes. Class moves fast \u2014 that is intentional. Students who pay attention improve quickly.", "skills": ["Jazz isolations and groove", "Fouett\u00e9 and pencil turns", "Leap technique: split leap and tour jet\u00e9", "Across-the-floor combinations", "Jazz performance energy"], "blocks": ["Isolation warm-up", "Turns across the floor", "Leaps and jumps", "Center combination", "Performance run-through"]}, "49": {"long": "4B Pointe and Pilates is a specialized 30-minute class that conditions the feet, ankles, and core for pointe work. Pilates-inspired exercises build the strength required for safe progression to full pointe.", "expect": "30-minute class. Pointe shoes required. Teacher approval required to join.", "skills": ["Foot and ankle strengthening", "Relev\u00e9 technique at the barre", "Core stability for pointe", "Safe pointe shoe habits", "Alignment awareness"], "blocks": ["Theraband exercises", "Barre relev\u00e9s", "Core conditioning", "Short pointe combination"]}, "61": {"long": "K-pop and Mini Groovers Hip Hop brings the energy of K-pop and urban dance to ages 5\u20139. Classes are high-energy and upbeat, mixing foundational hip hop grooves with age-appropriate formations and performance moments.", "expect": "60-minute class. Wear sneakers and comfortable clothes. Expect a lot of jumping, laughing, and learning way-cooler moves than you would expect.", "skills": ["Basic hip hop grooves and footwork", "Musicality and rhythm", "Formation awareness", "Performance energy", "Coordination and timing"], "blocks": ["Warm-up groove", "Footwork foundations", "Combination building", "Formation work", "Performance run"]}, "67": {"long": "Level 4B/4C Advanced Contemporary is a high-intensity class covering advanced release technique, complex floor work, and performance-ready combinations. Both 4B and 4C dancers work together, pushing development.", "expect": "60-minute class with no downtime. Come physically and mentally ready. The level of challenge here is the highest in the contemporary program.", "skills": ["Advanced release and floorwork", "Dynamic range: fast/slow and big/small", "Partner and ensemble work", "Complex spatial sequences", "Performance projection in contemporary style"], "blocks": ["Release warm-up", "Technical center", "Floor sequence", "Ensemble phrase", "Cool-down and reflection"]}, "72": {"long": "Level 4 Hip Hop is a 60-minute advanced class for teenage and young adult dancers wanting serious hip hop training. The class covers house, breaking concepts, hip hop fundamentals, and K-pop-style formations at a high technical level.", "expect": "60-minute class. Wear sneakers. The pace is fast and the combinations are long. Students are expected to pick up choreography quickly.", "skills": ["Advanced hip hop technique", "House and breaking fundamentals", "Cypher awareness", "Quick choreography absorption", "Performance confidence"], "blocks": ["Cypher warm-up", "Technique drills", "Combo building", "Full run-through"]}, "75": {"long": "Teen/Adult Intermediate Ballet is for those with some ballet background who want to advance. The class covers more complex barre combinations, turns at center, and works toward a full beginner-level syllabus.", "expect": "60-minute class. Some ballet background required \u2014 at least one semester or equivalent. Hair should be pulled back; ballet shoes required.", "skills": ["Intermediate barre combinations", "Pirouette preparation and execution", "Adagio center work", "Musical phrasing", "Performance carriage and posture"], "blocks": ["Extended barre", "Adagio center", "Pirouette prep", "Across the floor", "Short combination"]}};
+const DEFAULT_RICH={"long": "This class develops technical skill and artistic expression in a supportive, structured environment. Students build on previous training and are challenged to grow through detailed instruction.", "expect": "Come in appropriate dance attire with hair secured. Bring your full focus \u2014 and expect to be challenged in the best way.", "skills": ["Technical development", "Musicality and timing", "Body coordination", "Performance awareness", "Growth mindset"], "blocks": ["Warm-up", "Technical combinations", "Across the floor", "Cool-down"]};
+
+const CLASSES=[
+  {id:1,  name:"Mini Star Ballet",                          days:"Monday",    time:"3:30–4:15 PM",  fee:125,enrollment:"8 of 10", level:"Level 1",     ages:["5-9"],        discs:["Ballet"],                          skill:"a",  desc:"Foundational ballet technique set to fun, age-appropriate music."},
+  {id:2,  name:"Princess Ballet — Ballet & Movement Combo", days:"Monday",    time:"3:30–4:15 PM",  fee:125,enrollment:"6 of 8",  level:"Petites",     ages:["3-5"],        discs:["Ballet","Combo"],                  skill:"intro",desc:"Ballet barre work plus creative movement — the perfect first dance class."},
+  {id:3,  name:"Level 2B+/2C Jazz",                        days:"Monday",    time:"3:30–4:00 PM",  fee:125,enrollment:"8 of 10", level:"Level 2B-2C", ages:["9-14"],       discs:["Jazz"],                            skill:"b",  desc:"Upbeat jazz combinations focusing on rhythm, coordination, and style."},
+  {id:7,  name:"Level 4B Ballet",                          days:"Monday",    time:"4:30–6:00 PM",  fee:150,enrollment:"9 of 14", level:"Level 4",     ages:["12+"],        discs:["Ballet"],                          skill:"b",  desc:"Intermediate-advanced ballet for Level 4B dancers. Barre through center."},
+  {id:8,  name:"Pop Star Mini Jazz (Ages 5-7)",            days:"Monday",    time:"4:30–5:15 PM",  fee:125,enrollment:"0 of 12", level:"Level 2A",    ages:["5-9"],        discs:["Jazz"],                            skill:"a",  desc:"High-energy pop-inspired jazz for younger beginners.",waitlist:true},
+  {id:9,  name:"Level 2B+/2C Ballet",                      days:"Monday",    time:"4:30–5:30 PM",  fee:125,enrollment:"9 of 12", level:"Level 2B-2C", ages:["9-14"],       discs:["Ballet"],                          skill:"b",  desc:"Classical ballet technique building toward Level 3."},
+  {id:11, name:"Level 3A Beginner Ballet",                 days:"Monday",    time:"5:30–6:30 PM",  fee:125,enrollment:"10 of 10",level:"Level 3",     ages:["9-14"],       discs:["Ballet"],                          skill:"a",  desc:"Classical ballet introduction for students new to formal training, ages 9–14."},
+  {id:12, name:"Level 4C Jazz, Stretching & Tricks",       days:"Monday",    time:"5:30–6:30 PM",  fee:125,enrollment:"12 of 15",level:"Level 4",     ages:["12+"],        discs:["Jazz","Conditioning"],             skill:"c",  desc:"Jazz technique, flexibility, and tricks for advanced Level 4C dancers."},
+  {id:14, name:"Level 4C Ballet",                          days:"Monday",    time:"6:30–8:00 PM",  fee:150,enrollment:"13 of 15",level:"Level 4",     ages:["12+"],        discs:["Ballet"],                          skill:"c",  desc:"Full classical ballet class for the advanced Level 4C company."},
+  {id:17, name:"Teen/Adult Beginner Ballet",               days:"Monday",    time:"7:00–8:00 PM",  fee:125,enrollment:"14 of 17",level:"Adult/Teen",  ages:["teen-adult"], discs:["Ballet"],                          skill:"a",  desc:"Welcoming beginner ballet for teens and adults. No experience necessary."},
+  {id:20, name:"Ballet & Broadway Combo",                  days:"Tuesday",   time:"3:30–4:45 PM",  fee:150,enrollment:"11 of 12",level:"Level 2A",    ages:["5-9"],        discs:["Ballet","Musical Theater","Combo"], skill:"a",  desc:"Ballet barre and technique paired with Broadway-style musical theater."},
+  {id:21, name:"2C+ Advanced Ballet",                      days:"Tuesday",   time:"3:30–4:30 PM",  fee:125,enrollment:"11 of 11",level:"Level 2B-2C", ages:["9-14"],       discs:["Ballet"],                          skill:"c",  desc:"Advanced classical ballet for Level 2C+ — strong emphasis on technique."},
+  {id:22, name:"Tippy Toes & Twirls — Ballet & Movement",  days:"Tuesday",   time:"3:30–4:15 PM",  fee:125,enrollment:"11 of 12",level:"Petites",     ages:["3-5"],        discs:["Ballet","Combo"],                  skill:"intro",desc:"Ballet, movement, and imagination for our youngest dancers ages 3–5."},
+  {id:27, name:"Level 3C/4B Intermediate Ballet",          days:"Tuesday",   time:"5:00–6:30 PM",  fee:150,enrollment:"17 of 12",level:"Level 3",     ages:["9-14"],       discs:["Ballet"],                          skill:"c",  desc:"Bridge class combining Level 3C and 4B — advancing through classical repertoire."},
+  {id:28, name:"Level 4C Ballet Full Company",             days:"Tuesday",   time:"5:00–6:30 PM",  fee:150,enrollment:"14 of 15",level:"Level 4",     ages:["12+"],        discs:["Ballet"],                          skill:"c",  desc:"Full company Level 4C ballet — performance-level technique and artistry."},
+  {id:29, name:"Level 2C+ Intermediate Contemporary",      days:"Tuesday",   time:"5:00–5:30 PM",  fee:125,enrollment:"8 of 10", level:"Level 2B-2C", ages:["9-14"],       discs:["Contemporary"],                    skill:"c",  desc:"Contemporary movement fundamentals for intermediate-advanced Level 2 dancers."},
+  {id:30, name:"Level 4B Contemporary",                    days:"Tuesday",   time:"5:30–6:30 PM",  fee:125,enrollment:"8 of 12", level:"Level 4",     ages:["12+"],        discs:["Contemporary"],                    skill:"b",  desc:"Contemporary technique and floor work for Level 4B — lyrical and expressive."},
+  {id:32, name:"Level 4B Conditioning & Stretching",       days:"Tuesday",   time:"6:30–7:00 PM",  fee:125,enrollment:"10 of 12",level:"Level 4",     ages:["12+"],        discs:["Conditioning"],                    skill:"b",  desc:"Flexibility, Pilates, and conditioning to support Level 4B's full training load."},
+  {id:34, name:"Level 4C Contemporary",                    days:"Tuesday",   time:"7:00–7:45 PM",  fee:125,enrollment:"15 of 15",level:"Level 4",     ages:["12+"],        discs:["Contemporary"],                    skill:"c",  desc:"Advanced contemporary for Level 4C company dancers — choreographic focus."},
+  {id:37, name:"Level 2B+/2C Ballet",                      days:"Wednesday", time:"3:30–4:30 PM",  fee:125,enrollment:"8 of 12", level:"Level 2B-2C", ages:["9-14"],       discs:["Ballet"],                          skill:"b",  desc:"Classical ballet barre and center for Level 2B+/2C — Wednesday session."},
+  {id:38, name:"Sparkle & Shine Jazz",                     days:"Wednesday", time:"3:30–4:15 PM",  fee:125,enrollment:"7 of 12", level:"Level 1",     ages:["5-9"],        discs:["Jazz"],                            skill:"a",  desc:"Fun jazz for Level 1 with sparkle, shine, and performance pizzazz."},
+  {id:39, name:"POP Star Jazz! (Ages 5-9)",                days:"Wednesday", time:"3:30–4:15 PM",  fee:125,enrollment:"10 of 12",level:"Level 2A",    ages:["5-9"],        discs:["Jazz"],                            skill:"a",  desc:"Pop-style jazz for Level 2A students — high energy, great grooves."},
+  {id:43, name:"Level 2B+/2C Jazz & Tricks",               days:"Wednesday", time:"4:30–5:30 PM",  fee:125,enrollment:"8 of 10", level:"Level 2B-2C", ages:["9-14"],       discs:["Jazz","Conditioning"],             skill:"b",  desc:"Jazz combinations, stretching, and tricks for advancing Level 2 dancers."},
+  {id:44, name:"Level 4B Ballet",                          days:"Wednesday", time:"4:30–6:00 PM",  fee:150,enrollment:"11 of 14",level:"Level 4",     ages:["12+"],        discs:["Ballet"],                          skill:"b",  desc:"Classical ballet for Level 4B — Wednesday session."},
+  {id:45, name:"Level 2A Beginner Ballet",                 days:"Wednesday", time:"4:30–5:15 PM",  fee:125,enrollment:"5 of 10", level:"Level 2A",    ages:["5-9"],        discs:["Ballet"],                          skill:"a",  desc:"Beginner classical ballet for Level 2A students. Building the foundation right."},
+  {id:47, name:"Level 3B Intermediate Jazz",               days:"Wednesday", time:"5:30–6:15 PM",  fee:125,enrollment:"8 of 8",  level:"Level 3",     ages:["9-14"],       discs:["Jazz"],                            skill:"b",  desc:"Intermediate jazz with turns, leaps, and across-the-floor work."},
+  {id:48, name:"Level 4C Ballet",                          days:"Wednesday", time:"5:30–7:00 PM",  fee:150,enrollment:"12 of 15",level:"Level 4",     ages:["12+"],        discs:["Ballet"],                          skill:"c",  desc:"Classical ballet for the Level 4C company — Wednesday session."},
+  {id:49, name:"4B Pointe & Pilates",                      days:"Wednesday", time:"6:00–6:30 PM",  fee:125,enrollment:"9 of 14", level:"Level 4",     ages:["12+"],        discs:["Pointe","Conditioning"],           skill:"b",  desc:"Pointe introduction, Pilates, and stretching for Level 4B dancers."},
+  {id:52, name:"Level 4B Jazz — Turns & Jumps",            days:"Wednesday", time:"6:30–7:30 PM",  fee:125,enrollment:"13 of 15",level:"Level 4",     ages:["12+"],        discs:["Jazz"],                            skill:"b",  desc:"Jazz turns and jumps for Level 4B — technical and performance focus."},
+  {id:53, name:"Level 4C Pointe",                          days:"Wednesday", time:"7:00–7:30 PM",  fee:125,enrollment:"12 of 15",level:"Level 4",     ages:["12+"],        discs:["Pointe"],                          skill:"c",  desc:"Pointe technique for qualified Level 4C dancers."},
+  {id:54, name:"Level 4C Jazz — Jumps and Turns",          days:"Wednesday", time:"7:30–8:15 PM",  fee:125,enrollment:"13 of 15",level:"Level 4",     ages:["12+"],        discs:["Jazz"],                            skill:"c",  desc:"Advanced jazz jumps and turns for Level 4C — performance season prep."},
+  {id:56, name:"Princess Petites",                         days:"Thursday",  time:"3:30–4:15 PM",  fee:125,enrollment:"7 of 9",  level:"Petites",     ages:["3-5"],        discs:["Ballet"],                          skill:"intro",desc:"Ballet and creative movement for tiny dancers ages 3–5."},
+  {id:57, name:"2C+ Ballet",                               days:"Thursday",  time:"3:30–4:30 PM",  fee:125,enrollment:"13 of 14",level:"Level 2B-2C", ages:["9-14"],       discs:["Ballet"],                          skill:"c",  desc:"Classical ballet for Thursday's Level 2C+ group — barre through center."},
+  {id:58, name:"Level 2A Contemporary Flow",               days:"Thursday",  time:"3:30–4:30 PM",  fee:125,enrollment:"8 of 10", level:"Level 2A",    ages:["5-9"],        discs:["Contemporary"],                    skill:"a",  desc:"Contemporary-based movement for young Level 2A students ages 5–9."},
+  {id:61, name:"K-pop & Mini Groovers Hip Hop",            days:"Thursday",  time:"4:30–5:30 PM",  fee:125,enrollment:"11 of 12",level:"Level 1",     ages:["5-9"],        discs:["Hip Hop"],                         skill:"a",  desc:"K-pop inspired hip hop — grooves, formations, and fun for ages 5–9."},
+  {id:63, name:"Levels 3C/4B Intermediate Ballet",         days:"Thursday",  time:"5:00–6:30 PM",  fee:150,enrollment:"11 of 12",level:"Level 3",     ages:["9-14"],       discs:["Ballet"],                          skill:"c",  desc:"Bridge class for Level 3C/4B — serious intermediate-advanced ballet."},
+  {id:65, name:"Level 2C+ Jazz",                           days:"Thursday",  time:"5:00–5:30 PM",  fee:125,enrollment:"10 of 12",level:"Level 2B-2C", ages:["9-14"],       discs:["Jazz"],                            skill:"c",  desc:"Jazz for Level 2C+ — Thursday focused technique session."},
+  {id:67, name:"Level 4B/4C Advanced Contemporary",        days:"Thursday",  time:"5:30–6:30 PM",  fee:125,enrollment:"14 of 15",level:"Level 4",     ages:["12+"],        discs:["Contemporary"],                    skill:"c",  desc:"Advanced contemporary for Level 4B/4C — Thursday intensive."},
+  {id:68, name:"Pop-Up Hip Hop — 9 Weeks!",                days:"Thursday",  time:"5:30–6:30 PM",  fee:250,enrollment:"0 of 15", level:"Hip Hop",     ages:["5-9","9-14"], discs:["Hip Hop"],                         skill:"a",  desc:"Limited 9-week pop-up session. Multi-age, all experience levels welcome."},
+  {id:71, name:"Level 3C/4B Intermediate Contemporary",    days:"Thursday",  time:"6:30–7:30 PM",  fee:125,enrollment:"13 of 12",level:"Level 3",     ages:["9-14"],       discs:["Contemporary"],                    skill:"c",  desc:"Contemporary for Level 3C/4B — floor work, partnering, lyrical expression."},
+  {id:72, name:"Level 4 Hip Hop (Ages 12+)",               days:"Thursday",  time:"6:30–7:30 PM",  fee:125,enrollment:"12 of 15",level:"Hip Hop",     ages:["12+"],        discs:["Hip Hop"],                         skill:"c",  desc:"Hip hop for advanced Level 4 students ages 12 and up."},
+  {id:73, name:"Teen/Adult Pre-Pointe & Variations NEW",   days:"Thursday",  time:"7:00–7:30 PM",  fee:100,enrollment:"8 of 15", level:"Adult/Teen",  ages:["teen-adult"], discs:["Pointe"],                          skill:"a",  desc:"NEW! Pre-pointe conditioning and classical variations for teen/adult dancers."},
+  {id:75, name:"Teen/Adult Intermediate Ballet",           days:"Thursday",  time:"7:30–8:30 PM",  fee:125,enrollment:"11 of 15",level:"Adult/Teen",  ages:["teen-adult"], discs:["Ballet"],                          skill:"b",  desc:"Intermediate ballet for teens and adults with some prior experience."},
+  {id:76, name:"Tippy Toes & Twirls — Ballet & Movement",  days:"Friday",    time:"10:00–10:45 AM",fee:125,enrollment:"9 of 10", level:"Petites",     ages:["3-5"],        discs:["Ballet","Combo"],                  skill:"intro",desc:"Ballet, creative movement, and imagination for our Friday Petites."},
+  {id:77, name:"Tiny Tutus & Twirls NEW",                  days:"Friday",    time:"3:30–4:15 PM",  fee:125,enrollment:"0 of 0",  level:"Petites",     ages:["3-5"],        discs:["Ballet"],                          skill:"intro",desc:"NEW class forming — Tiny Tutus for our youngest Friday dancers.",waitlist:true},
+  {id:78, name:"Mini Musical Theater NEW",                 days:"Friday",    time:"4:30–5:15 PM",  fee:125,enrollment:"0 of 0",  level:"Level 1",     ages:["5-9"],        discs:["Musical Theater"],                 skill:"a",  desc:"NEW! Musical theater combining acting prep and dance for ages 5–9.",waitlist:true},
+  {id:79, name:"Level 2C/2C+/3C Pre-Pointe",              days:"Saturday",  time:"10:00–10:30 AM",fee:125,enrollment:"14 of 14",level:"Level 2B-2C", ages:["9-14"],       discs:["Pointe"],                          skill:"c",  desc:"Pre-pointe strengthening for qualified Level 2C/3C students."},
+  {id:80, name:"4B/4C Advanced Ballet",                    days:"Saturday",  time:"10:30 AM–12 PM",fee:150,enrollment:"22 of 30",level:"Level 4",     ages:["12+"],        discs:["Ballet"],                          skill:"c",  desc:"Saturday flagship class — full ballet for Level 4B/4C company."},
+  {id:81, name:"Level 2C/2C+/3C Jazz",                    days:"Saturday",  time:"10:30–11:30 AM",fee:125,enrollment:"14 of 15",level:"Level 2B-2C", ages:["9-14"],       discs:["Jazz"],                            skill:"c",  desc:"Jazz for Level 2C/3C — Saturday upbeat, technique-driven session."},
+  {id:82, name:"Level 4 Conditioning & Tricks",            days:"Saturday",  time:"11:30 AM–12:15",fee:125,enrollment:"8 of 13", level:"Level 4",     ages:["12+"],        discs:["Conditioning"],                    skill:"c",  desc:"Conditioning, tricks, and strength work for Saturday Level 4 dancers."},
+  {id:83, name:"Level 2C/2C+/3C Stretching & Tricks",     days:"Saturday",  time:"11:30 AM–12 PM",fee:125,enrollment:"14 of 14",level:"Level 2B-2C", ages:["9-14"],       discs:["Conditioning"],                    skill:"c",  desc:"Flexibility and tricks for Level 2C/3C — Saturday stretch session."},
+];
+
+const PROGRAMS=[
+  {id:'perf',  icon:'🎭',name:'Spring Performance',  desc:'Annual recital — open to all enrolled students. Costumes included.',        note:'Staff will reach out with details'},
+  {id:'comp',  icon:'🏆',name:'Competition Team',     desc:'Competitive program for Level 3+ dancers. Year-round commitment.',          note:'Audition required · Placement by invitation'},
+  {id:'priv',  icon:'🩰',name:'Private Lessons',      desc:'One-on-one or small group instruction. All levels and disciplines.',        note:'30 or 60 min · Scheduling via staff'},
+  {id:'summer',icon:'☀️',name:'Summer Intensive',     desc:'2-week summer program — technique, performance, and more.',                 note:'Open enrollment · Dates announced in spring'},
+  {id:'eval',  icon:'📋',name:'Placement Evaluation', desc:'Free 1-on-1 session to find your ideal starting level.',                   note:'15–20 min · Available weekday afternoons'},
+];
+
+// ══════════════════════════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════════════════════════
+let activeTab='all', cart=[], interests=[], isUnlimited=false, upsellDismissed=false, currentView='list';
+
+// Pre-populate enrolled classes into cart display (returning mode)
+const enrolledSet = new Set(CFG.enrolledClassIds||[]);
+
+function setView(v){
+  currentView=v;
+  document.getElementById('vt-list').classList.toggle('active',v==='list');
+  document.getElementById('vt-cal').classList.toggle('active',v==='calendar');
+  document.getElementById('list-view').classList.toggle('hidden',v!=='list');
+  document.getElementById('cal-view').classList.toggle('hidden',v!=='calendar');
+  render();
+}
+
+function setTab(key,el){
+  activeTab=key;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  const strip=document.getElementById('level-strip');
+  const meta=TAB_META[key];
+  if(key!=='all'&&meta){
+    strip.classList.remove('hidden');
+    document.getElementById('ls-icon').textContent=meta.icon;
+    document.getElementById('ls-name').textContent=meta.name||key;
+    document.getElementById('ls-age').textContent=meta.age||'';
+    document.getElementById('ls-skill').textContent=meta.skill||'';
+    document.getElementById('ls-desc').textContent=meta.desc||'';
+  }else strip.classList.add('hidden');
+  render();
+}
+
+function clearFilters(){
+  ['filter-age','filter-skill','filter-disc','filter-day','search-input'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  render();
+}
+function hasFilters(){
+  return ['filter-age','filter-skill','filter-disc','filter-day'].some(id=>{const el=document.getElementById(id);return el&&el.value;})||document.getElementById('search-input').value.trim();
+}
+function pct(enr){const[c,m]=enr.split(' of ').map(Number);return m>0?Math.min(100,Math.round(c/m*100)):0;}
+function isFull(enr){const[c,m]=enr.split(' of ').map(Number);return m>0&&c>=m;}
+
+function getFiltered(){
+  const ageF  = document.getElementById('filter-age').value;
+  const skillF= document.getElementById('filter-skill').value;
+  const discF = document.getElementById('filter-disc').value;
+  const dayF  = document.getElementById('filter-day').value;
+  const q     = document.getElementById('search-input').value.toLowerCase().trim();
+  return CLASSES.filter(c=>{
+    // ── Admin pre-filters (classFilter from embed config) ──
+    if(CFG.classAgeFilter.length   && !CFG.classAgeFilter.some(a=>c.ages.includes(a)))    return false;
+    if(CFG.classDiscFilter.length  && !CFG.classDiscFilter.some(d=>c.discs.includes(d)))  return false;
+    if(CFG.classLevelFilter.length && !CFG.classLevelFilter.includes(c.level))            return false;
+    if(CFG.classDayFilter.length   && !CFG.classDayFilter.includes(c.days))               return false;
+    if(CFG.classSkillFilter.length && !CFG.classSkillFilter.includes(c.skill))            return false;
+    // ── Active tab filter ──
+    if(activeTab!=='all'){
+      const tab = RESOLVED_TABS.find(t=>t.key===activeTab);
+      if(tab && !tabMatchesClass(tab,c)) return false;
+    }
+    // ── UI filter bar ──
+    if(ageF   && !c.ages.includes(ageF))           return false;
+    if(skillF && c.skill!==skillF)                  return false;
+    if(discF  && !c.discs.includes(discF))          return false;
+    if(dayF   && c.days!==dayF)                     return false;
+    if(q      && !c.name.toLowerCase().includes(q)&&!c.desc.toLowerCase().includes(q)&&!c.discs.some(d=>d.toLowerCase().includes(q))) return false;
+    return true;
+  });
+}
+
+function render(){
+  const filtered=getFiltered();
+  document.getElementById('results-count').textContent=filtered.length+(filtered.length===1?' class':' classes');
+  document.getElementById('clear-btn').classList.toggle('hidden',!hasFilters());
+  if(currentView==='list') renderList(filtered);
+  else renderCalendar(filtered);
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  LIST VIEW
+// ══════════════════════════════════════════════════════════════════════
+function renderList(filtered){
+  const el=document.getElementById('content');
+  if(!filtered.length){
+    el.innerHTML='<div class="empty"><div class="empty-icon">🩰</div><h3>No classes found</h3><p>Try adjusting your filters, or <a href="tel:9492290846" style="color:var(--primary)">call us</a> for a recommendation.</p></div>';
+    return;
+  }
+  const byDay={};
+  filtered.forEach(c=>{if(!byDay[c.days])byDay[c.days]=[];byDay[c.days].push(c);});
+  const days=Object.keys(byDay).sort((a,b)=>DAY_ORDER.indexOf(a)-DAY_ORDER.indexOf(b));
+  let html='';
+  days.forEach(day=>{
+    html+=`<div class="day-group"><div class="day-header"><div class="day-title">${day}</div><span class="day-count">${byDay[day].length}</span></div>`;
+    byDay[day].forEach(c=>{
+      const p=pct(c.enrollment),f=isFull(c.enrollment);
+      const isEnrolled=enrolledSet.has(c.id);
+      const inC=cart.includes(c.id);
+      const isRec=CFG.recommendedClassIds&&CFG.recommendedClassIds.includes(c.id);
+      const discB=c.discs.map(d=>`<span class="disc-badge ${DISC_CSS[d]||'disc-combo'}">${DISC_ICON[d]||''} ${d}</span>`).join('');
+      const skillB=`<span class="skill-pill ${SKILL_PILL[c.skill]||'pill-a'}">${SKILL_LABEL[c.skill]||c.skill}</span>`;
+      const recBadge=isRec?`<span style="font-size:9px;background:#FFF8D8;color:#7A5000;border:1px solid #D4A840;padding:2px 7px;border-radius:9px;font-weight:700;">⭐ Recommended</span>`:'';
+      let btn;
+      if(isEnrolled) btn=`<span class="enrolled-badge">✓ Enrolled</span>`;
+      else if(c.waitlist||f) btn=`<a href="${CFG.checkoutUrl}" target="_blank" class="waitlist-btn">Join Waitlist</a>`;
+      else if(inC) btn=`<button class="select-btn active" onclick="deselect(${c.id})">✓ ${isReturning?'Added':'Selected'}</button>`;
+      else btn=`<button class="select-btn" onclick="select(${c.id})">${isReturning?'Add to Schedule':'Select'}</button>`;
+
+      html+=`<div class="class-card${isEnrolled?' enrolled':inC?' selected':''}${isRec?' style=\"border-color:#D4A840\"':''}">
+        <div class="card-main">
+          <div class="card-name">${c.name}</div>
+          <div class="card-desc">${c.desc}</div>
+          <div class="card-tags">${skillB}${discB}${recBadge}</div>
+          <div class="card-meta">🕐 ${c.time}</div>
+        </div>
+        <div class="card-right">
+          <div class="card-price">$${c.fee}<small>/mo</small></div>
+          <div class="enroll-col"><div class="enroll-bar"><div class="enroll-fill${f?' full':''}" style="width:${p}%"></div></div><div class="enroll-text">${c.enrollment} enrolled</div></div>
+          <div class="card-btns">${btn}<button class="learn-link" onclick="openLearnMore(${c.id})">Learn more →</button></div>
+        </div>
+      </div>`;
+    });
+    html+='</div>';
+  });
+  el.innerHTML=html;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  CALENDAR VIEW
+// ══════════════════════════════════════════════════════════════════════
+function timeToMin(t){
+  const m=t.match(/(\d+):?(\d*)\s*(AM|PM)?/i);
+  if(!m)return 0;
+  let h=parseInt(m[1]),min=parseInt(m[2]||0),ap=(m[3]||'').toUpperCase();
+  if(ap==='PM'&&h!==12)h+=12;
+  if(ap==='AM'&&h===12)h=0;
+  return h*60+min;
+}
+function parseTimeRange(ts){
+  const parts=ts.split('–');
+  if(parts.length<2)return{start:0,end:60};
+  let r0=parts[0].trim(),r1=parts[1].trim();
+  const ap1=r1.match(/(AM|PM)/i);
+  if(ap1&&!/AM|PM/i.test(r0))r0=r0+' '+ap1[0];
+  const s=timeToMin(r0),e=timeToMin(r1);
+  return{start:s,end:e>s?e:e+60};
+}
+function renderCalendar(filtered){
+  const grid=document.getElementById('cal-grid');
+  const legend=document.getElementById('cal-legend');
+  if(!filtered.length){grid.innerHTML='<div style="grid-column:1/-1;padding:24px;font-size:12px;color:var(--muted);text-align:center;">No classes to display.</div>';legend.innerHTML='';return;}
+  let minMin=Infinity,maxMin=0;
+  filtered.forEach(c=>{const r=parseTimeRange(c.time);if(r.start<minMin)minMin=r.start;if(r.end>maxMin)maxMin=r.end;});
+  const startHour=Math.floor(minMin/60),endHour=Math.ceil(maxMin/60);
+  const hours=[];for(let h=startHour;h<endHour;h++)hours.push(h);
+  const days=DAY_ORDER.filter(d=>filtered.some(c=>c.days===d));
+  grid.style.gridTemplateColumns=`52px repeat(${days.length},1fr)`;
+  let html=`<div class="cal-day-hd cal-time-hd"></div>`;
+  days.forEach(d=>html+=`<div class="cal-day-hd">${d}</div>`);
+  hours.forEach((h,i)=>{
+    const h12=h>12?h-12:(h===0?12:h),ampm=h>=12?'PM':'AM';
+    html+=`<div class="cal-time">${h12}${ampm}</div>`;
+    days.forEach(day=>{
+      const slot=filtered.filter(c=>{if(c.days!==day)return false;const r=parseTimeRange(c.time);return r.start>=h*60&&r.start<(h+1)*60;});
+      const alt=i%2===1?' alt':'';
+      let cellHtml='';
+      slot.forEach(c=>{
+        const inC=cart.includes(c.id),isEnr=enrolledSet.has(c.id);
+        const calCls=DISC_CAL[c.discs[0]]||'cb-combo';
+        const f=isFull(c.enrollment);
+        cellHtml+=`<div class="cal-block ${calCls}${inC?' selected':isEnr?' enrolled':''}" onclick="openLearnMore(${c.id})" title="${c.name} · ${c.time}">
+          <div class="cb-name">${c.name}</div>
+          <div class="cb-time">${c.time}</div>
+          <div class="cb-price">$${c.fee}/mo${inC?' ✓':isEnr?' Enrolled':f?' · Full':''}</div>
+        </div>`;
+      });
+      html+=`<div class="cal-cell${alt}">${cellHtml}</div>`;
+    });
+  });
+  grid.innerHTML=html;
+  const usedDiscs=[...new Set(filtered.flatMap(c=>c.discs))];
+  legend.innerHTML=usedDiscs.map(d=>`<div class="leg-item"><div class="leg-dot" style="background:${DISC_COLOR[d]||'#aaa'}"></div>${d}</div>`).join('');
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  LEARN MORE MODAL
+// ══════════════════════════════════════════════════════════════════════
+function openLearnMore(id){
+  const c=CLASSES.find(x=>x.id===id);if(!c)return;
+  const r=Object.assign({},DEFAULT_RICH,RICH[String(id)]||{});
+  const inC=cart.includes(id),f=isFull(c.enrollment),isEnr=enrolledSet.has(id);
+  const barColor=DISC_COLOR[c.discs[0]]||'var(--primary)';
+  const discBadges=c.discs.map(d=>`<span class="disc-badge ${DISC_CSS[d]||'disc-combo'}">${DISC_ICON[d]||''} ${d}</span>`).join(' ');
+  const skillBadge=`<span class="skill-pill ${SKILL_PILL[c.skill]||'pill-a'}">${SKILL_LABEL[c.skill]||c.skill}</span>`;
+  const skillsHtml=r.skills.map(s=>`<span class="skill-tag">${s}</span>`).join('');
+  const blocksHtml=r.blocks.map((b,i)=>`<div class="block-item"><div class="block-num">${i+1}</div><div class="block-name">${b}</div></div>`).join('');
+  let btn;
+  if(isEnr) btn=`<span class="enrolled-badge" style="padding:11px 20px;font-size:12px;">✓ Currently Enrolled</span>`;
+  else if(c.waitlist||f) btn=`<a href="${CFG.checkoutUrl}" target="_blank" class="modal-select-btn" style="text-decoration:none">Join Waitlist</a>`;
+  else if(inC) btn=`<button class="modal-select-btn active" onclick="deselect(${id});closeLM()">✓ ${isReturning?'Added — Remove':'Selected — Remove'}</button>`;
+  else btn=`<button class="modal-select-btn" onclick="select(${id});closeLM()">${isReturning?'Add to My Schedule':'Select This Class'}</button>`;
+  document.getElementById('lm-title').textContent=c.name;
+  document.getElementById('lm-body').innerHTML=`
+    <div style="height:4px;background:${barColor};border-radius:2px;margin-bottom:12px"></div>
+    <div class="modal-tags">${skillBadge}${discBadges}<span style="font-size:11px;color:var(--muted);margin-left:4px">🕐 ${c.time} · ${c.days} · <strong style="color:var(--primary)">$${c.fee}/mo</strong></span></div>
+    <div class="modal-sec"><div class="modal-long">${r.long||c.desc}</div></div>
+    <div class="modal-sec"><div class="modal-sec-title">What to Expect</div><div class="expect-box"><p>${r.expect}</p></div></div>
+    <div class="modal-sec"><div class="modal-sec-title">Skills Developed</div><div class="skills-list">${skillsHtml}</div></div>
+    <div class="modal-sec"><div class="modal-sec-title">Class Structure</div><div class="blocks-row">${blocksHtml}</div></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding:10px 0;border-top:1px solid var(--border);">
+      <div><div class="enroll-bar" style="width:90px"><div class="enroll-fill${f?' full':''}" style="width:${pct(c.enrollment)}%"></div></div><div class="enroll-text" style="margin-top:3px">${c.enrollment} enrolled</div></div>
+      <div class="card-price">$${c.fee}<small>/mo</small></div>
+    </div>
+    <div class="modal-actions">${btn}</div>`;
+  document.getElementById('lm-overlay').classList.add('open');
+  document.body.style.overflow='hidden';
+}
+function closeLM(){document.getElementById('lm-overlay').classList.remove('open');document.body.style.overflow='';render();}
+
+// ══════════════════════════════════════════════════════════════════════
+//  CART
+//  Returning mode: upsell shows with 1+ class; copy changes throughout
+// ══════════════════════════════════════════════════════════════════════
+function select(id){if(!cart.includes(id))cart.push(id);updateBadge();render();openCart();}
+function deselect(id){cart=cart.filter(x=>x!==id);if(!cart.length)isUnlimited=false;updateBadge();render();renderCartBody();}
+function toggleInterest(id){const k='class_'+id;if(interests.includes(k))interests=interests.filter(x=>x!==k);else interests.push(k);renderCartBody();}
+function addProg(pid){if(!interests.includes(pid))interests.push(pid);renderCartBody();}
+function removeProg(pid){interests=interests.filter(x=>x!==pid);renderCartBody();}
+function switchToUnlimited(){isUnlimited=true;upsellDismissed=true;renderCartBody();}
+function dismissUpsell(){upsellDismissed=true;renderCartBody();}
+function removeUnlimited(){isUnlimited=false;upsellDismissed=false;renderCartBody();}
+function updateBadge(){
+  const b=document.getElementById('cart-badge');
+  if(cart.length){b.textContent=cart.length;b.classList.remove('hidden');}else b.classList.add('hidden');
+}
+function cartTotal(){return cart.reduce((s,id)=>{const c=CLASSES.find(x=>x.id===id);return s+(c?c.fee:0);},0);}
+function openCart(){document.getElementById('cart-overlay').classList.add('open');document.getElementById('cart-drawer').classList.add('open');document.body.style.overflow='hidden';renderCartBody();}
+function closeCart(){document.getElementById('cart-overlay').classList.remove('open');document.getElementById('cart-drawer').classList.remove('open');document.body.style.overflow='';}
+
+function renderCartBody(){
+  const body=document.getElementById('cart-body');
+  const footer=document.getElementById('cart-footer');
+  const sumEl=document.getElementById('cart-summary');
+  // In returning mode, show upsell even with 1 class
+  const upsellThreshold = isReturning ? 1 : 2;
+  if(!cart.length&&!interests.length){
+    const emptyMsg=isReturning
+      ?`<div class="cart-empty"><div class="cart-empty-icon">🩰</div><h3>Add to your schedule</h3><p>Browse classes and tap "Add to Schedule" to build next season's lineup.</p></div>`
+      :`<div class="cart-empty"><div class="cart-empty-icon">🩰</div><h3>Nothing selected yet</h3><p>Choose classes and tap Select to build your schedule.</p></div>`;
+    body.innerHTML=emptyMsg+recHtml([]);
+    footer.style.display='none';
+    return;
+  }
+  footer.style.display='block';
+  const total=cartTotal(),savings=total-CFG.unlimitedPrice;
+  const showUpsell=!isUnlimited&&!upsellDismissed&&cart.length>=upsellThreshold&&savings>0;
+  const items=cart.map(id=>CLASSES.find(x=>x.id===id)).filter(Boolean);
+  let html='';
+  if(showUpsell){
+    const upsellSub=isReturning
+      ?`You're adding ${cart.length} class${cart.length===1?'':'es'} to your schedule. Upgrade the whole family to Unlimited instead — one flat rate covers everything.`
+      :`With ${cart.length} classes you're spending $${total}/mo. Unlimited gives your dancer everything for one flat rate.`;
+    html+=`<div class="upsell"><div class="upsell-tag">💡 Best Value</div><div class="upsell-head">Switch to Unlimited & Save $${savings}/mo</div><div class="upsell-sub">${upsellSub}</div><div class="upsell-math"><div class="upsell-row"><span>${cart.length} classes (à la carte)</span><span>$${total}/mo</span></div><div class="upsell-row"><span>${CFG.unlimitedLabel}</span><span>$${CFG.unlimitedPrice}/mo</span></div><div class="upsell-row savings"><span>✓ You save</span><span>$${savings}/mo</span></div><div class="upsell-row total-r"><span>Unlimited total</span><span>$${CFG.unlimitedPrice}/mo</span></div></div><button class="upsell-cta" onclick="switchToUnlimited()">Switch to Unlimited — $${CFG.unlimitedPrice}/mo →</button><button class="upsell-skip" onclick="dismissUpsell()">Keep individual classes instead</button></div>`;
+  }
+  if(isUnlimited)html+=`<div class="unlimited-active"><div class="ua-crown">👑</div><div class="ua-info"><div class="ua-name">${CFG.unlimitedLabel}</div><div class="ua-sub">${CFG.unlimitedNote}</div></div><div class="ua-price">$${CFG.unlimitedPrice}/mo</div><button class="ua-remove" onclick="removeUnlimited()">×</button></div>`;
+  const secLabel=isReturning?'Adding to Schedule':'Selected Classes';
+  if(items.length){
+    html+=`<div class="c-sec">${secLabel}</div>`;
+    items.forEach(c=>{
+      const k='class_'+c.id,isInt=interests.includes(k);
+      html+=`<div class="ci"><div class="ci-icon">${DISC_ICON[c.discs[0]]||'🩰'}</div><div class="ci-info"><div class="ci-name">${c.name}</div><div class="ci-meta">${c.days} · ${c.time}</div></div><div class="ci-actions"><div class="ci-price">${isUnlimited?`<span style="text-decoration:line-through;color:var(--muted);font-size:10px">$${c.fee}</span>`:'$'+c.fee}</div><button class="ci-remove" onclick="deselect(${c.id})">×</button><button class="ci-interest-btn ${isInt?'interested':''}" onclick="toggleInterest(${c.id})">${isInt?'✓ On interest list':'+ Interest list'}</button></div></div>`;
+    });
+  }
+  const progInts=interests.filter(x=>!x.startsWith('class_'));
+  if(progInts.length){
+    html+=`<div class="c-sec" style="margin-top:12px">Program Interests — Staff Will Follow Up</div>`;
+    progInts.forEach(pid=>{
+      const p=PROGRAMS.find(x=>x.id===pid);if(!p)return;
+      html+=`<div class="interest-item"><div class="ii-icon">${p.icon}</div><div class="ii-info"><div class="ii-name">${p.name}</div><div class="ii-meta">${p.note}</div></div><button class="ii-remove" onclick="removeProg('${pid}')">×</button></div>`;
+    });
+  }
+  html+=recHtml(progInts);
+  body.innerHTML=html;
+  const dt=isUnlimited?CFG.unlimitedPrice:total;
+  let sh='';
+  if(isUnlimited)sh+=`<div class="sum-row"><span>${items.length} classes (value)</span><span>$${total}/mo</span></div><div class="sum-row savings"><span>✓ Unlimited discount</span><span>−$${total-CFG.unlimitedPrice}/mo</span></div>`;
+  if(cart.length)sh+=`<div class="sum-row total"><span>Monthly Total</span><span>$${dt}/mo</span></div>`;
+  if(progInts.length)sh+=`<div class="sum-row" style="margin-top:6px;font-size:10px;color:var(--muted)">✉ ${progInts.length} interest${progInts.length===1?'':'s'} will be sent to staff</div>`;
+  sumEl.innerHTML=sh;
+}
+function recHtml(existing){
+  const rem=PROGRAMS.filter(p=>!existing.includes(p.id));
+  if(!rem.length)return'';
+  return`<div class="rec-section"><div class="rec-title">Also Interested In?</div>${rem.map(p=>`<div class="rec-item"><div class="rec-icon">${p.icon}</div><div class="rec-info"><div class="rec-name">${p.name}</div><div class="rec-desc">${p.desc}</div></div><button class="rec-add${interests.includes(p.id)?' added':''}" onclick="addProg('${p.id}')">${interests.includes(p.id)?'✓ Added':'+ Interest'}</button></div>`).join('')}</div>`;
+}
+function checkout(){window.open(CFG.checkoutUrl,'_blank');}
+
+// ══════════════════════════════════════════════════════════════════════
+//  MODALS
+// ══════════════════════════════════════════════════════════════════════
+function openNSModal(){document.getElementById('ns-overlay').classList.add('open');document.body.style.overflow='hidden';}
+function closeNSModal(){document.getElementById('ns-overlay').classList.remove('open');document.body.style.overflow='';}
+function openTermsModal(){document.getElementById('terms-overlay').classList.add('open');document.body.style.overflow='hidden';}
+function closeTermsModal(){document.getElementById('terms-overlay').classList.remove('open');document.body.style.overflow='';}
+function openPlacementModal(){document.getElementById('pl-overlay').classList.add('open');document.body.style.overflow='hidden';}
+function closePlacementModal(){document.getElementById('pl-overlay').classList.remove('open');document.body.style.overflow='';}
+
+render();
+</script>
+</body>
+</html>
