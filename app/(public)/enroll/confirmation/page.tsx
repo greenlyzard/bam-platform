@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { EnrollmentConfirmation } from "./confirmation-view";
 
 export const metadata = {
@@ -22,7 +23,16 @@ export default function ConfirmationPage() {
       </header>
 
       <main className="mx-auto max-w-3xl px-4 py-8">
-        <EnrollmentConfirmation />
+        <Suspense
+          fallback={
+            <div className="text-center py-16">
+              <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-lavender border-t-transparent" />
+              <p className="mt-4 text-sm text-slate">Confirming your enrollment...</p>
+            </div>
+          }
+        >
+          <EnrollmentConfirmation />
+        </Suspense>
       </main>
 
       <footer className="border-t border-silver py-6 text-center">
