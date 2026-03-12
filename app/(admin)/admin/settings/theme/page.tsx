@@ -27,6 +27,7 @@ export default async function ThemeSettingsPage() {
       </div>
 
       <ThemeEditor
+        initialStudioName={settings?.studio_name ?? "Ballet Academy & Movement"}
         initialPreset={settings?.theme_preset ?? "lavender-cream"}
         initialCustomColors={settings?.custom_colors ?? {}}
         initialHeadingFont={settings?.heading_font ?? "Cormorant Garamond"}

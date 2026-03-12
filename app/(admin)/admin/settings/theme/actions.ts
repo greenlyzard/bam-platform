@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
 
 const schema = z.object({
+  studio_name: z.string().min(1),
   theme_preset: z.string().min(1),
   custom_colors: z.string(), // JSON string
   heading_font: z.string().min(1),
@@ -30,6 +31,7 @@ export async function updateThemeSettings(formData: FormData) {
   }
 
   const parsed = schema.safeParse({
+    studio_name: formData.get("studio_name"),
     theme_preset: formData.get("theme_preset"),
     custom_colors: formData.get("custom_colors"),
     heading_font: formData.get("heading_font"),
@@ -59,6 +61,7 @@ export async function updateThemeSettings(formData: FormData) {
     const { error } = await supabase
       .from("studio_settings")
       .update({
+        studio_name: parsed.data.studio_name,
         theme_preset: parsed.data.theme_preset,
         custom_colors: customColors,
         heading_font: parsed.data.heading_font,
@@ -72,6 +75,7 @@ export async function updateThemeSettings(formData: FormData) {
     if (error) return { error: error.message };
   } else {
     const { error } = await supabase.from("studio_settings").insert({
+      studio_name: parsed.data.studio_name,
       theme_preset: parsed.data.theme_preset,
       custom_colors: customColors,
       heading_font: parsed.data.heading_font,

@@ -1,5 +1,7 @@
+import Image from "next/image";
 import { requireParent } from "@/lib/auth/guards";
 import { getMyStudents, getMyEnrollments, getMyStudentBadges } from "@/lib/queries/portal";
+import { getStudioSettings } from "@/lib/queries/studio-settings";
 import { ClassCard } from "@/components/bam/ClassCard";
 import { DancerCard } from "@/components/bam/DancerCard";
 import { BadgeDisplay } from "@/components/bam/BadgeDisplay";
@@ -7,11 +9,13 @@ import { EmptyState } from "@/components/bam/empty-state";
 
 export default async function DashboardPage() {
   const user = await requireParent();
-  const [students, enrollments, badges] = await Promise.all([
+  const [students, enrollments, badges, settings] = await Promise.all([
     getMyStudents(),
     getMyEnrollments(),
     getMyStudentBadges(),
+    getStudioSettings(),
   ]);
+  const studioName = settings?.studio_name ?? "Ballet Academy & Movement";
 
   const hasStudents = students.length > 0;
   const hasEnrollments = enrollments.length > 0;
@@ -28,13 +32,23 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      {/* Greeting */}
-      <div>
+      {/* Logo + Greeting */}
+      <div className="text-center sm:text-left">
+        <div className="flex justify-center sm:justify-start mb-4">
+          <Image
+            src="/images/studio-logo.png"
+            alt={studioName}
+            width={300}
+            height={300}
+            className="h-auto w-full max-w-[300px]"
+            priority
+          />
+        </div>
         <h1 className="text-2xl font-heading font-semibold text-charcoal">
           Welcome back{user.firstName ? `, ${user.firstName}` : ""}
         </h1>
         <p className="mt-1 text-sm text-slate">
-          Here&apos;s what&apos;s happening at the studio.
+          Here&apos;s what&apos;s happening at {studioName}.
         </p>
       </div>
 

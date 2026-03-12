@@ -11,6 +11,7 @@ import {
 import { updateThemeSettings } from "./actions";
 
 interface ThemeEditorProps {
+  initialStudioName: string;
   initialPreset: string;
   initialCustomColors: Partial<ThemeColors>;
   initialHeadingFont: string;
@@ -32,12 +33,14 @@ const COLOR_FIELDS: { key: keyof ThemeColors; label: string }[] = [
 ];
 
 export function ThemeEditor({
+  initialStudioName,
   initialPreset,
   initialCustomColors,
   initialHeadingFont,
   initialBodyFont,
   initialLogoUrl,
 }: ThemeEditorProps) {
+  const [studioName, setStudioName] = useState(initialStudioName);
   const [preset, setPreset] = useState(initialPreset);
   const [customColors, setCustomColors] = useState<Partial<ThemeColors>>(initialCustomColors);
   const [headingFont, setHeadingFont] = useState(initialHeadingFont);
@@ -83,6 +86,7 @@ export function ThemeEditor({
     setSuccess("");
 
     const formData = new FormData();
+    formData.set("studio_name", studioName);
     formData.set("theme_preset", preset);
     formData.set("custom_colors", JSON.stringify(customColors));
     formData.set("heading_font", headingFont);
@@ -113,7 +117,32 @@ export function ThemeEditor({
         </div>
       )}
 
-      {/* Section 1: Theme Presets */}
+      {/* Section: Studio Branding */}
+      <section>
+        <h2 className="text-lg font-heading font-semibold text-charcoal mb-1">
+          Studio Branding
+        </h2>
+        <p className="text-sm text-slate mb-4">
+          Set the studio name displayed across the platform.
+        </p>
+        <div>
+          <label className="block text-sm font-medium text-charcoal mb-1.5">
+            Studio Name
+          </label>
+          <input
+            type="text"
+            value={studioName}
+            onChange={(e) => setStudioName(e.target.value)}
+            placeholder="Ballet Academy & Movement"
+            className="w-full max-w-md h-11 rounded-lg border border-silver bg-white px-4 text-sm text-charcoal placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
+          />
+          <p className="mt-1.5 text-xs text-mist">
+            This name appears in the portal header, emails, and landing pages.
+          </p>
+        </div>
+      </section>
+
+      {/* Section: Theme Presets */}
       <section>
         <h2 className="text-lg font-heading font-semibold text-charcoal mb-1">
           Theme Preset

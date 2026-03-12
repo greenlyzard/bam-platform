@@ -1,16 +1,22 @@
+import Image from "next/image";
 import { SignOutButton } from "@/components/layouts/sign-out-button";
 import { PortalNav } from "@/components/layouts/portal-nav";
 import { AngelinaChat } from "@/components/angelina/AngelinaChat";
 import { RoleProvider } from "@/context/RoleContext";
 import { requireRole } from "@/lib/auth/requireRole";
+import { getStudioSettings } from "@/lib/queries/studio-settings";
 
 export default async function PortalLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await requireRole(["super_admin", "admin", "parent"]);
+  const [session, settings] = await Promise.all([
+    requireRole(["super_admin", "admin", "parent"]),
+    getStudioSettings(),
+  ]);
   const { role, full_name } = session.profile;
+  const studioName = settings?.studio_name ?? "Ballet Academy & Movement";
 
   return (
     <RoleProvider role={role} fullName={full_name}>
@@ -18,8 +24,17 @@ export default async function PortalLayout({
         {/* Top header */}
         <header className="sticky top-0 z-40 border-b border-silver bg-white/80 backdrop-blur-sm">
           <div className="flex h-14 items-center justify-between px-4 max-w-5xl mx-auto">
-            <a href="/portal/dashboard" className="font-heading text-lg font-semibold text-charcoal">
-              Ballet Academy and Movement
+            <a href="/portal/dashboard" className="flex items-center gap-2.5">
+              <Image
+                src="/images/studio-logo.png"
+                alt={studioName}
+                width={32}
+                height={32}
+                className="h-8 w-8"
+              />
+              <span className="font-heading text-lg font-semibold text-charcoal">
+                {studioName}
+              </span>
             </a>
             <div className="flex items-center gap-3">
               <span className="hidden sm:block text-sm text-slate">
