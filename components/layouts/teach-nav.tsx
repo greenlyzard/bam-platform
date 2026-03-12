@@ -3,25 +3,21 @@
 import { usePathname } from "next/navigation";
 
 const navItems = [
-  { label: "Dashboard", href: "/teach/dashboard", icon: "⌂" },
-  { label: "My Classes", href: "/teach/classes", icon: "▦" },
-  { label: "Attendance", href: "/teach/attendance", icon: "●" },
-  { label: "Badges", href: "/teach/badges", icon: "◆" },
-  { label: "Assessments", href: "/teach/assessments", icon: "▲" },
-  { label: "Hours", href: "/teach/hours", icon: "◷" },
+  { label: "My Dashboard", href: "/teach/dashboard", icon: "⌂" },
+  { label: "My Schedule", href: "/teach/classes", icon: "▦" },
+  { label: "My Students", href: "/teach/students", icon: "♡" },
+  { label: "Log Hours", href: "/teach/hours", icon: "◷" },
   { label: "Report Absence", href: "/teach/report-absence", icon: "✕" },
-  { label: "Sub Requests", href: "/teach/substitute-requests", icon: "↻" },
-  { label: "Content", href: "/teach/content", icon: "▶" },
-  { label: "Messages", href: "/teach/messages", icon: "✉" },
-  { label: "Ask Angelina", href: "/teach/chat", icon: "◈" },
+  { label: "Substitute Requests", href: "/teach/substitute-requests", icon: "↻" },
+  { label: "Chat (Angelina)", href: "/teach/chat", icon: "◈" },
 ];
 
 const mobileItems = [
   { label: "Home", href: "/teach/dashboard", icon: "⌂" },
-  { label: "Classes", href: "/teach/classes", icon: "▦" },
-  { label: "Attend", href: "/teach/attendance", icon: "●" },
+  { label: "Schedule", href: "/teach/classes", icon: "▦" },
+  { label: "Students", href: "/teach/students", icon: "♡" },
   { label: "Hours", href: "/teach/hours", icon: "◷" },
-  { label: "More", href: "/teach/badges", icon: "⋯" },
+  { label: "More", href: "/teach/report-absence", icon: "⋯" },
 ];
 
 export function TeachNav({ mobile = false }: { mobile?: boolean }) {

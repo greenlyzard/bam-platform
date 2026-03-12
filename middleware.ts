@@ -95,8 +95,7 @@ export async function middleware(request: NextRequest) {
     );
 
     if (!hasAccess) {
-      const home = ROLE_HOME[role] ?? "/portal/dashboard";
-      return NextResponse.redirect(new URL(home, request.url));
+      return NextResponse.redirect(new URL("/unauthorized", request.url));
     }
   }
 

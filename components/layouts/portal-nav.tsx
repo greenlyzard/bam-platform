@@ -3,22 +3,20 @@
 import { usePathname } from "next/navigation";
 
 const navItems = [
-  { label: "Home", href: "/portal/dashboard", icon: "⌂" },
-  { label: "My Dancers", href: "/portal/children", icon: "♡" },
+  { label: "My Dashboard", href: "/portal/dashboard", icon: "⌂" },
+  { label: "My Children", href: "/portal/children", icon: "♡" },
   { label: "Schedule", href: "/portal/schedule", icon: "▦" },
+  { label: "Enrollment", href: "/portal/enrollment", icon: "◈" },
   { label: "Billing", href: "/portal/billing", icon: "✦" },
-  { label: "Performances", href: "/portal/performances", icon: "★" },
-  { label: "Messages", href: "/portal/messages", icon: "✉" },
-  { label: "Ask Angelina", href: "/portal/chat", icon: "◈" },
+  { label: "Chat (Angelina)", href: "/portal/chat", icon: "◇" },
 ];
 
-// Mobile bottom tab shows fewer items
 const mobileItems = [
   { label: "Home", href: "/portal/dashboard", icon: "⌂" },
-  { label: "Dancers", href: "/portal/children", icon: "♡" },
+  { label: "Children", href: "/portal/children", icon: "♡" },
   { label: "Schedule", href: "/portal/schedule", icon: "▦" },
   { label: "Billing", href: "/portal/billing", icon: "✦" },
-  { label: "More", href: "/portal/performances", icon: "⋯" },
+  { label: "More", href: "/portal/enrollment", icon: "⋯" },
 ];
 
 export function PortalNav({ mobile = false }: { mobile?: boolean }) {

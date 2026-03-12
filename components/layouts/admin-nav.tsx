@@ -1,8 +1,21 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import type { Role } from "@/lib/auth/getSessionWithRole";
 
-const navGroups = [
+interface NavItem {
+  label: string;
+  href: string;
+  icon: string;
+}
+
+interface NavGroup {
+  label: string;
+  items: NavItem[];
+  superAdminOnly?: boolean;
+}
+
+const navGroups: NavGroup[] = [
   {
     label: "Studio",
     items: [
@@ -62,13 +75,14 @@ const navGroups = [
   },
   {
     label: "Settings",
+    superAdminOnly: true,
     items: [
       { label: "Theme", href: "/admin/settings/theme", icon: "◑" },
     ],
   },
 ];
 
-const mobileItems = [
+const mobileItems: NavItem[] = [
   { label: "Home", href: "/admin/dashboard", icon: "⌂" },
   { label: "Classes", href: "/admin/classes", icon: "▦" },
   { label: "Teachers", href: "/admin/teachers", icon: "★" },
@@ -76,7 +90,13 @@ const mobileItems = [
   { label: "More", href: "/admin/billing", icon: "⋯" },
 ];
 
-export function AdminNav({ mobile = false }: { mobile?: boolean }) {
+export function AdminNav({
+  mobile = false,
+  role,
+}: {
+  mobile?: boolean;
+  role?: Role;
+}) {
   const pathname = usePathname();
 
   if (mobile) {
@@ -101,9 +121,13 @@ export function AdminNav({ mobile = false }: { mobile?: boolean }) {
     );
   }
 
+  const visibleGroups = navGroups.filter(
+    (group) => !group.superAdminOnly || role === "super_admin"
+  );
+
   return (
     <nav className="space-y-4">
-      {navGroups.map((group) => (
+      {visibleGroups.map((group) => (
         <div key={group.label}>
           <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-mist">
             {group.label}
