@@ -1,8 +1,18 @@
+import Image from "next/image";
+
 export default function HomePage() {
   return (
     <main className="min-h-screen flex flex-col items-center justify-center px-6">
+      <Image
+        src="/studio-logo.png"
+        alt="Ballet Academy & Movement"
+        width={700}
+        height={400}
+        className="h-auto w-full max-w-[280px] mb-6"
+        priority
+      />
       <h1 className="text-4xl md:text-5xl font-heading font-semibold text-charcoal text-center">
-        Ballet Academy and Movement
+        Ballet Academy &amp; Movement
       </h1>
       <p className="mt-4 text-lg text-slate text-center max-w-lg">
         Real ballet training in a nurturing environment.

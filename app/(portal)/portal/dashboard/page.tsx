@@ -36,11 +36,11 @@ export default async function DashboardPage() {
       <div className="text-center sm:text-left">
         <div className="flex justify-center sm:justify-start mb-4">
           <Image
-            src="/images/studio-logo.png"
+            src="/studio-logo.png"
             alt={studioName}
-            width={300}
-            height={300}
-            className="h-auto w-full max-w-[300px]"
+            width={700}
+            height={400}
+            className="h-auto w-full max-w-[280px]"
             priority
           />
         </div>
