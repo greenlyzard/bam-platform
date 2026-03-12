@@ -68,6 +68,8 @@ export async function getClassCatalog(filters?: {
       waitlistCount,
       spotsRemaining: Math.max(0, (cls.max_students as number) - activeCount),
       isFull: activeCount >= (cls.max_students as number),
+      monthlyTuitionCents: (cls.monthly_tuition_cents as number | null) ?? null,
+      registrationFeeCents: (cls.registration_fee_cents as number | null) ?? null,
     };
   });
 }

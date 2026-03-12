@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { enrollStudent, bookTrialClass } from "./actions";
+import { useCart } from "@/lib/cart-context";
 
 // ─── Types ──────────────────────────────────────────────
 
@@ -22,6 +23,8 @@ interface ClassInfo {
   activeCount: number;
   spotsRemaining: number;
   isFull: boolean;
+  monthlyTuitionCents: number | null;
+  registrationFeeCents: number | null;
 }
 
 interface ChildData {
@@ -256,6 +259,8 @@ function toggleMulti<T>(value: T, current: T[], exclusive?: T): T[] {
 // ─── Component ──────────────────────────────────────────
 
 export function EnrollmentWizard({ classes }: { classes: ClassInfo[] }) {
+  const cart = useCart();
+
   // ─── Quiz state ─────────────────────────────────
   const [step, setStep] = useState<Step>("who");
   const [enrolleeType, setEnrolleeType] = useState<EnrolleeType | null>(null);
@@ -1203,18 +1208,37 @@ export function EnrollmentWizard({ classes }: { classes: ClassInfo[] }) {
                   )}
 
                   <div className="flex gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        selectClass(
-                          cls,
-                          enrolleeType === "child" ? childName : undefined
-                        )
-                      }
-                      className="flex-1 h-11 rounded-lg bg-lavender hover:bg-lavender-dark text-white font-semibold text-sm transition-colors"
-                    >
-                      {cls.isFull ? "Join Waitlist" : "Enroll in This Class"}
-                    </button>
+                    {cart.hasClass(cls.id) ? (
+                      <button
+                        type="button"
+                        disabled
+                        className="flex-1 h-11 rounded-lg bg-success/10 text-success font-semibold text-sm cursor-default"
+                      >
+                        Added to Cart
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nameForCart =
+                            enrolleeType === "myself"
+                              ? "You"
+                              : enrolleeType === "child"
+                                ? childName || "Your child"
+                                : group.label.replace("For ", "");
+                          cart.addItem({
+                            classInfo: cls,
+                            childName: nameForCart,
+                            childAge:
+                              enrolleeType === "child" ? childAge : null,
+                            type: cls.isFull ? "waitlist" : "enroll",
+                          });
+                        }}
+                        className="flex-1 h-11 rounded-lg bg-lavender hover:bg-lavender-dark text-white font-semibold text-sm transition-colors"
+                      >
+                        {cls.isFull ? "Join Waitlist" : "Add to Cart"}
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => {
