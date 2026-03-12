@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- BAM Pink Circle Dancer Logo -->
+  <circle cx="256" cy="256" r="250" fill="#9C8BBF"/>
+  <circle cx="256" cy="256" r="235" fill="none" stroke="#C5B8E0" stroke-width="2"/>
+  <!-- Dancer silhouette in arabesque -->
+  <g transform="translate(256, 260) scale(1.8)" fill="#FAF7F2" stroke="none">
+    <!-- Head -->
+    <circle cx="0" cy="-70" r="16"/>
+    <!-- Hair bun -->
+    <circle cx="2" cy="-85" r="8"/>
+    <!-- Neck -->
+    <rect x="-3" y="-55" width="6" height="12" rx="3"/>
+    <!-- Torso -->
+    <path d="M-14,-43 Q-16,-20 -8,0 L8,0 Q16,-20 14,-43 Z"/>
+    <!-- Right arm (extended forward-up) -->
+    <path d="M14,-38 Q28,-52 44,-60" stroke="#FAF7F2" stroke-width="5" fill="none" stroke-linecap="round"/>
+    <!-- Left arm (extended back) -->
+    <path d="M-14,-38 Q-30,-44 -42,-36" stroke="#FAF7F2" stroke-width="5" fill="none" stroke-linecap="round"/>
+    <!-- Tutu -->
+    <ellipse cx="0" cy="2" rx="22" ry="8" fill="#FAF7F2" opacity="0.9"/>
+    <!-- Standing leg -->
+    <path d="M4,8 Q6,30 4,55 L4,70" stroke="#FAF7F2" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <!-- Pointe foot -->
+    <path d="M4,68 L4,76" stroke="#FAF7F2" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <!-- Extended leg (arabesque) -->
+    <path d="M-4,4 Q-20,10 -48,-10" stroke="#FAF7F2" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <!-- Extended foot -->
+    <path d="M-48,-10 L-56,-14" stroke="#FAF7F2" stroke-width="4" fill="none" stroke-linecap="round"/>
+  </g>
+</svg>

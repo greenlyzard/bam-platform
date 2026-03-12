@@ -1,0 +1,398 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&display=swap');
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 16px;
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #2C2C2C;
+  background: #FAF9F7;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.75rem;
+  font-weight: 600;
+  color: #2C2C2C;
+  margin: 0 0 4px;
+}
+
+.subtitle {
+  font-size: 0.875rem;
+  color: #6B6B7B;
+  margin: 0;
+}
+
+/* ── Week Navigation ─────────────────────────────────────── */
+
+.weekNav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.navButton {
+  padding: 6px 16px;
+  border-radius: 8px;
+  border: 1px solid #E0DDD8;
+  background: white;
+  color: #6B6B7B;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.navButton:hover {
+  background: #F0EBF8;
+  color: #6B5A99;
+  border-color: #9C8BBF;
+}
+
+.navButtonActive {
+  background: #9C8BBF;
+  color: white;
+  border-color: #9C8BBF;
+}
+
+.navButtonActive:hover {
+  background: #6B5A99;
+}
+
+/* ── Filter Bar ──────────────────────────────────────────── */
+
+.filterBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding: 16px;
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #E0DDD8;
+}
+
+.filterGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.filterLabel {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #A8A8B8;
+}
+
+.filterPills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pill {
+  padding: 4px 12px;
+  border-radius: 9999px;
+  border: 1px solid #C5B8E0;
+  background: transparent;
+  color: #6B5A99;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.pill:hover {
+  background: #F0EBF8;
+}
+
+.pillActive {
+  background: #9C8BBF;
+  color: white;
+  border-color: #9C8BBF;
+}
+
+.pillActive:hover {
+  background: #6B5A99;
+}
+
+.filterSelect {
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid #C5B8E0;
+  background: white;
+  color: #2C2C2C;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: #6B6B7B;
+  cursor: pointer;
+}
+
+.toggleInput {
+  accent-color: #9C8BBF;
+}
+
+/* ── Day Section ─────────────────────────────────────────── */
+
+.daySection {
+  margin-bottom: 24px;
+}
+
+.dayHeading {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #6B5A99;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #C5B8E0;
+  margin-bottom: 12px;
+}
+
+.classGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+/* ── Class Card ──────────────────────────────────────────── */
+
+.card {
+  background: white;
+  border-radius: 10px;
+  padding: 14px 14px 14px 18px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  border-left: 4px solid #C5B8E0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: box-shadow 0.2s;
+}
+
+.card:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.cardName {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #2C2C2C;
+  margin: 0;
+}
+
+.cardTime {
+  font-size: 0.85rem;
+  color: #6B6B7B;
+  margin: 0;
+}
+
+.cardAge {
+  font-size: 0.8rem;
+  color: #A8A8B8;
+  margin: 0;
+}
+
+.cardMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.badgePetite { background: #F4C6D420; color: #C4506A; }
+.badgePreBallet { background: #D4C6F420; color: #6B5B9E; }
+.badgeBeginner { background: #B8A9E020; color: #6B5B9E; }
+.badgeIntermediate { background: #9C8BBF1A; color: #6B5A99; }
+.badgeAdvanced { background: #6B5B9E1A; color: #6B5B9E; }
+.badgePreProfessional { background: #4A3A7E1A; color: #4A3A7E; }
+.badgeOpen { background: #A8C5A020; color: #5A7A52; }
+.badgeTrial { background: #7EC8C820; color: #3A8A8A; }
+.badgeRehearsal { background: #C9A84C1A; color: #9B7A2E; }
+
+.teacherName {
+  font-size: 0.8rem;
+  color: #6B6B7B;
+  margin: 0;
+}
+
+.typeIcon {
+  font-size: 0.85rem;
+}
+
+/* ── Level Border Colors ─────────────────────────────────── */
+
+.borderPetite { border-left-color: #F4C6D4; }
+.borderPreBallet { border-left-color: #D4C6F4; }
+.borderBeginner { border-left-color: #B8A9E0; }
+.borderIntermediate { border-left-color: #9C8BBF; }
+.borderAdvanced { border-left-color: #6B5B9E; }
+.borderPreProfessional { border-left-color: #4A3A7E; }
+.borderOpen { border-left-color: #A8C5A0; }
+.borderRehearsal { border-left-color: #C9A84C; }
+
+/* ── Empty State ─────────────────────────────────────────── */
+
+.emptyState {
+  text-align: center;
+  padding: 48px 24px;
+  color: #A8A8B8;
+}
+
+.emptyState p {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+/* ── Print Mode ──────────────────────────────────────────── */
+
+.printHeader {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.printStudioName {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.printSubheader {
+  font-size: 0.9rem;
+  color: #6B6B7B;
+  margin: 4px 0 0;
+}
+
+.printTable {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 16px;
+  font-size: 0.85rem;
+}
+
+.printTable th {
+  background: #9C8BBF;
+  color: white;
+  padding: 6px 10px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.printTable td {
+  padding: 6px 10px;
+  border-bottom: 1px solid #E0DDD8;
+}
+
+.printFooter {
+  text-align: center;
+  font-size: 0.75rem;
+  color: #A8A8B8;
+  padding-top: 16px;
+  border-top: 1px solid #E0DDD8;
+}
+
+.printButton {
+  padding: 8px 20px;
+  background: #9C8BBF;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  margin-bottom: 16px;
+}
+
+.printButton:hover {
+  background: #6B5A99;
+}
+
+/* ── Print row level colors ──────────────────────────────── */
+
+.printRowPetite { background: #F4C6D420; }
+.printRowBeginner { background: #B8A9E015; }
+.printRowIntermediate { background: #9C8BBF10; }
+.printRowAdvanced { background: #6B5B9E10; }
+.printRowPreProfessional { background: #4A3A7E10; }
+.printRowOpen { background: #A8C5A015; }
+.printRowRehearsal { background: #C9A84C10; }
+
+/* ── Responsive ──────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .container {
+    padding: 16px 12px;
+  }
+
+  .filterBar {
+    flex-direction: column;
+    padding: 12px;
+  }
+
+  .classGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .weekNav {
+    flex-wrap: wrap;
+  }
+}
+
+/* ── Print Media Query ───────────────────────────────────── */
+
+@media print {
+  .filterBar, .weekNav, .printButton {
+    display: none !important;
+  }
+
+  .card {
+    box-shadow: none;
+    border: 1px solid #E0DDD8;
+    break-inside: avoid;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    color-adjust: exact;
+  }
+
+  .container {
+    background: white;
+    padding: 0;
+  }
+
+  .printTable td, .printTable th {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    color-adjust: exact;
+  }
+}

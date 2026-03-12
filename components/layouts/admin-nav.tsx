@@ -9,6 +9,7 @@ const navGroups = [
       { label: "Dashboard", href: "/admin/dashboard", icon: "⌂" },
       { label: "Seasons", href: "/admin/seasons", icon: "◈" },
       { label: "Calendar", href: "/admin/calendar", icon: "▥" },
+      { label: "Schedule Embeds", href: "/admin/schedule-embeds", icon: "◫" },
       { label: "Classes", href: "/admin/classes", icon: "▦" },
       { label: "Students", href: "/admin/students", icon: "♡" },
       { label: "Families", href: "/admin/families", icon: "◇" },
@@ -19,6 +20,7 @@ const navGroups = [
     items: [
       { label: "Teachers", href: "/admin/teachers", icon: "★" },
       { label: "Compliance", href: "/admin/compliance", icon: "◆" },
+      { label: "Substitute Requests", href: "/admin/substitute-requests", icon: "↻" },
     ],
   },
   {

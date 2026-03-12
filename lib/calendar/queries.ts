@@ -84,14 +84,14 @@ export async function getScheduleInstances(
   const classIds = [
     ...new Set(instances.map((i) => i.class_id).filter(Boolean) as string[]),
   ];
-  const classInfo: Record<string, { name: string; level: string | null; style: string | null }> = {};
+  const classInfo: Record<string, { name: string; level: string | null; style: string | null; age_min: number | null; age_max: number | null; discipline: string | null }> = {};
   if (classIds.length > 0) {
     const { data: classes } = await supabase
       .from("classes")
-      .select("id, name, level, style")
+      .select("id, name, level, style, age_min, age_max, discipline")
       .in("id", classIds);
     for (const c of classes ?? []) {
-      classInfo[c.id] = { name: c.name, level: c.level, style: c.style };
+      classInfo[c.id] = { name: c.name, level: c.level, style: c.style, age_min: c.age_min, age_max: c.age_max, discipline: c.discipline };
     }
   }
 
@@ -105,6 +105,9 @@ export async function getScheduleInstances(
     roomName: i.room_id ? (roomNames[i.room_id] ?? null) : null,
     level: i.class_id ? (classInfo[i.class_id]?.level ?? null) : null,
     style: i.class_id ? (classInfo[i.class_id]?.style ?? null) : null,
+    ageMin: i.class_id ? (classInfo[i.class_id]?.age_min ?? null) : null,
+    ageMax: i.class_id ? (classInfo[i.class_id]?.age_max ?? null) : null,
+    discipline: i.class_id ? (classInfo[i.class_id]?.discipline ?? null) : null,
   }));
 }
 

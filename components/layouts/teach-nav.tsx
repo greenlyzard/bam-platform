@@ -9,6 +9,8 @@ const navItems = [
   { label: "Badges", href: "/teach/badges", icon: "◆" },
   { label: "Assessments", href: "/teach/assessments", icon: "▲" },
   { label: "Hours", href: "/teach/hours", icon: "◷" },
+  { label: "Report Absence", href: "/teach/report-absence", icon: "✕" },
+  { label: "Sub Requests", href: "/teach/substitute-requests", icon: "↻" },
   { label: "Content", href: "/teach/content", icon: "▶" },
   { label: "Messages", href: "/teach/messages", icon: "✉" },
 ];

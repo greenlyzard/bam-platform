@@ -201,6 +201,9 @@ export interface ScheduleInstanceWithDetails extends ScheduleInstance {
   roomName: string | null;
   level: string | null;
   style: string | null;
+  ageMin: number | null;
+  ageMax: number | null;
+  discipline: string | null;
 }
 
 // ── Filter Type ──────────────────────────────────────────
@@ -212,6 +215,57 @@ export interface ScheduleInstanceFilters {
   teacherId?: string;
   roomId?: string;
   statuses?: ScheduleInstanceStatus[];
+}
+
+// ── Substitute System Types ─────────────────────────────
+
+export type SubstituteRequestStatus = "open" | "filled" | "cancelled" | "unfilled";
+
+export type SubstituteAlertResponse = "accepted" | "declined" | "no_response";
+
+export interface SubstituteAuthorization {
+  id: string;
+  tenant_id: string;
+  teacher_id: string;
+  authorized_for_levels: string[] | null;
+  authorized_for_types: string[] | null;
+  priority_order: number;
+  notes: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface SubstituteRequest {
+  id: string;
+  tenant_id: string;
+  instance_id: string;
+  requesting_teacher_id: string;
+  reason: string | null;
+  status: SubstituteRequestStatus;
+  filled_by: string | null;
+  filled_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SubstituteAlert {
+  id: string;
+  tenant_id: string;
+  request_id: string;
+  teacher_id: string;
+  alert_sent_at: string;
+  response: SubstituteAlertResponse | null;
+  responded_at: string | null;
+  alert_channel: string[] | null;
+  created_at: string;
+}
+
+// ── Widget Data Types ───────────────────────────────────
+
+export interface WidgetScheduleData {
+  instances: ScheduleInstanceWithDetails[];
+  seasons: Season[];
+  embedConfig: ScheduleEmbed;
 }
 
 // ── Color Constants ──────────────────────────────────────
