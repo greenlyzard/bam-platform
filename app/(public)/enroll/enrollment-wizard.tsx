@@ -197,11 +197,11 @@ function getAdultRecommendations(
     (i) => !["pilates", "gyrotonic", "not_sure"].includes(i)
   );
 
-  // Adults must only see classes with "adult" or "teen" in the level.
-  // Never return children's levels (1, 2A, 2B, 2C, 3A, 3B, 3C, 4, Petites, etc.)
+  // Only return adult/teen classes: level "open" with age_min >= 14
+  // This excludes children's classes (petite, beginner, intermediate, etc.)
+  // and kids open-level classes like Pop-Up Hip Hop (age_min=5)
   let matches = classes.filter((cls) => {
-    const lvl = cls.level.toLowerCase();
-    return lvl.includes("adult") || lvl.includes("teen");
+    return cls.level === "open" && cls.ageMin !== null && cls.ageMin >= 14;
   });
 
   // When only pilates/gyrotonic selected, return zero dance classes
