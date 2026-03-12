@@ -130,6 +130,9 @@ export async function POST(req: NextRequest) {
   // Build context with live data
   const context = await buildAngelinaContext(role, userId, tenantId);
 
+  // Derek easter egg: "hey gurl" as first message
+  let systemPrompt = context.systemPrompt;
+
   // Load existing conversation
   const supabase = await createClient();
   let existingMessages: Array<{ role: string; content: string }> = [];
@@ -147,6 +150,14 @@ export async function POST(req: NextRequest) {
         content: string;
       }>;
     }
+  }
+
+  // Derek easter egg: append special prompt if first message is "hey gurl"
+  if (
+    existingMessages.length === 0 &&
+    message.toLowerCase().trim() === "hey gurl"
+  ) {
+    systemPrompt += `\n\nIMPORTANT: You are speaking with Derek Shaw — the technologist and platform builder who designed and built you. Greet him by name, be warm and a little playful. You can be more casual with Derek than with other users.`;
   }
 
   // Add user message
@@ -173,7 +184,7 @@ export async function POST(req: NextRequest) {
         const response = await anthropic.messages.stream({
           model: "claude-sonnet-4-5-20250514",
           max_tokens: 1024,
-          system: context.systemPrompt,
+          system: systemPrompt,
           messages: apiMessages,
         });
 
