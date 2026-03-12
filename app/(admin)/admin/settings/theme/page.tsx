@@ -33,6 +33,8 @@ export default async function ThemeSettingsPage() {
         initialHeadingFont={settings?.heading_font ?? "Cormorant Garamond"}
         initialBodyFont={settings?.body_font ?? "Montserrat"}
         initialLogoUrl={settings?.logo_url ?? ""}
+        initialFaviconUrl={settings?.favicon_url ?? ""}
+        initialAppIconUrl={settings?.app_icon_url ?? ""}
       />
     </div>
   );

@@ -17,6 +17,8 @@ interface ThemeEditorProps {
   initialHeadingFont: string;
   initialBodyFont: string;
   initialLogoUrl: string;
+  initialFaviconUrl: string;
+  initialAppIconUrl: string;
 }
 
 const COLOR_FIELDS: { key: keyof ThemeColors; label: string }[] = [
@@ -39,6 +41,8 @@ export function ThemeEditor({
   initialHeadingFont,
   initialBodyFont,
   initialLogoUrl,
+  initialFaviconUrl,
+  initialAppIconUrl,
 }: ThemeEditorProps) {
   const [studioName, setStudioName] = useState(initialStudioName);
   const [preset, setPreset] = useState(initialPreset);
@@ -46,6 +50,8 @@ export function ThemeEditor({
   const [headingFont, setHeadingFont] = useState(initialHeadingFont);
   const [bodyFont, setBodyFont] = useState(initialBodyFont);
   const [logoUrl, setLogoUrl] = useState(initialLogoUrl);
+  const [faviconUrl, setFaviconUrl] = useState(initialFaviconUrl);
+  const [appIconUrl, setAppIconUrl] = useState(initialAppIconUrl);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -92,6 +98,8 @@ export function ThemeEditor({
     formData.set("heading_font", headingFont);
     formData.set("body_font", bodyFont);
     formData.set("logo_url", logoUrl);
+    formData.set("favicon_url", faviconUrl);
+    formData.set("app_icon_url", appIconUrl);
 
     const result = await updateThemeSettings(formData);
     setSaving(false);
@@ -123,22 +131,87 @@ export function ThemeEditor({
           Studio Branding
         </h2>
         <p className="text-sm text-slate mb-4">
-          Set the studio name displayed across the platform.
+          Configure your studio name, favicon, and app icon.
         </p>
-        <div>
-          <label className="block text-sm font-medium text-charcoal mb-1.5">
-            Studio Name
-          </label>
-          <input
-            type="text"
-            value={studioName}
-            onChange={(e) => setStudioName(e.target.value)}
-            placeholder="Ballet Academy & Movement"
-            className="w-full max-w-md h-11 rounded-lg border border-silver bg-white px-4 text-sm text-charcoal placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
-          />
-          <p className="mt-1.5 text-xs text-mist">
-            This name appears in the portal header, emails, and landing pages.
-          </p>
+        <div className="space-y-6">
+          {/* Studio Name */}
+          <div>
+            <label className="block text-sm font-medium text-charcoal mb-1.5">
+              Studio Name
+            </label>
+            <input
+              type="text"
+              value={studioName}
+              onChange={(e) => setStudioName(e.target.value)}
+              placeholder="Ballet Academy & Movement"
+              className="w-full max-w-md h-11 rounded-lg border border-silver bg-white px-4 text-sm text-charcoal placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
+            />
+            <p className="mt-1.5 text-xs text-mist">
+              This name appears in the portal header, emails, and landing pages.
+            </p>
+          </div>
+
+          {/* Favicon */}
+          <div>
+            <label className="block text-sm font-medium text-charcoal mb-1.5">
+              Favicon
+            </label>
+            <div className="flex items-start gap-4">
+              <div className="flex-1 max-w-md">
+                <input
+                  type="url"
+                  value={faviconUrl}
+                  onChange={(e) => setFaviconUrl(e.target.value)}
+                  placeholder="https://example.com/favicon.png"
+                  className="w-full h-11 rounded-lg border border-silver bg-white px-4 text-sm text-charcoal placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
+                />
+                <p className="mt-1.5 text-xs text-mist">
+                  PNG or ICO. Leave blank to use the default favicon.
+                </p>
+              </div>
+              {faviconUrl && (
+                <div className="h-10 w-10 rounded-lg border border-silver bg-white flex items-center justify-center overflow-hidden shrink-0">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={faviconUrl}
+                    alt="Favicon preview"
+                    className="h-8 w-8 object-contain"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* App Icon */}
+          <div>
+            <label className="block text-sm font-medium text-charcoal mb-1.5">
+              App Icon (iOS / Android)
+            </label>
+            <div className="flex items-start gap-4">
+              <div className="flex-1 max-w-md">
+                <input
+                  type="url"
+                  value={appIconUrl}
+                  onChange={(e) => setAppIconUrl(e.target.value)}
+                  placeholder="https://example.com/app-icon-180.png"
+                  className="w-full h-11 rounded-lg border border-silver bg-white px-4 text-sm text-charcoal placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
+                />
+                <p className="mt-1.5 text-xs text-mist">
+                  PNG, minimum 180x180. Used for Apple Touch Icon and Android home screen.
+                </p>
+              </div>
+              {appIconUrl && (
+                <div className="h-12 w-12 rounded-xl border border-silver bg-white flex items-center justify-center overflow-hidden shrink-0">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={appIconUrl}
+                    alt="App icon preview"
+                    className="h-10 w-10 object-contain"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </section>
 

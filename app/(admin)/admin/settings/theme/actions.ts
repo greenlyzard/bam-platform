@@ -10,6 +10,8 @@ const schema = z.object({
   heading_font: z.string().min(1),
   body_font: z.string().min(1),
   logo_url: z.string().optional(),
+  favicon_url: z.string().optional(),
+  app_icon_url: z.string().optional(),
 });
 
 export async function updateThemeSettings(formData: FormData) {
@@ -37,6 +39,8 @@ export async function updateThemeSettings(formData: FormData) {
     heading_font: formData.get("heading_font"),
     body_font: formData.get("body_font"),
     logo_url: formData.get("logo_url") || undefined,
+    favicon_url: formData.get("favicon_url") || undefined,
+    app_icon_url: formData.get("app_icon_url") || undefined,
   });
 
   if (!parsed.success) {
@@ -57,16 +61,22 @@ export async function updateThemeSettings(formData: FormData) {
     .limit(1)
     .single();
 
+  const settingsPayload = {
+    studio_name: parsed.data.studio_name,
+    theme_preset: parsed.data.theme_preset,
+    custom_colors: customColors,
+    heading_font: parsed.data.heading_font,
+    body_font: parsed.data.body_font,
+    logo_url: parsed.data.logo_url || null,
+    favicon_url: parsed.data.favicon_url || null,
+    app_icon_url: parsed.data.app_icon_url || null,
+  };
+
   if (existing) {
     const { error } = await supabase
       .from("studio_settings")
       .update({
-        studio_name: parsed.data.studio_name,
-        theme_preset: parsed.data.theme_preset,
-        custom_colors: customColors,
-        heading_font: parsed.data.heading_font,
-        body_font: parsed.data.body_font,
-        logo_url: parsed.data.logo_url || null,
+        ...settingsPayload,
         updated_at: new Date().toISOString(),
         updated_by: user.id,
       })
@@ -75,12 +85,7 @@ export async function updateThemeSettings(formData: FormData) {
     if (error) return { error: error.message };
   } else {
     const { error } = await supabase.from("studio_settings").insert({
-      studio_name: parsed.data.studio_name,
-      theme_preset: parsed.data.theme_preset,
-      custom_colors: customColors,
-      heading_font: parsed.data.heading_font,
-      body_font: parsed.data.body_font,
-      logo_url: parsed.data.logo_url || null,
+      ...settingsPayload,
       updated_by: user.id,
     });
 
