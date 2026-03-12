@@ -178,6 +178,14 @@ export function LoginForm({
               className="w-full h-11 rounded-lg border border-silver bg-white px-4 text-base placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
             />
           </div>
+          <div className="flex justify-end">
+            <a
+              href="/forgot-password"
+              className="text-xs text-lavender hover:text-lavender-dark font-medium"
+            >
+              Forgot password?
+            </a>
+          </div>
           <button
             type="submit"
             disabled={loading}

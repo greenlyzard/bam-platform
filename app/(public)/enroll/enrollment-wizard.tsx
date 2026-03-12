@@ -1400,6 +1400,17 @@ export function EnrollmentWizard({ classes }: { classes: ClassInfo[] }) {
               </select>
             )}
 
+            {authMode === "signin" && (
+              <div className="flex justify-end">
+                <a
+                  href="/forgot-password"
+                  className="text-xs text-lavender hover:text-lavender-dark font-medium"
+                >
+                  Forgot password?
+                </a>
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={loading}
