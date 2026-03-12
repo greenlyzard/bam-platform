@@ -70,6 +70,8 @@ const navGroups: NavGroup[] = [
   {
     label: "Intelligence",
     items: [
+      { label: "Resources", href: "/admin/resources", icon: "◧" },
+      { label: "Rentals", href: "/admin/resources/rentals", icon: "◨" },
       { label: "Expansion", href: "/admin/expansion", icon: "●" },
     ],
   },
