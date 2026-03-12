@@ -9,6 +9,7 @@ const ROLE_ROUTES: Record<string, string[]> = {
   parent: ["/portal", "/learn", "/shop"],
   student: ["/portal", "/learn", "/shop"],
   teacher: ["/teach", "/portal", "/learn", "/shop"],
+  front_desk: ["/admin", "/portal", "/learn", "/shop"],
   admin: ["/admin", "/teach", "/portal", "/learn", "/shop"],
   super_admin: ["/admin", "/teach", "/portal", "/learn", "/shop"],
 };
@@ -18,6 +19,7 @@ const ROLE_HOME: Record<string, string> = {
   parent: "/portal/dashboard",
   student: "/portal/dashboard",
   teacher: "/teach/dashboard",
+  front_desk: "/admin/dashboard",
   admin: "/admin/dashboard",
   super_admin: "/admin/dashboard",
 };

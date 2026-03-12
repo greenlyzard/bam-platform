@@ -4,7 +4,7 @@ import { getClassCatalog } from "@/lib/queries/enroll";
 export const metadata = {
   title: "Enroll — Ballet Academy and Movement",
   description:
-    "Find the right class for your child and enroll in under 5 minutes.",
+    "Find the right class and enroll in under 5 minutes — for yourself or your children.",
 };
 
 export default async function EnrollPage() {

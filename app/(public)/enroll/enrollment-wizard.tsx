@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { enrollStudent, bookTrialClass } from "./actions";
 
+// ─── Types ──────────────────────────────────────────────
+
 interface ClassInfo {
   id: string;
   name: string;
@@ -22,9 +24,49 @@ interface ClassInfo {
   isFull: boolean;
 }
 
-type Step = "quiz" | "results" | "auth" | "student" | "confirm" | "done";
+interface ChildData {
+  name: string;
+  age: number | null;
+  experience: string;
+  disciplines: string[];
+}
 
-const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+interface RecommendationGroup {
+  label: string;
+  classes: ClassInfo[];
+  pilatesGyroInterest: boolean;
+}
+
+type EnrolleeType = "myself" | "child" | "multiple";
+
+type Step =
+  | "who"
+  | "adult_experience"
+  | "adult_interests"
+  | "adult_days"
+  | "child_name"
+  | "child_age"
+  | "child_experience"
+  | "child_disciplines"
+  | "child_days"
+  | "multi_child"
+  | "results"
+  | "auth"
+  | "student"
+  | "confirm"
+  | "done";
+
+// ─── Constants ──────────────────────────────────────────
+
+const DAYS = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
 
 const STYLE_LABELS: Record<string, string> = {
   ballet: "Ballet",
@@ -35,7 +77,40 @@ const STYLE_LABELS: Record<string, string> = {
   contemporary: "Contemporary",
   lyrical: "Lyrical",
   musical_theatre: "Musical Theatre",
+  hip_hop: "Hip Hop",
 };
+
+const ADULT_EXPERIENCE_OPTIONS = [
+  { value: "beginner", label: "Complete beginner", desc: "Never taken a formal class" },
+  { value: "some", label: "Some experience", desc: "Took classes years ago or casually" },
+  { value: "intermediate", label: "Intermediate", desc: "Fairly consistent training" },
+  { value: "advanced", label: "Advanced", desc: "Serious training background" },
+];
+
+const ADULT_INTEREST_OPTIONS = [
+  { value: "ballet", label: "Ballet" },
+  { value: "jazz", label: "Jazz" },
+  { value: "contemporary", label: "Contemporary" },
+  { value: "hip_hop", label: "Hip Hop" },
+  { value: "pilates", label: "Pilates (mat or reformer)" },
+  { value: "gyrotonic", label: "Gyrotonic" },
+  { value: "not_sure", label: "Not sure — help me decide" },
+];
+
+const CHILD_EXPERIENCE_OPTIONS = [
+  { value: "never", label: "Never", desc: "This will be their first class" },
+  { value: "a_little", label: "A little", desc: "Some classes but nothing formal" },
+  { value: "yes_other", label: "Yes, at another studio", desc: "We'd like to find the right level" },
+  { value: "yes_bam", label: "Yes, here at Ballet Academy and Movement", desc: "Returning student" },
+];
+
+const QUIZ_STEPS: Record<EnrolleeType, Step[]> = {
+  myself: ["who", "adult_experience", "adult_interests", "adult_days", "results"],
+  child: ["who", "child_name", "child_age", "child_experience", "child_disciplines", "child_days", "results"],
+  multiple: ["who", "multi_child", "results"],
+};
+
+// ─── Helpers ────────────────────────────────────────────
 
 function formatTime(t: string) {
   const [h, m] = t.split(":");
@@ -45,20 +120,164 @@ function formatTime(t: string) {
   return `${h12}:${m} ${ampm}`;
 }
 
+function getDisciplinesForAge(age: number | null) {
+  const opts: { value: string; label: string }[] = [
+    { value: "ballet", label: "Ballet" },
+  ];
+  if (age === null || age >= 6) opts.push({ value: "jazz", label: "Jazz" });
+  if (age === null || age >= 8) opts.push({ value: "contemporary", label: "Contemporary" });
+  if (age === null || age >= 10) {
+    opts.push({ value: "lyrical", label: "Lyrical" });
+    opts.push({ value: "musical_theatre", label: "Musical Theatre" });
+  }
+  if (age === null || age >= 10) opts.push({ value: "hip_hop", label: "Hip Hop" });
+  opts.push({ value: "not_sure", label: "Not sure yet" });
+  return opts;
+}
+
+function getChildRecommendations(
+  label: string,
+  age: number | null,
+  experience: string,
+  disciplines: string[],
+  days: number[],
+  classes: ClassInfo[]
+): RecommendationGroup {
+  let matches = classes.filter((cls) => {
+    if (age === null) return true;
+    if (cls.ageMin !== null && age < cls.ageMin - 1) return false;
+    if (cls.ageMax !== null && age > cls.ageMax + 1) return false;
+    return true;
+  });
+
+  const realDisciplines = disciplines.filter((d) => d !== "not_sure");
+  if (realDisciplines.length > 0) {
+    const styleMap: Record<string, string[]> = {
+      ballet: ["ballet", "pre_ballet", "creative_movement"],
+      jazz: ["jazz"],
+      contemporary: ["contemporary", "lyrical"],
+      lyrical: ["lyrical", "contemporary"],
+      musical_theatre: ["musical_theatre"],
+      hip_hop: ["hip_hop"],
+    };
+    const targetStyles = realDisciplines.flatMap((d) => styleMap[d] ?? [d]);
+    const filtered = matches.filter((c) => targetStyles.includes(c.style));
+    if (filtered.length > 0) matches = filtered;
+  }
+
+  if (days.length > 0) {
+    const dayFiltered = matches.filter((c) => days.includes(c.dayOfWeek));
+    if (dayFiltered.length > 0) matches = dayFiltered;
+  }
+
+  const experienced = experience === "yes_other" || experience === "yes_bam";
+  const levelPriority = experienced
+    ? ["intermediate", "advanced", "beginner", "open"]
+    : ["petite", "beginner", "open", "intermediate"];
+
+  matches.sort((a, b) => {
+    const aIdx = levelPriority.indexOf(a.level);
+    const bIdx = levelPriority.indexOf(b.level);
+    return (aIdx === -1 ? 99 : aIdx) - (bIdx === -1 ? 99 : bIdx);
+  });
+
+  return { label: `For ${label}`, classes: matches.slice(0, 3), pilatesGyroInterest: false };
+}
+
+function getAdultRecommendations(
+  experience: string,
+  interests: string[],
+  days: number[],
+  classes: ClassInfo[]
+): RecommendationGroup {
+  const hasPilatesGyro = interests.some(
+    (i) => i === "pilates" || i === "gyrotonic"
+  );
+  const danceInterests = interests.filter(
+    (i) => !["pilates", "gyrotonic", "not_sure"].includes(i)
+  );
+
+  let matches = classes.filter((cls) => {
+    if (cls.ageMax !== null && cls.ageMax < 14) return false;
+    return true;
+  });
+
+  if (danceInterests.length > 0) {
+    const styleMap: Record<string, string[]> = {
+      ballet: ["ballet"],
+      jazz: ["jazz"],
+      contemporary: ["contemporary", "lyrical"],
+      hip_hop: ["hip_hop"],
+    };
+    const targetStyles = danceInterests.flatMap((i) => styleMap[i] ?? []);
+    const filtered = matches.filter((c) => targetStyles.includes(c.style));
+    if (filtered.length > 0) matches = filtered;
+  }
+
+  if (days.length > 0) {
+    const dayFiltered = matches.filter((c) => days.includes(c.dayOfWeek));
+    if (dayFiltered.length > 0) matches = dayFiltered;
+  }
+
+  const isExperienced = experience === "intermediate" || experience === "advanced";
+  const levelPriority = isExperienced
+    ? ["intermediate", "advanced", "open", "beginner"]
+    : ["beginner", "open", "intermediate"];
+
+  matches.sort((a, b) => {
+    const aIdx = levelPriority.indexOf(a.level);
+    const bIdx = levelPriority.indexOf(b.level);
+    return (aIdx === -1 ? 99 : aIdx) - (bIdx === -1 ? 99 : bIdx);
+  });
+
+  return {
+    label: "For you",
+    classes: matches.slice(0, 3),
+    pilatesGyroInterest: hasPilatesGyro,
+  };
+}
+
+function toggleMulti<T>(value: T, current: T[], exclusive?: T): T[] {
+  if (value === exclusive) {
+    return current.includes(value) ? [] : [value];
+  }
+  const without = exclusive !== undefined ? current.filter((v) => v !== exclusive) : current;
+  return without.includes(value)
+    ? without.filter((v) => v !== value)
+    : [...without, value];
+}
+
+// ─── Component ──────────────────────────────────────────
+
 export function EnrollmentWizard({ classes }: { classes: ClassInfo[] }) {
-  const [step, setStep] = useState<Step>("quiz");
+  // ─── Quiz state ─────────────────────────────────
+  const [step, setStep] = useState<Step>("who");
+  const [enrolleeType, setEnrolleeType] = useState<EnrolleeType | null>(null);
 
-  // Quiz state
+  // Adult branch
+  const [adultExperience, setAdultExperience] = useState("");
+  const [adultInterests, setAdultInterests] = useState<string[]>([]);
+  const [adultDays, setAdultDays] = useState<number[]>([]);
+
+  // Single child branch
+  const [childName, setChildName] = useState("");
   const [childAge, setChildAge] = useState<number | null>(null);
-  const [experience, setExperience] = useState("");
-  const [interest, setInterest] = useState("");
-  const [preferredDay, setPreferredDay] = useState<number | null>(null);
+  const [childExperience, setChildExperience] = useState("");
+  const [childDisciplines, setChildDisciplines] = useState<string[]>([]);
+  const [childDays, setChildDays] = useState<number[]>([]);
 
-  // Results state
+  // Multi-child branch
+  const [children, setChildren] = useState<ChildData[]>([]);
+  const [mcName, setMcName] = useState("");
+  const [mcAge, setMcAge] = useState<number | null>(null);
+  const [mcExperience, setMcExperience] = useState("");
+  const [mcDisciplines, setMcDisciplines] = useState<string[]>([]);
+
+  // ─── Results state ──────────────────────────────
+  const [recommendations, setRecommendations] = useState<RecommendationGroup[]>([]);
   const [selectedClass, setSelectedClass] = useState<ClassInfo | null>(null);
-  const [recommendedClasses, setRecommendedClasses] = useState<ClassInfo[]>([]);
 
-  // Student state (for new students via authenticated flow)
+  // ─── Enrollment state ───────────────────────────
   const [studentName, setStudentName] = useState("");
   const [studentDob, setStudentDob] = useState("");
   const [medicalNotes, setMedicalNotes] = useState("");
@@ -66,12 +285,8 @@ export function EnrollmentWizard({ classes }: { classes: ClassInfo[] }) {
   const [existingStudents, setExistingStudents] = useState<
     { id: string; first_name: string; last_name: string }[]
   >([]);
-
-  // Auth state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authMode, setAuthMode] = useState<"signin" | "signup">("signup");
-
-  // Enrollment result
   const [enrollResult, setEnrollResult] = useState<{
     status: "active" | "waitlist";
     className: string;
@@ -88,55 +303,100 @@ export function EnrollmentWizard({ classes }: { classes: ClassInfo[] }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // ─── Quiz Logic ─────────────────────────────────────
-  function handleQuizSubmit() {
-    if (childAge === null || !experience) return;
+  // ─── Navigation ─────────────────────────────────
+  const BACK_MAP: Partial<Record<Step, Step>> = {
+    adult_experience: "who",
+    adult_interests: "adult_experience",
+    adult_days: "adult_interests",
+    child_name: "who",
+    child_age: "child_name",
+    child_experience: "child_age",
+    child_disciplines: "child_experience",
+    child_days: "child_disciplines",
+    multi_child: "who",
+    results:
+      enrolleeType === "myself"
+        ? "adult_days"
+        : enrolleeType === "child"
+          ? "child_days"
+          : "multi_child",
+    auth: "results",
+    student: "results",
+    confirm: "student",
+  };
 
-    let matches = classes.filter((cls) => {
-      if (cls.ageMin && childAge < cls.ageMin - 1) return false;
-      if (cls.ageMax && childAge > cls.ageMax + 1) return false;
-      return true;
-    });
+  function goBack() {
+    const prev = BACK_MAP[step];
+    if (prev) {
+      setError("");
+      setStep(prev);
+    }
+  }
 
-    // Filter by interest
-    if (interest && interest !== "not_sure") {
-      const styleMap: Record<string, string[]> = {
-        ballet: ["ballet", "pre_ballet", "creative_movement"],
-        jazz: ["jazz"],
-        contemporary: ["contemporary", "lyrical"],
-        musical_theatre: ["musical_theatre"],
-      };
-      const styles = styleMap[interest] ?? [];
-      const filtered = matches.filter((c) => styles.includes(c.style));
-      if (filtered.length > 0) matches = filtered;
+  // ─── Progress ───────────────────────────────────
+  function getProgress() {
+    if (!enrolleeType) return { current: 0, total: 1 };
+    const steps = QUIZ_STEPS[enrolleeType];
+    const idx = steps.indexOf(step);
+    if (idx >= 0) return { current: idx, total: steps.length };
+    return { current: steps.length - 1, total: steps.length };
+  }
+
+  // ─── Compute recommendations ────────────────────
+  function computeAndShowResults() {
+    let groups: RecommendationGroup[];
+
+    if (enrolleeType === "myself") {
+      groups = [getAdultRecommendations(adultExperience, adultInterests, adultDays, classes)];
+    } else if (enrolleeType === "child") {
+      groups = [
+        getChildRecommendations(
+          childName || "your child",
+          childAge,
+          childExperience,
+          childDisciplines,
+          childDays,
+          classes
+        ),
+      ];
+    } else {
+      groups = children.map((child) =>
+        getChildRecommendations(
+          child.name,
+          child.age,
+          child.experience,
+          child.disciplines,
+          [],
+          classes
+        )
+      );
     }
 
-    // Filter by day
-    if (preferredDay !== null) {
-      const dayFiltered = matches.filter((c) => c.dayOfWeek === preferredDay);
-      if (dayFiltered.length > 0) matches = dayFiltered;
-    }
-
-    // Sort by level match
-    const levelPriority: Record<string, string[]> = {
-      none: ["petite", "beginner", "open"],
-      some: ["beginner", "petite", "open"],
-      yes: ["intermediate", "beginner", "advanced", "open"],
-    };
-    const priorities = levelPriority[experience] ?? ["beginner"];
-    matches.sort((a, b) => {
-      const aIdx = priorities.indexOf(a.level);
-      const bIdx = priorities.indexOf(b.level);
-      return (aIdx === -1 ? 99 : aIdx) - (bIdx === -1 ? 99 : bIdx);
-    });
-
-    setRecommendedClasses(matches.slice(0, 3));
+    setRecommendations(groups);
     setStep("results");
   }
 
-  function selectClass(cls: ClassInfo) {
+  // ─── Multi-child add ────────────────────────────
+  function addChild() {
+    if (!mcName.trim() || mcAge === null || !mcExperience) return;
+    setChildren([
+      ...children,
+      { name: mcName.trim(), age: mcAge, experience: mcExperience, disciplines: [...mcDisciplines] },
+    ]);
+    setMcName("");
+    setMcAge(null);
+    setMcExperience("");
+    setMcDisciplines([]);
+  }
+
+  function removeChild(idx: number) {
+    setChildren(children.filter((_, i) => i !== idx));
+  }
+
+  // ─── Enrollment handlers (unchanged) ────────────
+  function selectClass(cls: ClassInfo, prefilledName?: string) {
     setSelectedClass(cls);
-    // Check if user is already authenticated
+    if (prefilledName) setStudentName(prefilledName);
     checkAuth();
   }
 
@@ -156,14 +416,11 @@ export function EnrollmentWizard({ classes }: { classes: ClassInfo[] }) {
     }
   }
 
-  // ─── Auth ───────────────────────────────────────────
   async function handleAuth(formData: FormData) {
     setLoading(true);
     setError("");
-
     const endpoint =
       authMode === "signup" ? "/api/enroll/signup" : "/api/enroll/signin";
-
     try {
       const res = await fetch(endpoint, {
         method: "POST",
@@ -178,7 +435,6 @@ export function EnrollmentWizard({ classes }: { classes: ClassInfo[] }) {
         }),
       });
       const data = await res.json();
-
       if (data.error) {
         setError(data.error);
       } else {
@@ -193,12 +449,10 @@ export function EnrollmentWizard({ classes }: { classes: ClassInfo[] }) {
     }
   }
 
-  // ─── Student Profile ────────────────────────────────
   async function handleAddStudent() {
     if (!studentName.trim() || !studentDob) return;
     setLoading(true);
     setError("");
-
     try {
       const res = await fetch("/api/enroll/add-student", {
         method: "POST",
@@ -229,24 +483,19 @@ export function EnrollmentWizard({ classes }: { classes: ClassInfo[] }) {
     setStep("confirm");
   }
 
-  // ─── Enrollment ─────────────────────────────────────
   async function handleEnroll() {
     if (!studentId || !selectedClass) return;
     setLoading(true);
     setError("");
-
     const fd = new FormData();
     fd.set("studentId", studentId);
     fd.set("classId", selectedClass.id);
-
     const result = await enrollStudent(fd);
-
     if (result.error) {
       setError(result.error);
       setLoading(false);
       return;
     }
-
     if (result.success) {
       setEnrollResult({
         status: result.status!,
@@ -258,27 +507,22 @@ export function EnrollmentWizard({ classes }: { classes: ClassInfo[] }) {
     setLoading(false);
   }
 
-  // ─── Trial Booking ──────────────────────────────────
   async function handleBookTrial() {
     if (!trialChildName || !trialEmail || !selectedClass) return;
     setLoading(true);
     setError("");
-
     const fd = new FormData();
     fd.set("childName", trialChildName);
     fd.set("childAge", String(childAge ?? 5));
     fd.set("email", trialEmail);
     fd.set("classId", selectedClass.id);
-    // Default trial date to next occurrence of the class day
     const today = new Date();
     const daysUntil =
       ((selectedClass.dayOfWeek - today.getDay() + 7) % 7) || 7;
     const trialDate = new Date(today.getTime() + daysUntil * 86400000);
     fd.set("trialDate", trialDate.toISOString().split("T")[0]);
-
     const result = await bookTrialClass(fd);
     setLoading(false);
-
     if (result.error) {
       setError(result.error);
     } else {
@@ -286,38 +530,38 @@ export function EnrollmentWizard({ classes }: { classes: ClassInfo[] }) {
     }
   }
 
-  // ─── Render Steps ───────────────────────────────────
+  // ─── Shared UI helpers ──────────────────────────
+  const btnSelected =
+    "bg-lavender text-white border-lavender";
+  const btnDefault =
+    "bg-white border-silver text-charcoal hover:border-lavender";
+
+  function optCls(selected: boolean) {
+    return `rounded-lg border text-sm font-medium transition-colors ${selected ? btnSelected : btnDefault}`;
+  }
+
+  // ─── Render ─────────────────────────────────────
+  const { current: progCurrent, total: progTotal } = getProgress();
+  const isQuizStep = enrolleeType
+    ? QUIZ_STEPS[enrolleeType].includes(step)
+    : step === "who";
+  const displayName = childName || "your child";
+
   return (
     <div className="space-y-6">
-      {/* Progress indicator */}
-      <div className="flex items-center justify-center gap-2">
-        {["quiz", "results", "auth", "student", "confirm", "done"].map(
-          (s, i) => {
-            const steps: Step[] = [
-              "quiz",
-              "results",
-              "auth",
-              "student",
-              "confirm",
-              "done",
-            ];
-            const currentIdx = steps.indexOf(step);
-            const isActive = i <= currentIdx;
-            return (
-              <div
-                key={s}
-                className={`h-1.5 rounded-full transition-colors ${
-                  i <= 1 || (i >= 2 && !showTrial)
-                    ? isActive
-                      ? "bg-lavender w-10"
-                      : "bg-silver w-10"
-                    : "hidden"
-                }`}
-              />
-            );
-          }
-        )}
-      </div>
+      {/* Progress dots (quiz phase only) */}
+      {isQuizStep && (
+        <div className="flex items-center justify-center gap-2">
+          {Array.from({ length: progTotal }).map((_, i) => (
+            <div
+              key={i}
+              className={`h-1.5 w-10 rounded-full transition-colors ${
+                i <= progCurrent ? "bg-lavender" : "bg-silver"
+              }`}
+            />
+          ))}
+        </div>
+      )}
 
       {error && (
         <div className="rounded-lg bg-error/10 border border-error/20 px-4 py-3 text-sm text-error">
@@ -325,139 +569,73 @@ export function EnrollmentWizard({ classes }: { classes: ClassInfo[] }) {
         </div>
       )}
 
-      {/* ─── Step 1: Quiz ──────────────────────────── */}
-      {step === "quiz" && (
+      {/* ─── Step: Who ───────────────────────────── */}
+      {step === "who" && (
         <div className="space-y-6">
           <div className="text-center">
             <h2 className="font-heading text-2xl font-semibold text-charcoal">
-              Find the right class
+              Who are you looking to enroll?
             </h2>
             <p className="mt-2 text-sm text-slate">
-              Answer a few quick questions and we&apos;ll recommend the best fit
-              for your child.
+              We&apos;ll recommend the best classes based on your answers.
             </p>
           </div>
 
-          {/* Age */}
-          <div>
-            <label className="block text-sm font-medium text-charcoal mb-2">
-              How old is your child?
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {[3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].map(
-                (age) => (
-                  <button
-                    key={age}
-                    type="button"
-                    onClick={() => setChildAge(age)}
-                    className={`h-10 w-12 rounded-lg border text-sm font-medium transition-colors ${
-                      childAge === age
-                        ? "bg-lavender text-white border-lavender"
-                        : "bg-white border-silver text-charcoal hover:border-lavender"
-                    }`}
-                  >
-                    {age}
-                  </button>
-                )
-              )}
-            </div>
+          <div className="space-y-3">
+            {([
+              {
+                type: "myself" as EnrolleeType,
+                icon: "\uD83E\uDE70",
+                title: "Myself",
+                desc: "I want to take classes",
+              },
+              {
+                type: "child" as EnrolleeType,
+                icon: "\uD83D\uDC67",
+                title: "My child",
+                desc: "I\u2019m enrolling my son or daughter",
+              },
+              {
+                type: "multiple" as EnrolleeType,
+                icon: "\uD83D\uDC68\u200D\uD83D\uDC67\u200D\uD83D\uDC66",
+                title: "Multiple children",
+                desc: "I have more than one child to enroll",
+              },
+            ]).map((opt) => (
+              <button
+                key={opt.type}
+                type="button"
+                onClick={() => {
+                  setEnrolleeType(opt.type);
+                  setStep(
+                    opt.type === "myself"
+                      ? "adult_experience"
+                      : opt.type === "child"
+                        ? "child_name"
+                        : "multi_child"
+                  );
+                }}
+                className="w-full flex items-center gap-4 rounded-xl border-2 border-silver bg-white p-5 hover:border-lavender transition-colors text-left"
+              >
+                <span className="text-3xl">{opt.icon}</span>
+                <div>
+                  <p className="font-heading text-base font-semibold text-charcoal">
+                    {opt.title}
+                  </p>
+                  <p className="text-sm text-slate">{opt.desc}</p>
+                </div>
+              </button>
+            ))}
           </div>
-
-          {/* Experience */}
-          <div>
-            <label className="block text-sm font-medium text-charcoal mb-2">
-              Has your child taken dance classes before?
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { value: "none", label: "Never" },
-                { value: "some", label: "A little" },
-                { value: "yes", label: "Yes, 1+ years" },
-              ].map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setExperience(opt.value)}
-                  className={`h-11 rounded-lg border text-sm font-medium transition-colors ${
-                    experience === opt.value
-                      ? "bg-lavender text-white border-lavender"
-                      : "bg-white border-silver text-charcoal hover:border-lavender"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Interest */}
-          <div>
-            <label className="block text-sm font-medium text-charcoal mb-2">
-              What is your child most interested in?
-            </label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {[
-                { value: "ballet", label: "Ballet" },
-                { value: "jazz", label: "Jazz" },
-                { value: "contemporary", label: "Contemporary" },
-                { value: "musical_theatre", label: "Musical Theatre" },
-                { value: "not_sure", label: "Not sure yet" },
-              ].map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setInterest(opt.value)}
-                  className={`h-11 rounded-lg border text-sm font-medium transition-colors ${
-                    interest === opt.value
-                      ? "bg-lavender text-white border-lavender"
-                      : "bg-white border-silver text-charcoal hover:border-lavender"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Preferred day (optional) */}
-          <div>
-            <label className="block text-sm font-medium text-charcoal mb-2">
-              Preferred day? <span className="text-mist">(optional)</span>
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {[1, 2, 3, 4, 5, 6].map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() =>
-                    setPreferredDay(preferredDay === d ? null : d)
-                  }
-                  className={`h-10 rounded-lg border px-4 text-sm font-medium transition-colors ${
-                    preferredDay === d
-                      ? "bg-lavender text-white border-lavender"
-                      : "bg-white border-silver text-charcoal hover:border-lavender"
-                  }`}
-                >
-                  {DAYS[d].slice(0, 3)}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleQuizSubmit}
-            disabled={childAge === null || !experience}
-            className="w-full h-12 rounded-lg bg-lavender hover:bg-lavender-dark text-white font-semibold text-sm transition-colors disabled:opacity-40"
-          >
-            Find My Classes
-          </button>
 
           <div className="text-center">
             <button
               type="button"
               onClick={() => {
-                setRecommendedClasses(classes);
+                setRecommendations([
+                  { label: "All classes", classes, pilatesGyroInterest: false },
+                ]);
+                setEnrolleeType("child");
                 setStep("results");
               }}
               className="text-sm text-lavender hover:text-lavender-dark font-medium"
@@ -468,122 +646,607 @@ export function EnrollmentWizard({ classes }: { classes: ClassInfo[] }) {
         </div>
       )}
 
-      {/* ─── Step 2: Results ───────────────────────── */}
-      {step === "results" && (
+      {/* ─── Adult: Experience ────────────────────── */}
+      {step === "adult_experience" && (
         <div className="space-y-6">
           <div className="text-center">
             <h2 className="font-heading text-2xl font-semibold text-charcoal">
-              {recommendedClasses.length > 0
-                ? "Recommended for your child"
-                : "No exact match found"}
+              How would you describe your dance experience?
             </h2>
-            <p className="mt-1 text-sm text-slate">
-              {recommendedClasses.length > 0
-                ? "Based on your answers, here are the best options."
-                : "We didn't find an exact match, but here are some alternatives."}
-            </p>
           </div>
 
-          {recommendedClasses.length === 0 && (
-            <div className="rounded-xl border border-silver bg-white p-6 text-center">
-              <p className="text-sm text-slate mb-4">
-                We don&apos;t currently have a class matching your criteria, but
-                we&apos;d love to hear from you.
-              </p>
-              <p className="text-sm text-charcoal font-medium">
-                Call us at (949) 229-0846 or email dance@bamsocal.com
-              </p>
-            </div>
-          )}
-
-          <div className="space-y-4">
-            {recommendedClasses.map((cls) => (
-              <div
-                key={cls.id}
-                className="rounded-xl border border-silver bg-white p-5 space-y-3"
+          <div className="space-y-3">
+            {ADULT_EXPERIENCE_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => {
+                  setAdultExperience(opt.value);
+                  setStep("adult_interests");
+                }}
+                className={`w-full rounded-xl border-2 p-4 text-left transition-colors ${
+                  adultExperience === opt.value
+                    ? "border-lavender bg-lavender/5"
+                    : "border-silver bg-white hover:border-lavender"
+                }`}
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="font-heading text-lg font-semibold text-charcoal">
-                      {cls.name}
-                    </h3>
-                    <div className="flex flex-wrap items-center gap-2 mt-1">
-                      <span className="text-xs bg-lavender/10 text-lavender-dark px-2 py-0.5 rounded-full font-medium">
-                        {STYLE_LABELS[cls.style] ?? cls.style}
-                      </span>
-                      <span className="text-xs text-mist capitalize">
-                        {cls.level}
-                      </span>
-                      {cls.ageMin && (
-                        <span className="text-xs text-mist">
-                          Ages {cls.ageMin}–{cls.ageMax ?? "up"}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    {cls.isFull ? (
-                      <span className="text-xs bg-warning/10 text-warning px-2 py-1 rounded-full font-medium">
-                        Waitlist
-                      </span>
-                    ) : (
-                      <span className="text-xs text-success font-medium">
-                        {cls.spotsRemaining} spot
-                        {cls.spotsRemaining !== 1 ? "s" : ""} left
-                      </span>
-                    )}
-                  </div>
-                </div>
+                <p className="text-sm font-semibold text-charcoal">{opt.label}</p>
+                <p className="text-xs text-slate mt-0.5">{opt.desc}</p>
+              </button>
+            ))}
+          </div>
 
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate">
-                  <span>
-                    {DAYS[cls.dayOfWeek]}s · {formatTime(cls.startTime)}–
-                    {formatTime(cls.endTime)}
-                  </span>
-                  {cls.room && <span>Room: {cls.room}</span>}
-                  {cls.teacherName && <span>{cls.teacherName}</span>}
-                </div>
+          <BackButton onClick={goBack} />
+        </div>
+      )}
 
-                {cls.description && (
-                  <p className="text-sm text-slate leading-relaxed">
-                    {cls.description}
-                  </p>
-                )}
+      {/* ─── Adult: Interests ────────────────────── */}
+      {step === "adult_interests" && (
+        <div className="space-y-6">
+          <div className="text-center">
+            <h2 className="font-heading text-2xl font-semibold text-charcoal">
+              What are you most interested in?
+            </h2>
+            <p className="mt-1 text-sm text-slate">Select all that apply</p>
+          </div>
 
-                <div className="flex gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => selectClass(cls)}
-                    className="flex-1 h-11 rounded-lg bg-lavender hover:bg-lavender-dark text-white font-semibold text-sm transition-colors"
-                  >
-                    {cls.isFull ? "Join Waitlist" : "Enroll in This Class"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedClass(cls);
-                      setShowTrial(true);
-                    }}
-                    className="h-11 rounded-lg border border-silver text-slate hover:text-charcoal hover:border-lavender font-medium text-sm px-5 transition-colors"
-                  >
-                    Free Trial
-                  </button>
-                </div>
-              </div>
+          <div className="grid grid-cols-2 gap-2">
+            {ADULT_INTEREST_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() =>
+                  setAdultInterests(
+                    toggleMulti(opt.value, adultInterests, "not_sure")
+                  )
+                }
+                className={`h-12 px-3 ${optCls(adultInterests.includes(opt.value))}`}
+              >
+                {opt.label}
+              </button>
             ))}
           </div>
 
           <button
             type="button"
-            onClick={() => setStep("quiz")}
-            className="text-sm text-lavender hover:text-lavender-dark font-medium"
+            onClick={() => setStep("adult_days")}
+            disabled={adultInterests.length === 0}
+            className="w-full h-12 rounded-lg bg-lavender hover:bg-lavender-dark text-white font-semibold text-sm transition-colors disabled:opacity-40"
           >
-            &larr; Back to quiz
+            Next
           </button>
+          <BackButton onClick={goBack} />
         </div>
       )}
 
-      {/* ─── Trial Booking Modal ───────────────────── */}
+      {/* ─── Adult: Days ─────────────────────────── */}
+      {step === "adult_days" && (
+        <div className="space-y-6">
+          <div className="text-center">
+            <h2 className="font-heading text-2xl font-semibold text-charcoal">
+              What days work best for you?
+            </h2>
+            <p className="mt-1 text-sm text-slate">Select all that apply</p>
+          </div>
+
+          <div className="flex flex-wrap gap-2 justify-center">
+            {[1, 2, 3, 4, 5, 6].map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => setAdultDays(toggleMulti(d, adultDays))}
+                className={`h-11 px-5 ${optCls(adultDays.includes(d))}`}
+              >
+                {DAYS[d]}
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={computeAndShowResults}
+            className="w-full h-12 rounded-lg bg-lavender hover:bg-lavender-dark text-white font-semibold text-sm transition-colors"
+          >
+            Find My Classes
+          </button>
+          <BackButton onClick={goBack} />
+        </div>
+      )}
+
+      {/* ─── Child: Name ─────────────────────────── */}
+      {step === "child_name" && (
+        <div className="space-y-6">
+          <div className="text-center">
+            <h2 className="font-heading text-2xl font-semibold text-charcoal">
+              What&apos;s your child&apos;s first name?
+            </h2>
+            <p className="mt-1 text-sm text-slate">
+              We&apos;ll use this to personalize recommendations
+            </p>
+          </div>
+
+          <input
+            type="text"
+            value={childName}
+            onChange={(e) => setChildName(e.target.value)}
+            placeholder="First name"
+            autoFocus
+            className="w-full h-12 rounded-lg border border-silver bg-white px-4 text-base text-charcoal placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && childName.trim()) setStep("child_age");
+            }}
+          />
+
+          <button
+            type="button"
+            onClick={() => setStep("child_age")}
+            disabled={!childName.trim()}
+            className="w-full h-12 rounded-lg bg-lavender hover:bg-lavender-dark text-white font-semibold text-sm transition-colors disabled:opacity-40"
+          >
+            Next
+          </button>
+          <BackButton onClick={goBack} />
+        </div>
+      )}
+
+      {/* ─── Child: Age ──────────────────────────── */}
+      {step === "child_age" && (
+        <div className="space-y-6">
+          <div className="text-center">
+            <h2 className="font-heading text-2xl font-semibold text-charcoal">
+              How old is {displayName}?
+            </h2>
+          </div>
+
+          <div className="flex flex-wrap gap-2 justify-center">
+            {[3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17].map(
+              (age) => (
+                <button
+                  key={age}
+                  type="button"
+                  onClick={() => {
+                    setChildAge(age);
+                    setStep("child_experience");
+                  }}
+                  className={`h-10 w-12 ${optCls(childAge === age)}`}
+                >
+                  {age}
+                </button>
+              )
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setChildAge(18);
+                setStep("child_experience");
+              }}
+              className={`h-10 px-4 ${optCls(childAge === 18)}`}
+            >
+              18+
+            </button>
+          </div>
+
+          <BackButton onClick={goBack} />
+        </div>
+      )}
+
+      {/* ─── Child: Experience ───────────────────── */}
+      {step === "child_experience" && (
+        <div className="space-y-6">
+          <div className="text-center">
+            <h2 className="font-heading text-2xl font-semibold text-charcoal">
+              Has {displayName} danced before?
+            </h2>
+          </div>
+
+          <div className="space-y-3">
+            {CHILD_EXPERIENCE_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => {
+                  setChildExperience(opt.value);
+                  setStep("child_disciplines");
+                }}
+                className={`w-full rounded-xl border-2 p-4 text-left transition-colors ${
+                  childExperience === opt.value
+                    ? "border-lavender bg-lavender/5"
+                    : "border-silver bg-white hover:border-lavender"
+                }`}
+              >
+                <p className="text-sm font-semibold text-charcoal">{opt.label}</p>
+                <p className="text-xs text-slate mt-0.5">{opt.desc}</p>
+              </button>
+            ))}
+          </div>
+
+          <BackButton onClick={goBack} />
+        </div>
+      )}
+
+      {/* ─── Child: Disciplines ──────────────────── */}
+      {step === "child_disciplines" && (
+        <div className="space-y-6">
+          <div className="text-center">
+            <h2 className="font-heading text-2xl font-semibold text-charcoal">
+              What disciplines interest {displayName}?
+            </h2>
+            <p className="mt-1 text-sm text-slate">Select all that apply</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            {getDisciplinesForAge(childAge).map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() =>
+                  setChildDisciplines(
+                    toggleMulti(opt.value, childDisciplines, "not_sure")
+                  )
+                }
+                className={`h-12 px-3 ${optCls(childDisciplines.includes(opt.value))}`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setStep("child_days")}
+            disabled={childDisciplines.length === 0}
+            className="w-full h-12 rounded-lg bg-lavender hover:bg-lavender-dark text-white font-semibold text-sm transition-colors disabled:opacity-40"
+          >
+            Next
+          </button>
+          <BackButton onClick={goBack} />
+        </div>
+      )}
+
+      {/* ─── Child: Days ─────────────────────────── */}
+      {step === "child_days" && (
+        <div className="space-y-6">
+          <div className="text-center">
+            <h2 className="font-heading text-2xl font-semibold text-charcoal">
+              What days work best?
+            </h2>
+            <p className="mt-1 text-sm text-slate">Select all that apply</p>
+          </div>
+
+          <div className="flex flex-wrap gap-2 justify-center">
+            {[1, 2, 3, 4, 5, 6].map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => setChildDays(toggleMulti(d, childDays))}
+                className={`h-11 px-5 ${optCls(childDays.includes(d))}`}
+              >
+                {DAYS[d]}
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={computeAndShowResults}
+            className="w-full h-12 rounded-lg bg-lavender hover:bg-lavender-dark text-white font-semibold text-sm transition-colors"
+          >
+            Find Classes for {displayName}
+          </button>
+          <BackButton onClick={goBack} />
+        </div>
+      )}
+
+      {/* ─── Multi-child ─────────────────────────── */}
+      {step === "multi_child" && (
+        <div className="space-y-6">
+          <div className="text-center">
+            <h2 className="font-heading text-2xl font-semibold text-charcoal">
+              Tell us about your children
+            </h2>
+            <p className="mt-1 text-sm text-slate">
+              We&apos;ll recommend the best classes for each child
+            </p>
+          </div>
+
+          {/* Added children */}
+          {children.length > 0 && (
+            <div className="space-y-2">
+              {children.map((child, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center justify-between rounded-lg border border-silver bg-white px-4 py-3"
+                >
+                  <div className="text-sm">
+                    <span className="font-medium text-charcoal">
+                      {child.name}
+                    </span>
+                    <span className="text-slate ml-2">
+                      age {child.age}
+                      {child.age === 18 ? "+" : ""}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeChild(idx)}
+                    className="text-mist hover:text-error text-xs font-medium"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Add child form */}
+          {children.length < 4 ? (
+            <div className="rounded-xl border border-silver bg-white p-5 space-y-4">
+              <p className="text-sm font-medium text-charcoal">
+                {children.length === 0
+                  ? "First child"
+                  : `Child ${children.length + 1}`}
+              </p>
+
+              <input
+                type="text"
+                value={mcName}
+                onChange={(e) => setMcName(e.target.value)}
+                placeholder="First name"
+                className="w-full h-11 rounded-lg border border-silver bg-white px-4 text-sm placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
+              />
+
+              <div>
+                <label className="block text-xs text-mist mb-1.5">Age</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {[3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17].map(
+                    (age) => (
+                      <button
+                        key={age}
+                        type="button"
+                        onClick={() => setMcAge(age)}
+                        className={`h-8 w-10 text-xs ${optCls(mcAge === age)}`}
+                      >
+                        {age}
+                      </button>
+                    )
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setMcAge(18)}
+                    className={`h-8 px-2.5 text-xs ${optCls(mcAge === 18)}`}
+                  >
+                    18+
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs text-mist mb-1.5">
+                  Dance experience
+                </label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {CHILD_EXPERIENCE_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setMcExperience(opt.value)}
+                      className={`h-9 px-2 text-xs ${optCls(mcExperience === opt.value)}`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs text-mist mb-1.5">
+                  Disciplines
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {getDisciplinesForAge(mcAge).map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() =>
+                        setMcDisciplines(
+                          toggleMulti(opt.value, mcDisciplines, "not_sure")
+                        )
+                      }
+                      className={`h-9 px-3 text-xs ${optCls(mcDisciplines.includes(opt.value))}`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={addChild}
+                disabled={!mcName.trim() || mcAge === null || !mcExperience}
+                className="w-full h-10 rounded-lg border-2 border-lavender text-lavender hover:bg-lavender/5 font-semibold text-sm transition-colors disabled:opacity-40 disabled:border-silver disabled:text-mist"
+              >
+                + Add Child
+              </button>
+            </div>
+          ) : (
+            <div className="rounded-lg bg-lavender/5 border border-lavender/20 px-4 py-3 text-sm text-slate">
+              For more than 4 children, please contact us directly at{" "}
+              <strong>(949) 229-0846</strong> — we&apos;d love to help you find
+              the right classes for everyone.
+            </div>
+          )}
+
+          {children.length > 0 && (
+            <button
+              type="button"
+              onClick={computeAndShowResults}
+              className="w-full h-12 rounded-lg bg-lavender hover:bg-lavender-dark text-white font-semibold text-sm transition-colors"
+            >
+              See Recommendations
+            </button>
+          )}
+
+          <BackButton onClick={goBack} />
+        </div>
+      )}
+
+      {/* ─── Results ─────────────────────────────── */}
+      {step === "results" && (
+        <div className="space-y-6">
+          {recommendations.map((group, gi) => (
+            <div key={gi} className="space-y-4">
+              <div className="text-center">
+                <h2 className="font-heading text-2xl font-semibold text-charcoal">
+                  {recommendations.length === 1 && group.label === "For you"
+                    ? "Recommended for you"
+                    : recommendations.length === 1
+                      ? `Recommended for ${group.label.replace("For ", "")}`
+                      : group.label}
+                </h2>
+                {gi === 0 && (
+                  <p className="mt-1 text-sm text-slate">
+                    Based on your answers, here are the best options.
+                  </p>
+                )}
+              </div>
+
+              {/* Pilates / Gyrotonic card */}
+              {group.pilatesGyroInterest && (
+                <div className="rounded-xl border-2 border-gold/40 bg-gold/5 p-5 space-y-2">
+                  <h3 className="font-heading text-base font-semibold text-charcoal">
+                    Pilates &amp; Gyrotonic
+                  </h3>
+                  <p className="text-sm text-slate">
+                    We offer Pilates and Gyrotonic by appointment. We&apos;ll
+                    reach out within 24 hours to schedule a session that works
+                    for you.
+                  </p>
+                  <p className="text-sm text-charcoal font-medium">
+                    Or contact us now: (949) 229-0846 · dance@bamsocal.com
+                  </p>
+                </div>
+              )}
+
+              {group.classes.length === 0 && !group.pilatesGyroInterest && (
+                <div className="rounded-xl border border-silver bg-white p-6 text-center">
+                  <p className="text-sm text-slate mb-4">
+                    We don&apos;t currently have a class matching your criteria,
+                    but we&apos;d love to hear from you.
+                  </p>
+                  <p className="text-sm text-charcoal font-medium">
+                    Call us at (949) 229-0846 or email dance@bamsocal.com
+                  </p>
+                </div>
+              )}
+
+              {group.classes.map((cls) => (
+                <div
+                  key={cls.id}
+                  className="rounded-xl border border-silver bg-white p-5 space-y-3"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-heading text-lg font-semibold text-charcoal">
+                        {cls.name}
+                      </h3>
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
+                        <span className="text-xs bg-lavender/10 text-lavender-dark px-2 py-0.5 rounded-full font-medium">
+                          {STYLE_LABELS[cls.style] ?? cls.style}
+                        </span>
+                        <span className="text-xs text-mist capitalize">
+                          {cls.level}
+                        </span>
+                        {cls.ageMin && (
+                          <span className="text-xs text-mist">
+                            Ages {cls.ageMin}&ndash;{cls.ageMax ?? "up"}
+                          </span>
+                        )}
+                        <span className="text-xs bg-success/10 text-success px-2 py-0.5 rounded-full font-medium">
+                          Free Trial
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      {cls.isFull ? (
+                        <span className="text-xs bg-warning/10 text-warning px-2 py-1 rounded-full font-medium">
+                          Waitlist
+                        </span>
+                      ) : (
+                        <span className="text-xs text-success font-medium">
+                          {cls.spotsRemaining} spot
+                          {cls.spotsRemaining !== 1 ? "s" : ""} left
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate">
+                    <span>
+                      {DAYS[cls.dayOfWeek]}s &middot; {formatTime(cls.startTime)}
+                      &ndash;{formatTime(cls.endTime)}
+                    </span>
+                    {cls.room && <span>Room: {cls.room}</span>}
+                    {cls.teacherName && <span>{cls.teacherName}</span>}
+                  </div>
+
+                  {cls.description && (
+                    <p className="text-sm text-slate leading-relaxed">
+                      {cls.description}
+                    </p>
+                  )}
+
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        selectClass(
+                          cls,
+                          enrolleeType === "child" ? childName : undefined
+                        )
+                      }
+                      className="flex-1 h-11 rounded-lg bg-lavender hover:bg-lavender-dark text-white font-semibold text-sm transition-colors"
+                    >
+                      {cls.isFull ? "Join Waitlist" : "Enroll in This Class"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedClass(cls);
+                        setShowTrial(true);
+                      }}
+                      className="h-11 rounded-lg border border-silver text-slate hover:text-charcoal hover:border-lavender font-medium text-sm px-5 transition-colors"
+                    >
+                      Free Trial
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {gi < recommendations.length - 1 && (
+                <hr className="border-silver" />
+              )}
+            </div>
+          ))}
+
+          <div className="text-center pt-2">
+            <p className="text-sm text-slate">
+              Not sure this is right?{" "}
+              <a
+                href="/"
+                className="text-lavender font-medium hover:text-lavender-dark"
+              >
+                Chat with us
+              </a>{" "}
+              or call (949) 229-0846
+            </p>
+          </div>
+
+          <BackButton onClick={goBack} />
+        </div>
+      )}
+
+      {/* ─── Trial Booking Modal ─────────────────── */}
       {showTrial && selectedClass && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-charcoal/40 p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl space-y-4">
@@ -602,7 +1265,11 @@ export function EnrollmentWizard({ classes }: { classes: ClassInfo[] }) {
               <div className="space-y-3">
                 <input
                   type="text"
-                  placeholder="Child's name"
+                  placeholder={
+                    enrolleeType === "myself"
+                      ? "Your name"
+                      : "Child\u2019s name"
+                  }
                   value={trialChildName}
                   onChange={(e) => setTrialChildName(e.target.value)}
                   className="w-full h-11 rounded-lg border border-silver bg-white px-4 text-sm placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
@@ -641,7 +1308,7 @@ export function EnrollmentWizard({ classes }: { classes: ClassInfo[] }) {
         </div>
       )}
 
-      {/* ─── Step 3: Auth ──────────────────────────── */}
+      {/* ─── Auth ────────────────────────────────── */}
       {step === "auth" && (
         <div className="space-y-6">
           <div className="text-center">
@@ -761,33 +1428,30 @@ export function EnrollmentWizard({ classes }: { classes: ClassInfo[] }) {
             </button>
           </p>
 
-          <button
-            type="button"
-            onClick={() => setStep("results")}
-            className="text-sm text-lavender hover:text-lavender-dark font-medium"
-          >
-            &larr; Back to classes
-          </button>
+          <BackButton onClick={goBack} label="Back to classes" />
         </div>
       )}
 
-      {/* ─── Step 4: Student Profile ───────────────── */}
+      {/* ─── Student Profile ─────────────────────── */}
       {step === "student" && (
         <div className="space-y-6">
           <div className="text-center">
             <h2 className="font-heading text-2xl font-semibold text-charcoal">
-              Who are we enrolling?
+              {enrolleeType === "myself"
+                ? "Add your info"
+                : "Who are we enrolling?"}
             </h2>
             <p className="mt-1 text-sm text-slate">
-              Select an existing dancer or add a new one.
+              {enrolleeType === "myself"
+                ? "We need a few details to get you started."
+                : "Select an existing dancer or add a new one."}
             </p>
           </div>
 
-          {/* Existing students */}
           {existingStudents.length > 0 && (
             <div className="space-y-2">
               <p className="text-sm font-medium text-charcoal">
-                Your dancers
+                {enrolleeType === "myself" ? "Your profiles" : "Your dancers"}
               </p>
               {existingStudents.map((s) => (
                 <button
@@ -808,16 +1472,19 @@ export function EnrollmentWizard({ classes }: { classes: ClassInfo[] }) {
             </div>
           )}
 
-          {/* Add new student */}
           <div className="space-y-3">
             {existingStudents.length > 0 && (
               <p className="text-sm font-medium text-charcoal">
-                Or add a new dancer
+                {enrolleeType === "myself"
+                  ? "Or add a new profile"
+                  : "Or add a new dancer"}
               </p>
             )}
             <input
               type="text"
-              placeholder="Child's full name"
+              placeholder={
+                enrolleeType === "myself" ? "Your full name" : "Child\u2019s full name"
+              }
               value={studentName}
               onChange={(e) => setStudentName(e.target.value)}
               className="w-full h-11 rounded-lg border border-silver bg-white px-4 text-sm placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
@@ -846,21 +1513,19 @@ export function EnrollmentWizard({ classes }: { classes: ClassInfo[] }) {
               disabled={!studentName.trim() || !studentDob || loading}
               className="w-full h-11 rounded-lg bg-lavender hover:bg-lavender-dark text-white font-semibold text-sm transition-colors disabled:opacity-40"
             >
-              {loading ? "Adding..." : "Add Dancer & Continue"}
+              {loading
+                ? "Adding..."
+                : enrolleeType === "myself"
+                  ? "Continue"
+                  : "Add Dancer & Continue"}
             </button>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setStep("results")}
-            className="text-sm text-lavender hover:text-lavender-dark font-medium"
-          >
-            &larr; Back to classes
-          </button>
+          <BackButton onClick={goBack} label="Back to classes" />
         </div>
       )}
 
-      {/* ─── Step 5: Confirm ───────────────────────── */}
+      {/* ─── Confirm ─────────────────────────────── */}
       {step === "confirm" && selectedClass && (
         <div className="space-y-6">
           <div className="text-center">
@@ -875,16 +1540,16 @@ export function EnrollmentWizard({ classes }: { classes: ClassInfo[] }) {
             </h3>
             <div className="grid grid-cols-2 gap-y-3 text-sm">
               <div>
-                <p className="text-mist text-xs">Style & Level</p>
+                <p className="text-mist text-xs">Style &amp; Level</p>
                 <p className="text-charcoal font-medium capitalize">
-                  {STYLE_LABELS[selectedClass.style] ?? selectedClass.style} ·{" "}
-                  {selectedClass.level}
+                  {STYLE_LABELS[selectedClass.style] ?? selectedClass.style}{" "}
+                  &middot; {selectedClass.level}
                 </p>
               </div>
               <div>
                 <p className="text-mist text-xs">Schedule</p>
                 <p className="text-charcoal font-medium">
-                  {DAYS[selectedClass.dayOfWeek]}s ·{" "}
+                  {DAYS[selectedClass.dayOfWeek]}s &middot;{" "}
                   {formatTime(selectedClass.startTime)}
                 </p>
               </div>
@@ -909,7 +1574,7 @@ export function EnrollmentWizard({ classes }: { classes: ClassInfo[] }) {
                 <p className="text-charcoal font-medium">
                   {selectedClass.isFull ? (
                     <span className="text-warning">
-                      Full — joining waitlist
+                      Full &mdash; joining waitlist
                     </span>
                   ) : (
                     <span className="text-success">
@@ -927,11 +1592,12 @@ export function EnrollmentWizard({ classes }: { classes: ClassInfo[] }) {
               </h4>
               <ul className="text-sm text-slate space-y-1">
                 <li>
-                  · Ballet shoes (pink for girls, black or white for boys)
+                  &middot; Ballet shoes (pink for girls, black or white for
+                  boys)
                 </li>
-                <li>· Leotard and tights (solid colors preferred)</li>
-                <li>· Hair pulled back in a neat bun</li>
-                <li>· Water bottle</li>
+                <li>&middot; Leotard and tights (solid colors preferred)</li>
+                <li>&middot; Hair pulled back in a neat bun</li>
+                <li>&middot; Water bottle</li>
               </ul>
             </div>
 
@@ -960,17 +1626,11 @@ export function EnrollmentWizard({ classes }: { classes: ClassInfo[] }) {
                 : "Confirm Enrollment"}
           </button>
 
-          <button
-            type="button"
-            onClick={() => setStep("student")}
-            className="text-sm text-lavender hover:text-lavender-dark font-medium"
-          >
-            &larr; Back
-          </button>
+          <BackButton onClick={() => setStep("student")} />
         </div>
       )}
 
-      {/* ─── Step 6: Done ──────────────────────────── */}
+      {/* ─── Done ────────────────────────────────── */}
       {step === "done" && enrollResult && (
         <div className="space-y-6 text-center">
           <div className="mx-auto h-16 w-16 rounded-full bg-success/10 flex items-center justify-center">
@@ -991,13 +1651,15 @@ export function EnrollmentWizard({ classes }: { classes: ClassInfo[] }) {
 
           <h2 className="font-heading text-2xl font-semibold text-charcoal">
             {enrollResult.status === "active"
-              ? "You're enrolled!"
+              ? "You\u2019re enrolled!"
               : "Added to waitlist"}
           </h2>
           <p className="text-sm text-slate max-w-md mx-auto">
             {enrollResult.status === "active"
-              ? `Your child is now enrolled in ${enrollResult.className}. We'll send a confirmation email with all the details.`
-              : `${enrollResult.className} is currently full. We've added you to the waitlist and will notify you as soon as a spot opens.`}
+              ? enrolleeType === "myself"
+                ? `You are now enrolled in ${enrollResult.className}. We\u2019ll send a confirmation email with all the details.`
+                : `Your child is now enrolled in ${enrollResult.className}. We\u2019ll send a confirmation email with all the details.`
+              : `${enrollResult.className} is currently full. We\u2019ve added you to the waitlist and will notify you as soon as a spot opens.`}
           </p>
 
           {enrollResult.ageWarning && (
@@ -1029,5 +1691,25 @@ export function EnrollmentWizard({ classes }: { classes: ClassInfo[] }) {
         </div>
       )}
     </div>
+  );
+}
+
+// ─── Shared Components ──────────────────────────────────
+
+function BackButton({
+  onClick,
+  label,
+}: {
+  onClick: () => void;
+  label?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="text-sm text-lavender hover:text-lavender-dark font-medium"
+    >
+      &larr; {label ?? "Back"}
+    </button>
   );
 }
