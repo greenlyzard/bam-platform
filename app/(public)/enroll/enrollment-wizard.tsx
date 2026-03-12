@@ -197,11 +197,14 @@ function getAdultRecommendations(
     (i) => !["pilates", "gyrotonic", "not_sure"].includes(i)
   );
 
+  // Adults must only see classes with "adult" or "teen" in the level.
+  // Never return children's levels (1, 2A, 2B, 2C, 3A, 3B, 3C, 4, Petites, etc.)
   let matches = classes.filter((cls) => {
-    if (cls.ageMax !== null && cls.ageMax < 14) return false;
-    return true;
+    const lvl = cls.level.toLowerCase();
+    return lvl.includes("adult") || lvl.includes("teen");
   });
 
+  // When only pilates/gyrotonic selected, return zero dance classes
   if (danceInterests.length > 0) {
     const styleMap: Record<string, string[]> = {
       ballet: ["ballet"],
@@ -212,6 +215,9 @@ function getAdultRecommendations(
     const targetStyles = danceInterests.flatMap((i) => styleMap[i] ?? []);
     const filtered = matches.filter((c) => targetStyles.includes(c.style));
     if (filtered.length > 0) matches = filtered;
+  } else {
+    // No dance interests — only pilates/gyrotonic or not_sure — show no classes
+    matches = [];
   }
 
   if (days.length > 0) {
