@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
-export type UserRole = "super_admin" | "admin" | "front_desk" | "teacher" | "parent" | "student";
+export type UserRole = "super_admin" | "admin" | "studio_admin" | "finance_admin" | "studio_manager" | "front_desk" | "teacher" | "parent" | "student";
 
 export interface AuthUser {
   id: string;
@@ -62,6 +62,9 @@ export async function requireRole(
     const roleHome: Record<string, string> = {
       super_admin: "/admin/dashboard",
       admin: "/admin/dashboard",
+      studio_admin: "/admin/dashboard",
+      finance_admin: "/admin/dashboard",
+      studio_manager: "/admin/dashboard",
       front_desk: "/admin/dashboard",
       teacher: "/teach/dashboard",
       parent: "/portal/dashboard",
@@ -77,7 +80,7 @@ export async function requireRole(
  * Require admin or super_admin role.
  */
 export async function requireAdmin(): Promise<AuthUser> {
-  return requireRole("admin", "super_admin");
+  return requireRole("admin", "super_admin", "studio_admin", "finance_admin", "studio_manager");
 }
 
 /**

@@ -80,6 +80,7 @@ const navGroups: NavGroup[] = [
     superAdminOnly: true,
     items: [
       { label: "Theme", href: "/admin/settings/theme", icon: "◑" },
+      { label: "Team Members", href: "/admin/settings/team", icon: "◉" },
     ],
   },
 ];

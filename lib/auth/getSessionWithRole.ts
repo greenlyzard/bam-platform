@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 
-export type Role = "super_admin" | "admin" | "front_desk" | "teacher" | "parent" | "student";
+export type Role = "super_admin" | "admin" | "studio_admin" | "finance_admin" | "studio_manager" | "front_desk" | "teacher" | "parent" | "student";
 
 export interface SessionWithRole {
   user: {

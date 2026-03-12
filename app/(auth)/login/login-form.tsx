@@ -178,7 +178,16 @@ export function LoginForm({
               className="w-full h-11 rounded-lg border border-silver bg-white px-4 text-base placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
             />
           </div>
-          <div className="flex justify-end">
+          <div className="flex items-center justify-between">
+            <label className="flex items-center gap-2 text-xs text-charcoal cursor-pointer">
+              <input
+                type="checkbox"
+                name="remember"
+                defaultChecked
+                className="h-4 w-4 rounded border-silver text-lavender focus:ring-lavender/20"
+              />
+              Remember me
+            </label>
             <a
               href="/forgot-password"
               className="text-xs text-lavender hover:text-lavender-dark font-medium"
