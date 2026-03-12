@@ -13,6 +13,15 @@ export function SignupForm() {
     setError("");
     setSuccess("");
 
+    const password = formData.get("password") as string;
+    const confirmPassword = formData.get("confirmPassword") as string;
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      setLoading(false);
+      return;
+    }
+
     const result = await signUp(formData);
     setLoading(false);
 
@@ -120,6 +129,25 @@ export function SignupForm() {
             required
             minLength={8}
             placeholder="At least 8 characters"
+            className="w-full h-11 rounded-lg border border-silver bg-white px-4 text-base placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
+          />
+        </div>
+
+        <div>
+          <label
+            htmlFor="confirmPassword"
+            className="block text-sm font-medium text-charcoal mb-1.5"
+          >
+            Confirm password
+          </label>
+          <input
+            id="confirmPassword"
+            name="confirmPassword"
+            type="password"
+            autoComplete="new-password"
+            required
+            minLength={8}
+            placeholder="Re-enter your password"
             className="w-full h-11 rounded-lg border border-silver bg-white px-4 text-base placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
           />
         </div>

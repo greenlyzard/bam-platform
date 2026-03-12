@@ -430,6 +430,17 @@ export function EnrollmentWizard({ classes }: { classes: ClassInfo[] }) {
   async function handleAuth(formData: FormData) {
     setLoading(true);
     setError("");
+
+    if (authMode === "signup") {
+      const password = formData.get("password") as string;
+      const confirmPassword = formData.get("confirmPassword") as string;
+      if (password !== confirmPassword) {
+        setError("Passwords do not match.");
+        setLoading(false);
+        return;
+      }
+    }
+
     const endpoint =
       authMode === "signup" ? "/api/enroll/signup" : "/api/enroll/signin";
     try {
@@ -1414,6 +1425,18 @@ export function EnrollmentWizard({ classes }: { classes: ClassInfo[] }) {
               }
               className="w-full h-11 rounded-lg border border-silver bg-white px-4 text-sm placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
             />
+
+            {authMode === "signup" && (
+              <input
+                name="confirmPassword"
+                type="password"
+                required
+                minLength={8}
+                placeholder="Confirm password"
+                autoComplete="new-password"
+                className="w-full h-11 rounded-lg border border-silver bg-white px-4 text-sm placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
+              />
+            )}
 
             {authMode === "signup" && (
               <select
