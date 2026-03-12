@@ -614,9 +614,9 @@ Items are grouped into these categories (displayed as collapsible sections in th
   >
   > 1. Unlock the front door — key code is [ADMIN: insert code] — do not share with students
   > 2. Disarm the security system: panel is located [ADMIN: insert location]
-  > 3. Turn on lights: main switch in [location], studio lights in each room independently
-  > 4. Check the classroom: floor is clear, barres are properly positioned, mirrors are clean
-  > 5. Turn on the sound system: [instructions per studio]
+  > 3. Turn on lights: main switch in [location], studio lights in Studio A, B, and C independently
+  > 4. Check your assigned studio: floor is clear, barres are properly positioned, mirrors are clean
+  > 5. Turn on the sound system: [instructions per studio — A, B, C each have separate systems]
   > 6. Check the first aid kit — if any supplies are low, text Amanda or Cara
   > 7. Confirm your class roster in the portal before students arrive
   >
