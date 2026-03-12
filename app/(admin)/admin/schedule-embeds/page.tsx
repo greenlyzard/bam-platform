@@ -39,6 +39,30 @@ export default async function ScheduleEmbedsPage() {
         </div>
       </div>
 
+      {/* Angelina Chat Widget Embed */}
+      <div className="rounded-xl border border-silver bg-white p-4">
+        <h3 className="font-semibold text-charcoal mb-2">
+          Angelina Chat Widget
+        </h3>
+        <p className="text-xs text-slate mb-3">
+          Embed the AI chat assistant on your WordPress site for lead capture and
+          visitor engagement.
+        </p>
+        <div className="bg-cream rounded-lg p-3 text-xs font-mono text-charcoal break-all select-all">
+          {`<iframe src="${process.env.NEXT_PUBLIC_APP_URL || "https://portal.balletacademyandmovement.com"}/widget/angelina" width="400" height="600" frameborder="0" style="border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.1);"></iframe>`}
+        </div>
+        <div className="flex gap-2 mt-3">
+          <a
+            href="/widget/angelina"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-lg px-3 py-1.5 text-sm font-medium text-lavender hover:bg-lavender/10 transition-colors"
+          >
+            Preview Widget
+          </a>
+        </div>
+      </div>
+
       {embeds && embeds.length > 0 ? (
         <div className="rounded-xl border border-silver bg-white divide-y divide-silver">
           {embeds.map((embed) => (

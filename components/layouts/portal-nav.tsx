@@ -9,6 +9,7 @@ const navItems = [
   { label: "Billing", href: "/portal/billing", icon: "✦" },
   { label: "Performances", href: "/portal/performances", icon: "★" },
   { label: "Messages", href: "/portal/messages", icon: "✉" },
+  { label: "Ask Angelina", href: "/portal/chat", icon: "◈" },
 ];
 
 // Mobile bottom tab shows fewer items

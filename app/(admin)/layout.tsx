@@ -1,5 +1,6 @@
 import { SignOutButton } from "@/components/layouts/sign-out-button";
 import { AdminNav } from "@/components/layouts/admin-nav";
+import { AngelinaChat } from "@/components/angelina/AngelinaChat";
 import { getUser } from "@/lib/auth/guards";
 
 export default async function AdminLayout({
@@ -49,6 +50,7 @@ export default async function AdminLayout({
       <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-silver bg-white lg:hidden">
         <AdminNav mobile />
       </nav>
+      <AngelinaChat role="admin" mode="floating" />
     </div>
   );
 }

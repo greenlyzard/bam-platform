@@ -13,6 +13,7 @@ const navItems = [
   { label: "Sub Requests", href: "/teach/substitute-requests", icon: "↻" },
   { label: "Content", href: "/teach/content", icon: "▶" },
   { label: "Messages", href: "/teach/messages", icon: "✉" },
+  { label: "Ask Angelina", href: "/teach/chat", icon: "◈" },
 ];
 
 const mobileItems = [

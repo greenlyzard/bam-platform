@@ -48,6 +48,13 @@ const navGroups = [
     items: [{ label: "LMS Content", href: "/admin/content", icon: "▶" }],
   },
   {
+    label: "AI",
+    items: [
+      { label: "Angelina Chat", href: "/admin/chat", icon: "◈" },
+      { label: "Conversations", href: "/admin/angelina", icon: "◇" },
+    ],
+  },
+  {
     label: "Intelligence",
     items: [
       { label: "Expansion", href: "/admin/expansion", icon: "●" },
