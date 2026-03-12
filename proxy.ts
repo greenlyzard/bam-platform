@@ -24,7 +24,7 @@ const ROLE_HOME: Record<string, string> = {
   super_admin: "/admin/dashboard",
 };
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Create Supabase client with cookie handling
