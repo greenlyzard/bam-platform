@@ -82,20 +82,41 @@ export function AddDancerForm() {
           </div>
         </div>
 
-        <div>
-          <label
-            htmlFor="dateOfBirth"
-            className="block text-sm font-medium text-charcoal mb-1.5"
-          >
-            Date of birth *
-          </label>
-          <input
-            id="dateOfBirth"
-            name="dateOfBirth"
-            type="date"
-            required
-            className="w-full h-11 rounded-lg border border-silver bg-white px-4 text-base placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
-          />
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label
+              htmlFor="dateOfBirth"
+              className="block text-sm font-medium text-charcoal mb-1.5"
+            >
+              Date of birth *
+            </label>
+            <input
+              id="dateOfBirth"
+              name="dateOfBirth"
+              type="date"
+              required
+              className="w-full h-11 rounded-lg border border-silver bg-white px-4 text-base placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="gender"
+              className="block text-sm font-medium text-charcoal mb-1.5"
+            >
+              Gender{" "}
+              <span className="text-mist font-normal">(optional)</span>
+            </label>
+            <select
+              id="gender"
+              name="gender"
+              className="w-full h-11 rounded-lg border border-silver bg-white px-4 text-base text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
+            >
+              <option value="">Prefer not to say</option>
+              <option value="female">Female</option>
+              <option value="male">Male</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
         </div>
 
         <div>
@@ -123,17 +144,44 @@ export function AddDancerForm() {
             htmlFor="medicalNotes"
             className="block text-sm font-medium text-charcoal mb-1.5"
           >
-            Medical notes or allergies{" "}
+            Medical notes{" "}
             <span className="text-mist font-normal">(optional)</span>
           </label>
           <textarea
             id="medicalNotes"
             name="medicalNotes"
             rows={2}
-            placeholder="Any information the studio should know..."
+            placeholder="Any medical information the studio should know..."
             className="w-full rounded-lg border border-silver bg-white px-4 py-3 text-base placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none resize-none"
           />
         </div>
+
+        <div>
+          <label
+            htmlFor="allergyNotes"
+            className="block text-sm font-medium text-charcoal mb-1.5"
+          >
+            Allergies{" "}
+            <span className="text-mist font-normal">(optional)</span>
+          </label>
+          <textarea
+            id="allergyNotes"
+            name="allergyNotes"
+            rows={2}
+            placeholder="Any allergies or sensitivities..."
+            className="w-full rounded-lg border border-silver bg-white px-4 py-3 text-base placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none resize-none"
+          />
+        </div>
+
+        <label className="flex items-center gap-2 text-sm text-slate">
+          <input
+            type="checkbox"
+            name="photoConsent"
+            value="true"
+            className="rounded border-silver"
+          />
+          I consent to photos and videos of my child being used for studio purposes
+        </label>
 
         <div className="flex gap-3 pt-2">
           <button
