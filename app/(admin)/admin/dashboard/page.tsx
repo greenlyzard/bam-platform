@@ -4,13 +4,15 @@ import {
   getCapacitySummary,
   getExpansionMarkets,
 } from "@/lib/queries/admin";
+import { getPayrollSummary } from "@/lib/queries/payroll-summary";
 
 export default async function AdminDashboardPage() {
   const user = await requireAdmin();
-  const [stats, capacity, markets] = await Promise.all([
+  const [stats, capacity, markets, payroll] = await Promise.all([
     getEnrollmentStats(),
     getCapacitySummary(),
     getExpansionMarkets(),
+    getPayrollSummary(),
   ]);
 
   // Top expansion market
@@ -108,6 +110,49 @@ export default async function AdminDashboardPage() {
           </p>
         </div>
       </section>
+
+      {/* Payroll Summary */}
+      {payroll.pendingCount > 0 && (
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-heading font-semibold text-charcoal">
+              Payroll Summary
+            </h2>
+            <a
+              href="/admin/timesheets/payroll"
+              className="text-sm text-lavender hover:text-lavender-dark font-medium"
+            >
+              Payroll Report →
+            </a>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="rounded-xl border border-warning/30 bg-warning/5 p-4 text-center">
+              <p className="text-2xl font-heading font-semibold text-warning">
+                {payroll.pendingCount}
+              </p>
+              <p className="mt-1 text-xs text-slate">Pending Approval</p>
+            </div>
+            <div className="rounded-xl border border-silver bg-white p-4 text-center">
+              <p className="text-2xl font-heading font-semibold text-charcoal">
+                {payroll.totalHoursThisMonth.toFixed(1)}
+              </p>
+              <p className="mt-1 text-xs text-slate">Hours This Month</p>
+            </div>
+            <div className="rounded-xl border border-silver bg-white p-4 text-center">
+              <p className="text-2xl font-heading font-semibold text-charcoal">
+                ${payroll.estimatedPayroll.toFixed(0)}
+              </p>
+              <p className="mt-1 text-xs text-slate">Est. Payroll</p>
+            </div>
+            <div className="rounded-xl border border-silver bg-white p-4 text-center">
+              <p className="text-2xl font-heading font-semibold text-charcoal">
+                {payroll.flaggedCount}
+              </p>
+              <p className="mt-1 text-xs text-slate">Flagged</p>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Quick Actions */}
       <section>
