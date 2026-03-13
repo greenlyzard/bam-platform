@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { buildAngelinaContext } from "@/lib/angelina/context";
+import { searchKnowledgeArticles } from "@/lib/angelina/knowledge";
 import { createClient } from "@/lib/supabase/server";
 import { getUser } from "@/lib/auth/guards";
 
@@ -158,6 +159,29 @@ export async function POST(req: NextRequest) {
     message.toLowerCase().trim() === "hey gurl"
   ) {
     systemPrompt += `\n\nIMPORTANT: You are speaking with Derek Shaw — the technologist and platform builder who designed and built you. Greet him by name, be warm and a little playful. You can be more casual with Derek than with other users.`;
+  }
+
+  // Search knowledge base for relevant articles and inject into context
+  if (tenantId) {
+    const audienceMap: Record<string, string> = {
+      public: "all",
+      parent: "parent",
+      teacher: "teacher",
+      admin: "all",
+    };
+    const articles = await searchKnowledgeArticles(
+      supabase,
+      message,
+      tenantId,
+      audienceMap[role] ?? "all",
+      3
+    );
+    if (articles.length > 0) {
+      const knowledgeBlock = articles
+        .map((a) => `### ${a.title}\n${a.content}`)
+        .join("\n\n");
+      systemPrompt += `\n\nKNOWLEDGE BASE — Use this information to answer accurately:\n\n${knowledgeBlock}`;
+    }
   }
 
   // Add user message
