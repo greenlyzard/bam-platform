@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { requireParent } from "@/lib/auth/guards";
 import { getMyStudents, getMyEnrollments, getMyStudentBadges } from "@/lib/queries/portal";
 import { getStudioSettings } from "@/lib/queries/studio-settings";
@@ -32,18 +31,8 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      {/* Logo + Greeting */}
+      {/* Greeting */}
       <div className="text-center sm:text-left">
-        <div className="flex justify-center sm:justify-start mb-4">
-          <Image
-            src="/studio-logo.png"
-            alt={studioName}
-            width={700}
-            height={400}
-            className="h-auto w-full max-w-[280px]"
-            priority
-          />
-        </div>
         <h1 className="text-2xl font-heading font-semibold text-charcoal">
           Welcome back{user.firstName ? `, ${user.firstName}` : ""}
         </h1>
