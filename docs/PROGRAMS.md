@@ -316,8 +316,13 @@ programs (
     -- 'draft' | 'published' | 'locked' | 'archived'
   public_slug         text UNIQUE NOT NULL,
     -- URL-safe slug for public access, e.g. 'sylvia-2026-friday'
+  default_language    text DEFAULT 'en',
+  supported_languages text[] DEFAULT '{en}',
+    -- e.g. '{en,es,fr,de,it,pt,zh,vi,ko,ru,uk}'
   casting_locked_at   timestamptz,
   published_at        timestamptz,
+  public_until        timestamptz,
+    -- null = auto-expire 7 days after archive; set to override
   created_by          uuid FK profiles NOT NULL,
   created_at          timestamptz DEFAULT now(),
   updated_at          timestamptz DEFAULT now()
@@ -332,6 +337,7 @@ program_blocks (
   display_order   integer NOT NULL,
   is_visible      boolean DEFAULT true,
   content_json    jsonb,   -- block-specific config and rich text content
+  translations    jsonb,   -- {es: {...}, fr: {...}} per language code
   created_at      timestamptz DEFAULT now(),
   updated_at      timestamptz DEFAULT now()
 )
@@ -541,22 +547,55 @@ Given the June 6, 2026 Sylvia deadline, the build order is:
 
 ---
 
-## 17. Open Questions
+## 17. Resolved Decisions
 
-- Should parents be able to submit bio content for their child
-  (subject to Admin approval), or is bio entry Admin-only?
-- Should sponsor logos be uploaded per-production or maintained in
-  a global sponsor library across productions?
-- Should programs support multiple languages (Spanish) for bios
-  and about sections?
-- For print PDF export: should the platform generate the PDF server-side
-  (Puppeteer/headless Chrome) or use a client-side print stylesheet?
-- Should archived programs remain publicly accessible indefinitely
-  (historical archive) or be fully hidden?
-- For competition itinerary: should timing estimates roll up to
-  an estimated start time per entry (auto-schedule)?
-- Should the travel itinerary be linked to a specific competition
-  in the competition module, or be standalone?
+The following questions were resolved on March 12, 2026:
+
+**Bio submission:**
+Parents can submit bio content for their child through the portal,
+subject to Admin approval before it appears in any program. Admin
+can also write or edit bios directly. Workflow: parent submits →
+Admin reviews → approve/edit/reject.
+
+**Sponsor library:**
+Global sponsor library maintained across productions. Sponsors are
+created once and can be associated with any production. Logo and
+details updated globally — changes reflect across all programs
+that include that sponsor.
+
+**Multi-language support:**
+Programs support translation into multiple languages. English is
+the primary/default. Supported languages:
+English, Spanish, French, German, Italian, Portuguese, Chinese,
+Vietnamese, Korean, Russian, Ukrainian.
+Each content block (synopsis, bio, about, welcome note) has a
+translations jsonb field storing content per language code.
+Audience selects language via a toggle on the public program page.
+
+**PDF export:**
+Server-side PDF generation using Puppeteer/headless Chrome.
+Admin triggers PDF export from the program builder. PDF is
+generated on the server, stored in Cloudflare R2, and returned
+as a download link.
+
+**Archived program visibility:**
+Archived programs are publicly inaccessible after 7 days from
+archive date. A "Keep Public" override button is available to
+Admin at any time to extend public access indefinitely.
+`programs.public_until timestamptz` — null = follow default rule.
+
+**Competition itinerary timing:**
+No auto-schedule. All start times and timing estimates are entered
+manually per entry. No rollup calculation.
+
+**Travel itinerary:**
+Standalone — not linked to the competition module. Manual entry only.
+
+**Ticketing integration:**
+See TICKETING.md for the full ticketing module including complimentary
+ticket allocation, seat holds, and SMS delivery. Ticketing is a
+separate module that integrates with Programs for the venue and
+show data.
 
 ---
 
