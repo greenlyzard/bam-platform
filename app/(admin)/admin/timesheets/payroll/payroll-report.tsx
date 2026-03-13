@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { markEntriesAsPaid } from "../actions";
 
 interface TeacherPayroll {
   id: string;
@@ -231,6 +232,7 @@ export function PayrollReport({
           </p>
         </div>
         <div className="flex gap-2">
+          <MarkAsPaidButton dateFrom={dateFrom} dateTo={dateTo} />
           <button
             onClick={handleExportCsv}
             className="h-10 rounded-lg border border-silver bg-white hover:bg-cloud text-sm font-medium text-charcoal px-4 transition-colors"
@@ -735,6 +737,68 @@ function SummaryStat({
       >
         {value}
       </div>
+    </div>
+  );
+}
+
+function MarkAsPaidButton({
+  dateFrom,
+  dateTo,
+}: {
+  dateFrom: string;
+  dateTo: string;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [result, setResult] = useState("");
+
+  if (result) {
+    return (
+      <span className="h-10 inline-flex items-center text-sm text-success font-medium px-4">
+        {result}
+      </span>
+    );
+  }
+
+  if (!confirming) {
+    return (
+      <button
+        onClick={() => setConfirming(true)}
+        className="h-10 rounded-lg bg-charcoal hover:bg-charcoal/90 text-white text-sm font-medium px-4 transition-colors"
+      >
+        Mark All as Paid
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-xs text-slate">Lock all approved entries?</span>
+      <form
+        action={async (fd) => {
+          setLoading(true);
+          const res = await markEntriesAsPaid(fd);
+          setLoading(false);
+          if (res?.error) setResult(res.error);
+          else setResult(`${res.count} entries marked as paid`);
+        }}
+      >
+        <input type="hidden" name="dateFrom" value={dateFrom} />
+        <input type="hidden" name="dateTo" value={dateTo} />
+        <button
+          type="submit"
+          disabled={loading}
+          className="h-8 rounded-md bg-success hover:bg-success/90 text-white font-medium text-xs px-3 disabled:opacity-50"
+        >
+          {loading ? "..." : "Confirm"}
+        </button>
+      </form>
+      <button
+        onClick={() => setConfirming(false)}
+        className="h-8 rounded-md border border-silver text-slate text-xs px-3"
+      >
+        Cancel
+      </button>
     </div>
   );
 }
