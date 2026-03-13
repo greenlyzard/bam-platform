@@ -57,13 +57,13 @@ export async function GET(req: NextRequest) {
     })),
     ...(leads ?? []).map((l) => ({
       id: l.id,
-      name: [l.first_name, l.last_name].filter(Boolean).join(" ") || l.email ?? "",
+      name: [l.first_name, l.last_name].filter(Boolean).join(" ") || (l.email ?? ""),
       email: l.email ?? "",
       type: "lead" as const,
     })),
     ...(staff ?? []).map((s) => ({
       id: s.id,
-      name: [s.first_name, s.last_name].filter(Boolean).join(" ") || s.email ?? "",
+      name: [s.first_name, s.last_name].filter(Boolean).join(" ") || (s.email ?? ""),
       email: s.email ?? "",
       type: "staff" as const,
     })),

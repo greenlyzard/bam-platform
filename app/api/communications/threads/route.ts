@@ -99,29 +99,27 @@ export async function GET(req: NextRequest) {
     .in("thread_id", threadIds.length > 0 ? threadIds : ["__none__"])
     .order("created_at", { ascending: false });
 
-  const previewMap: Record<string, typeof previews extends Array<infer T> ? T : never> = {};
-  for (const p of previews ?? []) {
+  const previewMap: Record<string, { thread_id: string; body_text: string | null; body_html: string | null; direction: string; sender_name: string | null; created_at: string }> = {};
+  for (const p of (previews ?? []) as { thread_id: string; body_text: string | null; body_html: string | null; direction: string; sender_name: string | null; created_at: string }[]) {
     if (!previewMap[p.thread_id]) {
       previewMap[p.thread_id] = p;
     }
   }
 
-  const threadsWithPreview = result.map((t) => ({
-    ...t,
-    last_message: previewMap[t.id]
-      ? {
-          preview:
-            (
-              previewMap[t.id].body_text ??
-              previewMap[t.id].body_html?.replace(/<[^>]+>/g, "") ??
-              ""
-            ).slice(0, 80),
-          direction: previewMap[t.id].direction,
-          sender_name: previewMap[t.id].sender_name,
-          created_at: previewMap[t.id].created_at,
-        }
-      : null,
-  }));
+  const threadsWithPreview = result.map((t) => {
+    const pm = previewMap[t.id];
+    return {
+      ...t,
+      last_message: pm
+        ? {
+            preview: (pm.body_text ?? pm.body_html?.replace(/<[^>]+>/g, "") ?? "").slice(0, 80),
+            direction: pm.direction,
+            sender_name: pm.sender_name,
+            created_at: pm.created_at,
+          }
+        : null,
+    };
+  });
 
   return NextResponse.json({ threads: threadsWithPreview });
 }

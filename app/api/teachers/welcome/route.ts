@@ -4,7 +4,9 @@ import { createClient } from "@/lib/supabase/server";
 import { renderEmailHtml } from "@/lib/email/layout";
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+function getResend() {
+  return new Resend(process.env.RESEND_API_KEY);
+}
 const FROM_EMAIL =
   process.env.RESEND_FROM_EMAIL ?? "hello@balletacademyandmovement.com";
 const FROM_NAME = "Ballet Academy and Movement";
@@ -82,7 +84,7 @@ export async function POST(req: NextRequest) {
     footerText: "Ballet Academy and Movement · 400-C Camino De Estrella, San Clemente, CA 92672",
   });
 
-  const { error: sendError } = await resend.emails.send({
+  const { error: sendError } = await getResend().emails.send({
     from: `${FROM_NAME} <${FROM_EMAIL}>`,
     to: [profile.email],
     subject: "Welcome to Ballet Academy and Movement — Your Teacher Portal is Ready",

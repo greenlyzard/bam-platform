@@ -211,10 +211,9 @@ export function InboxLayout({
     }
   }
 
-  function handleComposeSuccess(thread: Thread) {
+  function handleComposeSuccess() {
     setShowCompose(false);
-    setThreads((prev) => [thread, ...prev]);
-    openThread(thread);
+    fetchThreads();
   }
 
   return (
@@ -457,6 +456,7 @@ function ThreadDetail({
   onUpdate,
   onReply,
   onBack,
+  onRefreshMessages,
 }: {
   thread: Thread;
   messages: Message[];

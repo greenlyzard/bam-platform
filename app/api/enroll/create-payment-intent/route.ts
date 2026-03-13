@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { stripe } from "@/lib/stripe";
+import { getStripe } from "@/lib/stripe";
 import { z } from "zod";
 
 const schema = z.object({
@@ -53,7 +53,7 @@ export async function POST(req: Request) {
       .map((item) => `${item.className} (${item.childName})`)
       .join(", ");
 
-    const paymentIntent = await stripe.paymentIntents.create({
+    const paymentIntent = await getStripe().paymentIntents.create({
       amount: totalCents,
       currency: "usd",
       metadata: {
