@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
   const hookSecret = process.env.SUPABASE_AUTH_HOOK_SECRET;
   if (hookSecret) {
     const authHeader = req.headers.get("authorization");
-    if (authHeader !== `Bearer ${hookSecret}`) {
+    if (authHeader?.trim() !== `Bearer ${hookSecret?.trim()}`) {
       console.warn("[auth:send-email] Hook secret mismatch — skipping custom email");
       return NextResponse.json({ success: true });
     }
