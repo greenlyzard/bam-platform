@@ -23,6 +23,7 @@ interface Teacher {
   background_check_complete: boolean;
   background_check_expires_at: string | null;
   w9_on_file: boolean;
+  welcomeSentAt: string | null;
 }
 
 function formatCents(cents: number | null): string {
@@ -32,11 +33,36 @@ function formatCents(cents: number | null): string {
 
 export function TeacherList({ teachers }: { teachers: Teacher[] }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [sendingWelcome, setSendingWelcome] = useState<string | null>(null);
+  const [welcomeStatus, setWelcomeStatus] = useState<Record<string, string>>({});
   const router = useRouter();
 
   function handleSaved() {
     setSelectedId(null);
     router.refresh();
+  }
+
+  async function handleSendWelcome(teacherId: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    setSendingWelcome(teacherId);
+    try {
+      const res = await fetch("/api/teachers/welcome", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teacher_id: teacherId }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        setWelcomeStatus((prev) => ({ ...prev, [teacherId]: `Error: ${data.error}` }));
+      } else {
+        setWelcomeStatus((prev) => ({ ...prev, [teacherId]: `Sent to ${data.email}` }));
+        router.refresh();
+      }
+    } catch {
+      setWelcomeStatus((prev) => ({ ...prev, [teacherId]: "Failed to send" }));
+    } finally {
+      setSendingWelcome(null);
+    }
   }
 
   return (
@@ -167,6 +193,43 @@ export function TeacherList({ teachers }: { teachers: Teacher[] }) {
                   {isCompliant && (
                     <span className="inline-flex items-center rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success">
                       Fully Compliant
+                    </span>
+                  )}
+                </div>
+
+                {/* Welcome email status */}
+                <div className="mt-3 pt-3 border-t border-silver flex items-center gap-3">
+                  {t.welcomeSentAt ? (
+                    <>
+                      <span className="text-xs text-success">
+                        Welcome sent{" "}
+                        {new Date(t.welcomeSentAt).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => handleSendWelcome(t.id, e)}
+                        disabled={sendingWelcome === t.id}
+                        className="text-xs text-lavender hover:text-lavender-dark font-medium disabled:opacity-50"
+                      >
+                        {sendingWelcome === t.id ? "Sending..." : "Resend"}
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={(e) => handleSendWelcome(t.id, e)}
+                      disabled={sendingWelcome === t.id}
+                      className="inline-flex items-center gap-1 rounded-full bg-lavender/10 px-3 py-1 text-xs font-medium text-lavender-dark hover:bg-lavender/20 transition-colors disabled:opacity-50"
+                    >
+                      {sendingWelcome === t.id ? "Sending..." : "Send Welcome Email"}
+                    </button>
+                  )}
+                  {welcomeStatus[t.id] && (
+                    <span className={`text-xs ${welcomeStatus[t.id].startsWith("Error") || welcomeStatus[t.id] === "Failed to send" ? "text-error" : "text-success"}`}>
+                      {welcomeStatus[t.id]}
                     </span>
                   )}
                 </div>

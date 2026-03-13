@@ -155,6 +155,18 @@ export async function getAllTeachers() {
     }
   }
 
+  // Get welcome_sent_at from teacher_profiles
+  const welcomeMap: Record<string, string | null> = {};
+  if (ids.length > 0) {
+    const { data: tps } = await supabase
+      .from("teacher_profiles")
+      .select("user_id, welcome_sent_at")
+      .in("user_id", ids);
+    for (const tp of tps ?? []) {
+      welcomeMap[tp.user_id] = tp.welcome_sent_at;
+    }
+  }
+
   // Get class counts per teacher
   const { data: classes } = await supabase
     .from("classes")
@@ -174,6 +186,7 @@ export async function getAllTeachers() {
     lastName: profileNames[t.id]?.last_name ?? null,
     email: profileNames[t.id]?.email ?? null,
     classCount: classCounts[t.id] ?? 0,
+    welcomeSentAt: welcomeMap[t.id] ?? null,
   }));
 }
 

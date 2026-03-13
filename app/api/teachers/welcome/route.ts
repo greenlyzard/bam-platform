@@ -95,5 +95,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: sendError.message }, { status: 500 });
   }
 
+  // Track welcome_sent_at on teacher_profiles
+  await supabase
+    .from("teacher_profiles")
+    .update({ welcome_sent_at: new Date().toISOString() })
+    .eq("user_id", teacher_id);
+
   return NextResponse.json({ success: true, email: profile.email });
 }
