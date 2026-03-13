@@ -376,3 +376,93 @@ Angelina outputs placement and schedule recommendations in:
 - [ ] Room utilization dashboard
 - [ ] Retention prediction per student
 - [ ] Marketing audience sync on enrollment events (MARKETING_INTEGRATIONS.md)
+
+---
+
+## 11. Policy Decisions (Resolved)
+
+### Student Portal Access — Any Age, Admin-Approved
+- Students of any age can have their own portal login
+- Access requires explicit Admin approval (not automatic)
+- A parent submits the request or Admin creates it directly
+- Student portal is a restricted view — content is age/role appropriate:
+  - Young students (e.g., under 10): view their dances, performance
+    videos, badges earned. Read-only. No messaging.
+  - Older students (10–17): schedule view, class videos, badges,
+    limited communications (class channels only, no DMs with teachers)
+  - Adult students (18+): full student portal equivalent to parent view
+    for their own account
+- Parent account retains full visibility into their child's portal
+  activity at all times
+- Admin can revoke student portal access at any time
+- Student login is separate credentials from parent login
+- On a shared family device: student can log into their own account
+  without accessing parent's account or billing information
+
+```sql
+-- Additional fields on students table:
+portal_access_enabled     boolean default false,
+portal_access_approved_by uuid FK users nullable,
+portal_access_approved_at timestamptz nullable,
+portal_access_level       text CHECK IN (
+                            'view_only',      -- dances, videos, badges
+                            'standard',       -- + schedule, class channels
+                            'full'            -- adult students
+                          ) default 'view_only',
+```
+
+### Emergency Contacts vs. Approved Stream Contacts
+Both contact lists are tied to the **family record** (not individual
+students). This means one family maintains one set of contacts shared
+across all their enrolled students.
+
+However, **stream contact authorization is scoped per student** —
+Grandma can be approved to receive stream alerts for Maya's Nutcracker
+performance but not for her younger sibling who isn't performing yet.
+
+**Emergency Contacts (family-level)**
+- People to call if a student is injured, ill, or needs to be picked up
+- Not notified about livestreams
+- Visible to teachers and Admin during class sessions
+- Required minimum: 1 emergency contact beyond primary parent
+
+**Approved Stream Contacts (family-level list, student-level authorization)**
+- People authorized to receive livestream alert notifications
+- Separate from emergency contacts entirely
+- Primary parent is included by default (can be removed)
+- Additional contacts added by primary parent or Admin
+- Each contact specifies which students they're authorized for
+- Notification channels per contact: in-app, SMS, email (their preference)
+
+```sql
+family_contacts (
+  id                  uuid PK,
+  tenant_id           uuid FK tenants,
+  family_id           uuid FK families,
+  contact_type        text CHECK IN ('emergency','stream','both'),
+  first_name          text NOT NULL,
+  last_name           text NOT NULL,
+  relationship        text,               -- "Grandmother", "Aunt", etc.
+  phone               text,
+  email               text,
+  has_portal_account  boolean default false,
+  user_id             uuid FK users nullable, -- if they have a portal login
+  notify_via_sms      boolean default true,
+  notify_via_email    boolean default true,
+  notify_via_app      boolean default false,
+  is_primary          boolean default false,
+  -- Stream authorization is per-student (stored as array of student IDs)
+  stream_authorized_student_ids uuid[],   -- which students they get alerts for
+  created_by          uuid FK users,
+  created_at          timestamptz default now(),
+  updated_at          timestamptz default now()
+)
+```
+
+**Rules:**
+- Emergency contacts: visible to teachers during check-in
+- Stream contacts: only used by the livestream alert system
+- Admin can view and edit both lists
+- Primary parent can add/edit stream contacts for their own family
+- Teachers cannot see stream contact lists
+- A contact with `contact_type = 'both'` appears on both lists
