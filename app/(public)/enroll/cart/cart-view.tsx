@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useCart } from "@/lib/cart-context";
 import { formatCurrency } from "@/lib/utils";
 import Link from "next/link";
@@ -25,6 +26,52 @@ function formatTime(t: string) {
 export function EnrollmentCartView() {
   const { items, removeItem, totalCents, registrationTotalCents, itemCount } =
     useCart();
+  const [checkingOut, setCheckingOut] = useState(false);
+  const [checkoutError, setCheckoutError] = useState("");
+
+  async function handleCheckout() {
+    setCheckingOut(true);
+    setCheckoutError("");
+
+    try {
+      // Sync cart to server first
+      for (const item of items) {
+        await fetch("/api/enrollment/cart", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            class_id: item.classInfo.id,
+            student_name: item.childName,
+            price_cents:
+              (item.classInfo.monthlyTuitionCents ?? 0) +
+              (item.classInfo.registrationFeeCents ?? 0),
+          }),
+        });
+      }
+
+      // Create Stripe Checkout Session
+      const res = await fetch("/api/enrollment/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+
+      const data = await res.json();
+
+      if (data.error) {
+        setCheckoutError(data.error);
+        setCheckingOut(false);
+        return;
+      }
+
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch {
+      setCheckoutError("Failed to start checkout. Please try again.");
+      setCheckingOut(false);
+    }
+  }
 
   if (itemCount === 0) {
     return (
@@ -164,14 +211,23 @@ export function EnrollmentCartView() {
         </p>
       </div>
 
+      {/* Checkout error */}
+      {checkoutError && (
+        <div className="rounded-lg bg-error/10 border border-error/20 px-4 py-3 text-sm text-error">
+          {checkoutError}
+        </div>
+      )}
+
       {/* Actions */}
       <div className="space-y-3">
-        <Link
-          href="/enroll/checkout"
-          className="flex h-12 items-center justify-center rounded-lg bg-lavender hover:bg-lavender-dark text-white font-semibold text-sm transition-colors w-full"
+        <button
+          type="button"
+          onClick={handleCheckout}
+          disabled={checkingOut}
+          className="flex h-12 items-center justify-center rounded-lg bg-lavender hover:bg-lavender-dark text-white font-semibold text-sm transition-colors w-full disabled:opacity-40"
         >
-          Continue to Checkout
-        </Link>
+          {checkingOut ? "Redirecting to payment..." : "Proceed to Checkout"}
+        </button>
         <Link
           href="/enroll"
           className="flex h-11 items-center justify-center rounded-lg border border-silver text-slate hover:text-charcoal hover:border-lavender font-medium text-sm transition-colors w-full"
