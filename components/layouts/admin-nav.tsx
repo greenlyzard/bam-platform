@@ -83,6 +83,7 @@ const navGroups: NavGroup[] = [
     superAdminOnly: true,
     items: [
       { label: "Theme", href: "/admin/settings/theme", icon: "◑" },
+      { label: "Pay Rates", href: "/admin/settings/pay-rates", icon: "◈" },
       { label: "Team Members", href: "/admin/settings/team", icon: "◉" },
     ],
   },
