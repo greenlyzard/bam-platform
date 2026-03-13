@@ -16,7 +16,7 @@ create table if not exists leads (
   source        text check (source in ('website','referral','walk_in','email','social','other')),
   status        text not null default 'new' check (status in ('new','contacted','trial_scheduled','enrolled','lost')),
   notes         text,
-  family_id     uuid references families(id) on delete set null,
+  family_id     uuid,
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()
 );
@@ -41,9 +41,9 @@ create table communication_threads (
     check (channel in ('email','sms','in_app','system')),
 
   -- Contact linkage (one of these set)
-  family_id       uuid references families(id) on delete set null,
-  lead_id         uuid references leads(id) on delete set null,
-  staff_user_id   uuid references profiles(id) on delete set null,
+  family_id       uuid,
+  lead_id         uuid,
+  staff_user_id   uuid,
 
   -- Contact info (denormalized for fast display)
   contact_name    text,

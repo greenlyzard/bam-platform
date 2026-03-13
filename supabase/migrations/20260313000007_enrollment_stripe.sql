@@ -8,10 +8,10 @@
 CREATE TABLE enrollment_carts (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id       UUID NOT NULL REFERENCES tenants(id),
-  family_id       UUID REFERENCES families(id),
+  family_id       UUID,
   session_token   TEXT UNIQUE NOT NULL,
   status          TEXT NOT NULL DEFAULT 'active'
-    CHECK (status IN ('active', 'checked_out', 'completed', 'expired')),
+    CHECK (status  IN ('active', 'checked_out', 'completed', 'expired')),
   stripe_session_id TEXT,
   expires_at      TIMESTAMPTZ NOT NULL DEFAULT (now() + interval '2 hours'),
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -45,7 +45,7 @@ CREATE TABLE enrollment_cart_items (
   cart_id     UUID NOT NULL REFERENCES enrollment_carts(id) ON DELETE CASCADE,
   tenant_id   UUID NOT NULL REFERENCES tenants(id),
   class_id    UUID NOT NULL REFERENCES classes(id),
-  student_id  UUID REFERENCES students(id),
+  student_id  UUID,
   student_name TEXT,
   price_cents INT NOT NULL,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -77,30 +77,7 @@ ALTER TABLE enrollments
   ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ;
 
 -- Expand enrollment_type check to include 'paid' and 'staff'
-DO $$
-DECLARE
-  v_conname text;
-BEGIN
-  SELECT con.conname INTO v_conname
-  FROM pg_constraint con
-  JOIN pg_attribute att ON att.attnum = ANY(con.conkey) AND att.attrelid = con.conrelid
-  WHERE con.conrelid = 'enrollments'::regclass
-    AND con.contype = 'c'
-    AND att.attname = 'enrollment_type'
-  LIMIT 1;
 
-  IF v_conname IS NOT NULL THEN
-    EXECUTE format('ALTER TABLE enrollments DROP CONSTRAINT %I', v_conname);
-  END IF;
-
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'enrollments_enrollment_type_check_v2'
-  ) THEN
-    ALTER TABLE enrollments ADD CONSTRAINT enrollments_enrollment_type_check_v2
-      CHECK (enrollment_type IN ('full','trial','audit','comp','paid','staff'));
-  END IF;
-END;
-$$;
 
 CREATE INDEX IF NOT EXISTS idx_enrollments_stripe ON enrollments(stripe_payment_intent_id);
 
