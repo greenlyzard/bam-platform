@@ -1,44 +1,8 @@
 import { requireRole } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
-import { ReviewActions } from "./review-actions";
 import { ExportCsvButton } from "./export-csv";
-import {
-  AdminAddEntryButton,
-  AdminEditEntryButton,
-  AdminDeleteEntryButton,
-} from "./admin-entry-drawer";
+import { TimesheetsClient } from "./timesheets-client";
 import Link from "next/link";
-
-const STATUS_BADGES: Record<
-  string,
-  { bg: string; text: string; label: string }
-> = {
-  draft: {
-    bg: "bg-cloud",
-    text: "text-slate",
-    label: "Draft",
-  },
-  submitted: {
-    bg: "bg-gold/10",
-    text: "text-gold-dark",
-    label: "Submitted",
-  },
-  approved: {
-    bg: "bg-success/10",
-    text: "text-success",
-    label: "Approved",
-  },
-  rejected: {
-    bg: "bg-error/10",
-    text: "text-error",
-    label: "Returned",
-  },
-  exported: {
-    bg: "bg-info/10",
-    text: "text-info",
-    label: "Exported",
-  },
-};
 
 const ENTRY_TYPE_LABELS: Record<string, string> = {
   class_lead: "Class",
@@ -56,13 +20,32 @@ const ENTRY_TYPE_LABELS: Record<string, string> = {
 export default async function AdminTimesheetsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; view?: string }>;
+  searchParams: Promise<{
+    status?: string;
+    view?: string;
+    teacher?: string;
+    empType?: string;
+    entryType?: string;
+    from?: string;
+    to?: string;
+  }>;
 }) {
   await requireRole("finance_admin", "admin", "super_admin");
   const supabase = await createClient();
   const params = await searchParams;
   const filterStatus = params.status || "submitted";
   const view = params.view || "timesheets";
+
+  // Default date range: last month
+  const now = new Date();
+  const defaultFrom = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    .toISOString()
+    .split("T")[0];
+  const defaultTo = new Date(now.getFullYear(), now.getMonth(), 0)
+    .toISOString()
+    .split("T")[0];
+  const dateFrom = params.from || defaultFrom;
+  const dateTo = params.to || defaultTo;
 
   // Fetch all teachers for dropdown
   const { data: teacherProfiles } = await supabase
@@ -89,18 +72,18 @@ export default async function AdminTimesheetsPage({
   }));
 
   // Fetch timesheets with teacher info
-  let query = supabase
+  let tsQuery = supabase
     .from("timesheets")
     .select(
-      "id, status, total_hours, submitted_at, reviewed_at, rejection_notes, teacher_id, teacher_profiles(first_name, last_name, email)"
+      "id, status, total_hours, submitted_at, reviewed_at, rejection_notes, teacher_id, teacher_profiles(first_name, last_name, email, employment_type)"
     )
     .order("submitted_at", { ascending: false });
 
   if (filterStatus !== "all") {
-    query = query.eq("status", filterStatus);
+    tsQuery = tsQuery.eq("status", filterStatus);
   }
 
-  const { data: timesheets } = await query;
+  const { data: timesheets } = await tsQuery;
   const allTimesheets = timesheets ?? [];
 
   // Count by status for filter tabs
@@ -120,7 +103,7 @@ export default async function AdminTimesheetsPage({
       ? await supabase
           .from("timesheet_entries")
           .select(
-            "id, timesheet_id, date, entry_type, total_hours, description, sub_for, production_id, production_name, event_tag, notes"
+            "id, timesheet_id, date, entry_type, total_hours, description, sub_for, production_id, production_name, event_tag, notes, status, flag_question, flag_response, flagged_at, approved_at, adjustment_note"
           )
           .in("timesheet_id", timesheetIds)
           .order("date", { ascending: false })
@@ -146,350 +129,122 @@ export default async function AdminTimesheetsPage({
     };
   });
 
-  const filterTabs = [
-    { key: "submitted", label: "Submitted", count: counts.submitted ?? 0 },
-    { key: "approved", label: "Approved", count: counts.approved ?? 0 },
-    { key: "draft", label: "Drafts", count: counts.draft ?? 0 },
-    { key: "all", label: "All", count: (allTs ?? []).length },
-  ];
-
-  // View toggle tabs
-  const viewTabs = [
-    { key: "timesheets", label: "Timesheets" },
-    { key: "entries", label: "All Entries" },
-  ];
-
-  // For "entries" view, fetch all recent entries across all timesheets
+  // For "entries" view, fetch entries with richer data
   let recentEntries: typeof allEntries = [];
   if (view === "entries") {
-    const { data: entries } = await supabase
+    let entryQuery = supabase
       .from("timesheet_entries")
       .select(
-        "id, timesheet_id, date, entry_type, total_hours, description, sub_for, production_id, production_name, event_tag, notes, timesheets(teacher_id, status, teacher_profiles(first_name, last_name))"
+        "id, timesheet_id, date, entry_type, total_hours, description, sub_for, production_id, production_name, event_tag, notes, status, flag_question, flag_response, flagged_at, approved_at, adjustment_note, timesheets!inner(teacher_id, status, teacher_profiles(first_name, last_name, employment_type))"
       )
+      .gte("date", dateFrom)
+      .lte("date", dateTo)
       .order("date", { ascending: false })
-      .limit(100);
+      .limit(200);
+
+    // Apply filters
+    if (params.teacher) {
+      entryQuery = entryQuery.eq("timesheets.teacher_id", params.teacher);
+    }
+
+    const { data: entries } = await entryQuery;
     recentEntries = entries as typeof allEntries;
+
+    // Client-side filter for empType and entryType since they need join data
+    if (params.empType || params.entryType) {
+      recentEntries = (recentEntries ?? []).filter((e) => {
+        if (params.entryType && e.entry_type !== params.entryType) return false;
+        if (params.empType) {
+          const ts = (e as Record<string, unknown>).timesheets as {
+            teacher_profiles: { employment_type: string } | null;
+          } | null;
+          const et = ts?.teacher_profiles?.employment_type;
+          if (et !== params.empType) return false;
+        }
+        return true;
+      });
+    }
+  }
+
+  // Fetch change logs for visible entries
+  const visibleEntryIds = view === "entries"
+    ? (recentEntries ?? []).map((e) => e.id)
+    : (allEntries ?? []).map((e) => e.id);
+
+  const { data: changeLogs } =
+    visibleEntryIds.length > 0
+      ? await supabase
+          .from("timesheet_entry_changes")
+          .select("id, entry_id, change_type, changed_by_name, field_changed, old_value, new_value, note, created_at")
+          .in("entry_id", visibleEntryIds)
+          .order("created_at", { ascending: true })
+      : { data: [] };
+
+  type ChangeLogRow = { id: string; entry_id: string; change_type: string; changed_by_name: string | null; field_changed: string | null; old_value: string | null; new_value: string | null; note: string | null; created_at: string };
+  const changeLogMap: Record<string, ChangeLogRow[]> = {};
+  for (const cl of (changeLogs ?? []) as ChangeLogRow[]) {
+    if (!changeLogMap[cl.entry_id]) changeLogMap[cl.entry_id] = [];
+    changeLogMap[cl.entry_id].push(cl);
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-heading font-semibold text-charcoal">
-            Timesheets
-          </h1>
-          <p className="mt-1 text-sm text-slate">
-            Review, approve, or return teacher timesheets for payroll.
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <AdminAddEntryButton
-            teachers={teachers}
-            productions={productions}
-          />
-          <Link
-            href="/admin/timesheets/payroll"
-            className="h-10 rounded-lg border border-silver bg-white hover:bg-cloud text-sm font-medium text-charcoal px-4 transition-colors inline-flex items-center gap-1.5"
-          >
-            Payroll Report →
-          </Link>
-          {csvRows.length > 0 && <ExportCsvButton rows={csvRows} />}
-        </div>
-      </div>
-
-      {/* View toggle */}
-      <div className="flex gap-4 border-b border-silver">
-        {viewTabs.map((tab) => (
-          <a
-            key={tab.key}
-            href={`/admin/timesheets?view=${tab.key}${tab.key === "timesheets" ? `&status=${filterStatus}` : ""}`}
-            className={`pb-2 text-sm font-medium border-b-2 transition-colors ${
-              view === tab.key
-                ? "border-lavender text-lavender-dark"
-                : "border-transparent text-slate hover:text-charcoal"
-            }`}
-          >
-            {tab.label}
-          </a>
-        ))}
-      </div>
-
-      {view === "timesheets" ? (
-        <>
-          {/* Filter tabs */}
-          <div className="flex gap-1 rounded-lg bg-cloud/50 p-1">
-            {filterTabs.map((tab) => {
-              const active = filterStatus === tab.key;
-              return (
-                <a
-                  key={tab.key}
-                  href={`/admin/timesheets?status=${tab.key}&view=timesheets`}
-                  className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                    active
-                      ? "bg-white text-charcoal shadow-sm"
-                      : "text-slate hover:text-charcoal"
-                  }`}
-                >
-                  {tab.label}
-                  <span className="ml-1.5 text-xs text-mist">
-                    {tab.count}
-                  </span>
-                </a>
-              );
-            })}
-          </div>
-
-          {/* Timesheets list */}
-          {allTimesheets.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-silver bg-white p-8 text-center text-sm text-mist">
-              No timesheets with status &ldquo;{filterStatus}&rdquo;.
-            </div>
-          ) : (
-            <div className="rounded-xl border border-silver bg-white overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-silver bg-cloud/50">
-                      <th className="px-4 py-3 text-left font-medium text-slate">
-                        Teacher
-                      </th>
-                      <th className="px-4 py-3 text-left font-medium text-slate">
-                        Status
-                      </th>
-                      <th className="px-4 py-3 text-right font-medium text-slate">
-                        Hours
-                      </th>
-                      <th className="px-4 py-3 text-left font-medium text-slate">
-                        Submitted
-                      </th>
-                      <th className="px-4 py-3 text-left font-medium text-slate">
-                        Notes
-                      </th>
-                      {filterStatus === "submitted" && (
-                        <th className="px-4 py-3 text-right font-medium text-slate w-40">
-                          Actions
-                        </th>
-                      )}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-silver">
-                    {allTimesheets.map((ts) => {
-                      const tp = ts.teacher_profiles as unknown as {
-                        first_name: string | null;
-                        last_name: string | null;
-                        email: string | null;
-                      } | null;
-                      const name =
-                        [tp?.first_name, tp?.last_name]
-                          .filter(Boolean)
-                          .join(" ") || "Unknown";
-                      const badge =
-                        STATUS_BADGES[ts.status] ?? STATUS_BADGES.draft;
-
-                      return (
-                        <tr
-                          key={ts.id}
-                          className="hover:bg-cloud/30 transition-colors"
-                        >
-                          <td className="px-4 py-3">
-                            <div>
-                              <span className="font-medium text-charcoal">
-                                {name}
-                              </span>
-                              {tp?.email && (
-                                <p className="text-xs text-mist">
-                                  {tp.email}
-                                </p>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span
-                              className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${badge.bg} ${badge.text}`}
-                            >
-                              {badge.label}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-right font-medium text-charcoal">
-                            {(ts.total_hours ?? 0).toFixed(1)}
-                          </td>
-                          <td className="px-4 py-3 text-slate">
-                            {ts.submitted_at
-                              ? new Date(
-                                  ts.submitted_at
-                                ).toLocaleDateString("en-US", {
-                                  month: "short",
-                                  day: "numeric",
-                                  hour: "numeric",
-                                  minute: "2-digit",
-                                })
-                              : "—"}
-                          </td>
-                          <td className="px-4 py-3 text-xs text-slate max-w-[200px] truncate">
-                            {ts.rejection_notes ?? "—"}
-                          </td>
-                          {filterStatus === "submitted" && (
-                            <td className="px-4 py-3 text-right">
-                              <ReviewActions timesheetId={ts.id} />
-                            </td>
-                          )}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </>
-      ) : (
-        /* All Entries view */
-        <div className="rounded-xl border border-silver bg-white overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-silver bg-cloud/50">
-                  <th className="px-4 py-3 text-left font-medium text-slate">
-                    Date
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium text-slate">
-                    Teacher
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium text-slate">
-                    Category
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium text-slate">
-                    Description
-                  </th>
-                  <th className="px-4 py-3 text-right font-medium text-slate">
-                    Hours
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium text-slate">
-                    Tags
-                  </th>
-                  <th className="px-4 py-3 text-right font-medium text-slate w-20">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-silver">
-                {(recentEntries ?? []).length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={7}
-                      className="px-4 py-8 text-center text-mist"
-                    >
-                      No entries found.
-                    </td>
-                  </tr>
-                ) : (
-                  (recentEntries ?? []).map((e) => {
-                    const ts = (e as Record<string, unknown>).timesheets as {
-                      teacher_id: string;
-                      status: string;
-                      teacher_profiles: {
-                        first_name: string | null;
-                        last_name: string | null;
-                      } | null;
-                    } | null;
-                    const teacherName = ts?.teacher_profiles
-                      ? [
-                          ts.teacher_profiles.first_name,
-                          ts.teacher_profiles.last_name,
-                        ]
-                          .filter(Boolean)
-                          .join(" ")
-                      : "Unknown";
-
-                    return (
-                      <tr
-                        key={e.id}
-                        className="hover:bg-cloud/30 transition-colors"
-                      >
-                        <td className="px-4 py-3 text-charcoal whitespace-nowrap">
-                          {new Date(
-                            e.date + "T12:00:00"
-                          ).toLocaleDateString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                          })}
-                        </td>
-                        <td className="px-4 py-3 font-medium text-charcoal">
-                          {teacherName}
-                        </td>
-                        <td className="px-4 py-3 text-slate">
-                          {ENTRY_TYPE_LABELS[e.entry_type] ?? e.entry_type}
-                        </td>
-                        <td className="px-4 py-3 text-charcoal max-w-[200px] truncate">
-                          {e.description ?? "—"}
-                          {e.sub_for && (
-                            <span className="ml-1.5 text-xs text-mist">
-                              (Sub: {e.sub_for})
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-right font-medium text-charcoal">
-                          {e.total_hours?.toFixed(1)}
-                        </td>
-                        <td className="px-4 py-3">
-                          <EntryBadges
-                            productionName={e.production_name}
-                            eventTag={e.event_tag}
-                          />
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex justify-end gap-1">
-                            <AdminEditEntryButton
-                              entry={{
-                                ...e,
-                                teacher_id: ts?.teacher_id,
-                              }}
-                              teachers={teachers}
-                              productions={productions}
-                            />
-                            <AdminDeleteEntryButton entryId={e.id} />
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-    </div>
+    <TimesheetsClient
+      view={view}
+      filterStatus={filterStatus}
+      dateFrom={dateFrom}
+      dateTo={dateTo}
+      filterTeacher={params.teacher || ""}
+      filterEmpType={params.empType || ""}
+      filterEntryType={params.entryType || ""}
+      teachers={teachers}
+      productions={productions}
+      timesheets={allTimesheets.map((ts) => {
+        const tp = ts.teacher_profiles as unknown as {
+          first_name: string | null;
+          last_name: string | null;
+          email: string | null;
+          employment_type: string;
+        } | null;
+        return {
+          id: ts.id,
+          status: ts.status,
+          totalHours: ts.total_hours ?? 0,
+          submittedAt: ts.submitted_at,
+          reviewedAt: ts.reviewed_at,
+          rejectionNotes: ts.rejection_notes,
+          teacherId: ts.teacher_id,
+          teacherName: [tp?.first_name, tp?.last_name].filter(Boolean).join(" ") || "Unknown",
+          teacherEmail: tp?.email ?? "",
+          employmentType: tp?.employment_type ?? "w2",
+        };
+      })}
+      entries={(allEntries ?? []).map((e) => ({
+        ...e,
+        changes: changeLogMap[e.id] ?? [],
+      }))}
+      recentEntries={(recentEntries ?? []).map((e) => {
+        const ts = (e as Record<string, unknown>).timesheets as {
+          teacher_id: string;
+          status: string;
+          teacher_profiles: {
+            first_name: string | null;
+            last_name: string | null;
+            employment_type: string;
+          } | null;
+        } | null;
+        return {
+          ...e,
+          teacherId: ts?.teacher_id ?? "",
+          teacherName: ts?.teacher_profiles
+            ? [ts.teacher_profiles.first_name, ts.teacher_profiles.last_name].filter(Boolean).join(" ")
+            : "Unknown",
+          timesheetStatus: ts?.status ?? "draft",
+          changes: changeLogMap[e.id] ?? [],
+        };
+      })}
+      counts={counts}
+      csvRows={csvRows}
+      entryTypeLabels={ENTRY_TYPE_LABELS}
+    />
   );
-}
-
-function EntryBadges({
-  productionName,
-  eventTag,
-}: {
-  productionName: string | null;
-  eventTag: string | null;
-}) {
-  if (productionName) {
-    const label =
-      productionName.length > 24
-        ? productionName.slice(0, 24) + "…"
-        : productionName;
-    return (
-      <span className="inline-flex items-center rounded-full bg-lavender/10 px-2 py-0.5 text-[10px] font-medium text-lavender-dark">
-        {label}
-      </span>
-    );
-  }
-  if (eventTag) {
-    const label =
-      eventTag.length > 24 ? eventTag.slice(0, 24) + "…" : eventTag;
-    return (
-      <span className="inline-flex items-center rounded-full bg-cloud px-2 py-0.5 text-[10px] font-medium text-slate">
-        {label}
-      </span>
-    );
-  }
-  return null;
 }
