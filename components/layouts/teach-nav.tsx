@@ -4,7 +4,8 @@ import { usePathname } from "next/navigation";
 
 const navItems = [
   { label: "My Dashboard", href: "/teach/dashboard", icon: "⌂" },
-  { label: "My Schedule", href: "/teach/classes", icon: "▦" },
+  { label: "My Schedule", href: "/teach/schedule", icon: "▥" },
+  { label: "My Classes", href: "/teach/classes", icon: "▦" },
   { label: "My Students", href: "/teach/students", icon: "♡" },
   { label: "Log Hours", href: "/teach/hours", icon: "◷" },
   { label: "Timesheets", href: "/teach/timesheets", icon: "▤" },

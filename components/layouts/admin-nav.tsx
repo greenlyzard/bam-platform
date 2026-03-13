@@ -21,6 +21,9 @@ const navGroups: NavGroup[] = [
     items: [
       { label: "Dashboard", href: "/admin/dashboard", icon: "⌂" },
       { label: "Seasons", href: "/admin/seasons", icon: "◈" },
+      { label: "Schedule", href: "/admin/schedule", icon: "▥" },
+      { label: "Schedule Classes", href: "/admin/schedule/classes", icon: "▦" },
+      { label: "Tasks", href: "/admin/tasks", icon: "☑" },
       { label: "Calendar", href: "/admin/calendar", icon: "▥" },
       { label: "Schedule Embeds", href: "/admin/schedule-embeds", icon: "◫" },
       { label: "Classes", href: "/admin/classes", icon: "▦" },
