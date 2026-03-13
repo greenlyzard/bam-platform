@@ -1,0 +1,5591 @@
+{
+  "roles": [
+    {
+      "name": "Sylvia",
+      "order": 1,
+      "level": "4C",
+      "performance_type": "Sylvia",
+      "is_understudy": false
+    },
+    {
+      "name": "Aphrodite",
+      "order": 2,
+      "level": "4C",
+      "performance_type": "Sylvia",
+      "is_understudy": false
+    },
+    {
+      "name": "Diana",
+      "order": 3,
+      "level": "4C",
+      "performance_type": "Sylvia",
+      "is_understudy": false
+    },
+    {
+      "name": "Muse of Wisdom",
+      "order": 4,
+      "level": "4C",
+      "performance_type": "Sylvia",
+      "is_understudy": false
+    },
+    {
+      "name": "Muse of Beauty",
+      "order": 5,
+      "level": "4C",
+      "performance_type": "Sylvia",
+      "is_understudy": false
+    },
+    {
+      "name": "Muse of Music",
+      "order": 6,
+      "level": "4C",
+      "performance_type": "Sylvia",
+      "is_understudy": false
+    },
+    {
+      "name": "Queen of the Sea",
+      "order": 7,
+      "level": "4C",
+      "performance_type": "Sylvia",
+      "is_understudy": false
+    },
+    {
+      "name": "Sea Princesses",
+      "order": 8,
+      "level": "4B / 4C",
+      "performance_type": "Sylvia",
+      "is_understudy": false
+    },
+    {
+      "name": "Lead Shepherdesses",
+      "order": 9,
+      "level": "4B / 4C",
+      "performance_type": "Sylvia",
+      "is_understudy": false
+    },
+    {
+      "name": "Enchanted Fairies",
+      "order": 10,
+      "level": "4B",
+      "performance_type": "Sylvia",
+      "is_understudy": false
+    },
+    {
+      "name": "Lead Huntresses",
+      "order": 11,
+      "level": "4C",
+      "performance_type": "Sylvia",
+      "is_understudy": false
+    },
+    {
+      "name": "Shepherdesses",
+      "order": 12,
+      "level": "4B / 4C",
+      "performance_type": "Sylvia",
+      "is_understudy": false
+    },
+    {
+      "name": "Opening Butterflies",
+      "order": 13,
+      "level": "2B+",
+      "performance_type": "Sylvia",
+      "is_understudy": false
+    },
+    {
+      "name": "Opening Unicorns",
+      "order": 14,
+      "level": "2C",
+      "performance_type": "Sylvia",
+      "is_understudy": false
+    },
+    {
+      "name": "Opening Fireflies",
+      "order": 15,
+      "level": "3C",
+      "performance_type": "Sylvia",
+      "is_understudy": false
+    },
+    {
+      "name": "Nymphs",
+      "order": 16,
+      "level": "4B",
+      "performance_type": "Sylvia",
+      "is_understudy": false
+    },
+    {
+      "name": "The Huntresses",
+      "order": 17,
+      "level": "4C",
+      "performance_type": "Sylvia",
+      "is_understudy": false
+    },
+    {
+      "name": "Mermaids",
+      "order": 18,
+      "level": "2B+",
+      "performance_type": "Sylvia",
+      "is_understudy": false
+    },
+    {
+      "name": "Unicorns",
+      "order": 19,
+      "level": "2C",
+      "performance_type": "Sylvia",
+      "is_understudy": false
+    },
+    {
+      "name": "Fireflies",
+      "order": 20,
+      "level": "3C",
+      "performance_type": "Sylvia",
+      "is_understudy": false
+    },
+    {
+      "name": "Huntress Waltz",
+      "order": 21,
+      "level": "4C",
+      "performance_type": "Sylvia",
+      "is_understudy": false
+    },
+    {
+      "name": "Cupids",
+      "order": 22,
+      "level": "2C",
+      "performance_type": "Sylvia",
+      "is_understudy": false
+    },
+    {
+      "name": "Villagers",
+      "order": 24,
+      "level": "3A / 4A",
+      "performance_type": "Sylvia",
+      "is_understudy": false
+    },
+    {
+      "name": "Closing Butterflies",
+      "order": 25,
+      "level": "2B+",
+      "performance_type": "Sylvia",
+      "is_understudy": false
+    },
+    {
+      "name": "Closing Cupids",
+      "order": 26,
+      "level": "2C",
+      "performance_type": "Sylvia",
+      "is_understudy": false
+    },
+    {
+      "name": "Gifts Waltz",
+      "order": 27,
+      "level": "3C / 4B",
+      "performance_type": "Sylvia",
+      "is_understudy": false
+    },
+    {
+      "name": "Muse Understudy",
+      "order": 28,
+      "level": "4C",
+      "performance_type": "Sylvia",
+      "is_understudy": true
+    }
+  ],
+  "students": [
+    {
+      "first_name": "Ella",
+      "last_name": "Garcia",
+      "roles": [
+        {
+          "role": "Sylvia",
+          "understudy": false
+        },
+        {
+          "role": "Lead Huntresses",
+          "understudy": false
+        },
+        {
+          "role": "The Huntresses",
+          "understudy": false
+        },
+        {
+          "role": "Huntress Waltz",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Giselle",
+      "last_name": "Thomas",
+      "roles": [
+        {
+          "role": "Aphrodite",
+          "understudy": false
+        },
+        {
+          "role": "Lead Huntresses",
+          "understudy": false
+        },
+        {
+          "role": "The Huntresses",
+          "understudy": false
+        },
+        {
+          "role": "Huntress Waltz",
+          "understudy": false
+        },
+        {
+          "role": "Muse Understudy",
+          "understudy": true
+        }
+      ]
+    },
+    {
+      "first_name": "Caterina",
+      "last_name": "D\u2019Elia",
+      "roles": [
+        {
+          "role": "Diana",
+          "understudy": false
+        },
+        {
+          "role": "Lead Huntresses",
+          "understudy": false
+        },
+        {
+          "role": "The Huntresses",
+          "understudy": false
+        },
+        {
+          "role": "Huntress Waltz",
+          "understudy": false
+        },
+        {
+          "role": "Muse Understudy",
+          "understudy": true
+        }
+      ]
+    },
+    {
+      "first_name": "Ava",
+      "last_name": "McLarand",
+      "roles": [
+        {
+          "role": "Muse of Wisdom",
+          "understudy": false
+        },
+        {
+          "role": "Lead Huntresses",
+          "understudy": false
+        },
+        {
+          "role": "The Huntresses",
+          "understudy": false
+        },
+        {
+          "role": "Huntress Waltz",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Ruby",
+      "last_name": "Turner",
+      "roles": [
+        {
+          "role": "Muse of Beauty",
+          "understudy": false
+        },
+        {
+          "role": "Lead Huntresses",
+          "understudy": false
+        },
+        {
+          "role": "The Huntresses",
+          "understudy": false
+        },
+        {
+          "role": "Huntress Waltz",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Brielle",
+      "last_name": "Corbridge",
+      "roles": [
+        {
+          "role": "Muse of Music",
+          "understudy": false
+        },
+        {
+          "role": "Lead Huntresses",
+          "understudy": false
+        },
+        {
+          "role": "The Huntresses",
+          "understudy": false
+        },
+        {
+          "role": "Huntress Waltz",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Clara",
+      "last_name": "Bredthauer",
+      "roles": [
+        {
+          "role": "Queen of the Sea",
+          "understudy": false
+        },
+        {
+          "role": "Shepherdesses",
+          "understudy": false
+        },
+        {
+          "role": "The Huntresses",
+          "understudy": false
+        },
+        {
+          "role": "Huntress Waltz",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Margo",
+      "last_name": "Haderlie",
+      "roles": [
+        {
+          "role": "Sea Princesses",
+          "understudy": false
+        },
+        {
+          "role": "Shepherdesses",
+          "understudy": false
+        },
+        {
+          "role": "Nymphs",
+          "understudy": false
+        },
+        {
+          "role": "Gifts Waltz",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Scout",
+      "last_name": "Williams",
+      "roles": [
+        {
+          "role": "Sea Princesses",
+          "understudy": false
+        },
+        {
+          "role": "Shepherdesses",
+          "understudy": false
+        },
+        {
+          "role": "The Huntresses",
+          "understudy": false
+        },
+        {
+          "role": "Huntress Waltz",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Stormy",
+      "last_name": "Williams",
+      "roles": [
+        {
+          "role": "Sea Princesses",
+          "understudy": false
+        },
+        {
+          "role": "Shepherdesses",
+          "understudy": false
+        },
+        {
+          "role": "Nymphs",
+          "understudy": false
+        },
+        {
+          "role": "Gifts Waltz",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Kaya",
+      "last_name": "Bregman",
+      "roles": [
+        {
+          "role": "Lead Shepherdesses",
+          "understudy": false
+        },
+        {
+          "role": "Nymphs",
+          "understudy": false
+        },
+        {
+          "role": "Gifts Waltz",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Mya",
+      "last_name": "Host",
+      "roles": [
+        {
+          "role": "Lead Shepherdesses",
+          "understudy": false
+        },
+        {
+          "role": "The Huntresses",
+          "understudy": false
+        },
+        {
+          "role": "Huntress Waltz",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Willow",
+      "last_name": "Anderson",
+      "roles": [
+        {
+          "role": "Enchanted Fairies",
+          "understudy": false
+        },
+        {
+          "role": "Nymphs",
+          "understudy": false
+        },
+        {
+          "role": "Gifts Waltz",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Kailyn",
+      "last_name": "Bird",
+      "roles": [
+        {
+          "role": "Enchanted Fairies",
+          "understudy": false
+        },
+        {
+          "role": "Nymphs",
+          "understudy": false
+        },
+        {
+          "role": "Gifts Waltz",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Delaney",
+      "last_name": "Franklin",
+      "roles": [
+        {
+          "role": "Enchanted Fairies",
+          "understudy": false
+        },
+        {
+          "role": "Nymphs",
+          "understudy": false
+        },
+        {
+          "role": "Gifts Waltz",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Lauren",
+      "last_name": "Koupal",
+      "roles": [
+        {
+          "role": "Lead Huntresses",
+          "understudy": false
+        },
+        {
+          "role": "The Huntresses",
+          "understudy": false
+        },
+        {
+          "role": "Huntress Waltz",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Eliza",
+      "last_name": "Johnson",
+      "roles": [
+        {
+          "role": "Shepherdesses",
+          "understudy": false
+        },
+        {
+          "role": "The Huntresses",
+          "understudy": false
+        },
+        {
+          "role": "Huntress Waltz",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Eve",
+      "last_name": "Christians",
+      "roles": [
+        {
+          "role": "Opening Butterflies",
+          "understudy": false
+        },
+        {
+          "role": "Mermaids",
+          "understudy": false
+        },
+        {
+          "role": "Closing Butterflies",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Kirra",
+      "last_name": "Faron",
+      "roles": [
+        {
+          "role": "Opening Butterflies",
+          "understudy": false
+        },
+        {
+          "role": "Mermaids",
+          "understudy": false
+        },
+        {
+          "role": "Closing Butterflies",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Collette",
+      "last_name": "Kimbley",
+      "roles": [
+        {
+          "role": "Opening Butterflies",
+          "understudy": false
+        },
+        {
+          "role": "Mermaids",
+          "understudy": false
+        },
+        {
+          "role": "Closing Butterflies",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Vivienne",
+      "last_name": "Morris",
+      "roles": [
+        {
+          "role": "Opening Butterflies",
+          "understudy": false
+        },
+        {
+          "role": "Mermaids",
+          "understudy": false
+        },
+        {
+          "role": "Closing Butterflies",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Yvese",
+      "last_name": "Steele",
+      "roles": [
+        {
+          "role": "Opening Butterflies",
+          "understudy": false
+        },
+        {
+          "role": "Mermaids",
+          "understudy": false
+        },
+        {
+          "role": "Closing Butterflies",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Elena",
+      "last_name": "Wilczek",
+      "roles": [
+        {
+          "role": "Opening Butterflies",
+          "understudy": false
+        },
+        {
+          "role": "Mermaids",
+          "understudy": false
+        },
+        {
+          "role": "Closing Butterflies",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Autumn",
+      "last_name": "Yost",
+      "roles": [
+        {
+          "role": "Opening Butterflies",
+          "understudy": false
+        },
+        {
+          "role": "Mermaids",
+          "understudy": false
+        },
+        {
+          "role": "Closing Butterflies",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Violet",
+      "last_name": "Fitzpatrick",
+      "roles": [
+        {
+          "role": "Opening Unicorns",
+          "understudy": false
+        },
+        {
+          "role": "Unicorns",
+          "understudy": false
+        },
+        {
+          "role": "Cupids",
+          "understudy": false
+        },
+        {
+          "role": "Closing Cupids",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Finley",
+      "last_name": "Gaboury",
+      "roles": [
+        {
+          "role": "Opening Unicorns",
+          "understudy": false
+        },
+        {
+          "role": "Unicorns",
+          "understudy": false
+        },
+        {
+          "role": "Cupids",
+          "understudy": false
+        },
+        {
+          "role": "Closing Cupids",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Margie",
+      "last_name": "Gillies",
+      "roles": [
+        {
+          "role": "Opening Unicorns",
+          "understudy": false
+        },
+        {
+          "role": "Unicorns",
+          "understudy": false
+        },
+        {
+          "role": "Cupids",
+          "understudy": false
+        },
+        {
+          "role": "Closing Cupids",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Marlys",
+      "last_name": "Gillies",
+      "roles": [
+        {
+          "role": "Opening Unicorns",
+          "understudy": false
+        },
+        {
+          "role": "Unicorns",
+          "understudy": false
+        },
+        {
+          "role": "Cupids",
+          "understudy": false
+        },
+        {
+          "role": "Closing Cupids",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Isla",
+      "last_name": "Maletta",
+      "roles": [
+        {
+          "role": "Opening Unicorns",
+          "understudy": false
+        },
+        {
+          "role": "Unicorns",
+          "understudy": false
+        },
+        {
+          "role": "Cupids",
+          "understudy": false
+        },
+        {
+          "role": "Closing Cupids",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Mia",
+      "last_name": "Pisano",
+      "roles": [
+        {
+          "role": "Opening Unicorns",
+          "understudy": false
+        },
+        {
+          "role": "Unicorns",
+          "understudy": false
+        },
+        {
+          "role": "Cupids",
+          "understudy": false
+        },
+        {
+          "role": "Closing Cupids",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Charlotte",
+      "last_name": "Thompson",
+      "roles": [
+        {
+          "role": "Opening Unicorns",
+          "understudy": false
+        },
+        {
+          "role": "Unicorns",
+          "understudy": false
+        },
+        {
+          "role": "Cupids",
+          "understudy": false
+        },
+        {
+          "role": "Closing Cupids",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Lilah",
+      "last_name": "Turner",
+      "roles": [
+        {
+          "role": "Opening Unicorns",
+          "understudy": false
+        },
+        {
+          "role": "Unicorns",
+          "understudy": false
+        },
+        {
+          "role": "Cupids",
+          "understudy": false
+        },
+        {
+          "role": "Closing Cupids",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Adeline",
+      "last_name": "Collins",
+      "roles": [
+        {
+          "role": "Opening Fireflies",
+          "understudy": false
+        },
+        {
+          "role": "Fireflies",
+          "understudy": false
+        },
+        {
+          "role": "Gifts Waltz",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Lola",
+      "last_name": "Crane",
+      "roles": [
+        {
+          "role": "Opening Fireflies",
+          "understudy": false
+        },
+        {
+          "role": "Fireflies",
+          "understudy": false
+        },
+        {
+          "role": "Gifts Waltz",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Mackenzie",
+      "last_name": "Crane",
+      "roles": [
+        {
+          "role": "Opening Fireflies",
+          "understudy": false
+        },
+        {
+          "role": "Fireflies",
+          "understudy": false
+        },
+        {
+          "role": "Gifts Waltz",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Aline",
+      "last_name": "Johnson",
+      "roles": [
+        {
+          "role": "Opening Fireflies",
+          "understudy": false
+        },
+        {
+          "role": "Fireflies",
+          "understudy": false
+        },
+        {
+          "role": "Gifts Waltz",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Jaclyn",
+      "last_name": "Lee",
+      "roles": [
+        {
+          "role": "Opening Fireflies",
+          "understudy": false
+        },
+        {
+          "role": "Unicorns",
+          "understudy": false
+        },
+        {
+          "role": "Fireflies",
+          "understudy": false
+        },
+        {
+          "role": "Gifts Waltz",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Aphrodite",
+      "last_name": "Lovullo",
+      "roles": [
+        {
+          "role": "Opening Fireflies",
+          "understudy": false
+        },
+        {
+          "role": "Fireflies",
+          "understudy": false
+        },
+        {
+          "role": "Gifts Waltz",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Emerson",
+      "last_name": "McCormick",
+      "roles": [
+        {
+          "role": "Opening Fireflies",
+          "understudy": false
+        },
+        {
+          "role": "Fireflies",
+          "understudy": false
+        },
+        {
+          "role": "Gifts Waltz",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Valeria",
+      "last_name": "Scorza",
+      "roles": [
+        {
+          "role": "Opening Fireflies",
+          "understudy": false
+        },
+        {
+          "role": "Fireflies",
+          "understudy": false
+        },
+        {
+          "role": "Gifts Waltz",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Leah",
+      "last_name": "Beranek",
+      "roles": [
+        {
+          "role": "Mermaids",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Jolie",
+      "last_name": "Laub",
+      "roles": [
+        {
+          "role": "Mermaids",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Camryn",
+      "last_name": "Schoenstein",
+      "roles": [
+        {
+          "role": "Mermaids",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Teagan",
+      "last_name": "Aron",
+      "roles": [
+        {
+          "role": "Unicorns",
+          "understudy": false
+        },
+        {
+          "role": "Cupids",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Vivian",
+      "last_name": "Lee",
+      "roles": [
+        {
+          "role": "Unicorns",
+          "understudy": false
+        },
+        {
+          "role": "Cupids",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Olivia",
+      "last_name": "Boutsady",
+      "roles": [
+        {
+          "role": "Fireflies",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Abigail",
+      "last_name": "Green",
+      "roles": [
+        {
+          "role": "Fireflies",
+          "understudy": false
+        },
+        {
+          "role": "Gifts Waltz",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Mia",
+      "last_name": "McPherson",
+      "roles": [
+        {
+          "role": "Cupids",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Ellie",
+      "last_name": "Tran",
+      "roles": [
+        {
+          "role": "Cupids",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Raniah",
+      "last_name": "Beavers",
+      "roles": [
+        {
+          "role": "Villagers",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Gemma",
+      "last_name": "Cooley",
+      "roles": [
+        {
+          "role": "Villagers",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Preslee",
+      "last_name": "Kim",
+      "roles": [
+        {
+          "role": "Villagers",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Madi",
+      "last_name": "Mandel",
+      "roles": [
+        {
+          "role": "Villagers",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Sapphirra",
+      "last_name": "Beasley",
+      "roles": [
+        {
+          "role": "Villagers",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Janelle",
+      "last_name": "Tsujiuchi",
+      "roles": [
+        {
+          "role": "Villagers",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Katerina",
+      "last_name": "Brunnick",
+      "roles": [
+        {
+          "role": "Villagers",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Emma",
+      "last_name": "Juarez",
+      "roles": [
+        {
+          "role": "Villagers",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Audrey",
+      "last_name": "Chi",
+      "roles": [
+        {
+          "role": "Villagers",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Jessica",
+      "last_name": "Alvarado",
+      "roles": [
+        {
+          "role": "Villagers",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Quinnie",
+      "last_name": "Lewis",
+      "roles": [
+        {
+          "role": "Villagers",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Christina",
+      "last_name": "Reardon",
+      "roles": [
+        {
+          "role": "Villagers",
+          "understudy": false
+        }
+      ]
+    },
+    {
+      "first_name": "Bren",
+      "last_name": "Ethington",
+      "roles": [
+        {
+          "role": "Villagers",
+          "understudy": false
+        }
+      ]
+    }
+  ],
+  "casting": [
+    {
+      "first_name": "Ella",
+      "last_name": "Garcia",
+      "role_name": "Sylvia",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Giselle",
+      "last_name": "Thomas",
+      "role_name": "Aphrodite",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Caterina",
+      "last_name": "D\u2019Elia",
+      "role_name": "Diana",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Ava",
+      "last_name": "McLarand",
+      "role_name": "Muse of Wisdom",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Ruby",
+      "last_name": "Turner",
+      "role_name": "Muse of Beauty",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Brielle",
+      "last_name": "Corbridge",
+      "role_name": "Muse of Music",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Clara",
+      "last_name": "Bredthauer",
+      "role_name": "Queen of the Sea",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Margo",
+      "last_name": "Haderlie",
+      "role_name": "Sea Princesses",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Scout",
+      "last_name": "Williams",
+      "role_name": "Sea Princesses",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Stormy",
+      "last_name": "Williams",
+      "role_name": "Sea Princesses",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Kaya",
+      "last_name": "Bregman",
+      "role_name": "Lead Shepherdesses",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Mya",
+      "last_name": "Host",
+      "role_name": "Lead Shepherdesses",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Willow",
+      "last_name": "Anderson",
+      "role_name": "Enchanted Fairies",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Kailyn",
+      "last_name": "Bird",
+      "role_name": "Enchanted Fairies",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Delaney",
+      "last_name": "Franklin",
+      "role_name": "Enchanted Fairies",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Brielle",
+      "last_name": "Corbridge",
+      "role_name": "Lead Huntresses",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Caterina",
+      "last_name": "D\u2019Elia",
+      "role_name": "Lead Huntresses",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Ella",
+      "last_name": "Garcia",
+      "role_name": "Lead Huntresses",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Lauren",
+      "last_name": "Koupal",
+      "role_name": "Lead Huntresses",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Ava",
+      "last_name": "McLarand",
+      "role_name": "Lead Huntresses",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Giselle",
+      "last_name": "Thomas",
+      "role_name": "Lead Huntresses",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Ruby",
+      "last_name": "Turner",
+      "role_name": "Lead Huntresses",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Clara",
+      "last_name": "Bredthauer",
+      "role_name": "Shepherdesses",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Eliza",
+      "last_name": "Johnson",
+      "role_name": "Shepherdesses",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Margo",
+      "last_name": "Haderlie",
+      "role_name": "Shepherdesses",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Scout",
+      "last_name": "Williams",
+      "role_name": "Shepherdesses",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Stormy",
+      "last_name": "Williams",
+      "role_name": "Shepherdesses",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Eve",
+      "last_name": "Christians",
+      "role_name": "Opening Butterflies",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Kirra",
+      "last_name": "Faron",
+      "role_name": "Opening Butterflies",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Collette",
+      "last_name": "Kimbley",
+      "role_name": "Opening Butterflies",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Vivienne",
+      "last_name": "Morris",
+      "role_name": "Opening Butterflies",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Yvese",
+      "last_name": "Steele",
+      "role_name": "Opening Butterflies",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Elena",
+      "last_name": "Wilczek",
+      "role_name": "Opening Butterflies",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Autumn",
+      "last_name": "Yost",
+      "role_name": "Opening Butterflies",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Violet",
+      "last_name": "Fitzpatrick",
+      "role_name": "Opening Unicorns",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Finley",
+      "last_name": "Gaboury",
+      "role_name": "Opening Unicorns",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Margie",
+      "last_name": "Gillies",
+      "role_name": "Opening Unicorns",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Marlys",
+      "last_name": "Gillies",
+      "role_name": "Opening Unicorns",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Isla",
+      "last_name": "Maletta",
+      "role_name": "Opening Unicorns",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Mia",
+      "last_name": "Pisano",
+      "role_name": "Opening Unicorns",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Charlotte",
+      "last_name": "Thompson",
+      "role_name": "Opening Unicorns",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Lilah",
+      "last_name": "Turner",
+      "role_name": "Opening Unicorns",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Adeline",
+      "last_name": "Collins",
+      "role_name": "Opening Fireflies",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Lola",
+      "last_name": "Crane",
+      "role_name": "Opening Fireflies",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Mackenzie",
+      "last_name": "Crane",
+      "role_name": "Opening Fireflies",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Aline",
+      "last_name": "Johnson",
+      "role_name": "Opening Fireflies",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Jaclyn",
+      "last_name": "Lee",
+      "role_name": "Opening Fireflies",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Aphrodite",
+      "last_name": "Lovullo",
+      "role_name": "Opening Fireflies",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Emerson",
+      "last_name": "McCormick",
+      "role_name": "Opening Fireflies",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Valeria",
+      "last_name": "Scorza",
+      "role_name": "Opening Fireflies",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Willow",
+      "last_name": "Anderson",
+      "role_name": "Nymphs",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Kailyn",
+      "last_name": "Bird",
+      "role_name": "Nymphs",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Kaya",
+      "last_name": "Bregman",
+      "role_name": "Nymphs",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Delaney",
+      "last_name": "Franklin",
+      "role_name": "Nymphs",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Margo",
+      "last_name": "Haderlie",
+      "role_name": "Nymphs",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Stormy",
+      "last_name": "Williams",
+      "role_name": "Nymphs",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Clara",
+      "last_name": "Bredthauer",
+      "role_name": "The Huntresses",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Brielle",
+      "last_name": "Corbridge",
+      "role_name": "The Huntresses",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Caterina",
+      "last_name": "D\u2019Elia",
+      "role_name": "The Huntresses",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Mya",
+      "last_name": "Host",
+      "role_name": "The Huntresses",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Ella",
+      "last_name": "Garcia",
+      "role_name": "The Huntresses",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Lauren",
+      "last_name": "Koupal",
+      "role_name": "The Huntresses",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Ava",
+      "last_name": "McLarand",
+      "role_name": "The Huntresses",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Giselle",
+      "last_name": "Thomas",
+      "role_name": "The Huntresses",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Ruby",
+      "last_name": "Turner",
+      "role_name": "The Huntresses",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Scout",
+      "last_name": "Williams",
+      "role_name": "The Huntresses",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Eliza",
+      "last_name": "Johnson",
+      "role_name": "The Huntresses",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Leah",
+      "last_name": "Beranek",
+      "role_name": "Mermaids",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Eve",
+      "last_name": "Christians",
+      "role_name": "Mermaids",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Kirra",
+      "last_name": "Faron",
+      "role_name": "Mermaids",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Collette",
+      "last_name": "Kimbley",
+      "role_name": "Mermaids",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Jolie",
+      "last_name": "Laub",
+      "role_name": "Mermaids",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Vivienne",
+      "last_name": "Morris",
+      "role_name": "Mermaids",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Camryn",
+      "last_name": "Schoenstein",
+      "role_name": "Mermaids",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Yvese",
+      "last_name": "Steele",
+      "role_name": "Mermaids",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Elena",
+      "last_name": "Wilczek",
+      "role_name": "Mermaids",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Autumn",
+      "last_name": "Yost",
+      "role_name": "Mermaids",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Teagan",
+      "last_name": "Aron",
+      "role_name": "Unicorns",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Violet",
+      "last_name": "Fitzpatrick",
+      "role_name": "Unicorns",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Finley",
+      "last_name": "Gaboury",
+      "role_name": "Unicorns",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Margie",
+      "last_name": "Gillies",
+      "role_name": "Unicorns",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Marlys",
+      "last_name": "Gillies",
+      "role_name": "Unicorns",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Jaclyn",
+      "last_name": "Lee",
+      "role_name": "Unicorns",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Vivian",
+      "last_name": "Lee",
+      "role_name": "Unicorns",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Isla",
+      "last_name": "Maletta",
+      "role_name": "Unicorns",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Mia",
+      "last_name": "Pisano",
+      "role_name": "Unicorns",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Charlotte",
+      "last_name": "Thompson",
+      "role_name": "Unicorns",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Lilah",
+      "last_name": "Turner",
+      "role_name": "Unicorns",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Olivia",
+      "last_name": "Boutsady",
+      "role_name": "Fireflies",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Adeline",
+      "last_name": "Collins",
+      "role_name": "Fireflies",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Lola",
+      "last_name": "Crane",
+      "role_name": "Fireflies",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Mackenzie",
+      "last_name": "Crane",
+      "role_name": "Fireflies",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Abigail",
+      "last_name": "Green",
+      "role_name": "Fireflies",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Aline",
+      "last_name": "Johnson",
+      "role_name": "Fireflies",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Jaclyn",
+      "last_name": "Lee",
+      "role_name": "Fireflies",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Aphrodite",
+      "last_name": "Lovullo",
+      "role_name": "Fireflies",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Emerson",
+      "last_name": "McCormick",
+      "role_name": "Fireflies",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Valeria",
+      "last_name": "Scorza",
+      "role_name": "Fireflies",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Clara",
+      "last_name": "Bredthauer",
+      "role_name": "Huntress Waltz",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Brielle",
+      "last_name": "Corbridge",
+      "role_name": "Huntress Waltz",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Caterina",
+      "last_name": "D\u2019Elia",
+      "role_name": "Huntress Waltz",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Mya",
+      "last_name": "Host",
+      "role_name": "Huntress Waltz",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Ella",
+      "last_name": "Garcia",
+      "role_name": "Huntress Waltz",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Lauren",
+      "last_name": "Koupal",
+      "role_name": "Huntress Waltz",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Ava",
+      "last_name": "McLarand",
+      "role_name": "Huntress Waltz",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Giselle",
+      "last_name": "Thomas",
+      "role_name": "Huntress Waltz",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Ruby",
+      "last_name": "Turner",
+      "role_name": "Huntress Waltz",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Scout",
+      "last_name": "Williams",
+      "role_name": "Huntress Waltz",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Eliza",
+      "last_name": "Johnson",
+      "role_name": "Huntress Waltz",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Teagan",
+      "last_name": "Aron",
+      "role_name": "Cupids",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Violet",
+      "last_name": "Fitzpatrick",
+      "role_name": "Cupids",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Finley",
+      "last_name": "Gaboury",
+      "role_name": "Cupids",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Margie",
+      "last_name": "Gillies",
+      "role_name": "Cupids",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Marlys",
+      "last_name": "Gillies",
+      "role_name": "Cupids",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Vivian",
+      "last_name": "Lee",
+      "role_name": "Cupids",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Isla",
+      "last_name": "Maletta",
+      "role_name": "Cupids",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Mia",
+      "last_name": "McPherson",
+      "role_name": "Cupids",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Mia",
+      "last_name": "Pisano",
+      "role_name": "Cupids",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Charlotte",
+      "last_name": "Thompson",
+      "role_name": "Cupids",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Ellie",
+      "last_name": "Tran",
+      "role_name": "Cupids",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Lilah",
+      "last_name": "Turner",
+      "role_name": "Cupids",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Raniah",
+      "last_name": "Beavers",
+      "role_name": "Villagers",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Gemma",
+      "last_name": "Cooley",
+      "role_name": "Villagers",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Preslee",
+      "last_name": "Kim",
+      "role_name": "Villagers",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Madi",
+      "last_name": "Mandel",
+      "role_name": "Villagers",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Sapphirra",
+      "last_name": "Beasley",
+      "role_name": "Villagers",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Janelle",
+      "last_name": "Tsujiuchi",
+      "role_name": "Villagers",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Katerina",
+      "last_name": "Brunnick",
+      "role_name": "Villagers",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Emma",
+      "last_name": "Juarez",
+      "role_name": "Villagers",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Audrey",
+      "last_name": "Chi",
+      "role_name": "Villagers",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Jessica",
+      "last_name": "Alvarado",
+      "role_name": "Villagers",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Quinnie",
+      "last_name": "Lewis",
+      "role_name": "Villagers",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Christina",
+      "last_name": "Reardon",
+      "role_name": "Villagers",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Bren",
+      "last_name": "Ethington",
+      "role_name": "Villagers",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Eve",
+      "last_name": "Christians",
+      "role_name": "Closing Butterflies",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Kirra",
+      "last_name": "Faron",
+      "role_name": "Closing Butterflies",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Collette",
+      "last_name": "Kimbley",
+      "role_name": "Closing Butterflies",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Vivienne",
+      "last_name": "Morris",
+      "role_name": "Closing Butterflies",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Yvese",
+      "last_name": "Steele",
+      "role_name": "Closing Butterflies",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Elena",
+      "last_name": "Wilczek",
+      "role_name": "Closing Butterflies",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Autumn",
+      "last_name": "Yost",
+      "role_name": "Closing Butterflies",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Violet",
+      "last_name": "Fitzpatrick",
+      "role_name": "Closing Cupids",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Finley",
+      "last_name": "Gaboury",
+      "role_name": "Closing Cupids",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Margie",
+      "last_name": "Gillies",
+      "role_name": "Closing Cupids",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Marlys",
+      "last_name": "Gillies",
+      "role_name": "Closing Cupids",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Isla",
+      "last_name": "Maletta",
+      "role_name": "Closing Cupids",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Mia",
+      "last_name": "Pisano",
+      "role_name": "Closing Cupids",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Charlotte",
+      "last_name": "Thompson",
+      "role_name": "Closing Cupids",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Lilah",
+      "last_name": "Turner",
+      "role_name": "Closing Cupids",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Willow",
+      "last_name": "Anderson",
+      "role_name": "Gifts Waltz",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Adeline",
+      "last_name": "Collins",
+      "role_name": "Gifts Waltz",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Lola",
+      "last_name": "Crane",
+      "role_name": "Gifts Waltz",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Kaya",
+      "last_name": "Bregman",
+      "role_name": "Gifts Waltz",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Mackenzie",
+      "last_name": "Crane",
+      "role_name": "Gifts Waltz",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Delaney",
+      "last_name": "Franklin",
+      "role_name": "Gifts Waltz",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Abigail",
+      "last_name": "Green",
+      "role_name": "Gifts Waltz",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Margo",
+      "last_name": "Haderlie",
+      "role_name": "Gifts Waltz",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Aline",
+      "last_name": "Johnson",
+      "role_name": "Gifts Waltz",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Jaclyn",
+      "last_name": "Lee",
+      "role_name": "Gifts Waltz",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Aphrodite",
+      "last_name": "Lovullo",
+      "role_name": "Gifts Waltz",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Emerson",
+      "last_name": "McCormick",
+      "role_name": "Gifts Waltz",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Valeria",
+      "last_name": "Scorza",
+      "role_name": "Gifts Waltz",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Kailyn",
+      "last_name": "Bird",
+      "role_name": "Gifts Waltz",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Stormy",
+      "last_name": "Williams",
+      "role_name": "Gifts Waltz",
+      "is_understudy": false
+    },
+    {
+      "first_name": "Giselle",
+      "last_name": "Thomas",
+      "role_name": "Muse Understudy",
+      "is_understudy": true
+    },
+    {
+      "first_name": "Caterina",
+      "last_name": "D\u2019Elia",
+      "role_name": "Muse Understudy",
+      "is_understudy": true
+    }
+  ],
+  "schedule": [
+    {
+      "role": "Aphrodite",
+      "date": "2026-02-13",
+      "start": "16:00:00",
+      "end": "18:30:00",
+      "teacher": "Cobb / Tate",
+      "location": "San Juan Hills High School"
+    },
+    {
+      "role": "Aphrodite",
+      "date": "2026-02-26",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Aphrodite",
+      "date": "2026-02-27",
+      "start": "17:30:00",
+      "end": "18:30:00",
+      "teacher": "Cobb / Tate",
+      "location": "San Juan Hills High School"
+    },
+    {
+      "role": "Mermaids",
+      "date": "2026-03-09",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Aphrodite",
+      "date": "2026-03-21",
+      "start": "12:15:00",
+      "end": "12:45:00",
+      "teacher": "Thomas",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Aphrodite",
+      "date": "2026-04-03",
+      "start": "15:30:00",
+      "end": "17:30:00",
+      "teacher": "Cobb / Tate",
+      "location": "Center Stage (RSM)"
+    },
+    {
+      "role": "Aphrodite",
+      "date": "2026-04-10",
+      "start": "15:30:00",
+      "end": "17:30:00",
+      "teacher": "Cobb / Tate",
+      "location": "Center Stage (RSM)"
+    },
+    {
+      "role": "Aphrodite",
+      "date": "2026-04-17",
+      "start": "17:30:00",
+      "end": "19:00:00",
+      "teacher": "Cobb / Tate",
+      "location": "San Juan Hills High School"
+    },
+    {
+      "role": "Aphrodite",
+      "date": "2026-04-24",
+      "start": "14:30:00",
+      "end": "16:30:00",
+      "teacher": "Cobb / Tate",
+      "location": "Center Stage (RSM)"
+    },
+    {
+      "role": "Lead Huntresses",
+      "date": "2026-03-06",
+      "start": "17:00:00",
+      "end": "18:00:00",
+      "teacher": "Thomas/Cobb",
+      "location": "San Juan Hills High School"
+    },
+    {
+      "role": "The Huntresses",
+      "date": "2026-03-06",
+      "start": "17:00:00",
+      "end": "18:00:00",
+      "teacher": "Thomas/Cobb",
+      "location": "San Juan Hills High School"
+    },
+    {
+      "role": "Aphrodite",
+      "date": "2026-05-01",
+      "start": "14:30:00",
+      "end": "16:30:00",
+      "teacher": "Cobb / Tate",
+      "location": "Center Stage (RSM)"
+    },
+    {
+      "role": "Aphrodite",
+      "date": "2026-05-08",
+      "start": "14:30:00",
+      "end": "16:30:00",
+      "teacher": "Cobb / Tate",
+      "location": "Center Stage (RSM)"
+    },
+    {
+      "role": "Aphrodite",
+      "date": "2026-05-15",
+      "start": "16:00:00",
+      "end": "18:00:00",
+      "teacher": "Cobb / Tate",
+      "location": "San Juan Hills High School"
+    },
+    {
+      "role": "Aphrodite",
+      "date": "2026-05-22",
+      "start": "14:30:00",
+      "end": "16:30:00",
+      "teacher": "Cobb / Tate",
+      "location": "Center Stage (RSM)"
+    },
+    {
+      "role": "Aphrodite",
+      "date": "2026-05-29",
+      "start": "14:30:00",
+      "end": "16:30:00",
+      "teacher": "Cobb / Tate",
+      "location": "Center Stage (RSM)"
+    },
+    {
+      "role": "Nymphs",
+      "date": "2026-03-09",
+      "start": "17:00:00",
+      "end": "17:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Opening Fireflies",
+      "date": "2026-03-21",
+      "start": "12:15:00",
+      "end": "12:45:00",
+      "teacher": "Rowe",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Opening Unicorns",
+      "date": "2026-03-21",
+      "start": "12:15:00",
+      "end": "12:45:00",
+      "teacher": "Thomas",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Opening Fireflies",
+      "date": "2026-03-28",
+      "start": "12:15:00",
+      "end": "12:30:00",
+      "teacher": "Rowe",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Closing Butterflies",
+      "date": "2026-05-15",
+      "start": "16:00:00",
+      "end": "18:00:00",
+      "teacher": "Thomas/Cobb",
+      "location": "San Juan Hills High School"
+    },
+    {
+      "role": "Opening Unicorns",
+      "date": "2026-03-28",
+      "start": "12:00:00",
+      "end": "12:15:00",
+      "teacher": "Rowe",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Closing Butterflies",
+      "date": "2026-04-18",
+      "start": "13:15:00",
+      "end": "14:15:00",
+      "teacher": "Thomas/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Opening Butterflies",
+      "date": "2026-04-18",
+      "start": "12:15:00",
+      "end": "13:15:00",
+      "teacher": "Thomas/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Closing Cupids",
+      "date": "2026-04-18",
+      "start": "12:30:00",
+      "end": "13:30:00",
+      "teacher": "Thomas",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Closing Cupids",
+      "date": "2026-05-02",
+      "start": "12:30:00",
+      "end": "13:30:00",
+      "teacher": "Thomas",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Closing Cupids",
+      "date": "2026-05-09",
+      "start": "12:30:00",
+      "end": "13:30:00",
+      "teacher": "Thomas",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Closing Cupids",
+      "date": "2026-05-15",
+      "start": "16:00:00",
+      "end": "18:00:00",
+      "teacher": "Thomas/Cobb",
+      "location": "San Juan Hills High School"
+    },
+    {
+      "role": "Closing Cupids",
+      "date": "2026-05-16",
+      "start": "12:30:00",
+      "end": "13:30:00",
+      "teacher": "Thomas",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Closing Cupids",
+      "date": "2026-05-23",
+      "start": "12:30:00",
+      "end": "13:30:00",
+      "teacher": "Thomas",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Closing Cupids",
+      "date": "2026-05-30",
+      "start": "12:30:00",
+      "end": "13:30:00",
+      "teacher": "Thomas",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Cupids",
+      "date": "2026-02-05",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Cupids",
+      "date": "2026-02-12",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Cupids",
+      "date": "2026-02-19",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Cupids",
+      "date": "2026-02-26",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Cupids",
+      "date": "2026-03-05",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "The Huntresses",
+      "date": "2026-03-09",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Thomas/Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Cupids",
+      "date": "2026-03-19",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Cupids",
+      "date": "2026-03-26",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Cupids",
+      "date": "2026-04-02",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Cupids",
+      "date": "2026-04-09",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Cupids",
+      "date": "2026-04-16",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Cupids",
+      "date": "2026-04-23",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Cupids",
+      "date": "2026-04-30",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Cupids",
+      "date": "2026-05-07",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Cupids",
+      "date": "2026-05-14",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Cupids",
+      "date": "2026-05-21",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Cupids",
+      "date": "2026-05-28",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Cupids",
+      "date": "2026-06-04",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Cupids",
+      "date": "2026-06-05",
+      "start": "17:30:00",
+      "end": "19:30:00",
+      "teacher": "Cobb",
+      "location": "San Juan Hills High School"
+    },
+    {
+      "role": "Cupids",
+      "date": "2026-06-06",
+      "start": "10:00:00",
+      "end": "16:00:00",
+      "teacher": "Cobb",
+      "location": "San Juan Hills High School"
+    },
+    {
+      "role": "Diana",
+      "date": "2026-02-13",
+      "start": "17:00:00",
+      "end": "18:30:00",
+      "teacher": "Thomas/Cobb",
+      "location": "San Juan Hills High School"
+    },
+    {
+      "role": "Diana",
+      "date": "2026-02-26",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Diana",
+      "date": "2026-02-27",
+      "start": "17:00:00",
+      "end": "17:30:00",
+      "teacher": "Cobb / Tate",
+      "location": "San Juan Hills High School"
+    },
+    {
+      "role": "Villagers",
+      "date": "2026-03-09",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Fauerbach",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Unicorns",
+      "date": "2026-03-10",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Diana",
+      "date": "2026-03-21",
+      "start": "12:15:00",
+      "end": "12:45:00",
+      "teacher": "Rowe",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Enchanted Fairies",
+      "date": "2026-02-25",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Matchett/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Enchanted Fairies",
+      "date": "2026-03-03",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Enchanted Fairies",
+      "date": "2026-03-04",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Matchett/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Gifts Waltz",
+      "date": "2026-03-10",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Huntress Waltz",
+      "date": "2026-03-10",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Enchanted Fairies",
+      "date": "2026-03-17",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Enchanted Fairies",
+      "date": "2026-03-18",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Matchett/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Enchanted Fairies",
+      "date": "2026-03-24",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Enchanted Fairies",
+      "date": "2026-03-25",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Matchett/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Enchanted Fairies",
+      "date": "2026-03-31",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Enchanted Fairies",
+      "date": "2026-04-01",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Matchett/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Enchanted Fairies",
+      "date": "2026-04-07",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Enchanted Fairies",
+      "date": "2026-04-08",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Matchett/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Enchanted Fairies",
+      "date": "2026-04-14",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Enchanted Fairies",
+      "date": "2026-04-15",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Matchett/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Enchanted Fairies",
+      "date": "2026-04-21",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Enchanted Fairies",
+      "date": "2026-04-22",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Matchett/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Enchanted Fairies",
+      "date": "2026-04-28",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Enchanted Fairies",
+      "date": "2026-04-29",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Matchett/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Enchanted Fairies",
+      "date": "2026-05-05",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Enchanted Fairies",
+      "date": "2026-05-06",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Matchett/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Enchanted Fairies",
+      "date": "2026-05-12",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Enchanted Fairies",
+      "date": "2026-05-13",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Matchett/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Enchanted Fairies",
+      "date": "2026-05-19",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Enchanted Fairies",
+      "date": "2026-05-20",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Matchett/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Enchanted Fairies",
+      "date": "2026-05-26",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Enchanted Fairies",
+      "date": "2026-05-27",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Matchett/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Enchanted Fairies",
+      "date": "2026-06-02",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Enchanted Fairies",
+      "date": "2026-06-03",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Matchett/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Fireflies",
+      "date": "2026-02-05",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Fireflies",
+      "date": "2026-02-12",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Fireflies",
+      "date": "2026-02-19",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Fireflies",
+      "date": "2026-02-26",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Fireflies",
+      "date": "2026-03-05",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Fireflies",
+      "date": "2026-03-10",
+      "start": "19:00:00",
+      "end": "19:30:00",
+      "teacher": "",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Opening Fireflies",
+      "date": "2026-04-18",
+      "start": "12:15:00",
+      "end": "13:15:00",
+      "teacher": "Thomas/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Fireflies",
+      "date": "2026-03-19",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Fireflies",
+      "date": "2026-03-26",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Fireflies",
+      "date": "2026-04-02",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Fireflies",
+      "date": "2026-04-09",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Fireflies",
+      "date": "2026-04-16",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Fireflies",
+      "date": "2026-04-23",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Fireflies",
+      "date": "2026-04-30",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Fireflies",
+      "date": "2026-05-07",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Fireflies",
+      "date": "2026-05-14",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Fireflies",
+      "date": "2026-05-21",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Fireflies",
+      "date": "2026-05-28",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Fireflies",
+      "date": "2026-06-04",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Gifts Waltz",
+      "date": "2026-02-03",
+      "start": "19:00:00",
+      "end": "19:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Gifts Waltz",
+      "date": "2026-02-10",
+      "start": "19:00:00",
+      "end": "19:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Gifts Waltz",
+      "date": "2026-02-17",
+      "start": "19:00:00",
+      "end": "19:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Gifts Waltz",
+      "date": "2026-02-24",
+      "start": "19:00:00",
+      "end": "19:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Gifts Waltz",
+      "date": "2026-03-03",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Aphrodite",
+      "date": "2026-03-10",
+      "start": "19:00:00",
+      "end": "19:30:00",
+      "teacher": "",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Gifts Waltz",
+      "date": "2026-03-17",
+      "start": "19:00:00",
+      "end": "19:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Gifts Waltz",
+      "date": "2026-03-24",
+      "start": "19:00:00",
+      "end": "19:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Gifts Waltz",
+      "date": "2026-03-31",
+      "start": "19:00:00",
+      "end": "19:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Gifts Waltz",
+      "date": "2026-04-07",
+      "start": "19:00:00",
+      "end": "19:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Gifts Waltz",
+      "date": "2026-04-14",
+      "start": "19:00:00",
+      "end": "19:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Gifts Waltz",
+      "date": "2026-04-21",
+      "start": "19:00:00",
+      "end": "19:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Gifts Waltz",
+      "date": "2026-04-28",
+      "start": "19:00:00",
+      "end": "19:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Gifts Waltz",
+      "date": "2026-05-05",
+      "start": "19:00:00",
+      "end": "19:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Gifts Waltz",
+      "date": "2026-05-12",
+      "start": "19:00:00",
+      "end": "19:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Gifts Waltz",
+      "date": "2026-05-19",
+      "start": "19:00:00",
+      "end": "19:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Gifts Waltz",
+      "date": "2026-05-26",
+      "start": "19:00:00",
+      "end": "19:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Gifts Waltz",
+      "date": "2026-06-02",
+      "start": "19:00:00",
+      "end": "19:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Huntress Waltz",
+      "date": "2026-02-03",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Huntress Waltz",
+      "date": "2026-02-10",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Huntress Waltz",
+      "date": "2026-02-17",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Huntress Waltz",
+      "date": "2026-02-24",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Huntress Waltz",
+      "date": "2026-03-03",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Huntress Waltz",
+      "date": "2026-03-06",
+      "start": "17:00:00",
+      "end": "18:00:00",
+      "teacher": "Thomas/Cobb",
+      "location": "San Juan Hills High School"
+    },
+    {
+      "role": "Huntress Waltz",
+      "date": "2026-03-17",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Huntress Waltz",
+      "date": "2026-03-24",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Huntress Waltz",
+      "date": "2026-03-31",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Huntress Waltz",
+      "date": "2026-04-07",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Huntress Waltz",
+      "date": "2026-04-14",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Huntress Waltz",
+      "date": "2026-04-17",
+      "start": "16:00:00",
+      "end": "17:30:00",
+      "teacher": "Thomas/Cobb",
+      "location": "San Juan Hills High School"
+    },
+    {
+      "role": "Huntress Waltz",
+      "date": "2026-04-21",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Huntress Waltz",
+      "date": "2026-04-28",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Huntress Waltz",
+      "date": "2026-05-05",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Huntress Waltz",
+      "date": "2026-05-12",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Huntress Waltz",
+      "date": "2026-05-19",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Huntress Waltz",
+      "date": "2026-05-26",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Huntress Waltz",
+      "date": "2026-06-02",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Lead Shepherdesses",
+      "date": "2026-02-28",
+      "start": "12:00:00",
+      "end": "13:00:00",
+      "teacher": "Thomas",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Lead Shepherdesses",
+      "date": "2026-03-07",
+      "start": "12:00:00",
+      "end": "13:00:00",
+      "teacher": "Thomas/Helman",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Diana",
+      "date": "2026-03-10",
+      "start": "19:00:00",
+      "end": "19:30:00",
+      "teacher": "",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Lead Shepherdesses",
+      "date": "2026-04-17",
+      "start": "16:00:00",
+      "end": "17:30:00",
+      "teacher": "Cobb",
+      "location": "San Juan Hills High School"
+    },
+    {
+      "role": "Lead Shepherdesses",
+      "date": "2026-05-02",
+      "start": "13:45:00",
+      "end": "14:15:00",
+      "teacher": "Thomas/Helman",
+      "location": "TBD"
+    },
+    {
+      "role": "Lead Shepherdesses",
+      "date": "2026-05-09",
+      "start": "13:15:00",
+      "end": "14:15:00",
+      "teacher": "Thomas/Helman",
+      "location": "TBD"
+    },
+    {
+      "role": "Lead Shepherdesses",
+      "date": "2026-05-15",
+      "start": "16:00:00",
+      "end": "18:00:00",
+      "teacher": "Cobb",
+      "location": "San Juan Hills High School"
+    },
+    {
+      "role": "Lead Shepherdesses",
+      "date": "2026-05-16",
+      "start": "13:15:00",
+      "end": "14:15:00",
+      "teacher": "Thomas/Helman",
+      "location": "TBD"
+    },
+    {
+      "role": "Lead Shepherdesses",
+      "date": "2026-05-23",
+      "start": "13:15:00",
+      "end": "14:15:00",
+      "teacher": "Thomas/Helman",
+      "location": "TBD"
+    },
+    {
+      "role": "Lead Shepherdesses",
+      "date": "2026-05-30",
+      "start": "13:15:00",
+      "end": "14:15:00",
+      "teacher": "Thomas/Helman",
+      "location": "TBD"
+    },
+    {
+      "role": "Mermaids",
+      "date": "2026-02-02",
+      "start": "17:15:00",
+      "end": "17:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Mermaids",
+      "date": "2026-02-04",
+      "start": "16:00:00",
+      "end": "16:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Mermaids",
+      "date": "2026-02-09",
+      "start": "17:15:00",
+      "end": "17:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Mermaids",
+      "date": "2026-02-11",
+      "start": "16:00:00",
+      "end": "16:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Mermaids",
+      "date": "2026-02-16",
+      "start": "17:15:00",
+      "end": "17:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Mermaids",
+      "date": "2026-02-18",
+      "start": "16:00:00",
+      "end": "16:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Mermaids",
+      "date": "2026-02-23",
+      "start": "17:15:00",
+      "end": "17:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Mermaids",
+      "date": "2026-02-25",
+      "start": "16:00:00",
+      "end": "16:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Mermaids",
+      "date": "2026-03-02",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Mermaids",
+      "date": "2026-03-04",
+      "start": "16:00:00",
+      "end": "16:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Sylvia",
+      "date": "2026-03-10",
+      "start": "19:00:00",
+      "end": "19:30:00",
+      "teacher": "",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Mermaids",
+      "date": "2026-03-16",
+      "start": "17:15:00",
+      "end": "17:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Mermaids",
+      "date": "2026-03-18",
+      "start": "16:00:00",
+      "end": "16:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Mermaids",
+      "date": "2026-03-23",
+      "start": "17:15:00",
+      "end": "17:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Mermaids",
+      "date": "2026-03-25",
+      "start": "16:00:00",
+      "end": "16:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Mermaids",
+      "date": "2026-03-30",
+      "start": "17:15:00",
+      "end": "17:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Mermaids",
+      "date": "2026-04-01",
+      "start": "16:00:00",
+      "end": "16:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Mermaids",
+      "date": "2026-04-06",
+      "start": "17:15:00",
+      "end": "17:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Mermaids",
+      "date": "2026-04-08",
+      "start": "16:00:00",
+      "end": "16:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Mermaids",
+      "date": "2026-04-13",
+      "start": "17:15:00",
+      "end": "17:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Mermaids",
+      "date": "2026-04-15",
+      "start": "16:00:00",
+      "end": "16:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Mermaids",
+      "date": "2026-04-20",
+      "start": "17:15:00",
+      "end": "17:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Mermaids",
+      "date": "2026-04-22",
+      "start": "16:00:00",
+      "end": "16:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Mermaids",
+      "date": "2026-04-27",
+      "start": "17:15:00",
+      "end": "17:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Mermaids",
+      "date": "2026-04-29",
+      "start": "16:00:00",
+      "end": "16:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Mermaids",
+      "date": "2026-05-04",
+      "start": "17:15:00",
+      "end": "17:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Mermaids",
+      "date": "2026-05-06",
+      "start": "16:00:00",
+      "end": "16:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Mermaids",
+      "date": "2026-05-11",
+      "start": "17:15:00",
+      "end": "17:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Mermaids",
+      "date": "2026-05-13",
+      "start": "16:00:00",
+      "end": "16:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Mermaids",
+      "date": "2026-05-18",
+      "start": "17:15:00",
+      "end": "17:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Mermaids",
+      "date": "2026-05-20",
+      "start": "16:00:00",
+      "end": "16:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Mermaids",
+      "date": "2026-05-25",
+      "start": "17:15:00",
+      "end": "17:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Mermaids",
+      "date": "2026-05-27",
+      "start": "16:00:00",
+      "end": "16:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Mermaids",
+      "date": "2026-06-01",
+      "start": "17:15:00",
+      "end": "17:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Beauty",
+      "date": "2026-02-05",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Beauty",
+      "date": "2026-02-12",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Beauty",
+      "date": "2026-02-19",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Beauty",
+      "date": "2026-02-26",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Beauty",
+      "date": "2026-02-28",
+      "start": "13:00:00",
+      "end": "14:00:00",
+      "teacher": "Thomas",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Beauty",
+      "date": "2026-03-05",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Mermaids",
+      "date": "2026-03-11",
+      "start": "16:00:00",
+      "end": "16:30:00",
+      "teacher": "Hampton",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Nymphs",
+      "date": "2026-03-11",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Beauty",
+      "date": "2026-03-19",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Beauty",
+      "date": "2026-03-21",
+      "start": "12:45:00",
+      "end": "13:30:00",
+      "teacher": "Thomas",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Beauty",
+      "date": "2026-03-26",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Beauty",
+      "date": "2026-04-02",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Beauty",
+      "date": "2026-04-09",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Beauty",
+      "date": "2026-04-16",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Beauty",
+      "date": "2026-04-17",
+      "start": "16:00:00",
+      "end": "17:30:00",
+      "teacher": "Cobb",
+      "location": "San Juan Hills High School"
+    },
+    {
+      "role": "Muse of Beauty",
+      "date": "2026-04-23",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Beauty",
+      "date": "2026-04-30",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Beauty",
+      "date": "2026-05-07",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Beauty",
+      "date": "2026-05-14",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Beauty",
+      "date": "2026-05-21",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Beauty",
+      "date": "2026-05-28",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Beauty",
+      "date": "2026-06-04",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Beauty",
+      "date": "2026-06-05",
+      "start": "17:30:00",
+      "end": "19:30:00",
+      "teacher": "TBD",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Beauty",
+      "date": "2026-06-06",
+      "start": "10:00:00",
+      "end": "16:00:00",
+      "teacher": "TBD",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Music",
+      "date": "2026-02-05",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Music",
+      "date": "2026-02-12",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Music",
+      "date": "2026-02-19",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Music",
+      "date": "2026-02-26",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Music",
+      "date": "2026-02-28",
+      "start": "13:00:00",
+      "end": "14:00:00",
+      "teacher": "Thomas",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Music",
+      "date": "2026-03-05",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Music",
+      "date": "2026-03-07",
+      "start": "13:00:00",
+      "end": "14:00:00",
+      "teacher": "Thomas/Helman",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Enchanted Fairies",
+      "date": "2026-03-11",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Matchett/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "The Huntresses",
+      "date": "2026-03-11",
+      "start": "19:00:00",
+      "end": "19:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Music",
+      "date": "2026-03-19",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Music",
+      "date": "2026-03-21",
+      "start": "12:00:00",
+      "end": "12:15:00",
+      "teacher": "Thomas",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Music",
+      "date": "2026-03-26",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Music",
+      "date": "2026-04-02",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Music",
+      "date": "2026-04-09",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Music",
+      "date": "2026-04-16",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Music",
+      "date": "2026-04-17",
+      "start": "16:00:00",
+      "end": "17:30:00",
+      "teacher": "Cobb",
+      "location": "San Juan Hills High School"
+    },
+    {
+      "role": "Muse of Music",
+      "date": "2026-04-23",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Music",
+      "date": "2026-04-30",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Music",
+      "date": "2026-05-07",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Music",
+      "date": "2026-05-14",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Music",
+      "date": "2026-05-21",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Music",
+      "date": "2026-05-28",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Music",
+      "date": "2026-06-04",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Music",
+      "date": "2026-06-05",
+      "start": "17:30:00",
+      "end": "19:30:00",
+      "teacher": "Cobb",
+      "location": "San Juan Hills High School"
+    },
+    {
+      "role": "Muse of Music",
+      "date": "2026-06-06",
+      "start": "10:00:00",
+      "end": "16:00:00",
+      "teacher": "Cobb",
+      "location": "San Juan Hills High School"
+    },
+    {
+      "role": "Muse of Wisdom",
+      "date": "2026-02-05",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Wisdom",
+      "date": "2026-02-12",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Wisdom",
+      "date": "2026-02-19",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Wisdom",
+      "date": "2026-02-26",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Wisdom",
+      "date": "2026-02-28",
+      "start": "13:00:00",
+      "end": "14:00:00",
+      "teacher": "Thomas",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Wisdom",
+      "date": "2026-03-05",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Wisdom",
+      "date": "2026-03-07",
+      "start": "13:00:00",
+      "end": "14:00:00",
+      "teacher": "Thomas/Helman",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Aphrodite",
+      "date": "2026-03-11",
+      "start": "19:00:00",
+      "end": "20:00:00",
+      "teacher": "",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Diana",
+      "date": "2026-03-11",
+      "start": "19:00:00",
+      "end": "20:00:00",
+      "teacher": "",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Wisdom",
+      "date": "2026-03-19",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Wisdom",
+      "date": "2026-03-21",
+      "start": "12:00:00",
+      "end": "12:15:00",
+      "teacher": "Thomas",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Wisdom",
+      "date": "2026-03-26",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Wisdom",
+      "date": "2026-04-02",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Wisdom",
+      "date": "2026-04-09",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Wisdom",
+      "date": "2026-04-16",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Wisdom",
+      "date": "2026-04-17",
+      "start": "16:00:00",
+      "end": "17:30:00",
+      "teacher": "Cobb",
+      "location": "San Juan Hills High School"
+    },
+    {
+      "role": "Muse of Wisdom",
+      "date": "2026-04-23",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Wisdom",
+      "date": "2026-04-30",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Wisdom",
+      "date": "2026-05-07",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Wisdom",
+      "date": "2026-05-14",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Wisdom",
+      "date": "2026-05-21",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Wisdom",
+      "date": "2026-05-28",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Wisdom",
+      "date": "2026-06-04",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse Understudy",
+      "date": "2026-02-28",
+      "start": "13:00:00",
+      "end": "14:00:00",
+      "teacher": "Thomas",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Nymphs",
+      "date": "2026-02-02",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Nymphs",
+      "date": "2026-02-09",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Nymphs",
+      "date": "2026-02-16",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Nymphs",
+      "date": "2026-02-23",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Nymphs",
+      "date": "2026-03-02",
+      "start": "17:00:00",
+      "end": "17:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Sylvia",
+      "date": "2026-03-11",
+      "start": "19:00:00",
+      "end": "20:00:00",
+      "teacher": "",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Nymphs",
+      "date": "2026-03-16",
+      "start": "17:00:00",
+      "end": "17:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Nymphs",
+      "date": "2026-03-23",
+      "start": "17:00:00",
+      "end": "17:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Nymphs",
+      "date": "2026-03-30",
+      "start": "17:00:00",
+      "end": "17:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Nymphs",
+      "date": "2026-04-06",
+      "start": "17:00:00",
+      "end": "17:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Nymphs",
+      "date": "2026-04-13",
+      "start": "17:00:00",
+      "end": "17:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Nymphs",
+      "date": "2026-04-20",
+      "start": "17:00:00",
+      "end": "17:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Nymphs",
+      "date": "2026-04-27",
+      "start": "17:00:00",
+      "end": "17:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Nymphs",
+      "date": "2026-05-04",
+      "start": "17:00:00",
+      "end": "17:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Nymphs",
+      "date": "2026-05-11",
+      "start": "17:00:00",
+      "end": "17:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Nymphs",
+      "date": "2026-05-18",
+      "start": "17:00:00",
+      "end": "17:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Nymphs",
+      "date": "2026-05-25",
+      "start": "17:00:00",
+      "end": "17:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Nymphs",
+      "date": "2026-06-01",
+      "start": "17:00:00",
+      "end": "17:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Opening Unicorns",
+      "date": "2026-04-18",
+      "start": "12:15:00",
+      "end": "13:15:00",
+      "teacher": "Thomas/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Closing Butterflies",
+      "date": "2026-04-25",
+      "start": "13:15:00",
+      "end": "14:15:00",
+      "teacher": "Thomas/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Opening Butterflies",
+      "date": "2026-04-25",
+      "start": "12:15:00",
+      "end": "13:15:00",
+      "teacher": "Thomas/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Opening Fireflies",
+      "date": "2026-04-25",
+      "start": "12:15:00",
+      "end": "13:15:00",
+      "teacher": "Thomas/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Opening Unicorns",
+      "date": "2026-04-25",
+      "start": "12:15:00",
+      "end": "13:15:00",
+      "teacher": "Thomas/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Closing Butterflies",
+      "date": "2026-05-02",
+      "start": "13:15:00",
+      "end": "14:15:00",
+      "teacher": "Thomas/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Opening Butterflies",
+      "date": "2026-05-02",
+      "start": "12:15:00",
+      "end": "13:15:00",
+      "teacher": "Thomas/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Opening Fireflies",
+      "date": "2026-05-02",
+      "start": "12:15:00",
+      "end": "13:15:00",
+      "teacher": "Thomas/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Opening Unicorns",
+      "date": "2026-05-02",
+      "start": "12:15:00",
+      "end": "13:15:00",
+      "teacher": "Thomas/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Closing Butterflies",
+      "date": "2026-05-09",
+      "start": "13:15:00",
+      "end": "14:15:00",
+      "teacher": "Thomas/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Opening Butterflies",
+      "date": "2026-05-09",
+      "start": "12:15:00",
+      "end": "13:15:00",
+      "teacher": "Thomas/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Opening Fireflies",
+      "date": "2026-05-09",
+      "start": "12:15:00",
+      "end": "13:15:00",
+      "teacher": "Thomas/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Opening Unicorns",
+      "date": "2026-05-09",
+      "start": "12:15:00",
+      "end": "13:15:00",
+      "teacher": "Thomas/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Closing Butterflies",
+      "date": "2026-05-16",
+      "start": "13:15:00",
+      "end": "14:15:00",
+      "teacher": "Thomas/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Opening Butterflies",
+      "date": "2026-05-16",
+      "start": "12:15:00",
+      "end": "13:15:00",
+      "teacher": "Thomas/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Opening Fireflies",
+      "date": "2026-05-16",
+      "start": "12:15:00",
+      "end": "13:15:00",
+      "teacher": "Thomas/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Opening Unicorns",
+      "date": "2026-05-16",
+      "start": "12:15:00",
+      "end": "13:15:00",
+      "teacher": "Thomas/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Closing Butterflies",
+      "date": "2026-05-23",
+      "start": "13:15:00",
+      "end": "14:15:00",
+      "teacher": "Thomas/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Opening Butterflies",
+      "date": "2026-05-23",
+      "start": "12:15:00",
+      "end": "13:15:00",
+      "teacher": "Thomas/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Opening Fireflies",
+      "date": "2026-05-23",
+      "start": "12:15:00",
+      "end": "13:15:00",
+      "teacher": "Thomas/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Opening Unicorns",
+      "date": "2026-05-23",
+      "start": "12:15:00",
+      "end": "13:15:00",
+      "teacher": "Thomas/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Closing Butterflies",
+      "date": "2026-05-30",
+      "start": "13:15:00",
+      "end": "14:15:00",
+      "teacher": "Thomas/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Opening Unicorns",
+      "date": "2026-05-15",
+      "start": "16:00:00",
+      "end": "18:00:00",
+      "teacher": "Thomas/Cobb",
+      "location": "San Juan Hills High School"
+    },
+    {
+      "role": "Opening Butterflies",
+      "date": "2026-05-30",
+      "start": "12:15:00",
+      "end": "13:15:00",
+      "teacher": "Thomas/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Opening Fireflies",
+      "date": "2026-05-30",
+      "start": "12:15:00",
+      "end": "13:15:00",
+      "teacher": "Thomas/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Opening Unicorns",
+      "date": "2026-05-30",
+      "start": "12:15:00",
+      "end": "13:15:00",
+      "teacher": "Thomas/Cobb",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Queen of the Sea",
+      "date": "2026-03-11",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Queen of the Sea",
+      "date": "2026-03-04",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Queen of the Sea",
+      "date": "2026-03-18",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Queen of the Sea",
+      "date": "2026-03-25",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Queen of the Sea",
+      "date": "2026-04-01",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Queen of the Sea",
+      "date": "2026-04-08",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Queen of the Sea",
+      "date": "2026-04-15",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Queen of the Sea",
+      "date": "2026-04-22",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Queen of the Sea",
+      "date": "2026-04-29",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Queen of the Sea",
+      "date": "2026-05-06",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Queen of the Sea",
+      "date": "2026-05-13",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Queen of the Sea",
+      "date": "2026-05-20",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Queen of the Sea",
+      "date": "2026-05-27",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Queen of the Sea",
+      "date": "2026-06-03",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Sea Princesses",
+      "date": "2026-03-11",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Sea Princesses",
+      "date": "2026-03-04",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Cupids",
+      "date": "2026-03-12",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Sea Princesses",
+      "date": "2026-03-18",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Sea Princesses",
+      "date": "2026-03-25",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Sea Princesses",
+      "date": "2026-04-01",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Sea Princesses",
+      "date": "2026-04-08",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Sea Princesses",
+      "date": "2026-04-15",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Sea Princesses",
+      "date": "2026-04-22",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Sea Princesses",
+      "date": "2026-04-29",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Sea Princesses",
+      "date": "2026-05-06",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Sea Princesses",
+      "date": "2026-05-13",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Sea Princesses",
+      "date": "2026-05-20",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Sea Princesses",
+      "date": "2026-05-27",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Sea Princesses",
+      "date": "2026-06-03",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Shepherdesses",
+      "date": "2026-02-28",
+      "start": "12:00:00",
+      "end": "13:00:00",
+      "teacher": "Thomas",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Shepherdesses",
+      "date": "2026-03-07",
+      "start": "12:00:00",
+      "end": "13:00:00",
+      "teacher": "Thomas/Helman",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Fireflies",
+      "date": "2026-03-12",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Sylvia",
+      "date": "2026-02-13",
+      "start": "18:00:00",
+      "end": "18:30:00",
+      "teacher": "Cobb",
+      "location": "San Juan Hills High School"
+    },
+    {
+      "role": "Sylvia",
+      "date": "2026-02-26",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Sylvia",
+      "date": "2026-02-27",
+      "start": "16:00:00",
+      "end": "17:00:00",
+      "teacher": "Cobb / Tate",
+      "location": "San Juan Hills High School"
+    },
+    {
+      "role": "Muse of Beauty",
+      "date": "2026-03-12",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Sylvia",
+      "date": "2026-04-18",
+      "start": "13:15:00",
+      "end": "13:45:00",
+      "teacher": "Cobb/Thomas",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "The Huntresses",
+      "date": "2026-02-02",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Thomas/Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "The Huntresses",
+      "date": "2026-02-04",
+      "start": "19:00:00",
+      "end": "19:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "The Huntresses",
+      "date": "2026-02-09",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Thomas/Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "The Huntresses",
+      "date": "2026-02-11",
+      "start": "19:00:00",
+      "end": "19:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "The Huntresses",
+      "date": "2026-02-16",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Thomas/Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "The Huntresses",
+      "date": "2026-02-18",
+      "start": "19:00:00",
+      "end": "19:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "The Huntresses",
+      "date": "2026-02-23",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Thomas/Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "The Huntresses",
+      "date": "2026-02-25",
+      "start": "19:00:00",
+      "end": "19:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "The Huntresses",
+      "date": "2026-03-02",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Thomas/Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "The Huntresses",
+      "date": "2026-03-04",
+      "start": "19:00:00",
+      "end": "19:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Music",
+      "date": "2026-03-12",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Wisdom",
+      "date": "2026-03-12",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "The Huntresses",
+      "date": "2026-03-16",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Thomas/Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "The Huntresses",
+      "date": "2026-03-18",
+      "start": "19:00:00",
+      "end": "19:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "The Huntresses",
+      "date": "2026-03-23",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Thomas/Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "The Huntresses",
+      "date": "2026-03-25",
+      "start": "19:00:00",
+      "end": "19:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "The Huntresses",
+      "date": "2026-03-30",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Thomas/Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "The Huntresses",
+      "date": "2026-04-01",
+      "start": "19:00:00",
+      "end": "19:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "The Huntresses",
+      "date": "2026-04-06",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Thomas/Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "The Huntresses",
+      "date": "2026-04-08",
+      "start": "19:00:00",
+      "end": "19:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "The Huntresses",
+      "date": "2026-04-13",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Thomas/Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "The Huntresses",
+      "date": "2026-04-15",
+      "start": "19:00:00",
+      "end": "19:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "The Huntresses",
+      "date": "2026-04-20",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Thomas/Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "The Huntresses",
+      "date": "2026-04-22",
+      "start": "19:00:00",
+      "end": "19:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "The Huntresses",
+      "date": "2026-04-27",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Thomas/Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "The Huntresses",
+      "date": "2026-04-29",
+      "start": "19:00:00",
+      "end": "19:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "The Huntresses",
+      "date": "2026-05-04",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Thomas/Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "The Huntresses",
+      "date": "2026-05-06",
+      "start": "19:00:00",
+      "end": "19:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "The Huntresses",
+      "date": "2026-05-11",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Thomas/Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "The Huntresses",
+      "date": "2026-05-13",
+      "start": "19:00:00",
+      "end": "19:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "The Huntresses",
+      "date": "2026-05-18",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Thomas/Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "The Huntresses",
+      "date": "2026-05-20",
+      "start": "19:00:00",
+      "end": "19:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "The Huntresses",
+      "date": "2026-05-25",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Thomas/Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "The Huntresses",
+      "date": "2026-05-27",
+      "start": "19:00:00",
+      "end": "19:30:00",
+      "teacher": "Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "The Huntresses",
+      "date": "2026-06-01",
+      "start": "20:00:00",
+      "end": "20:30:00",
+      "teacher": "Thomas/Matchett",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Unicorns",
+      "date": "2026-02-03",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Unicorns",
+      "date": "2026-02-10",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Unicorns",
+      "date": "2026-02-17",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Unicorns",
+      "date": "2026-02-24",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Unicorns",
+      "date": "2026-03-03",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Aphrodite",
+      "date": "2026-03-13",
+      "start": "16:00:00",
+      "end": "18:00:00",
+      "teacher": "Cobb / Tate",
+      "location": "San Juan Hills High School"
+    },
+    {
+      "role": "Unicorns",
+      "date": "2026-03-17",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Unicorns",
+      "date": "2026-03-24",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Unicorns",
+      "date": "2026-03-31",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Unicorns",
+      "date": "2026-04-07",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Unicorns",
+      "date": "2026-04-14",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Unicorns",
+      "date": "2026-04-21",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Unicorns",
+      "date": "2026-04-28",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Unicorns",
+      "date": "2026-05-05",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Unicorns",
+      "date": "2026-05-12",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Unicorns",
+      "date": "2026-05-19",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Unicorns",
+      "date": "2026-05-26",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Unicorns",
+      "date": "2026-06-02",
+      "start": "16:30:00",
+      "end": "17:00:00",
+      "teacher": "Helmen",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Villagers",
+      "date": "2026-02-02",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Fauerbach",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Villagers",
+      "date": "2026-02-09",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Fauerbach",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Villagers",
+      "date": "2026-02-16",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Fauerbach",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Villagers",
+      "date": "2026-02-23",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Fauerbach",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Villagers",
+      "date": "2026-03-02",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Fauerbach",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Diana",
+      "date": "2026-03-13",
+      "start": "17:30:00",
+      "end": "18:00:00",
+      "teacher": "Cobb / Tate",
+      "location": "San Juan Hills High School"
+    },
+    {
+      "role": "Villagers",
+      "date": "2026-03-16",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Fauerbach",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Villagers",
+      "date": "2026-03-23",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Fauerbach",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Villagers",
+      "date": "2026-03-30",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Fauerbach",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Villagers",
+      "date": "2026-04-06",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Fauerbach",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Villagers",
+      "date": "2026-04-13",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Fauerbach",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Villagers",
+      "date": "2026-04-20",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Fauerbach",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Villagers",
+      "date": "2026-04-27",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Fauerbach",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Villagers",
+      "date": "2026-05-04",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Fauerbach",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Villagers",
+      "date": "2026-05-11",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Fauerbach",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Villagers",
+      "date": "2026-05-18",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Fauerbach",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Villagers",
+      "date": "2026-05-25",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Fauerbach",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Villagers",
+      "date": "2026-06-01",
+      "start": "18:30:00",
+      "end": "19:00:00",
+      "teacher": "Fauerbach",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Sylvia",
+      "date": "2026-03-06",
+      "start": "16:00:00",
+      "end": "17:00:00",
+      "teacher": "Thomas/Cobb",
+      "location": "San Juan Hills High School"
+    },
+    {
+      "role": "Opening Butterflies",
+      "date": "2026-05-15",
+      "start": "16:00:00",
+      "end": "18:00:00",
+      "teacher": "Thomas/Cobb",
+      "location": "San Juan Hills High School"
+    },
+    {
+      "role": "Opening Fireflies",
+      "date": "2026-05-15",
+      "start": "16:00:00",
+      "end": "18:00:00",
+      "teacher": "Thomas/Cobb",
+      "location": "San Juan Hills High School"
+    },
+    {
+      "role": "Sylvia",
+      "date": "2026-03-13",
+      "start": "16:00:00",
+      "end": "18:00:00",
+      "teacher": "Cobb / Tate",
+      "location": "San Juan Hills High School"
+    },
+    {
+      "role": "Lead Shepherdesses",
+      "date": "2026-03-14",
+      "start": "12:00:00",
+      "end": "12:15:00",
+      "teacher": "Thomas/Helman",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Shepherdesses",
+      "date": "2026-03-14",
+      "start": "12:00:00",
+      "end": "12:15:00",
+      "teacher": "TBD",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Muse of Music",
+      "date": "2026-03-14",
+      "start": "12:15:00",
+      "end": "12:30:00",
+      "teacher": "TBD",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Fireflies",
+      "date": "2026-03-14",
+      "start": "12:30:00",
+      "end": "13:30:00",
+      "teacher": "Thomas",
+      "location": "BAM Studios"
+    },
+    {
+      "role": "Diana",
+      "date": "2026-03-14",
+      "start": "12:30:00",
+      "end": "13:30:00",
+      "teacher": "Thomas/Cobb",
+      "location": "BAM Studios"
+    }
+  ]
+}

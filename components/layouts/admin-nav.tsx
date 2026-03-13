@@ -1,131 +1,59 @@
 "use client";
 
+import { useState } from "react";
 import { usePathname } from "next/navigation";
 import type { Role } from "@/lib/auth/getSessionWithRole";
 
-interface NavItem {
+export interface ModuleItem {
+  key: string;
   label: string;
-  href: string;
   icon: string;
-  featureFlag?: string;
+  href: string;
+  nav_group: string;
+  sort_order: number;
+  platform_enabled: boolean;
+  tenant_enabled: boolean;
+  nav_visible: boolean;
+  requires_role?: string | null;
 }
 
 interface NavGroup {
   label: string;
-  items: NavItem[];
-  superAdminOnly?: boolean;
-  featureFlag?: string;
+  items: ModuleItem[];
 }
 
 const SUPER_EMAIL = "derek@greenlyzard.com";
 
-const navGroups: NavGroup[] = [
-  {
-    label: "Studio",
-    items: [
-      { label: "Dashboard", href: "/admin/dashboard", icon: "⌂" },
-      { label: "Seasons", href: "/admin/seasons", icon: "◈", featureFlag: "seasons" },
-      { label: "Schedule", href: "/admin/schedule", icon: "▥" },
-      { label: "Schedule Classes", href: "/admin/schedule/classes", icon: "▦", featureFlag: "schedule_classes" },
-      { label: "Tasks", href: "/admin/tasks", icon: "☑", featureFlag: "tasks" },
-      { label: "Calendar", href: "/admin/calendar", icon: "▥", featureFlag: "calendar" },
-      { label: "Schedule Embeds", href: "/admin/schedule-embeds", icon: "◫", featureFlag: "schedule_embeds" },
-      { label: "Classes", href: "/admin/classes", icon: "▦" },
-      { label: "Students", href: "/admin/students", icon: "♡" },
-      { label: "Families", href: "/admin/families", icon: "◇" },
-    ],
-  },
-  {
-    label: "Staff",
-    items: [
-      { label: "Teachers", href: "/admin/teachers", icon: "★" },
-      { label: "Timesheets", href: "/admin/timesheets", icon: "▤" },
-      { label: "Compliance", href: "/admin/compliance", icon: "◆", featureFlag: "compliance" },
-      { label: "Substitute Requests", href: "/admin/substitute-requests", icon: "↻", featureFlag: "substitute_requests" },
-    ],
-  },
-  {
-    label: "Productions",
-    featureFlag: "productions",
-    items: [
-      { label: "Productions", href: "/admin/productions", icon: "♛" },
-      { label: "Rehearsals", href: "/admin/rehearsals", icon: "♪" },
-    ],
-  },
-  {
-    label: "Communications",
-    items: [
-      { label: "Announcements", href: "/admin/communications", icon: "✉", featureFlag: "announcements" },
-      { label: "Email Templates", href: "/admin/emails", icon: "✧", featureFlag: "email_templates" },
-    ],
-  },
-  {
-    label: "Commerce",
-    items: [
-      { label: "Billing", href: "/admin/billing", icon: "✦" },
-      { label: "Reports", href: "/admin/reports", icon: "▲" },
-    ],
-  },
-  {
-    label: "Content",
-    items: [{ label: "LMS Content", href: "/admin/content", icon: "▶" }],
-  },
-  {
-    label: "AI",
-    items: [
-      { label: "Angelina Chat", href: "/admin/chat", icon: "◈" },
-      { label: "Conversations", href: "/admin/angelina", icon: "◇" },
-      { label: "Knowledge Base", href: "/admin/knowledge-base", icon: "◆" },
-    ],
-  },
-  {
-    label: "Intelligence",
-    items: [
-      { label: "Resources", href: "/admin/resources", icon: "◧" },
-      { label: "Rentals", href: "/admin/resources/rentals", icon: "◨" },
-      { label: "Expansion", href: "/admin/expansion", icon: "●" },
-    ],
-  },
-  {
-    label: "Settings",
-    superAdminOnly: true,
-    items: [
-      { label: "Theme", href: "/admin/settings/theme", icon: "◑" },
-      { label: "Pay Rates", href: "/admin/settings/pay-rates", icon: "◈" },
-      { label: "Team Members", href: "/admin/settings/team", icon: "◉" },
-    ],
-  },
+const GROUP_ORDER = [
+  "Studio",
+  "Students & Families",
+  "Staff",
+  "Productions",
+  "Communications",
+  "Settings",
 ];
 
-const mobileItems: NavItem[] = [
+const mobileItems = [
   { label: "Home", href: "/admin/dashboard", icon: "⌂" },
   { label: "Classes", href: "/admin/classes", icon: "▦" },
   { label: "Teachers", href: "/admin/teachers", icon: "★" },
   { label: "Students", href: "/admin/students", icon: "♡" },
-  { label: "More", href: "/admin/billing", icon: "⋯" },
+  { label: "More", href: "/admin/settings", icon: "⋯" },
 ];
 
 export function AdminNav({
   mobile = false,
   role,
-  featureFlags = {},
+  modules = [],
   userEmail,
 }: {
   mobile?: boolean;
   role?: Role;
-  featureFlags?: Record<string, boolean>;
+  modules?: ModuleItem[];
   userEmail?: string;
 }) {
   const pathname = usePathname();
   const isDerek = userEmail === SUPER_EMAIL;
-
-  function isItemVisible(flag?: string): "visible" | "disabled" | "hidden" {
-    if (!flag) return "visible";
-    if (featureFlags[flag] !== false) return "visible";
-    // Flag is disabled
-    if (isDerek) return "disabled";
-    return "hidden";
-  }
 
   if (mobile) {
     return (
@@ -149,60 +77,111 @@ export function AdminNav({
     );
   }
 
-  const visibleGroups = navGroups.filter(
-    (group) => !group.superAdminOnly || role === "super_admin"
-  );
+  // Build groups from modules
+  const groupMap: Record<string, ModuleItem[]> = {};
+  for (const mod of modules) {
+    // Platform-level kill switch: completely hide
+    if (!mod.platform_enabled) continue;
+
+    // Settings platform page: only Derek
+    if (mod.key === "settings_platform" && !isDerek) continue;
+
+    // Check if module should be visible
+    const isEnabled = mod.tenant_enabled && mod.nav_visible;
+    if (!isEnabled && !isDerek) continue;
+
+    if (!groupMap[mod.nav_group]) groupMap[mod.nav_group] = [];
+    groupMap[mod.nav_group].push(mod);
+  }
+
+  // Sort groups by defined order, items by sort_order
+  const groups: NavGroup[] = GROUP_ORDER
+    .filter((g) => groupMap[g] && groupMap[g].length > 0)
+    .map((g) => ({
+      label: g,
+      items: groupMap[g].sort((a, b) => a.sort_order - b.sort_order),
+    }));
 
   return (
-    <nav className="space-y-4">
-      {visibleGroups.map((group) => {
-        // Check group-level flag
-        const groupVis = isItemVisible(group.featureFlag);
-        if (groupVis === "hidden") return null;
-
-        // Filter items by flags
-        const visibleItems = group.items.filter(
-          (item) => isItemVisible(item.featureFlag) !== "hidden"
-        );
-        if (visibleItems.length === 0) return null;
-
-        return (
-          <div key={group.label}>
-            <p
-              className={`px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-mist ${
-                groupVis === "disabled" ? "opacity-50" : ""
-              }`}
-            >
-              {group.label}
-            </p>
-            <div className="flex flex-col gap-0.5">
-              {visibleItems.map((item) => {
-                const active = pathname.startsWith(item.href);
-                const itemVis = isItemVisible(item.featureFlag);
-                const isDisabled = groupVis === "disabled" || itemVis === "disabled";
-
-                return (
-                  <a
-                    key={item.href}
-                    href={item.href}
-                    className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                      active
-                        ? "bg-lavender/10 text-lavender-dark"
-                        : "text-slate hover:bg-cloud hover:text-charcoal"
-                    } ${isDisabled ? "opacity-50" : ""}`}
-                  >
-                    <span className="text-base leading-none">{item.icon}</span>
-                    {item.label}
-                    {isDisabled && (
-                      <span className="ml-auto text-xs">🔒</span>
-                    )}
-                  </a>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })}
+    <nav className="space-y-1">
+      {groups.map((group) => (
+        <NavGroupSection
+          key={group.label}
+          group={group}
+          pathname={pathname}
+          isDerek={isDerek}
+        />
+      ))}
     </nav>
+  );
+}
+
+function NavGroupSection({
+  group,
+  pathname,
+  isDerek,
+}: {
+  group: NavGroup;
+  pathname: string;
+  isDerek: boolean;
+}) {
+  const hasActiveItem = group.items.some((item) =>
+    pathname.startsWith(item.href)
+  );
+  const [isOpen, setIsOpen] = useState(true);
+
+  return (
+    <div className="pt-3 first:pt-0">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between px-3 pb-1 group"
+      >
+        <span className="text-xs font-semibold uppercase tracking-wider text-mist">
+          {group.label}
+        </span>
+        <svg
+          className={`w-3 h-3 text-mist transition-transform ${
+            isOpen ? "rotate-0" : "-rotate-90"
+          }`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M19 9l-7 7-7-7"
+          />
+        </svg>
+      </button>
+      {isOpen && (
+        <div className="flex flex-col gap-0.5">
+          {group.items.map((item) => {
+            const active = pathname.startsWith(item.href);
+            const isDisabled =
+              !item.tenant_enabled || !item.nav_visible;
+
+            return (
+              <a
+                key={item.key}
+                href={item.href}
+                className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  active
+                    ? "bg-lavender/10 text-lavender-dark"
+                    : "text-slate hover:bg-cloud hover:text-charcoal"
+                } ${isDisabled ? "opacity-50" : ""}`}
+              >
+                <span className="text-base leading-none">{item.icon}</span>
+                {item.label}
+                {isDisabled && isDerek && (
+                  <span className="ml-auto text-xs">🔒</span>
+                )}
+              </a>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }

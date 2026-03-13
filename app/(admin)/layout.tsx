@@ -1,4 +1,5 @@
 import { AdminNav } from "@/components/layouts/admin-nav";
+import type { ModuleItem } from "@/components/layouts/admin-nav";
 import { AvatarDropdown } from "@/components/layouts/avatar-dropdown";
 import { AngelinaChat } from "@/components/angelina/AngelinaChat";
 import { RoleProvider } from "@/context/RoleContext";
@@ -14,16 +15,30 @@ export default async function AdminLayout({
   const { role, full_name } = session.profile;
 
   const supabase = await createClient();
-  const [{ data: settings }, { data: flagRows }] = await Promise.all([
+  const [{ data: settings }, { data: moduleRows }] = await Promise.all([
     supabase.from("studio_settings").select("logo_url").limit(1).single(),
-    supabase.from("feature_flags").select("key, is_enabled"),
+    supabase
+      .from("platform_modules")
+      .select(
+        "key, label, icon, href, nav_group, sort_order, platform_enabled, tenant_enabled, nav_visible, requires_role"
+      )
+      .order("sort_order"),
   ]);
   const logoUrl = settings?.logo_url;
-  const featureFlags: Record<string, boolean> = {};
-  for (const f of flagRows ?? []) {
-    featureFlags[f.key] = f.is_enabled;
-  }
   const userEmail = session.user.email;
+
+  const modules: ModuleItem[] = (moduleRows ?? []).map((m) => ({
+    key: m.key,
+    label: m.label,
+    icon: m.icon,
+    href: m.href ?? "",
+    nav_group: m.nav_group,
+    sort_order: m.sort_order,
+    platform_enabled: m.platform_enabled,
+    tenant_enabled: m.tenant_enabled,
+    nav_visible: m.nav_visible,
+    requires_role: m.requires_role,
+  }));
 
   return (
     <RoleProvider role={role} fullName={full_name}>
@@ -60,7 +75,7 @@ export default async function AdminLayout({
         {/* Desktop: sidebar + content */}
         <div className="hidden lg:flex">
           <aside className="w-60 shrink-0 border-r border-silver bg-white min-h-[calc(100vh-3.5rem)] overflow-y-auto py-4 px-3">
-            <AdminNav role={role} featureFlags={featureFlags} userEmail={userEmail} />
+            <AdminNav role={role} modules={modules} userEmail={userEmail} />
           </aside>
           <main className="flex-1 p-6 min-w-0">{children}</main>
         </div>
@@ -70,7 +85,7 @@ export default async function AdminLayout({
 
         {/* Bottom tab bar (mobile) */}
         <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-silver bg-white lg:hidden">
-          <AdminNav mobile role={role} featureFlags={featureFlags} userEmail={userEmail} />
+          <AdminNav mobile role={role} modules={modules} userEmail={userEmail} />
         </nav>
         <AngelinaChat role="admin" mode="floating" />
       </div>
