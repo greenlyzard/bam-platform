@@ -1,311 +1,378 @@
-# Registration & Onboarding Module
-
-**Ballet Academy and Movement — Platform Module Specification**
-
-- **Module status:** Phase 2 build target
-- **Depends on:** Core data model (families, students, seasons, classes), Scheduling module, Billing module
-- **Feeds into:** Parent portal, LMS (initial level placement), Communications module, Admin dashboard
-- **Last updated:** March 2026
-- **Owner:** Ballet Academy and Movement platform team
-- **Related files:** `CLAUDE.md`, `SCHEDULING_AND_LMS.md`, `CASTING_AND_REHEARSAL.md`, `COMMUNICATIONS.md`
+# REGISTRATION_AND_ONBOARDING.md
+# Ballet Academy and Movement — Registration & Onboarding Spec
+# Version: 2.0 | Status: Authoritative | Owner: Derek Shaw (Green Lyzard)
+# Updated: March 2026
 
 ---
 
-## Guiding Principle
+## 1. Overview
 
-Registration must feel simpler than a typical e-commerce checkout. A parent who finds BAM through Google, Instagram, or word of mouth should be able to go from landing on the site to fully enrolled in under five minutes — on a phone, without confusion, without calling the studio.
+Registration at BAM is not a single flow — it is a set of distinct
+experiences based on who is registering and what they already know
+about the studio. The system must feel effortless for every user type
+while preserving Amanda's ability to control placement, quality, and
+culture.
 
-Every screen in this flow should reduce friction. If a parent has to stop and think, the flow has failed.
-
-This module serves two distinct user journeys that share underlying infrastructure but have different experiences:
-
-- **New families** — have never registered with BAM before
-- **Returning families** — re-enrolling for a new season, or adding a second child
-
-Both journeys must be handled gracefully. A returning family should never feel like a stranger.
+Cross-references:
+- BILLING.md — fees, tuition, proration, payment processing
+- SCHEDULING_AND_LMS.md — class records, enrollment counts, trial eligibility
+- COMMUNICATIONS.md — welcome sequences, Angelina follow-up
+- CHATBOT_AND_LEAD_CAPTURE.md — Angelina conversation flows
+- MARKETING_INTEGRATIONS.md — audience sync on registration events
 
 ---
 
-## Part 1: New Family Onboarding
+## 2. User Types & Their Experiences
 
-### 1.1 Entry Points
-
-All entry points must land in the correct context:
-
-| Entry Point | Where They Land |
-|---|---|
-| Website "Enroll Now" button | Class recommendation quiz (Step 1) |
-| Direct class link (from SEO landing page) | That specific class detail page with Enroll CTA |
-| QR code from flyer or performance program | Mobile-optimized registration start |
-| Referral link from another parent | Registration start, referral source logged |
-| "Free Trial Class" offer | Trial class booking flow (separate, simplified — see Part 4) |
-| Email campaign link | Season-specific class catalog |
-
-No matter the entry point, a parent should never arrive at a blank form asking for information before they understand what they're signing up for.
-
-### 1.2 Class Recommendation Quiz
-
-Before any account creation, new parents complete a short quiz that outputs a personalized class recommendation. This replaces the need for a phone call or email inquiry for the majority of families.
-
-**Quiz questions (3–4 maximum):**
-1. How old is your child? (age selector — not a text field)
-2. Has your child taken dance classes before? (Never / A little / Yes, for a year or more)
-3. What is your child most interested in? (Ballet / Jazz / Contemporary / Musical Theatre / Not sure yet)
-4. Are you looking for classes on a specific day? (Optional — show available days as buttons)
-
-**Output:**
-The quiz produces 1–3 recommended classes, displayed as cards showing:
-- Class name and level
-- Age range
-- Day, time, and duration
-- Instructor name and short bio
-- Spots remaining (or Waitlist if full)
-- Brief description of what students learn in this class
-- "Enroll in This Class" CTA
-
-If no classes match exactly (e.g., age gap, program not currently offered), the system shows the closest option and surfaces a "Join the Waitlist" or "Notify Me When Available" option instead of a dead end.
-
-> **Why this comes first:** Most parents don't know the difference between Pre-Ballet I and Primary II. Asking them to choose from a catalog before they understand what they're looking at creates anxiety and abandonment. The quiz does the work for them and builds confidence that they're making the right choice.
-
-### 1.3 Account Creation
-
-After a parent selects a recommended class, they create a family account. This is the first point of data collection.
-
-**Fields — kept to the minimum required:**
-- Parent/guardian first and last name
-- Email address
-- Phone number (mobile preferred — used for SMS notifications if opted in)
-- Password (or magic link option — no password required)
-- How did you hear about us? (dropdown — Google, Instagram, friend referral, saw a performance, Yelp, other)
-- Social login (Google, Apple) — offered to reduce friction
-
-No address, no payment info, no emergency contacts at this step. The goal of account creation is to get an identity established so the parent can continue.
-
-### 1.4 Student Profile
-
-**Required fields:**
-- Child's first and last name
-- Date of birth (used to verify age eligibility for selected class)
-- Gender (optional — used for costume sizing and role assignments)
-- Any relevant health or physical considerations the instructor should know (free text, optional)
-
-**Multiple children:** After completing the first student profile, the parent is offered "Add another child" before proceeding. This should not require re-entering parent/account information.
-
-### 1.5 Enrollment Confirmation and Class Details
-
-The parent sees a clear summary of what they're enrolling in before payment:
-- Child name
-- Class name, level, day, time, instructor
-- Season dates (start and end)
-- Tuition amount and payment schedule
-- What to bring to the first class (dress code, shoes, hair)
-- Studio address and parking notes
-- Cancellation and refund policy (brief, plain language)
-
-This page is designed to answer every practical question a parent might have before they hand over payment information. It is the last page before the payment step.
-
-### 1.6 Payment
-
-Payments are processed via **Stripe**. The payment step is a single screen:
-- Tuition summary (monthly, per-semester, or annual — depending on studio policy)
-- Registration fee (if applicable)
-- Payment method: credit/debit card, or ACH (bank transfer)
-- Auto-pay enrollment (on by default with clear opt-out)
-- Promo code / scholarship code field (collapsed by default, expandable)
-
-**On successful payment:**
-- Confirmation screen with all class details
-- Confirmation email sent immediately (see Communications section)
-- Student appears in the class roster in the instructor portal
-- Admin receives a new enrollment notification
-
-### 1.7 Post-Enrollment Welcome Sequence
-
-After enrollment is confirmed, an automated welcome sequence begins. Handled by **Klaviyo**, triggered via platform webhook:
-
-| Email | Timing | Subject / Content |
+| User Type | Path | Key Difference |
 |---|---|---|
-| Email 1 | Immediate | **You're enrolled!** Class details, dress code, what to bring, studio address, instructor intro, contact info |
-| Email 2 | Day 3 | **Culture and Story** — Amanda's background and teaching philosophy, what makes BAM different, what a typical class looks like |
-| Email 3 | Day 7 | **Community** — Nutcracker and performance opportunities, how parents can stay involved, social links |
-| Email 4 | 2 days before first class | **Reminder** — Class time, room, what to wear, where to park, what happens on the first day |
-
-> This sequence is paused if the parent completes an action that makes the next email redundant (e.g., if they open and click the dress code link in Email 1, the dress code reminder in Email 4 is shortened).
-
----
-
-## Part 2: Returning Family Re-Enrollment
-
-### 2.1 Seasonal Re-Enrollment Flow
-
-Returning families re-enroll at the start of each new season. Their history, payment methods, and child profiles are preserved.
-
-**Re-enrollment opens in two phases:**
-- **Priority window:** Existing families get early access before classes open to the public. This is a retention tool — families should feel valued, not rushed to compete with newcomers for spots.
-- **Open enrollment:** All remaining spots open to the public.
-
-When a returning family logs in during the enrollment window, they see:
-- Their children's current enrollment from last season
-- A prompt: "Re-enroll [Child's Name] for [Season Name]?"
-- Recommended classes for each child based on their current level (pulled from LMS progress data)
-- Level advancements since last season highlighted: "[Child's Name] has advanced to Ballet II!"
-
-The goal is to make re-enrollment a single-tap confirmation for the majority of families, not a full repeat of the new family flow.
-
-### 2.2 Adding a Sibling
-
-When a returning parent adds a second child, they follow the new student quiz flow (Part 1.2) but with their account already established. They skip account creation and go directly to the student profile step.
-
-### 2.3 Handling Program Changes
-
-If a child wants to switch from ballet to jazz, or add a second class in a different style, the returning flow surfaces this option after confirming their primary class: "Would [Child's Name] like to add another class this season?" with filtered recommendations based on schedule availability.
+| New family (child student) | Discovery → Survey → Trial → Register | AI-guided placement, trial first |
+| New adult student | Discovery → Light survey → Register | Can go straight to registration |
+| Existing family re-enrolling | Portal → Review placement → Confirm → Pay | Previous level + annual eval drives placement |
+| Admin enrolling a student | Admin → Select student → Select class → Enroll | Direct enrollment, no wizard |
+| Walk-in / phone inquiry | Angelina or Admin creates lead record | Captured, nurtured into registration |
 
 ---
 
-## Part 3: Class Catalog and Placement Logic
+## 3. New Family — Primary Flow
 
-### 3.1 Class Catalog
+### 3.1 Entry Points
+New families can enter registration from multiple places:
+- Website chatbot (Angelina)
+- Website "Enroll Now" button
+- Direct URL from ad campaign
+- QR code from in-studio or printed marketing
 
-The public-facing class catalog is browsable without an account. It displays:
-- All classes offered in the current season
-- Filters: program (ballet, jazz, contemporary, musical theatre), age range, day of week, level
-- Each class card: name, level, instructor, day/time, duration, age range, open spots, brief description
-- Tapping a class shows the full detail page with instructor bio, what students learn, and the Enroll CTA
+### 3.2 Path A — Angelina Chat-Guided (default for website visitors)
+1. Angelina greets visitor, asks about their child (age, experience,
+   goals, schedule)
+2. Based on responses, Angelina recommends 1–3 classes
+3. For trial-eligible classes: "Would you like to book a free trial?"
+4. For non-level or beginner classes: "Ready to register now?" —
+   can bypass trial entirely
+5. Parent enters contact info → lead record created in CRM
+6. If trial: trial session booked, confirmation sent
+7. If direct registration: flows into enrollment wizard (Section 3.4)
 
-**Waitlist:** When a class is full, the Enroll CTA becomes "Join Waitlist." Waitlist position is shown. When a spot opens, the next family on the waitlist receives an email with 48 hours to claim it before it moves to the next person.
+### 3.3 Path B — Intake Survey → AI Recommendation → Trial/Register
+For parents who prefer self-service over chat:
+1. Parent fills out intake survey:
+   - Child's name and date of birth
+   - Prior dance experience (none / some / trained)
+   - Goals (fun & confidence / serious training / both)
+   - Schedule availability (days/times)
+   - How they heard about BAM
+2. AI (Angelina API) processes survey + compares to available classes
+3. AI returns 1–3 recommended classes with reasoning
+   ("Based on Maya's age and no prior experience, we recommend...")
+4. Parent sees recommendation card per class:
+   - Simple name, days/times, teacher, room
+   - Trial available badge (if eligible)
+   - "Book Trial" or "Register Now" CTA
+5. Parent selects their path
 
-### 3.2 Age and Prerequisite Validation
+### 3.4 Path C — Straight Registration (beginner / non-level classes)
+For classes where trial is not required or where parent already knows
+what they want:
+1. Parent browses available classes filtered by:
+   - Age of child
+   - Day/time preference
+   - Class type
+2. Selects class → enrollment wizard:
+   - Step 1: Student info (name, DOB, any health/allergy notes)
+   - Step 2: Parent/guardian info
+   - Step 3: Emergency contacts + approved stream contacts
+   - Step 4: Registration fee payment (unless waived)
+   - Step 5: Confirm enrollment
+3. Confirmation email + welcome sequence triggers in Klaviyo
 
-The system enforces age eligibility at the enrollment step:
-- If a child's age falls outside the class's defined range, the system surfaces a warning: "This class is for ages [X–Y]. Based on [Child's Name]'s age, we'd recommend [Class Name] instead."
-- The warning does **not** hard-block enrollment — admin can override for exceptional cases (e.g., a mature 4-year-old in a 5–6 class with instructor approval)
-- Prerequisite levels (e.g., Ballet III requires Ballet II completion or instructor approval) trigger a soft block: "This class typically requires prior ballet training. If [Child's Name] has dance experience from another studio, our director will be in touch to schedule a brief evaluation."
+### 3.5 Trial Class Rules
+- One free trial per student — enforced by system (checks student email/DOB)
+- Second trial requires Super Admin approval (Amanda)
+- Trial student appears on session roster tagged [TRIAL]
+- Trial session is not charged
+- Trial does NOT require registration fee — fee is due only on full enrollment
+- After trial: Angelina sends follow-up sequence (see Section 3.6)
+- If `trial_requires_approval = true` on the class: Admin reviews and
+  confirms the trial booking before parent receives confirmation
 
-### 3.3 Placement Evaluations
+### 3.6 Post-Trial Follow-Up (Angelina Sequence)
+Triggered automatically after trial session attendance is confirmed:
 
-For students transferring from another studio or whose prior experience is unclear:
-1. Parent selects "My child has previous dance experience" during the quiz
-2. System offers a short evaluation session with Amanda or a senior instructor (scheduled as a private lesson entry in the scheduling module)
-3. After the evaluation, the instructor sets the student's initial level in the LMS
-4. The student is directed to the appropriate class with a personal recommendation note
-
-This replaces the informal "call and ask" process with a defined, bookable workflow.
-
----
-
-## Part 4: Free Trial Class Flow
-
-BAM may offer trial classes as a lead capture tool. The trial class flow is a simplified version of the full registration flow:
-
-1. Parent fills in child's name, age, and email (3 fields only)
-2. System shows available trial slots (limited per class, admin-controlled)
-3. Parent selects a slot and confirms — no payment required
-4. Confirmation email sent with class details and dress code
-5. After the trial class, an automated follow-up email is sent within 24 hours: "How did [Child's Name] enjoy her class?" with a direct Enroll CTA
-6. If no response after 3 days, a second follow-up is sent
-7. If no enrollment after 7 days, the lead is added to a nurture sequence in Klaviyo
-
-Trial class contacts who do not convert are tracked as leads in the platform's CRM layer and surfaced to admin with a "last contact" date.
-
----
-
-## Part 5: Admin Registration Tools
-
-### 5.1 Admin Enrollment Dashboard
-
-Surfaces:
-- Total enrolled students by class for the current season
-- Classes approaching capacity (flagged at 80% and 100%)
-- Waitlist counts per class
-- New enrollments in the last 7 days
-- Pending placement evaluations
-- Incomplete registrations (started but not completed — these are warm leads)
-
-### 5.2 Manual Enrollment
-
-Admin can enroll a student directly (for in-person signups, phone registrations, or scholarship students):
-1. Search for existing family or create new family record
-2. Select class
-3. Set payment terms (standard, scholarship, payment plan, comp)
-4. Generate invoice or mark as paid
-5. Student appears in roster immediately
-
-### 5.3 Incomplete Registration Recovery
-
-When a parent starts the registration flow but does not complete it, the system logs the incomplete registration with whatever data was captured (email, child name, class interest).
-
-Admin sees these in a "Warm Leads" panel and can:
-- Trigger a personal follow-up email from Amanda
-- Assign a staff member to call the family
-- Mark as "contacted" or "not interested" to clean up the list
-
-An automated email is sent 24 hours after an incomplete registration: "Did you have questions? We'd love to help [Child's Name] get started."
-
-### 5.4 Scholarship and Discount Management
-
-| Type | Description |
+| Timing | Action |
 |---|---|
-| Promo codes | Percentage or fixed-dollar discount on tuition or registration fee, with expiration date and usage limit |
-| Scholarships | Per-student designation that sets a custom tuition amount, tracked separately in financial reporting |
-| Sibling discount | Configurable percentage reduction automatically applied when a second (or third) child from the same family enrolls |
-| Early-bird pricing | Reduced rate for enrollments before a specified date, auto-expires |
-
-All discounts are logged to the financial record with the code or designation used, so they appear correctly in accounting exports.
-
----
-
-## Part 6: Data Captured at Registration
-
-### Family Record
-- Parent/guardian name(s)
-- Email address
-- Phone number
-- SMS opt-in status
-- Referral source
-- Account creation date
-
-### Student Record
-- Full name
-- Date of birth
-- Age (calculated)
-- Gender (optional)
-- Health / physical considerations
-- Prior dance experience (none / some / yes)
-- Prior studio name (if applicable)
-- Initial level placement (set by quiz output or evaluation)
-
-### Enrollment Record
-- Season
-- Class selected
-- Enrollment date
-- Entry path (quiz, direct class link, trial conversion, manual admin, referral)
-- Discount or scholarship code applied
-- Payment plan selected
-- Auto-pay status
-
-### Emergency Contact
-Collected post-enrollment, before first class. Requiring it during checkout adds friction and is not needed to complete the transaction. After enrollment is confirmed, the platform prompts the family to complete their emergency contact information before their first class date. Admin is flagged if emergency contacts are not completed 48 hours before the first class.
+| Same day (after class) | Angelina sends warm follow-up: "How did Maya enjoy her class today?" |
+| Day 2 | Email: what to expect in the full program, Amanda's philosophy |
+| Day 4 | SMS or in-app: "Ready to save Maya's spot? Registration is open." |
+| Day 7 | Final follow-up: limited spots note if class is near capacity |
+| Day 14 | Admin task created: "Trial student [name] has not registered — follow up" |
 
 ---
 
-## Part 7: Integration Points
+## 4. Existing Student Re-Enrollment
 
-| This module | Connects to | How |
-|---|---|---|
-| Registration | Scheduling module | Enrolled students appear on class roster and session attendee lists |
-| Registration | LMS | Initial level placement populates student's LMS profile |
-| Registration | Billing module | Enrollment triggers invoice generation and Stripe recurring charge |
-| Registration | Communications module | Triggers welcome sequence via Klaviyo |
-| Registration | Admin dashboard | New enrollments, waitlists, and incomplete registrations surfaced |
-| Trial class flow | CRM / lead tracking | Non-converting trials enter nurture sequence |
-| Scholarship module | Financial reporting | Discounts tracked separately in accounting exports |
+### 4.1 Placement Logic
+Existing students are NOT placed manually by Amanda for every student
+every year. The system uses a structured progression:
+
+1. **Previous level** is the baseline — a student in Ballet II is
+   assumed to continue in Ballet II unless changed
+2. **Annual evaluation** (conducted by teacher near year end) can
+   recommend advancement, hold, or level change
+3. **AI recommendation** — Amanda can prompt Angelina in bulk:
+   "Based on this year's evaluations and attendance, recommend
+   class placements for all returning students for Fall 2026"
+4. Angelina outputs a draft placement list showing:
+   - Student name
+   - Current class / level
+   - Recommended class / level for next year
+   - Reasoning (evaluation score, attendance rate, teacher note)
+   - Confidence level (high / medium / needs review)
+5. Amanda reviews the draft list, adjusts individual placements,
+   and approves in bulk or one by one
+6. Once Amanda approves: parent receives placement notification
+   in portal and via email
+7. Parent confirms enrollment and pays registration fee
+
+### 4.2 Annual Evaluation
+Teachers complete evaluations per student near year end:
+
+```sql
+student_evaluations (
+  id                uuid PK,
+  tenant_id         uuid FK tenants,
+  student_id        uuid FK users,
+  class_id          uuid FK classes,
+  evaluator_id      uuid FK users,        -- teacher
+  school_year       text,                 -- "2025-2026"
+  technical_score   integer,              -- 1-5
+  musicality_score  integer,
+  performance_score integer,
+  attendance_rate   numeric,              -- computed from session_attendance
+  teacher_notes     text,
+  recommended_level text,                 -- from BALLET_DOMAIN.md taxonomy
+  recommended_class_ids uuid[],          -- specific classes for next year
+  approved_by       uuid FK users,        -- Amanda
+  approved_at       timestamptz,
+  created_at        timestamptz default now()
+)
+```
+
+### 4.3 Angelina Bulk Placement
+Amanda opens Admin → Enrollment → Class Placement and types:
+"Place all returning students for Fall 2026 based on this year's
+evaluations. Prioritize retention. Flag anyone who needs a level
+change discussion."
+
+Angelina:
+- Reads all evaluations for the current school year
+- Reads each student's attendance record
+- Reads current class schedules for next year
+- Outputs a draft placement table (list + calendar view)
+- Flags students needing discussion with reason
+- Outputs room utilization model (is Studio A overbooked on Mondays?)
+
+Amanda reviews, adjusts, approves. System sends notifications.
+
+### 4.4 Early Access Window
+Returning families get a registration window before the public:
+- Admin sets: early access open date, early access close date,
+  public open date
+- Early access families may also receive earlybird pricing
+  (discounted registration fee or tuition — Admin configures)
+- System enforces: returning families can only enroll during their
+  window; new families cannot register until public open date
+
+```sql
+enrollment_windows (
+  id                    uuid PK,
+  tenant_id             uuid FK tenants,
+  school_year           text,
+  returning_open_at     timestamptz,
+  returning_close_at    timestamptz,
+  public_open_at        timestamptz,
+  public_close_at       timestamptz nullable,
+  earlybird_discount_type text,           -- 'percent' or 'amount'
+  earlybird_discount_value numeric(10,2),
+  earlybird_applies_to  text,             -- 'registration_fee' or 'first_month'
+  created_by            uuid FK users,
+  created_at            timestamptz default now()
+)
+```
 
 ---
 
-## Part 8: Out of Scope for Initial Build
+## 5. Adult Student Self-Registration
 
-- Online recital costume ordering (Phase 4 — tied to performance/casting module)
-- Group class gifting or gift cards
-- Sibling group classes (e.g., parent-and-child classes) — architecture supports it but not in Phase 2
-- Student self-registration (all registration is parent-initiated)
-- Multilingual registration flow
+Adult students (18+) enrolling themselves:
+1. Light intake: name, goals, schedule preference, any injuries/limitations
+2. AI recommends classes appropriate for adults
+3. Can go straight to registration — no trial required (but trial available
+   if the class is trial-eligible)
+4. Billing is under their own account (not a family/parent account)
+5. Same enrollment wizard as Path C (Section 3.4)
+
+---
+
+## 6. Admin Direct Enrollment
+
+Admin can enroll any student in any class directly:
+- Admin → Schedule → Classes → [Class] → Enrolled Students → Add Student
+- Search existing students or create new student record
+- Select enrollment type: Full / Trial / Audit (observe only)
+- Set billing override if needed (scholarship, comp, custom rate)
+- Enrollment is immediate — no payment wizard required
+- System still generates billing record; Finance Admin processes payment
+
+---
+
+## 7. Family Account Structure
+
+One family account can hold multiple student profiles.
+Billing is consolidated under the family account.
+
+```sql
+families (
+  id              uuid PK,
+  tenant_id       uuid FK tenants,
+  primary_contact_id uuid FK users,     -- parent/guardian account
+  family_name     text,                 -- "The Johnson Family"
+  billing_email   text,
+  billing_phone   text,
+  stripe_customer_id text,              -- or adapter equivalent
+  account_credit  numeric(10,2) default 0, -- studio credit balance
+  notes           text,                 -- internal Admin notes
+  created_at      timestamptz default now()
+)
+
+students (
+  id              uuid PK,
+  tenant_id       uuid FK tenants,
+  family_id       uuid FK families,
+  user_id         uuid FK users nullable, -- if student has portal login
+  first_name      text NOT NULL,
+  last_name       text NOT NULL,
+  date_of_birth   date NOT NULL,
+  gender          text,
+  medical_notes   text,
+  allergy_notes   text,
+  photo_consent   boolean default false,
+  stream_consent  boolean default false,
+  approved_stream_contacts jsonb,       -- [{name, relationship, phone, email}]
+  current_level   text,                 -- from BALLET_DOMAIN.md taxonomy
+  trial_used      boolean default false,
+  trial_approved_override boolean default false, -- Amanda approved 2nd trial
+  created_at      timestamptz default now(),
+  updated_at      timestamptz default now()
+)
+
+enrollments (
+  id              uuid PK,
+  tenant_id       uuid FK tenants,
+  student_id      uuid FK students,
+  family_id       uuid FK families,
+  class_id        uuid FK classes,
+  enrollment_type text CHECK IN ('full','trial','audit','comp'),
+  status          text CHECK IN ('active','dropped','completed',
+                    'suspended','pending_payment'),
+  enrolled_at     timestamptz,
+  enrolled_by     uuid FK users,
+  drop_date       date nullable,
+  drop_reason     text nullable,
+  drop_approved_by uuid FK users nullable,
+  cancellation_notice_date date nullable, -- 30-day notice start
+  billing_override boolean default false,
+  override_amount numeric(10,2) nullable,
+  override_reason text nullable,
+  override_by     uuid FK users nullable,
+  created_at      timestamptz default now(),
+  updated_at      timestamptz default now()
+)
+```
+
+---
+
+## 8. Cancellation & Drop Policy
+
+- **30-day written notice required** to cancel enrollment
+- No mid-month refund unless overridden by Finance Admin or above
+- Future credit (applied to family account balance) is available
+  at Admin discretion
+- Cancellation notice date is logged; system calculates final billing date
+- Override (waive notice period) requires Finance Admin or above
+- When a student is dropped:
+  1. `enrollments.status` → 'dropped'
+  2. `enrollments.drop_date` logged
+  3. Future tuition charges cancelled in billing system
+  4. If mid-month: no refund generated unless override applied
+  5. Admin task created: "Student [name] dropped [class] — confirm
+     final billing and any credit to apply"
+
+---
+
+## 9. AI Learning from Enrollment History
+
+The system accumulates enrollment, attendance, advancement, and
+retention data year over year. Angelina uses this to:
+
+### 9.1 Placement Intelligence
+- Which students advanced? What were their attendance rates?
+- Which level transitions had the highest retention?
+- Which class combinations correlate with long-term retention?
+
+### 9.2 Schedule Optimization
+When Amanda asks Angelina to model next year's schedule:
+- "Which classes are consistently underenrolled? Should we consolidate?"
+- "Studio A is booked 6 days a week — what can move to Studio B?"
+- "If we add a Wednesday Petites class, how many students might fill it
+  based on inquiry patterns?"
+
+### 9.3 AI Data Inputs for Recommendations
+| Signal | Weight |
+|---|---|
+| Student's current level | High |
+| Annual evaluation scores | High |
+| Attendance rate this year | High |
+| Teacher recommendation | High |
+| Number of years enrolled | Medium |
+| Classes dropped in prior years | Medium |
+| Trial → enrollment conversion pattern | Medium |
+| Parent-stated goals (from intake survey) | Medium |
+
+### 9.4 Output Formats
+Angelina outputs placement and schedule recommendations in:
+- **List view** — table of students, current class, recommended class
+- **Calendar/grid view** — draft schedule by day/time/room
+- **Flagged list** — students needing Admin discussion
+- **Room utilization model** — occupancy % per room per time slot
+
+---
+
+## 10. Phase Implementation Order
+
+### Phase 1 — Core Registration
+- [ ] Family + student + enrollment tables
+- [ ] Enrollment wizard (Path C — straight registration)
+- [ ] Admin direct enrollment
+- [ ] Trial class booking with [TRIAL] roster tag
+- [ ] Registration fee payment integration (BILLING.md)
+- [ ] Welcome email trigger on enrollment confirm
+
+### Phase 2 — New Family Flow
+- [ ] Intake survey → AI class recommendation
+- [ ] Angelina post-trial follow-up sequence
+- [ ] Lead record creation for unconverted inquiries
+- [ ] Enrollment windows (early access + earlybird pricing)
+
+### Phase 3 — Re-Enrollment & AI Placement
+- [ ] Annual evaluation form for teachers
+- [ ] Angelina bulk placement prompt + draft output
+- [ ] List view + calendar view for placement draft
+- [ ] Amanda approval flow → parent notification
+- [ ] AI learning model (enrollment history analysis)
+
+### Phase 4 — Advanced
+- [ ] Schedule optimization modeling
+- [ ] Room utilization dashboard
+- [ ] Retention prediction per student
+- [ ] Marketing audience sync on enrollment events (MARKETING_INTEGRATIONS.md)
