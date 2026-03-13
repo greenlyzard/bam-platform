@@ -1,5 +1,5 @@
-import { SignOutButton } from "@/components/layouts/sign-out-button";
 import { TeachNav } from "@/components/layouts/teach-nav";
+import { AvatarDropdown } from "@/components/layouts/avatar-dropdown";
 import { AngelinaChat } from "@/components/angelina/AngelinaChat";
 import { RoleProvider } from "@/context/RoleContext";
 import { requireRole } from "@/lib/auth/requireRole";
@@ -35,10 +35,12 @@ export default async function TeachLayout({
               <span className="hidden sm:block text-sm text-slate">
                 {full_name ?? session.user.email}
               </span>
-              <SignOutButton />
-              <div className="h-8 w-8 rounded-full bg-lavender-light flex items-center justify-center text-xs font-semibold text-lavender-dark">
-                {full_name?.[0] ?? session.user.email[0]?.toUpperCase() ?? "?"}
-              </div>
+              <AvatarDropdown
+                initial={full_name?.[0] ?? session.user.email[0]?.toUpperCase() ?? "?"}
+                fullName={full_name ?? ""}
+                email={session.user.email}
+                profileHref="/teach/settings/profile"
+              />
             </div>
           </div>
         </header>

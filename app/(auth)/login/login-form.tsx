@@ -19,6 +19,7 @@ export function LoginForm({
   const [error, setError] = useState(params.error ?? "");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
 
   async function handleMagicLink(formData: FormData) {
     setLoading(true);
@@ -36,6 +37,8 @@ export function LoginForm({
       setError(result.error);
     } else {
       setSuccess("Check your email for a sign-in link.");
+      setMagicLinkSent(true);
+      setTimeout(() => setMagicLinkSent(false), 60_000);
     }
   }
 
@@ -133,10 +136,22 @@ export function LoginForm({
           </div>
           <button
             type="submit"
-            disabled={loading}
-            className="w-full h-11 rounded-lg bg-lavender hover:bg-lavender-dark text-white font-semibold text-sm tracking-wide transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={loading || magicLinkSent}
+            className="w-full h-11 rounded-lg bg-lavender hover:bg-lavender-dark text-white font-semibold text-sm tracking-wide transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            {loading ? "Sending..." : "Send Magic Link"}
+            {loading ? (
+              <>
+                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Sending...
+              </>
+            ) : magicLinkSent ? (
+              "Check your email \u2713"
+            ) : (
+              "Send Magic Link"
+            )}
           </button>
         </form>
       )}
