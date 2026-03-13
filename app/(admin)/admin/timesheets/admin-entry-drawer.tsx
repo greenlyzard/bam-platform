@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { adminAddEntry, adminUpdateEntry, adminDeleteEntry } from "./actions";
 
 interface Teacher {
@@ -57,12 +57,80 @@ const DESCRIPTION_LABELS: Record<string, string> = {
   other: "Description",
 };
 
+// ── Quick Entry Mode bar ──────────────────────────────────
+export function QuickEntryBar({
+  quickMode,
+  setQuickMode,
+  stickyTeacher,
+  setStickyTeacher,
+  sessionHours,
+  teachers,
+}: {
+  quickMode: boolean;
+  setQuickMode: (v: boolean) => void;
+  stickyTeacher: string;
+  setStickyTeacher: (v: string) => void;
+  sessionHours: number;
+  teachers: Teacher[];
+}) {
+  return (
+    <div className="rounded-xl border border-silver bg-white p-4 flex flex-wrap items-center gap-4">
+      <label className="flex items-center gap-2 text-sm font-medium text-charcoal cursor-pointer">
+        <input
+          type="checkbox"
+          checked={quickMode}
+          onChange={(e) => setQuickMode(e.target.checked)}
+          className="h-4 w-4 rounded border-silver text-lavender focus:ring-lavender/20"
+        />
+        Quick Entry Mode
+      </label>
+
+      {quickMode && (
+        <>
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-charcoal whitespace-nowrap">
+              Entry for:
+            </label>
+            <select
+              value={stickyTeacher}
+              onChange={(e) => setStickyTeacher(e.target.value)}
+              className="h-9 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:outline-none min-w-[180px]"
+            >
+              <option value="">Select teacher...</option>
+              {teachers.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="ml-auto text-sm text-slate">
+            Session:{" "}
+            <span className="font-semibold text-charcoal">
+              {sessionHours.toFixed(1)} hrs
+            </span>{" "}
+            entered
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Add Entry Button ──────────────────────────────────────
 export function AdminAddEntryButton({
   teachers,
   productions,
+  quickMode,
+  stickyTeacher,
+  onEntryAdded,
 }: {
   teachers: Teacher[];
   productions: Production[];
+  quickMode?: boolean;
+  stickyTeacher?: string;
+  onEntryAdded?: (hours: number) => void;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -78,13 +146,20 @@ export function AdminAddEntryButton({
         <EntryDrawer
           teachers={teachers}
           productions={productions}
+          quickMode={quickMode}
+          defaultTeacher={stickyTeacher}
           onClose={() => setOpen(false)}
+          onSaved={(hours) => {
+            onEntryAdded?.(hours);
+            if (!quickMode) setOpen(false);
+          }}
         />
       )}
     </>
   );
 }
 
+// ── Edit Entry Button ─────────────────────────────────────
 export function AdminEditEntryButton({
   entry,
   teachers,
@@ -117,6 +192,7 @@ export function AdminEditEntryButton({
   );
 }
 
+// ── Delete Entry Button ───────────────────────────────────
 export function AdminDeleteEntryButton({ entryId }: { entryId: string }) {
   const [confirming, setConfirming] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -163,61 +239,136 @@ export function AdminDeleteEntryButton({ entryId }: { entryId: string }) {
   );
 }
 
+// ── Entry Drawer ──────────────────────────────────────────
 function EntryDrawer({
   entry,
   teachers,
   productions,
+  quickMode,
+  defaultTeacher,
   onClose,
+  onSaved,
 }: {
   entry?: EntryData;
   teachers: Teacher[];
   productions: Production[];
+  quickMode?: boolean;
+  defaultTeacher?: string;
   onClose: () => void;
+  onSaved?: (hours: number) => void;
 }) {
   const isEdit = !!entry;
+  const formRef = useRef<HTMLFormElement>(null);
   const [category, setCategory] = useState(
     entry ? (ENTRY_TYPE_TO_CATEGORY[entry.entry_type] ?? "other") : "class"
   );
-  const [selectedTeacher, setSelectedTeacher] = useState(entry?.teacher_id ?? "");
-  const [selectedProduction, setSelectedProduction] = useState(entry?.production_id ?? "");
+  const [selectedTeacher, setSelectedTeacher] = useState(
+    entry?.teacher_id ?? defaultTeacher ?? ""
+  );
+  const [selectedProduction, setSelectedProduction] = useState(
+    entry?.production_id ?? ""
+  );
+  const [currentDate, setCurrentDate] = useState(
+    entry?.date ?? new Date().toISOString().split("T")[0]
+  );
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   const teacher = teachers.find((t) => t.id === selectedTeacher);
 
-  async function handleSubmit(formData: FormData) {
-    setLoading(true);
-    setError("");
+  const handleSubmitAction = useCallback(
+    async (formData: FormData) => {
+      setLoading(true);
+      setError("");
 
-    // Set production name from selection
-    if (selectedProduction) {
-      const prod = productions.find((p) => p.id === selectedProduction);
-      if (prod) {
-        formData.set("productionName", prod.name);
+      if (selectedProduction) {
+        const prod = productions.find((p) => p.id === selectedProduction);
+        if (prod) formData.set("productionName", prod.name);
+      }
+
+      const hours = parseFloat(formData.get("totalHours") as string) || 0;
+      const result = isEdit
+        ? await adminUpdateEntry(formData)
+        : await adminAddEntry(formData);
+
+      setLoading(false);
+
+      if (result?.error) {
+        setError(result.error);
+      } else if (quickMode && !isEdit) {
+        // Quick mode: reset form, advance date by 1 day
+        onSaved?.(hours);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 1500);
+
+        const nextDate = new Date(currentDate + "T12:00:00");
+        nextDate.setDate(nextDate.getDate() + 1);
+        setCurrentDate(nextDate.toISOString().split("T")[0]);
+
+        // Reset form fields but keep teacher and category
+        if (formRef.current) {
+          const descInput = formRef.current.querySelector(
+            'input[name="description"]'
+          ) as HTMLInputElement | null;
+          const hoursInput = formRef.current.querySelector(
+            'input[name="totalHours"]'
+          ) as HTMLInputElement | null;
+          const notesInput = formRef.current.querySelector(
+            'textarea[name="notes"]'
+          ) as HTMLTextAreaElement | null;
+          if (descInput) descInput.value = "";
+          if (hoursInput) hoursInput.value = "";
+          if (notesInput) notesInput.value = "";
+        }
+      } else {
+        onSaved?.(hours);
+        onClose();
+      }
+    },
+    [
+      isEdit,
+      quickMode,
+      selectedProduction,
+      productions,
+      currentDate,
+      onClose,
+      onSaved,
+    ]
+  );
+
+  // Cmd+Enter to save
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+        e.preventDefault();
+        formRef.current?.requestSubmit();
       }
     }
-
-    const result = isEdit
-      ? await adminUpdateEntry(formData)
-      : await adminAddEntry(formData);
-
-    setLoading(false);
-
-    if (result?.error) {
-      setError(result.error);
-    } else {
-      onClose();
-    }
-  }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
       <div className="relative w-full max-w-lg bg-white shadow-xl overflow-y-auto">
         <div className="sticky top-0 bg-white border-b border-silver px-6 py-4 flex items-center justify-between z-10">
-          <h2 className="text-lg font-heading font-semibold text-charcoal">
-            {isEdit ? "Edit Entry" : "Add Entry"}
-          </h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-heading font-semibold text-charcoal">
+              {isEdit ? "Edit Entry" : "Add Entry"}
+            </h2>
+            {quickMode && !isEdit && (
+              <span className="text-xs bg-lavender/10 text-lavender-dark px-2 py-0.5 rounded-full font-medium">
+                Quick Mode
+              </span>
+            )}
+            {saved && (
+              <span className="text-xs bg-success/10 text-success px-2 py-0.5 rounded-full font-medium animate-pulse">
+                Saved
+              </span>
+            )}
+          </div>
           <button
             onClick={onClose}
             className="text-slate hover:text-charcoal text-lg"
@@ -226,7 +377,7 @@ function EntryDrawer({
           </button>
         </div>
 
-        <form action={handleSubmit} className="p-6 space-y-5">
+        <form ref={formRef} action={handleSubmitAction} className="p-6 space-y-5">
           {isEdit && <input type="hidden" name="entryId" value={entry.id} />}
 
           {/* Teacher (add only) */}
@@ -275,9 +426,8 @@ function EntryDrawer({
               name="date"
               type="date"
               required
-              defaultValue={
-                entry?.date ?? new Date().toISOString().split("T")[0]
-              }
+              value={currentDate}
+              onChange={(e) => setCurrentDate(e.target.value)}
               className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
             />
           </div>
@@ -320,7 +470,7 @@ function EntryDrawer({
             />
           </div>
 
-          {/* Description — label changes with category */}
+          {/* Description */}
           <div>
             <label className="block text-sm font-medium text-charcoal mb-1.5">
               {DESCRIPTION_LABELS[category] ?? "Description"}
@@ -334,12 +484,12 @@ function EntryDrawer({
                 category === "class"
                   ? "e.g. Intermediate Ballet"
                   : category === "private"
-                  ? "e.g. Sophia Martin"
-                  : category === "rehearsal"
-                  ? "e.g. Nutcracker Act II Corps"
-                  : category === "admin"
-                  ? "e.g. Schedule coordination"
-                  : "Description"
+                    ? "e.g. Sophia Martin"
+                    : category === "rehearsal"
+                      ? "e.g. Nutcracker Act II Corps"
+                      : category === "admin"
+                        ? "e.g. Schedule coordination"
+                        : "Description"
               }
               className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
             />
@@ -424,16 +574,26 @@ function EntryDrawer({
               disabled={loading}
               className="h-11 rounded-lg bg-lavender hover:bg-lavender-dark text-white font-semibold text-sm px-6 transition-colors disabled:opacity-50"
             >
-              {loading ? "Saving..." : "Save Entry"}
+              {loading
+                ? "Saving..."
+                : quickMode && !isEdit
+                  ? "Save & Next"
+                  : "Save Entry"}
             </button>
             <button
               type="button"
               onClick={onClose}
               className="h-11 rounded-lg border border-silver text-slate hover:text-charcoal font-medium text-sm px-6 transition-colors"
             >
-              Cancel
+              {quickMode ? "Done" : "Cancel"}
             </button>
           </div>
+
+          {quickMode && !isEdit && (
+            <p className="text-xs text-mist text-center">
+              Tip: Press Cmd+Enter to save and stay open
+            </p>
+          )}
         </form>
       </div>
     </div>
