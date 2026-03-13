@@ -6,6 +6,8 @@ import {
   CLASS_TYPE_COLORS,
 } from "@/lib/schedule/queries";
 import { createClient } from "@/lib/supabase/server";
+import { getClassEnrollments } from "@/lib/queries/families";
+import { EnrolledStudents } from "./enrolled-students";
 import Link from "next/link";
 
 export async function generateMetadata({
@@ -48,9 +50,10 @@ export default async function ClassDetailPage({
   await requireAdmin();
   const { id } = await params;
 
-  const [cls, recurrenceRules] = await Promise.all([
+  const [cls, recurrenceRules, classEnrollments] = await Promise.all([
     getScheduleClassById(id),
     getRecurrenceRules(id),
+    getClassEnrollments(id),
   ]);
 
   if (!cls) notFound();
@@ -340,6 +343,13 @@ export default async function ClassDetailPage({
           </table>
         </div>
       </div>
+
+      {/* Enrolled Students */}
+      <EnrolledStudents
+        classId={id}
+        enrollments={classEnrollments as never[]}
+        maxEnrollment={cls.max_enrollment}
+      />
     </div>
   );
 }

@@ -46,7 +46,7 @@ export function DancerCard({
 
   return (
     <a
-      href={`/portal/children?id=${student.id}`}
+      href={`/portal/students/${student.id}`}
       className="block rounded-xl border border-silver bg-white p-5 hover:shadow-md transition-shadow"
     >
       <div className="flex items-start gap-4">

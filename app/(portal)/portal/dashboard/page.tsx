@@ -1,5 +1,5 @@
 import { requireParent } from "@/lib/auth/guards";
-import { getMyStudents, getMyEnrollments, getMyStudentBadges } from "@/lib/queries/portal";
+import { getMyStudents, getMyEnrollments, getMyStudentBadges, getMyFamily } from "@/lib/queries/portal";
 import { getStudioSettings } from "@/lib/queries/studio-settings";
 import { ClassCard } from "@/components/bam/ClassCard";
 import { DancerCard } from "@/components/bam/DancerCard";
@@ -8,11 +8,12 @@ import { EmptyState } from "@/components/bam/empty-state";
 
 export default async function DashboardPage() {
   const user = await requireParent();
-  const [students, enrollments, badges, settings] = await Promise.all([
+  const [students, enrollments, badges, settings, family] = await Promise.all([
     getMyStudents(),
     getMyEnrollments(),
     getMyStudentBadges(),
     getStudioSettings(),
+    getMyFamily(),
   ]);
   const studioName = settings?.studio_name ?? "Ballet Academy & Movement";
 
@@ -209,6 +210,25 @@ export default async function DashboardPage() {
               icon="✉"
               label="Messages"
             />
+          </div>
+        </section>
+      )}
+
+      {/* Family Account Balance */}
+      {family && Number(family.account_credit) > 0 && (
+        <section className="rounded-xl border border-silver bg-white p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-heading text-base font-semibold text-charcoal">
+                Account Credit
+              </h3>
+              <p className="text-sm text-slate mt-0.5">
+                {family.family_name}
+              </p>
+            </div>
+            <p className="text-xl font-semibold text-[#5A9E6F]">
+              ${Number(family.account_credit).toFixed(2)}
+            </p>
           </div>
         </section>
       )}
