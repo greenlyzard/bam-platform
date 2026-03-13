@@ -13,20 +13,29 @@ ALTER TABLE profiles
 ALTER TABLE profiles
   ADD COLUMN IF NOT EXISTS last_name text;
 
--- 2. Replace signup trigger with ON CONFLICT guard
+-- 2. Add phone column (idempotent)
+ALTER TABLE profiles
+  ADD COLUMN IF NOT EXISTS phone text;
+
+-- 3. Replace signup trigger — populates first_name, last_name from metadata
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS trigger AS $$
 BEGIN
-  INSERT INTO profiles (id, email, role)
+  INSERT INTO profiles (id, email, first_name, last_name, role)
   VALUES (
     NEW.id,
     NEW.email,
+    NEW.raw_user_meta_data ->> 'first_name',
+    NEW.raw_user_meta_data ->> 'last_name',
     coalesce(
       (NEW.raw_user_meta_data ->> 'role')::user_role,
       'parent'
     )
   )
-  ON CONFLICT (id) DO NOTHING;
+  ON CONFLICT (id) DO UPDATE SET
+    first_name = COALESCE(EXCLUDED.first_name, profiles.first_name),
+    last_name  = COALESCE(EXCLUDED.last_name, profiles.last_name),
+    email      = COALESCE(EXCLUDED.email, profiles.email);
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
