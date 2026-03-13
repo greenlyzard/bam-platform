@@ -330,7 +330,7 @@ export async function submitTimesheet(formData: FormData) {
   // Calculate totals
   const { data: entries } = await supabase
     .from("timesheet_entries")
-    .select("total_hours")
+    .select("id, total_hours")
     .eq("timesheet_id", timesheetId);
 
   const totalHours = (entries ?? []).reduce(
@@ -338,11 +338,13 @@ export async function submitTimesheet(formData: FormData) {
     0
   );
 
+  const now = new Date().toISOString();
+
   const { error } = await supabase
     .from("timesheets")
     .update({
       status: "submitted",
-      submitted_at: new Date().toISOString(),
+      submitted_at: now,
       total_hours: totalHours,
     })
     .eq("id", timesheetId);
@@ -351,6 +353,74 @@ export async function submitTimesheet(formData: FormData) {
     console.error("[timesheets:submit]", error);
     return { error: "Failed to submit timesheet." };
   }
+
+  // Also mark all entries as submitted
+  for (const entry of entries ?? []) {
+    await supabase
+      .from("timesheet_entries")
+      .update({ status: "submitted", submitted_at: now })
+      .eq("id", entry.id);
+
+    await supabase.from("timesheet_entry_changes").insert({
+      tenant_id: tp.tenant_id,
+      entry_id: entry.id,
+      changed_by: (await supabase.auth.getUser()).data.user!.id,
+      changed_by_name: null,
+      change_type: "submitted",
+    });
+  }
+
+  revalidatePath("/teach/timesheets");
+  return { success: true };
+}
+
+export async function respondToFlag(formData: FormData) {
+  const supabase = await createClient();
+  const tp = await getTeacherContext(supabase);
+  if (!tp) return { error: "Teacher profile not found." };
+
+  const entryId = formData.get("entryId") as string;
+  const response = formData.get("response") as string;
+  if (!entryId || !response?.trim()) return { error: "Response is required." };
+
+  // Verify ownership
+  const { data: entry } = await supabase
+    .from("timesheet_entries")
+    .select("id, tenant_id, status, timesheet_id, timesheets(teacher_id)")
+    .eq("id", entryId)
+    .single();
+
+  if (!entry) return { error: "Entry not found." };
+  const ts = entry.timesheets as unknown as { teacher_id: string };
+  if (ts.teacher_id !== tp.id) return { error: "Not your entry." };
+  if (entry.status !== "flagged") return { error: "Entry is not flagged." };
+
+  const now = new Date().toISOString();
+  const userId = (await supabase.auth.getUser()).data.user!.id;
+
+  const { error } = await supabase
+    .from("timesheet_entries")
+    .update({
+      status: "submitted",
+      flag_response: response.trim(),
+      flag_responded_at: now,
+      submitted_at: now,
+    })
+    .eq("id", entryId);
+
+  if (error) {
+    console.error("[timesheets:respondToFlag]", error);
+    return { error: "Failed to submit response." };
+  }
+
+  await supabase.from("timesheet_entry_changes").insert({
+    tenant_id: entry.tenant_id,
+    entry_id: entryId,
+    changed_by: userId,
+    changed_by_name: null,
+    change_type: "flag_responded",
+    note: response.trim(),
+  });
 
   revalidatePath("/teach/timesheets");
   return { success: true };

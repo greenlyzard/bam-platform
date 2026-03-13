@@ -1,6 +1,7 @@
 import { requireRole } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { AddEntryForm, EditEntryRow } from "./entry-form";
+import { FlagResponseForm } from "./flag-response";
 
 export default async function TimesheetsPage() {
   const user = await requireRole("teacher", "admin", "super_admin");
@@ -49,11 +50,13 @@ export default async function TimesheetsPage() {
     ? await supabase
         .from("timesheet_entries")
         .select(
-          "id, date, entry_type, total_hours, description, sub_for, production_id, production_name, event_tag, notes"
+          "id, date, entry_type, total_hours, description, sub_for, production_id, production_name, event_tag, notes, status, flag_question, flag_response, flagged_at, approved_at, adjustment_note"
         )
         .eq("timesheet_id", timesheet.id)
         .order("date", { ascending: false })
     : { data: null };
+
+  const flaggedEntries = (entries ?? []).filter((e) => e.status === "flagged");
 
   const totalHours = (entries ?? []).reduce(
     (sum, e) => sum + (e.total_hours ?? 0),
@@ -122,6 +125,46 @@ export default async function TimesheetsPage() {
         <div className="rounded-lg bg-warning/10 border border-warning/20 px-4 py-3 text-sm text-warning">
           The pay period is locked after the 26th. You can still review and
           submit your timesheet, but entries cannot be added or edited.
+        </div>
+      )}
+
+      {/* Flagged entries needing response */}
+      {flaggedEntries.length > 0 && (
+        <div className="rounded-xl border-2 border-warning/30 bg-warning/5 p-5 space-y-4">
+          <h3 className="font-heading text-lg font-semibold text-charcoal flex items-center gap-2">
+            <span className="text-warning">!</span> Action Needed
+          </h3>
+          <p className="text-sm text-slate">
+            Amanda has questions about the following entries. Please respond below.
+          </p>
+          {flaggedEntries.map((entry) => (
+            <div
+              key={entry.id}
+              className="rounded-lg border border-warning/20 bg-white p-4 space-y-3"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-charcoal">
+                    {entry.description ?? "Entry"} — {entry.total_hours?.toFixed(1)} hrs
+                  </p>
+                  <p className="text-xs text-slate mt-0.5">
+                    {new Date(entry.date + "T12:00:00").toLocaleDateString("en-US", {
+                      weekday: "short",
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </p>
+                </div>
+              </div>
+              <div className="bg-warning/5 rounded-lg px-3 py-2 border-l-2 border-warning">
+                <p className="text-xs text-mist mb-0.5">Amanda&apos;s question:</p>
+                <p className="text-sm text-charcoal italic">
+                  &ldquo;{entry.flag_question}&rdquo;
+                </p>
+              </div>
+              <FlagResponseForm entryId={entry.id} />
+            </div>
+          ))}
         </div>
       )}
 
