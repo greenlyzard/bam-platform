@@ -1,5 +1,7 @@
 import { requireRole } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
+import { AddEntryForm, EditEntryRow } from "./entry-form";
+import { SubmitTimesheetButton } from "./submit-button";
 
 const ENTRY_TYPE_LABELS: Record<string, string> = {
   class_lead: "Class (Lead)",
@@ -18,47 +20,61 @@ export default async function TimesheetsPage() {
   const user = await requireRole("teacher", "admin", "super_admin");
   const supabase = await createClient();
 
-  // Get current month date range
   const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
+  const monthLabel = now.toLocaleString("default", {
+    month: "long",
+    year: "numeric",
+  });
+  const isLocked = now.getDate() > 26;
 
-  const monthLabel = now.toLocaleString("default", { month: "long", year: "numeric" });
-
-  // Fetch timesheet + entries for this teacher via teacher_profiles
-  // First get the teacher_profile for this user
+  // Get teacher_profile
   const { data: teacherProfile } = await supabase
     .from("teacher_profiles")
     .select("id")
     .eq("user_id", user.id)
     .single();
 
-  // Fetch the current month's timesheet
+  // Fetch the current timesheet (any status)
   const { data: timesheet } = teacherProfile
     ? await supabase
         .from("timesheets")
-        .select("id, status, total_hours")
+        .select("id, status, total_hours, submitted_at")
         .eq("teacher_id", teacherProfile.id)
-        .single()
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
     : { data: null };
 
-  // Fetch entries for current month
+  // Fetch entries
   const { data: entries } = timesheet
     ? await supabase
         .from("timesheet_entries")
         .select("id, date, entry_type, total_hours, description")
         .eq("timesheet_id", timesheet.id)
-        .gte("date", startOfMonth)
-        .lte("date", endOfMonth)
         .order("date", { ascending: false })
     : { data: null };
 
-  const totalHours = (entries ?? []).reduce((sum, e) => sum + (e.total_hours ?? 0), 0);
+  const totalHours = (entries ?? []).reduce(
+    (sum, e) => sum + (e.total_hours ?? 0),
+    0
+  );
   const timesheetStatus = timesheet?.status ?? "draft";
+  const isDraft = timesheetStatus === "draft";
+  const canEdit = isDraft && !isLocked;
+
+  const STATUS_BADGES: Record<string, { bg: string; text: string; label: string }> = {
+    draft: { bg: "bg-lavender/10", text: "text-lavender-dark", label: "Draft — not yet submitted" },
+    submitted: { bg: "bg-gold/10", text: "text-gold-dark", label: "Submitted — awaiting review" },
+    approved: { bg: "bg-success/10", text: "text-success", label: "Approved" },
+    rejected: { bg: "bg-error/10", text: "text-error", label: "Returned — needs changes" },
+    exported: { bg: "bg-success/10", text: "text-success", label: "Exported to payroll" },
+  };
+
+  const badge = STATUS_BADGES[timesheetStatus];
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-heading font-semibold text-charcoal">
             My Timesheets
@@ -67,26 +83,28 @@ export default async function TimesheetsPage() {
             {monthLabel} — {totalHours.toFixed(1)} total hours
           </p>
         </div>
-        {timesheet && timesheetStatus === "draft" && entries && entries.length > 0 && (
-          <span className="inline-flex items-center rounded-full bg-lavender/10 px-3 py-1 text-xs font-medium text-lavender-dark">
-            Draft — not yet submitted
-          </span>
-        )}
-        {timesheetStatus === "submitted" && (
-          <span className="inline-flex items-center rounded-full bg-gold/10 px-3 py-1 text-xs font-medium text-gold-dark">
-            Submitted — awaiting review
-          </span>
-        )}
-        {timesheetStatus === "approved" && (
-          <span className="inline-flex items-center rounded-full bg-success/10 px-3 py-1 text-xs font-medium text-success">
-            Approved
-          </span>
-        )}
+        <div className="flex items-center gap-3">
+          {badge && (entries?.length ?? 0) > 0 && (
+            <span
+              className={`inline-flex items-center rounded-full ${badge.bg} px-3 py-1 text-xs font-medium ${badge.text}`}
+            >
+              {badge.label}
+            </span>
+          )}
+        </div>
       </div>
 
+      {isLocked && isDraft && (
+        <div className="rounded-lg bg-warning/10 border border-warning/20 px-4 py-3 text-sm text-warning">
+          The pay period is locked after the 26th. You can still review and
+          submit your timesheet, but entries cannot be added or edited.
+        </div>
+      )}
+
+      {/* Entries table */}
       {(!entries || entries.length === 0) ? (
         <div className="rounded-xl border border-dashed border-silver bg-white p-8 text-center text-sm text-mist">
-          No timesheet entries for {monthLabel}. Hours will appear here as they are logged.
+          No timesheet entries for {monthLabel}. Add your first entry below.
         </div>
       ) : (
         <div className="rounded-xl border border-silver bg-white overflow-hidden">
@@ -94,47 +112,63 @@ export default async function TimesheetsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-silver bg-cloud/50">
-                  <th className="px-4 py-3 text-left font-medium text-slate">Date</th>
-                  <th className="px-4 py-3 text-left font-medium text-slate">Description</th>
-                  <th className="px-4 py-3 text-left font-medium text-slate">Type</th>
-                  <th className="px-4 py-3 text-right font-medium text-slate">Hours</th>
+                  <th className="px-4 py-3 text-left font-medium text-slate">
+                    Date
+                  </th>
+                  <th className="px-4 py-3 text-left font-medium text-slate">
+                    Description
+                  </th>
+                  <th className="px-4 py-3 text-left font-medium text-slate">
+                    Type
+                  </th>
+                  <th className="px-4 py-3 text-right font-medium text-slate">
+                    Hours
+                  </th>
+                  {canEdit && (
+                    <th className="px-4 py-3 text-right font-medium text-slate w-24">
+                      Actions
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-silver">
                 {entries.map((entry) => (
-                  <tr key={entry.id} className="hover:bg-cloud/30 transition-colors">
-                    <td className="px-4 py-3 text-charcoal">
-                      {new Date(entry.date).toLocaleDateString("en-US", {
-                        weekday: "short",
-                        month: "short",
-                        day: "numeric",
-                      })}
-                    </td>
-                    <td className="px-4 py-3 text-charcoal">
-                      {entry.description ?? "—"}
-                    </td>
-                    <td className="px-4 py-3 text-slate">
-                      {ENTRY_TYPE_LABELS[entry.entry_type] ?? entry.entry_type}
-                    </td>
-                    <td className="px-4 py-3 text-right text-charcoal font-medium">
-                      {entry.total_hours?.toFixed(1)}
-                    </td>
-                  </tr>
+                  <EditEntryRow
+                    key={entry.id}
+                    entry={entry}
+                    locked={!canEdit}
+                  />
                 ))}
               </tbody>
               <tfoot>
                 <tr className="border-t border-silver bg-cloud/30">
-                  <td colSpan={3} className="px-4 py-3 text-sm font-medium text-charcoal">
+                  <td
+                    colSpan={canEdit ? 3 : 3}
+                    className="px-4 py-3 text-sm font-medium text-charcoal"
+                  >
                     Total
                   </td>
                   <td className="px-4 py-3 text-right text-sm font-semibold text-charcoal">
                     {totalHours.toFixed(1)}
                   </td>
+                  {canEdit && <td />}
                 </tr>
               </tfoot>
             </table>
           </div>
         </div>
+      )}
+
+      {/* Add entry (only in draft) */}
+      {isDraft && <AddEntryForm locked={isLocked} />}
+
+      {/* Submit button (Part 3) */}
+      {timesheet && isDraft && (entries?.length ?? 0) > 0 && (
+        <SubmitTimesheetButton
+          timesheetId={timesheet.id}
+          totalHours={totalHours}
+          entryCount={entries?.length ?? 0}
+        />
       )}
     </div>
   );
