@@ -12,7 +12,7 @@ const FROM_NAME = "Ballet Academy and Movement";
  *
  * Configure in Supabase Dashboard → Authentication → Hooks → Send Email:
  *   URL:    https://<your-domain>/api/auth/send-email
- *   Secret: SUPABASE_AUTH_HOOK_SECRET (set in env vars)
+ *   Secret: HOOK_SECRET (set in env vars)
  *
  * Supabase calls this instead of its built-in mailer for:
  *   - signup (confirmation email)
@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
   // Verify the hook secret to prevent unauthorized calls.
   // If verification fails, log a warning but still return 200
   // so Supabase auth flow is not blocked for the end user.
-  const hookSecret = process.env.SUPABASE_AUTH_HOOK_SECRET;
+  const hookSecret = process.env.HOOK_SECRET;
   if (hookSecret) {
     const authHeader = req.headers.get("authorization");
     if (authHeader?.trim() !== `Bearer ${hookSecret?.trim()}`) {
