@@ -35,6 +35,7 @@ const navGroups: NavGroup[] = [
     label: "Staff",
     items: [
       { label: "Teachers", href: "/admin/teachers", icon: "★" },
+      { label: "Timesheets", href: "/admin/timesheets", icon: "▤" },
       { label: "Compliance", href: "/admin/compliance", icon: "◆" },
       { label: "Substitute Requests", href: "/admin/substitute-requests", icon: "↻" },
     ],
@@ -68,6 +69,7 @@ const navGroups: NavGroup[] = [
     items: [
       { label: "Angelina Chat", href: "/admin/chat", icon: "◈" },
       { label: "Conversations", href: "/admin/angelina", icon: "◇" },
+      { label: "Knowledge Base", href: "/admin/knowledge-base", icon: "◆" },
     ],
   },
   {
