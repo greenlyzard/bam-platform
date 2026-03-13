@@ -60,6 +60,9 @@ export async function GET(request: NextRequest) {
         const roleHome: Record<string, string> = {
           super_admin: "/admin/dashboard",
           admin: "/admin/dashboard",
+          studio_admin: "/admin/dashboard",
+          finance_admin: "/admin/dashboard",
+          studio_manager: "/admin/dashboard",
           front_desk: "/admin/dashboard",
           teacher: "/teach/dashboard",
           parent: "/portal/dashboard",
