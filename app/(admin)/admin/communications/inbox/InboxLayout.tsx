@@ -342,6 +342,13 @@ export function InboxLayout({
             onUpdate={updateThread}
             onReply={sendReply}
             onBack={() => setMobilePanel("list")}
+            onRefreshMessages={async () => {
+              const res = await fetch(`/api/communications/threads/${selectedThread.id}`);
+              if (res.ok) {
+                const data = await res.json();
+                setMessages(data.messages);
+              }
+            }}
           />
         ) : (
           <div className="flex-1 flex items-center justify-center">
@@ -459,6 +466,7 @@ function ThreadDetail({
   onUpdate: (id: string, updates: Record<string, unknown>) => void;
   onReply: (bodyHtml: string) => void;
   onBack: () => void;
+  onRefreshMessages?: () => void;
 }) {
   const [replyText, setReplyText] = useState("");
   const [sending, setSending] = useState(false);
@@ -589,6 +597,8 @@ function ThreadDetail({
             key={msg.id}
             message={msg}
             isOwn={msg.sender_id === currentUser.id}
+            isAdmin={isAdmin}
+            onMatched={onRefreshMessages}
           />
         ))}
       </div>
@@ -621,9 +631,13 @@ function ThreadDetail({
 function MessageBubble({
   message,
   isOwn,
+  isAdmin,
+  onMatched,
 }: {
   message: Message;
   isOwn: boolean;
+  isAdmin?: boolean;
+  onMatched?: () => void;
 }) {
   const isSystem = message.direction === "system";
   const isInbound = message.direction === "inbound";
@@ -677,6 +691,139 @@ function MessageBubble({
           {message.body_text}
         </p>
       ) : null}
+
+      {/* Unmatched message banner */}
+      {isAdmin && isInbound && !message.matched && (
+        <MatchBanner messageId={message.id} senderName={message.sender_name} senderEmail={message.sender_email} onMatched={onMatched} />
+      )}
+    </div>
+  );
+}
+
+// ── Match Banner ─────────────────────────────────────────────
+
+function MatchBanner({
+  messageId,
+  senderName,
+  senderEmail,
+  onMatched,
+}: {
+  messageId: string;
+  senderName: string | null;
+  senderEmail: string | null;
+  onMatched?: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<{ id: string; name: string; email: string; type: string }[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  async function search(q: string) {
+    setQuery(q);
+    if (q.length < 2) {
+      setResults([]);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/communications/contacts/search?q=${encodeURIComponent(q)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setResults(data.contacts ?? []);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  async function matchTo(contact: { id: string; type: string }) {
+    setSaving(true);
+    const payload: Record<string, unknown> = {};
+    if (contact.type === "family") payload.family_id = contact.id;
+    if (contact.type === "lead") payload.lead_id = contact.id;
+    if (contact.type === "staff") payload.staff_user_id = contact.id;
+
+    await fetch(`/api/communications/messages/${messageId}/match`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    setSaving(false);
+    onMatched?.();
+  }
+
+  async function createLead() {
+    setSaving(true);
+    await fetch(`/api/communications/messages/${messageId}/match`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        create_lead: true,
+        sender_name: senderName,
+        sender_email: senderEmail,
+      }),
+    });
+    setSaving(false);
+    onMatched?.();
+  }
+
+  if (!expanded) {
+    return (
+      <div className="ml-8 mt-2">
+        <button
+          onClick={() => setExpanded(true)}
+          className="text-xs text-warning hover:text-warning/80 bg-warning/10 rounded px-2 py-1"
+        >
+          ⚠ Unmatched sender — click to link to a contact
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="ml-8 mt-2 rounded-lg border border-warning/30 bg-warning/5 p-3 space-y-2">
+      <p className="text-xs font-medium text-charcoal">
+        Link this sender to a contact:
+      </p>
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => search(e.target.value)}
+        placeholder="Search families, leads, staff..."
+        className="w-full rounded border border-silver px-2 py-1.5 text-xs focus:border-lavender focus:outline-none"
+      />
+      {results.length > 0 && (
+        <div className="max-h-32 overflow-y-auto divide-y divide-silver/50">
+          {results.map((r) => (
+            <button
+              key={`${r.type}-${r.id}`}
+              onClick={() => matchTo(r)}
+              disabled={saving}
+              className="flex w-full items-center gap-2 px-2 py-1.5 text-left hover:bg-cloud/50 text-xs disabled:opacity-50"
+            >
+              <span className="font-medium text-charcoal">{r.name}</span>
+              <span className="text-mist">{r.email}</span>
+              <span className="ml-auto rounded bg-cloud px-1.5 py-0.5 text-[10px] uppercase text-mist">
+                {r.type}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-2">
+        <button
+          onClick={createLead}
+          disabled={saving}
+          className="text-xs text-lavender hover:text-lavender-dark disabled:opacity-50"
+        >
+          + Create as new lead
+        </button>
+        <button
+          onClick={() => setExpanded(false)}
+          className="text-xs text-mist hover:text-slate ml-auto"
+        >
+          Cancel
+        </button>
+      </div>
     </div>
   );
 }
