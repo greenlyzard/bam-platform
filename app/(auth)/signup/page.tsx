@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { SignupForm } from "./signup-form";
 
 export default function SignupPage() {
@@ -6,6 +7,13 @@ export default function SignupPage() {
       <div className="w-full max-w-sm space-y-8">
         {/* Header */}
         <div className="text-center">
+          <Image
+            src="/images/studio-logo.png"
+            alt="Ballet Academy and Movement"
+            width={80}
+            height={80}
+            className="mx-auto mb-4"
+          />
           <h1 className="text-3xl font-heading font-semibold text-charcoal">
             Join Our Studio
           </h1>
