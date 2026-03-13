@@ -73,3 +73,121 @@ This platform must:
 - **Email:** dance@bamsocal.com
 - **Repo:** github.com/greenlyzard/bam-platform
 - **Production URL:** portal.balletacademyandmovement.com
+
+- ## Migration Rules (MANDATORY)
+
+These rules apply to every migration file written in this project. Violations cause deployment failures and require manual nano edits in production. Follow them without exception.
+
+### 1. No Forward Foreign Key References
+
+**Never** add a `REFERENCES` constraint to a table that may not exist yet in the migration sequence. This includes but is not limited to:
+
+- `families`
+- `students`
+- `profiles`
+- `user_profiles`
+- `classes`
+- `teachers`
+- `productions`
+- `enrollments`
+
+**Wrong:**
+```sql
+family_id UUID REFERENCES families(id) ON DELETE SET NULL,
+student_id UUID REFERENCES students(id),
+```
+
+**Correct:**
+```sql
+family_id UUID,
+student_id UUID,
+```
+
+FK constraints will be added in a dedicated later migration once all referenced tables are confirmed to exist in the remote database.
+
+### 2. Always Use `IF NOT EXISTS`
+
+All `CREATE TABLE` statements must use `IF NOT EXISTS`. All `CREATE INDEX` statements must use `IF NOT EXISTS`. All `ALTER TABLE ADD COLUMN` statements must use `IF NOT EXISTS`.
+
+**Wrong:**
+```sql
+CREATE TABLE enrollments (...);
+CREATE INDEX idx_enrollments_family ON enrollments(family_id);
+```
+
+**Correct:**
+```sql
+CREATE TABLE IF NOT EXISTS enrollments (...);
+CREATE INDEX IF NOT EXISTS idx_enrollments_family ON enrollments(family_id);
+```
+
+### 3. No Assumptions About Table Order
+
+Do not assume that tables created in earlier migrations exist on the remote database. The remote DB may be behind by multiple migrations. Every migration must be self-contained and safe to run regardless of current remote state.
+
+### 4. Check Before Adding Columns
+
+When using `ALTER TABLE ADD COLUMN`, always use `IF NOT EXISTS`:
+
+```sql
+ALTER TABLE timesheet_entries
+ADD COLUMN IF NOT EXISTS production_id UUID,
+ADD COLUMN IF NOT EXISTS event_tag TEXT;
+```
+
+### 5. Supabase DB Push Runs in a Separate Terminal
+
+The Supabase CLI browser-based login cannot complete inside Claude Code. Never attempt to run `npx supabase db push` inside a Claude Code session. Always remind Derek to run it in a separate normal terminal window:
+
+```bash
+cd /Users/derekshaw/bam-platform
+npx supabase db push
+```
+
+### 6. Migration Filename Format
+
+Always use the format:
+```
+supabase/migrations/YYYYMMDDHHMMSS_description.sql
+```
+
+Use the current timestamp at the time of writing. Never reuse or duplicate timestamps.
+
+---
+
+## Environment Variables
+
+The following env vars are required in both `.env.local` and Vercel. Never hardcode these values in source code.
+
+| Variable | Purpose |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role (server only) |
+| `SUPABASE_AUTH_HOOK_SECRET` | Auth hook verification |
+| `RESEND_API_KEY` | Transactional email |
+| `RESEND_FROM_EMAIL` | Sender address |
+| `ANTHROPIC_API_KEY` | Angelina chatbot |
+| `STRIPE_SECRET_KEY` | Stripe payments (server only) |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe (client) |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook verification |
+| `PAYMENT_ENCRYPTION_KEY` | Tenant payment config encryption (add when building TENANT_PAYMENT_CONFIG) |
+| `DEFAULT_TENANT_ID` | BAM tenant UUID |
+| `NEXT_PUBLIC_APP_URL` | Full production URL |
+| `DATABASE_URL` | Direct DB connection for migrations |
+
+Never commit `.env.local` to git. Never log secret keys. Never expose `SUPABASE_SERVICE_ROLE_KEY` or `STRIPE_SECRET_KEY` to client-side code.
+
+---
+
+## Build Verification
+
+After every Claude Code session, run before final push:
+
+```bash
+npx tsc --noEmit 2>&1 | head -20
+npx next build 2>&1 | tail -30
+```
+
+Fix all TypeScript errors before committing. A passing build is required before `git push origin main`.
+
