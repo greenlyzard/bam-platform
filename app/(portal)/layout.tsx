@@ -1,10 +1,11 @@
 import Image from "next/image";
-import { SignOutButton } from "@/components/layouts/sign-out-button";
 import { PortalNav } from "@/components/layouts/portal-nav";
+import { PortalUserMenu } from "@/components/layouts/portal-user-menu";
 import { AngelinaChat } from "@/components/angelina/AngelinaChat";
 import { RoleProvider } from "@/context/RoleContext";
 import { requireRole } from "@/lib/auth/requireRole";
 import { getStudioSettings } from "@/lib/queries/studio-settings";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function PortalLayout({
   children,
@@ -17,6 +18,14 @@ export default async function PortalLayout({
   ]);
   const { role, full_name } = session.profile;
   const studioName = settings?.studio_name ?? "Ballet Academy & Movement";
+
+  // Fetch avatar_url for the user menu
+  const supabase = await createClient();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("avatar_url")
+    .eq("id", session.user.id)
+    .single();
 
   return (
     <RoleProvider role={role} fullName={full_name}>
@@ -40,10 +49,11 @@ export default async function PortalLayout({
               <span className="hidden sm:block text-sm text-slate">
                 {full_name ?? session.user.email}
               </span>
-              <SignOutButton />
-              <div className="h-8 w-8 rounded-full bg-lavender-light flex items-center justify-center text-xs font-semibold text-lavender-dark">
-                {full_name?.[0] ?? session.user.email[0]?.toUpperCase() ?? "?"}
-              </div>
+              <PortalUserMenu
+                fullName={full_name}
+                email={session.user.email}
+                avatarUrl={profile?.avatar_url ?? null}
+              />
             </div>
           </div>
         </header>

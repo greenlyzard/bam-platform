@@ -9,6 +9,7 @@ const navItems = [
   { label: "Enrollment", href: "/portal/enrollment", icon: "◈" },
   { label: "Billing", href: "/portal/billing", icon: "✦" },
   { label: "Chat (Angelina)", href: "/portal/chat", icon: "◇" },
+  { label: "Settings", href: "/portal/settings", icon: "◎" },
 ];
 
 const mobileItems = [
