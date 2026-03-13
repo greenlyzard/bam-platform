@@ -1,7 +1,7 @@
 import { requireRole } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { AddEntryForm, EditEntryRow } from "./entry-form";
-import { SubmitTimesheetButton } from "./submit-button";
+// SubmitTimesheetButton kept for inline quick-submit; summary page is primary flow
 
 const ENTRY_TYPE_LABELS: Record<string, string> = {
   class_lead: "Class (Lead)",
@@ -162,13 +162,28 @@ export default async function TimesheetsPage() {
       {/* Add entry (only in draft) */}
       {isDraft && <AddEntryForm locked={isLocked} />}
 
-      {/* Submit button (Part 3) */}
+      {/* Submit flow */}
       {timesheet && isDraft && (entries?.length ?? 0) > 0 && (
-        <SubmitTimesheetButton
-          timesheetId={timesheet.id}
-          totalHours={totalHours}
-          entryCount={entries?.length ?? 0}
-        />
+        <div className="rounded-xl border border-silver bg-white p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-heading text-lg font-semibold text-charcoal">
+                Ready to submit?
+              </h3>
+              <p className="text-sm text-slate mt-1">
+                {entries?.length ?? 0}{" "}
+                {(entries?.length ?? 0) === 1 ? "entry" : "entries"} ·{" "}
+                {totalHours.toFixed(1)} hours total
+              </p>
+            </div>
+            <a
+              href="/teach/timesheets/summary"
+              className="inline-flex items-center h-11 rounded-lg bg-lavender hover:bg-lavender-dark text-white font-semibold text-sm px-6 transition-colors"
+            >
+              Review &amp; Submit
+            </a>
+          </div>
+        </div>
       )}
     </div>
   );
