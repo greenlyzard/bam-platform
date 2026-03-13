@@ -7,6 +7,7 @@ import {
   getFamilyEnrollments,
 } from "@/lib/queries/families";
 import { FamilyForm } from "./family-form";
+import { CommunicationsTab } from "@/components/communications/CommunicationsTab";
 import Link from "next/link";
 
 export async function generateMetadata({
@@ -58,6 +59,8 @@ export default async function FamilyDetailPage({
         contacts={contacts}
         enrollments={enrollments as never[]}
       />
+
+      <CommunicationsTab familyId={id} />
     </div>
   );
 }
