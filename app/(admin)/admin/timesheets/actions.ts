@@ -11,30 +11,64 @@ async function requireFinanceAdmin() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { supabase, user: null, error: "Unauthorized" };
+  if (!user) return { supabase, user: null, profile: null, error: "Unauthorized" };
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, first_name, last_name")
     .eq("id", user.id)
     .single();
 
   if (!profile || !ALLOWED_ROLES.includes(profile.role)) {
-    return { supabase, user: null, error: "Finance Admin required" };
+    return { supabase, user: null, profile: null, error: "Finance Admin required" };
   }
 
-  return { supabase, user, error: null };
+  return { supabase, user, profile, error: null };
 }
 
+function getAdminName(profile: { first_name: string | null; last_name: string | null } | null): string {
+  if (!profile) return "Admin";
+  return [profile.first_name, profile.last_name].filter(Boolean).join(" ") || "Admin";
+}
+
+async function logChange(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  opts: {
+    tenantId: string;
+    entryId: string;
+    changedBy: string;
+    changedByName: string;
+    changeType: string;
+    fieldChanged?: string;
+    oldValue?: string;
+    newValue?: string;
+    note?: string;
+  }
+) {
+  await supabase.from("timesheet_entry_changes").insert({
+    tenant_id: opts.tenantId,
+    entry_id: opts.entryId,
+    changed_by: opts.changedBy,
+    changed_by_name: opts.changedByName,
+    change_type: opts.changeType,
+    field_changed: opts.fieldChanged || null,
+    old_value: opts.oldValue || null,
+    new_value: opts.newValue || null,
+    note: opts.note || null,
+  });
+}
+
+// ── Timesheet-level actions ─────────────────────────────────
+
 export async function approveTimesheet(formData: FormData) {
-  const { supabase, user, error: authError } = await requireFinanceAdmin();
+  const { supabase, user, profile, error: authError } = await requireFinanceAdmin();
   if (authError || !user) return { error: authError ?? "Unauthorized" };
 
   const timesheetId = formData.get("timesheetId") as string;
 
   const { data: ts } = await supabase
     .from("timesheets")
-    .select("id, status")
+    .select("id, status, tenant_id")
     .eq("id", timesheetId)
     .single();
 
@@ -55,6 +89,32 @@ export async function approveTimesheet(formData: FormData) {
   if (error) {
     console.error("[admin:approveTimesheet]", error);
     return { error: "Failed to approve." };
+  }
+
+  // Also approve all entries in this timesheet
+  const { data: entries } = await supabase
+    .from("timesheet_entries")
+    .select("id")
+    .eq("timesheet_id", timesheetId);
+
+  const adminName = getAdminName(profile);
+  for (const entry of entries ?? []) {
+    await supabase
+      .from("timesheet_entries")
+      .update({
+        status: "approved",
+        approved_at: new Date().toISOString(),
+        approved_by: user.id,
+      })
+      .eq("id", entry.id);
+
+    await logChange(supabase, {
+      tenantId: ts.tenant_id,
+      entryId: entry.id,
+      changedBy: user.id,
+      changedByName: adminName,
+      changeType: "approved",
+    });
   }
 
   revalidatePath("/admin/timesheets");
@@ -95,8 +155,237 @@ export async function returnTimesheet(formData: FormData) {
     return { error: "Failed to return timesheet." };
   }
 
+  // Reset entry statuses back to draft
+  await supabase
+    .from("timesheet_entries")
+    .update({ status: "draft", submitted_at: null })
+    .eq("timesheet_id", timesheetId);
+
   revalidatePath("/admin/timesheets");
   return { success: true };
+}
+
+// ── Entry-level approval actions ────────────────────────────
+
+export async function approveTimesheetEntry(formData: FormData) {
+  const { supabase, user, profile, error: authError } = await requireFinanceAdmin();
+  if (authError || !user) return { error: authError ?? "Unauthorized" };
+
+  const entryId = formData.get("entryId") as string;
+  if (!entryId) return { error: "Entry ID required." };
+
+  const { data: entry } = await supabase
+    .from("timesheet_entries")
+    .select("id, tenant_id, status")
+    .eq("id", entryId)
+    .single();
+
+  if (!entry) return { error: "Entry not found." };
+
+  const { error } = await supabase
+    .from("timesheet_entries")
+    .update({
+      status: "approved",
+      approved_at: new Date().toISOString(),
+      approved_by: user.id,
+    })
+    .eq("id", entryId);
+
+  if (error) {
+    console.error("[admin:approveEntry]", error);
+    return { error: "Failed to approve entry." };
+  }
+
+  await logChange(supabase, {
+    tenantId: entry.tenant_id,
+    entryId,
+    changedBy: user.id,
+    changedByName: getAdminName(profile),
+    changeType: "approved",
+  });
+
+  revalidatePath("/admin/timesheets");
+  return { success: true };
+}
+
+export async function flagTimesheetEntry(formData: FormData) {
+  const { supabase, user, profile, error: authError } = await requireFinanceAdmin();
+  if (authError || !user) return { error: authError ?? "Unauthorized" };
+
+  const entryId = formData.get("entryId") as string;
+  const question = formData.get("question") as string;
+  if (!entryId || !question?.trim()) return { error: "Entry ID and question required." };
+
+  const { data: entry } = await supabase
+    .from("timesheet_entries")
+    .select("id, tenant_id")
+    .eq("id", entryId)
+    .single();
+
+  if (!entry) return { error: "Entry not found." };
+
+  const { error } = await supabase
+    .from("timesheet_entries")
+    .update({
+      status: "flagged",
+      flagged_at: new Date().toISOString(),
+      flagged_by: user.id,
+      flag_question: question.trim(),
+    })
+    .eq("id", entryId);
+
+  if (error) {
+    console.error("[admin:flagEntry]", error);
+    return { error: "Failed to flag entry." };
+  }
+
+  await logChange(supabase, {
+    tenantId: entry.tenant_id,
+    entryId,
+    changedBy: user.id,
+    changedByName: getAdminName(profile),
+    changeType: "flagged",
+    note: question.trim(),
+  });
+
+  revalidatePath("/admin/timesheets");
+  return { success: true };
+}
+
+export async function adjustTimesheetEntry(formData: FormData) {
+  const { supabase, user, profile, error: authError } = await requireFinanceAdmin();
+  if (authError || !user) return { error: authError ?? "Unauthorized" };
+
+  const entryId = formData.get("entryId") as string;
+  const adjustmentNote = formData.get("adjustmentNote") as string;
+  if (!entryId) return { error: "Entry ID required." };
+  if (!adjustmentNote?.trim()) return { error: "Adjustment note is required." };
+
+  // Get old values for change log
+  const { data: oldEntry } = await supabase
+    .from("timesheet_entries")
+    .select("id, tenant_id, total_hours, entry_type, description, date")
+    .eq("id", entryId)
+    .single();
+
+  if (!oldEntry) return { error: "Entry not found." };
+
+  const parsed = adminEntrySchema.omit({ teacherProfileId: true }).safeParse({
+    date: formData.get("date"),
+    category: formData.get("category"),
+    totalHours: parseFloat(formData.get("totalHours") as string),
+    description: formData.get("description") || undefined,
+    subFor: formData.get("subFor") || undefined,
+    productionId: formData.get("productionId") || undefined,
+    productionName: formData.get("productionName") || undefined,
+    eventTag: formData.get("eventTag") || undefined,
+    notes: formData.get("notes") || undefined,
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  const d = parsed.data;
+  const newHours = d.totalHours;
+
+  const { error } = await supabase
+    .from("timesheet_entries")
+    .update({
+      entry_type: CATEGORY_TO_ENTRY_TYPE[d.category] ?? "admin",
+      date: d.date,
+      total_hours: newHours,
+      description: d.description || null,
+      sub_for: d.subFor || null,
+      production_id: d.productionId || null,
+      production_name: d.productionName || null,
+      event_tag: d.eventTag || null,
+      notes: d.notes || null,
+      status: "adjusted",
+      adjusted_by: user.id,
+      adjustment_note: adjustmentNote.trim(),
+    })
+    .eq("id", entryId);
+
+  if (error) {
+    console.error("[admin:adjustEntry]", error);
+    return { error: "Failed to adjust entry." };
+  }
+
+  const adminName = getAdminName(profile);
+
+  // Log hours change
+  if (oldEntry.total_hours !== newHours) {
+    await logChange(supabase, {
+      tenantId: oldEntry.tenant_id,
+      entryId,
+      changedBy: user.id,
+      changedByName: adminName,
+      changeType: "adjusted",
+      fieldChanged: "hours",
+      oldValue: String(oldEntry.total_hours),
+      newValue: String(newHours),
+      note: adjustmentNote.trim(),
+    });
+  } else {
+    await logChange(supabase, {
+      tenantId: oldEntry.tenant_id,
+      entryId,
+      changedBy: user.id,
+      changedByName: adminName,
+      changeType: "adjusted",
+      note: adjustmentNote.trim(),
+    });
+  }
+
+  revalidatePath("/admin/timesheets");
+  return { success: true };
+}
+
+// ── Mark entries as paid ────────────────────────────────────
+
+export async function markEntriesAsPaid(formData: FormData) {
+  const { supabase, user, profile, error: authError } = await requireFinanceAdmin();
+  if (authError || !user) return { error: authError ?? "Unauthorized" };
+
+  const dateFrom = formData.get("dateFrom") as string;
+  const dateTo = formData.get("dateTo") as string;
+  if (!dateFrom || !dateTo) return { error: "Date range required." };
+
+  const { data: entries, error: fetchErr } = await supabase
+    .from("timesheet_entries")
+    .select("id, tenant_id")
+    .eq("status", "approved")
+    .gte("date", dateFrom)
+    .lte("date", dateTo)
+    .is("paid_at", null);
+
+  if (fetchErr) {
+    console.error("[admin:markPaid]", fetchErr);
+    return { error: "Failed to fetch entries." };
+  }
+
+  const now = new Date().toISOString();
+  const adminName = getAdminName(profile);
+
+  for (const entry of entries ?? []) {
+    await supabase
+      .from("timesheet_entries")
+      .update({ status: "paid", paid_at: now })
+      .eq("id", entry.id);
+
+    await logChange(supabase, {
+      tenantId: entry.tenant_id,
+      entryId: entry.id,
+      changedBy: user.id,
+      changedByName: adminName,
+      changeType: "paid",
+    });
+  }
+
+  revalidatePath("/admin/timesheets");
+  revalidatePath("/admin/timesheets/payroll");
+  return { success: true, count: (entries ?? []).length };
 }
 
 // ── Admin Entry CRUD ──────────────────────────────────────────
@@ -182,7 +471,7 @@ async function getOrCreateTimesheetForTeacher(
 }
 
 export async function adminAddEntry(formData: FormData) {
-  const { supabase, user, error: authError } = await requireFinanceAdmin();
+  const { supabase, user, profile, error: authError } = await requireFinanceAdmin();
   if (authError || !user) return { error: authError ?? "Unauthorized" };
 
   const parsed = adminEntrySchema.safeParse({
@@ -215,32 +504,46 @@ export async function adminAddEntry(formData: FormData) {
   const timesheet = await getOrCreateTimesheetForTeacher(supabase, tp.id, tp.tenant_id);
   if (!timesheet) return { error: "Could not create timesheet." };
 
-  const { error } = await supabase.from("timesheet_entries").insert({
-    tenant_id: tp.tenant_id,
-    timesheet_id: timesheet.id,
-    entry_type: CATEGORY_TO_ENTRY_TYPE[d.category] ?? "admin",
-    date: d.date,
-    total_hours: d.totalHours,
-    description: d.description || null,
-    sub_for: d.subFor || null,
-    production_id: d.productionId || null,
-    production_name: d.productionName || null,
-    event_tag: d.eventTag || null,
-    notes: d.notes || null,
-  });
+  const { data: newEntry, error } = await supabase
+    .from("timesheet_entries")
+    .insert({
+      tenant_id: tp.tenant_id,
+      timesheet_id: timesheet.id,
+      entry_type: CATEGORY_TO_ENTRY_TYPE[d.category] ?? "admin",
+      date: d.date,
+      total_hours: d.totalHours,
+      description: d.description || null,
+      sub_for: d.subFor || null,
+      production_id: d.productionId || null,
+      production_name: d.productionName || null,
+      event_tag: d.eventTag || null,
+      notes: d.notes || null,
+      status: "draft",
+    })
+    .select("id")
+    .single();
 
-  if (error) {
+  if (error || !newEntry) {
     console.error("[admin:addEntry]", error);
     return { error: "Failed to add entry." };
   }
+
+  await logChange(supabase, {
+    tenantId: tp.tenant_id,
+    entryId: newEntry.id,
+    changedBy: user.id,
+    changedByName: getAdminName(profile),
+    changeType: "created",
+    note: `${d.totalHours} hrs ${d.category}`,
+  });
 
   revalidatePath("/admin/timesheets");
   return { success: true };
 }
 
 export async function adminUpdateEntry(formData: FormData) {
-  const { supabase, error: authError } = await requireFinanceAdmin();
-  if (authError) return { error: authError };
+  const { supabase, user, profile, error: authError } = await requireFinanceAdmin();
+  if (authError || !user) return { error: authError ?? "Unauthorized" };
 
   const entryId = formData.get("entryId") as string;
   if (!entryId) return { error: "Entry ID required." };
@@ -263,6 +566,13 @@ export async function adminUpdateEntry(formData: FormData) {
 
   const d = parsed.data;
 
+  // Get old values for change log
+  const { data: oldEntry } = await supabase
+    .from("timesheet_entries")
+    .select("id, tenant_id, total_hours")
+    .eq("id", entryId)
+    .single();
+
   const { error } = await supabase
     .from("timesheet_entries")
     .update({
@@ -283,16 +593,45 @@ export async function adminUpdateEntry(formData: FormData) {
     return { error: "Failed to update entry." };
   }
 
+  if (oldEntry && oldEntry.total_hours !== d.totalHours) {
+    await logChange(supabase, {
+      tenantId: oldEntry.tenant_id,
+      entryId,
+      changedBy: user.id,
+      changedByName: getAdminName(profile),
+      changeType: "edited",
+      fieldChanged: "hours",
+      oldValue: String(oldEntry.total_hours),
+      newValue: String(d.totalHours),
+    });
+  }
+
   revalidatePath("/admin/timesheets");
   return { success: true };
 }
 
 export async function adminDeleteEntry(formData: FormData) {
-  const { supabase, error: authError } = await requireFinanceAdmin();
-  if (authError) return { error: authError };
+  const { supabase, user, profile, error: authError } = await requireFinanceAdmin();
+  if (authError || !user) return { error: authError ?? "Unauthorized" };
 
   const entryId = formData.get("entryId") as string;
   if (!entryId) return { error: "Entry ID required." };
+
+  const { data: entry } = await supabase
+    .from("timesheet_entries")
+    .select("id, tenant_id")
+    .eq("id", entryId)
+    .single();
+
+  if (entry) {
+    await logChange(supabase, {
+      tenantId: entry.tenant_id,
+      entryId,
+      changedBy: user.id,
+      changedByName: getAdminName(profile),
+      changeType: "deleted",
+    });
+  }
 
   const { error } = await supabase
     .from("timesheet_entries")
