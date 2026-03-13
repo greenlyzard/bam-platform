@@ -327,6 +327,10 @@ Full competitive analysis: `docs/marketing/competitive-intelligence.md`
 | GitHub repo structure | ✅ Done | github.com/greenlyzard/bam-platform |
 | CLAUDE.md | ✅ Done | `CLAUDE.md` |
 | README.md | ✅ Done | `README.md` |
+| Registration & Onboarding spec | ✅ Done | `docs/REGISTRATION_AND_ONBOARDING.md` |
+| Billing engine spec | ✅ Done | `docs/BILLING.md` |
+| Marketing integrations spec | ✅ Done | `docs/MARKETING_INTEGRATIONS.md` |
+| Scheduling & LMS spec (canonical — replaces prior version) | ✅ Done | `docs/SCHEDULING_AND_LMS.md` |
 
 ---
 
