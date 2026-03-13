@@ -6,7 +6,7 @@ import {
   dismissTask,
   setCancellationPayDecision,
 } from "@/lib/schedule/actions";
-import type { AdminTask } from "@/lib/schedule/queries";
+import type { AdminTask } from "@/lib/schedule/types";
 
 export function TaskActions({ task }: { task: AdminTask }) {
   return (

@@ -2,8 +2,8 @@
 
 import { useState, useTransition, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import type { ClassSession } from "@/lib/schedule/queries";
-import { CLASS_TYPE_BG, CLASS_TYPE_COLORS } from "@/lib/schedule/queries";
+import type { ClassSession } from "@/lib/schedule/types";
+import { CLASS_TYPE_BG, CLASS_TYPE_COLORS } from "@/lib/schedule/types";
 import { cancelSession, setCancellationPayDecision, createPayDecisionTask } from "@/lib/schedule/actions";
 import Link from "next/link";
 
