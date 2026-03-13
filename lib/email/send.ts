@@ -8,11 +8,13 @@ import { renderEmailHtml } from "./layout";
  * @param slug - Template slug (e.g., 'welcome', 'class_reminder')
  * @param to - Recipient email address
  * @param variables - Key-value pairs to replace {{variable}} placeholders
+ * @param options - Optional overrides (threadToken for reply-to threading)
  */
 export async function sendEmail(
   slug: string,
   to: string,
-  variables: Record<string, string> = {}
+  variables: Record<string, string> = {},
+  options?: { threadToken?: string }
 ): Promise<{ success: boolean; error?: string }> {
   if (!process.env.RESEND_API_KEY) {
     return { success: false, error: "RESEND_API_KEY is not configured" };
@@ -62,17 +64,76 @@ export async function sendEmail(
     footerText: template.footer_text,
   });
 
+  // Build reply-to: thread token takes priority over template default
+  let replyTo = template.reply_to || undefined;
+  if (options?.threadToken) {
+    replyTo = `reply+${options.threadToken}@mail.balletacademyandmovement.com`;
+  }
+
   // Send via Resend
   const { error: sendError } = await resend.emails.send({
     from: `${template.from_name} <${template.from_email}>`,
     to,
-    replyTo: template.reply_to || undefined,
+    replyTo,
     subject,
     html,
   });
 
   if (sendError) {
     console.error("[email:send] Resend error:", sendError);
+    return { success: false, error: sendError.message };
+  }
+
+  return { success: true };
+}
+
+/**
+ * Send a raw branded email (not template-based).
+ * Used by the communications inbox for direct replies.
+ */
+export async function sendRawEmail({
+  to,
+  subject,
+  bodyHtml,
+  threadToken,
+  fromName,
+  fromEmail,
+}: {
+  to: string;
+  subject: string;
+  bodyHtml: string;
+  threadToken?: string;
+  fromName?: string;
+  fromEmail?: string;
+}): Promise<{ success: boolean; error?: string }> {
+  if (!process.env.RESEND_API_KEY) {
+    return { success: false, error: "RESEND_API_KEY is not configured" };
+  }
+
+  const resend = new Resend(process.env.RESEND_API_KEY);
+  const senderName = fromName ?? "Ballet Academy and Movement";
+  const senderEmail =
+    fromEmail ?? process.env.RESEND_FROM_EMAIL ?? "hello@balletacademyandmovement.com";
+
+  const html = renderEmailHtml({
+    bodyHtml,
+    footerText: null,
+  });
+
+  const replyTo = threadToken
+    ? `reply+${threadToken}@mail.balletacademyandmovement.com`
+    : undefined;
+
+  const { error: sendError } = await resend.emails.send({
+    from: `${senderName} <${senderEmail}>`,
+    to,
+    replyTo,
+    subject,
+    html,
+  });
+
+  if (sendError) {
+    console.error("[email:sendRaw] Resend error:", sendError);
     return { success: false, error: sendError.message };
   }
 
