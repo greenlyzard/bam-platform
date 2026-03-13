@@ -1,20 +1,6 @@
 import { requireRole } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { AddEntryForm, EditEntryRow } from "./entry-form";
-// SubmitTimesheetButton kept for inline quick-submit; summary page is primary flow
-
-const ENTRY_TYPE_LABELS: Record<string, string> = {
-  class_lead: "Class (Lead)",
-  class_assistant: "Class (Assistant)",
-  private: "Private Lesson",
-  rehearsal: "Rehearsal",
-  performance_event: "Performance Event",
-  competition: "Competition",
-  training: "Training",
-  admin: "Administrative",
-  substitute: "Substitute",
-  bonus: "Bonus",
-};
 
 export default async function TimesheetsPage() {
   const user = await requireRole("teacher", "admin", "super_admin");
@@ -30,9 +16,22 @@ export default async function TimesheetsPage() {
   // Get teacher_profile
   const { data: teacherProfile } = await supabase
     .from("teacher_profiles")
-    .select("id")
+    .select("id, employment_type")
     .eq("user_id", user.id)
     .single();
+
+  const employmentType = teacherProfile?.employment_type ?? "w2";
+
+  // Fetch productions for dropdown
+  const { data: productionRows } = await supabase
+    .from("productions")
+    .select("id, name")
+    .order("name");
+
+  const productions = (productionRows ?? []).map((p) => ({
+    id: p.id,
+    name: p.name,
+  }));
 
   // Fetch the current timesheet (any status)
   const { data: timesheet } = teacherProfile
@@ -45,11 +44,13 @@ export default async function TimesheetsPage() {
         .maybeSingle()
     : { data: null };
 
-  // Fetch entries
+  // Fetch entries with new fields
   const { data: entries } = timesheet
     ? await supabase
         .from("timesheet_entries")
-        .select("id, date, entry_type, total_hours, description")
+        .select(
+          "id, date, entry_type, total_hours, description, sub_for, production_id, production_name, event_tag, notes"
+        )
         .eq("timesheet_id", timesheet.id)
         .order("date", { ascending: false })
     : { data: null };
@@ -62,12 +63,35 @@ export default async function TimesheetsPage() {
   const isDraft = timesheetStatus === "draft";
   const canEdit = isDraft && !isLocked;
 
-  const STATUS_BADGES: Record<string, { bg: string; text: string; label: string }> = {
-    draft: { bg: "bg-lavender/10", text: "text-lavender-dark", label: "Draft — not yet submitted" },
-    submitted: { bg: "bg-gold/10", text: "text-gold-dark", label: "Submitted — awaiting review" },
-    approved: { bg: "bg-success/10", text: "text-success", label: "Approved" },
-    rejected: { bg: "bg-error/10", text: "text-error", label: "Returned — needs changes" },
-    exported: { bg: "bg-success/10", text: "text-success", label: "Exported to payroll" },
+  const STATUS_BADGES: Record<
+    string,
+    { bg: string; text: string; label: string }
+  > = {
+    draft: {
+      bg: "bg-lavender/10",
+      text: "text-lavender-dark",
+      label: "Draft — not yet submitted",
+    },
+    submitted: {
+      bg: "bg-gold/10",
+      text: "text-gold-dark",
+      label: "Submitted — awaiting review",
+    },
+    approved: {
+      bg: "bg-success/10",
+      text: "text-success",
+      label: "Approved",
+    },
+    rejected: {
+      bg: "bg-error/10",
+      text: "text-error",
+      label: "Returned — needs changes",
+    },
+    exported: {
+      bg: "bg-success/10",
+      text: "text-success",
+      label: "Exported to payroll",
+    },
   };
 
   const badge = STATUS_BADGES[timesheetStatus];
@@ -102,7 +126,7 @@ export default async function TimesheetsPage() {
       )}
 
       {/* Entries table */}
-      {(!entries || entries.length === 0) ? (
+      {!entries || entries.length === 0 ? (
         <div className="rounded-xl border border-dashed border-silver bg-white p-8 text-center text-sm text-mist">
           No timesheet entries for {monthLabel}. Add your first entry below.
         </div>
@@ -119,7 +143,10 @@ export default async function TimesheetsPage() {
                     Description
                   </th>
                   <th className="px-4 py-3 text-left font-medium text-slate">
-                    Type
+                    Category
+                  </th>
+                  <th className="px-4 py-3 text-left font-medium text-slate">
+                    Tags
                   </th>
                   <th className="px-4 py-3 text-right font-medium text-slate">
                     Hours
@@ -137,13 +164,15 @@ export default async function TimesheetsPage() {
                     key={entry.id}
                     entry={entry}
                     locked={!canEdit}
+                    employmentType={employmentType}
+                    productions={productions}
                   />
                 ))}
               </tbody>
               <tfoot>
                 <tr className="border-t border-silver bg-cloud/30">
                   <td
-                    colSpan={canEdit ? 3 : 3}
+                    colSpan={4}
                     className="px-4 py-3 text-sm font-medium text-charcoal"
                   >
                     Total
@@ -160,7 +189,13 @@ export default async function TimesheetsPage() {
       )}
 
       {/* Add entry (only in draft) */}
-      {isDraft && <AddEntryForm locked={isLocked} />}
+      {isDraft && (
+        <AddEntryForm
+          locked={isLocked}
+          employmentType={employmentType}
+          productions={productions}
+        />
+      )}
 
       {/* Submit flow */}
       {timesheet && isDraft && (entries?.length ?? 0) > 0 && (

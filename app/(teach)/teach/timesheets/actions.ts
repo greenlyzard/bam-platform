@@ -17,11 +17,25 @@ const ENTRY_TYPES = [
   "bonus",
 ] as const;
 
+const CATEGORY_TO_ENTRY_TYPE: Record<string, string> = {
+  class: "class_lead",
+  private: "private",
+  rehearsal: "rehearsal",
+  admin: "admin",
+  other: "bonus",
+};
+
 const entrySchema = z.object({
   date: z.string().date("Valid date is required"),
-  entryType: z.enum(ENTRY_TYPES),
+  entryType: z.enum(ENTRY_TYPES).optional(),
+  category: z.enum(["class", "private", "rehearsal", "admin", "other"]).optional(),
   totalHours: z.number().positive().max(24),
   description: z.string().max(500).optional(),
+  subFor: z.string().max(200).optional(),
+  productionId: z.string().uuid().optional(),
+  productionName: z.string().max(200).optional(),
+  eventTag: z.string().max(200).optional(),
+  notes: z.string().max(2000).optional(),
 });
 
 /** Get or create a draft timesheet for this teacher / current pay period */
@@ -113,6 +127,14 @@ function isPeriodLocked(): boolean {
   return now.getDate() > 26;
 }
 
+function resolveEntryType(formData: FormData): string {
+  const category = formData.get("category") as string | null;
+  if (category && CATEGORY_TO_ENTRY_TYPE[category]) {
+    return CATEGORY_TO_ENTRY_TYPE[category];
+  }
+  return (formData.get("entryType") as string) || "class_lead";
+}
+
 export async function addTimesheetEntry(formData: FormData) {
   if (isPeriodLocked()) {
     return { error: "Pay period is locked after the 26th." };
@@ -124,9 +146,15 @@ export async function addTimesheetEntry(formData: FormData) {
 
   const parsed = entrySchema.safeParse({
     date: formData.get("date"),
-    entryType: formData.get("entryType"),
+    entryType: formData.get("entryType") || undefined,
+    category: formData.get("category") || undefined,
     totalHours: parseFloat(formData.get("totalHours") as string),
     description: formData.get("description") || undefined,
+    subFor: formData.get("subFor") || undefined,
+    productionId: formData.get("productionId") || undefined,
+    productionName: formData.get("productionName") || undefined,
+    eventTag: formData.get("eventTag") || undefined,
+    notes: formData.get("notes") || undefined,
   });
 
   if (!parsed.success) {
@@ -139,13 +167,20 @@ export async function addTimesheetEntry(formData: FormData) {
     return { error: "Timesheet already submitted — cannot add entries." };
   }
 
+  const entryType = resolveEntryType(formData);
+
   const { error } = await supabase.from("timesheet_entries").insert({
     tenant_id: tp.tenant_id,
     timesheet_id: timesheet.id,
-    entry_type: parsed.data.entryType,
+    entry_type: entryType,
     date: parsed.data.date,
     total_hours: parsed.data.totalHours,
     description: parsed.data.description || null,
+    sub_for: parsed.data.subFor || null,
+    production_id: parsed.data.productionId || null,
+    production_name: parsed.data.productionName || null,
+    event_tag: parsed.data.eventTag || null,
+    notes: parsed.data.notes || null,
   });
 
   if (error) {
@@ -170,9 +205,15 @@ export async function updateTimesheetEntry(formData: FormData) {
 
   const parsed = entrySchema.safeParse({
     date: formData.get("date"),
-    entryType: formData.get("entryType"),
+    entryType: formData.get("entryType") || undefined,
+    category: formData.get("category") || undefined,
     totalHours: parseFloat(formData.get("totalHours") as string),
     description: formData.get("description") || undefined,
+    subFor: formData.get("subFor") || undefined,
+    productionId: formData.get("productionId") || undefined,
+    productionName: formData.get("productionName") || undefined,
+    eventTag: formData.get("eventTag") || undefined,
+    notes: formData.get("notes") || undefined,
   });
 
   if (!parsed.success) {
@@ -197,13 +238,20 @@ export async function updateTimesheetEntry(formData: FormData) {
     return { error: "Timesheet already submitted — cannot edit entries." };
   }
 
+  const entryType = resolveEntryType(formData);
+
   const { error } = await supabase
     .from("timesheet_entries")
     .update({
-      entry_type: parsed.data.entryType,
+      entry_type: entryType,
       date: parsed.data.date,
       total_hours: parsed.data.totalHours,
       description: parsed.data.description || null,
+      sub_for: parsed.data.subFor || null,
+      production_id: parsed.data.productionId || null,
+      production_name: parsed.data.productionName || null,
+      event_tag: parsed.data.eventTag || null,
+      notes: parsed.data.notes || null,
     })
     .eq("id", entryId);
 
