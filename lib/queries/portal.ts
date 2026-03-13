@@ -230,6 +230,71 @@ export async function getMyFamily() {
 }
 
 /**
+ * Fetch upcoming class sessions for a parent's enrolled students.
+ * Returns sessions grouped by student_id via enrollment → class → class_sessions.
+ */
+export async function getUpcomingSessionsForStudents(studentIds: string[]) {
+  if (!studentIds.length) return [];
+
+  const supabase = await createClient();
+
+  // Get active/trial enrollments for these students
+  const { data: enrollments } = await supabase
+    .from("enrollments")
+    .select("student_id, class_id")
+    .in("student_id", studentIds)
+    .in("status", ["active", "trial"]);
+
+  if (!enrollments?.length) return [];
+
+  const classIds = [...new Set(enrollments.map((e) => e.class_id))];
+
+  const today = new Date().toISOString().split("T")[0];
+
+  const { data: sessions, error } = await supabase
+    .from("class_sessions")
+    .select(
+      `
+      id,
+      class_id,
+      session_date,
+      start_time,
+      end_time,
+      room,
+      status,
+      is_cancelled,
+      classes (id, name, simple_name, style, level)
+    `
+    )
+    .in("class_id", classIds)
+    .gte("session_date", today)
+    .eq("is_cancelled", false)
+    .in("status", ["scheduled"])
+    .order("session_date", { ascending: true })
+    .order("start_time", { ascending: true })
+    .limit(50);
+
+  if (error) {
+    console.error("[portal:getUpcomingSessions]", error);
+    return [];
+  }
+
+  // Map sessions to students via enrollments
+  const classToStudents: Record<string, string[]> = {};
+  for (const e of enrollments) {
+    if (!classToStudents[e.class_id]) classToStudents[e.class_id] = [];
+    if (!classToStudents[e.class_id].includes(e.student_id)) {
+      classToStudents[e.class_id].push(e.student_id);
+    }
+  }
+
+  return (sessions ?? []).map((s) => ({
+    ...s,
+    studentIds: classToStudents[s.class_id] ?? [],
+  }));
+}
+
+/**
  * Fetch badges earned by a parent's children.
  */
 export async function getMyStudentBadges() {
