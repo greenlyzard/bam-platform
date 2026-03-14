@@ -1,16 +1,14 @@
+export const runtime = "edge";
+
 import { NextRequest, NextResponse } from "next/server";
-import { Resend } from "resend";
 import { renderEmailHtml } from "@/lib/email/layout";
 
-function getResend() {
-  return new Resend(process.env.RESEND_API_KEY);
-}
 const FROM_EMAIL =
   process.env.RESEND_FROM_EMAIL ?? "hello@balletacademyandmovement.com";
 const FROM_NAME = "Ballet Academy and Movement";
 
 /**
- * Supabase Auth Email Hook.
+ * Supabase Auth Email Hook — edge runtime for zero cold start.
  *
  * Configure in Supabase Dashboard → Authentication → Hooks → Send Email:
  *   URL:    https://<your-domain>/api/auth/send-email
@@ -21,6 +19,8 @@ const FROM_NAME = "Ballet Academy and Movement";
  *   - magiclink (magic link email)
  *   - recovery (password reset)
  *   - email_change (email change confirmation)
+ *
+ * Uses Resend REST API directly (not the SDK) for edge compatibility.
  *
  * See: https://supabase.com/docs/guides/auth/auth-hooks/send-email-hook
  */
@@ -85,21 +85,37 @@ export async function POST(req: NextRequest) {
     buttonUrl: confirmationUrl,
   });
 
-  const { error } = await getResend().emails.send({
-    from: `${FROM_NAME} <${FROM_EMAIL}>`,
-    to: [recipientEmail],
-    subject,
-    html,
-  });
-
-  if (error) {
-    console.error("[auth:send-email] Resend error:", error);
-    // Return success anyway so Supabase auth flow is not blocked.
-    // The user won't get the branded email but auth still works
-    // because Supabase falls back to its built-in mailer on hook failure.
+  // Send via Resend REST API directly (edge-compatible, no SDK needed)
+  const resendKey = process.env.RESEND_API_KEY;
+  if (!resendKey) {
+    console.error("[auth:send-email] RESEND_API_KEY not set");
     return NextResponse.json({ success: true });
   }
 
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${resendKey}`,
+      },
+      body: JSON.stringify({
+        from: `${FROM_NAME} <${FROM_EMAIL}>`,
+        to: [recipientEmail],
+        subject,
+        html,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      console.error("[auth:send-email] Resend API error:", res.status, err);
+    }
+  } catch (err) {
+    console.error("[auth:send-email] Resend fetch error:", err);
+  }
+
+  // Always return success so Supabase auth flow is not blocked.
   return NextResponse.json({ success: true });
 }
 
