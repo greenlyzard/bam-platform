@@ -35,7 +35,7 @@ CREATE POLICY "admins_manage_roles" ON profile_roles
     EXISTS (
       SELECT 1 FROM profiles
       WHERE id = auth.uid()
-        AND role IN ('super_admin', 'admin', 'studio_admin')
+        AND role IN ('super_admin', 'admin')
     )
   );
 
@@ -168,46 +168,6 @@ SELECT 'admin', id FROM permissions
 WHERE key NOT IN ('settings.platform.manage', 'comms.templates.edit_baseline')
 ON CONFLICT DO NOTHING;
 
--- studio_admin same as admin
-INSERT INTO role_permissions (role, permission_id)
-SELECT 'studio_admin', id FROM permissions
-WHERE key NOT IN ('settings.platform.manage', 'comms.templates.edit_baseline')
-ON CONFLICT DO NOTHING;
-
--- finance_admin: dashboard, billing, staff, timesheets, admin portal
-INSERT INTO role_permissions (role, permission_id)
-SELECT 'finance_admin', id FROM permissions
-WHERE key IN (
-  'studio.dashboard.view', 'studio.billing.manage', 'studio.staff.view',
-  'timesheets.manage', 'timesheets.payroll.view', 'admin.portal.access',
-  'students.view_all', 'classes.roster.view_all'
-)
-ON CONFLICT DO NOTHING;
-
--- studio_manager: operational access, no billing/payroll/settings
-INSERT INTO role_permissions (role, permission_id)
-SELECT 'studio_manager', id FROM permissions
-WHERE key IN (
-  'studio.dashboard.view', 'studio.staff.view',
-  'classes.manage', 'classes.roster.view_all', 'classes.attendance.take',
-  'students.view_all', 'comms.announcements.send', 'comms.inbox.view',
-  'comms.templates.edit_studio', 'admin.portal.access',
-  'productions.manage', 'productions.scanner.activate', 'productions.scanner.scan',
-  'productions.tickets.purchase', 'productions.tickets.view_own'
-)
-ON CONFLICT DO NOTHING;
-
--- front_desk: limited operational access
-INSERT INTO role_permissions (role, permission_id)
-SELECT 'front_desk', id FROM permissions
-WHERE key IN (
-  'studio.dashboard.view', 'classes.roster.view_all', 'classes.attendance.take',
-  'students.view_all', 'admin.portal.access',
-  'productions.scanner.activate', 'productions.scanner.scan',
-  'productions.tickets.purchase', 'productions.tickets.view_own'
-)
-ON CONFLICT DO NOTHING;
-
 -- teacher: own classes, schedule, timesheets, teacher portal
 INSERT INTO role_permissions (role, permission_id)
 SELECT 'teacher', id FROM permissions
@@ -319,7 +279,7 @@ RETURNS boolean AS $$
     SELECT 1 FROM profile_roles
     WHERE user_id = auth.uid()
       AND is_active = true
-      AND role IN ('admin', 'super_admin', 'studio_admin', 'finance_admin', 'studio_manager')
+      AND role IN ('admin', 'super_admin')
   ) OR EXISTS (
     SELECT 1 FROM profiles
     WHERE id = auth.uid()
