@@ -2,7 +2,6 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
 
 /**
  * Sign in with magic link (email only, no password).
@@ -13,17 +12,20 @@ export async function signInWithMagicLink(formData: FormData) {
   if (!email) return { error: "Email is required" };
 
   const supabase = await createClient();
-  const headersList = await headers();
-  const origin = headersList.get("origin") ?? "http://localhost:3000";
+
+  const siteUrl =
+    process.env.NEXT_PUBLIC_APP_URL ??
+    "https://portal.balletacademyandmovement.com";
 
   const redirectTo = formData.get("redirect") as string | null;
   const callbackUrl = redirectTo
-    ? `${origin}/callback?redirect=${encodeURIComponent(redirectTo)}`
-    : `${origin}/callback`;
+    ? `${siteUrl}/callback?redirect=${encodeURIComponent(redirectTo)}`
+    : `${siteUrl}/callback`;
 
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
+      shouldCreateUser: false,
       emailRedirectTo: callbackUrl,
     },
   });
@@ -107,14 +109,16 @@ export async function signUp(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const headersList = await headers();
-  const origin = headersList.get("origin") ?? "http://localhost:3000";
+
+  const siteUrl =
+    process.env.NEXT_PUBLIC_APP_URL ??
+    "https://portal.balletacademyandmovement.com";
 
   const { error } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      emailRedirectTo: `${origin}/callback`,
+      emailRedirectTo: `${siteUrl}/callback`,
       data: {
         first_name: firstName,
         last_name: lastName,
@@ -136,13 +140,15 @@ export async function signUp(formData: FormData) {
  */
 export async function signInWithGoogle(formData?: FormData) {
   const supabase = await createClient();
-  const headersList = await headers();
-  const origin = headersList.get("origin") ?? "http://localhost:3000";
+
+  const siteUrl =
+    process.env.NEXT_PUBLIC_APP_URL ??
+    "https://portal.balletacademyandmovement.com";
 
   const redirectTo = formData?.get("redirect") as string | null;
   const callbackUrl = redirectTo
-    ? `${origin}/callback?redirect=${encodeURIComponent(redirectTo)}`
-    : `${origin}/callback`;
+    ? `${siteUrl}/callback?redirect=${encodeURIComponent(redirectTo)}`
+    : `${siteUrl}/callback`;
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",

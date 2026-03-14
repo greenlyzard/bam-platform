@@ -51,21 +51,18 @@ export async function POST(req: NextRequest) {
   const emailType: string = email_data?.email_action_type ?? "";
   const token: string = email_data?.token ?? "";
   const tokenHash: string = email_data?.token_hash ?? "";
-  const redirectTo: string = email_data?.redirect_to ?? "";
-
-  // Build the confirmation URL
-  // Supabase expects the token to be verified via its /auth/v1/verify endpoint
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  // Build the confirmation URL — point directly to our callback route
+  // so the user's browser calls verifyOtp itself, bypassing Supabase's
+  // /auth/v1/verify redirect (which Gmail SafeLinks pre-fetches and breaks).
   const siteUrl =
     process.env.NEXT_PUBLIC_APP_URL ??
     "https://portal.balletacademyandmovement.com";
 
   let confirmationUrl: string;
   if (tokenHash) {
-    // PKCE flow — use token_hash with type param
-    confirmationUrl = `${supabaseUrl}/auth/v1/verify?token=${tokenHash}&type=${emailType}&redirect_to=${encodeURIComponent(redirectTo || siteUrl)}`;
+    confirmationUrl = `${siteUrl}/callback?token_hash=${tokenHash}&type=${emailType}`;
   } else if (token) {
-    confirmationUrl = `${supabaseUrl}/auth/v1/verify?token=${token}&type=${emailType}&redirect_to=${encodeURIComponent(redirectTo || siteUrl)}`;
+    confirmationUrl = `${siteUrl}/callback?token_hash=${token}&type=${emailType}`;
   } else {
     confirmationUrl = siteUrl;
   }
