@@ -91,6 +91,12 @@ const studioSettings: SettingsItem[] = [
 
 const platformSettings: SettingsItem[] = [
   {
+    label: "Roles & Permissions",
+    description: "Manage user roles and view permission matrix",
+    href: "/admin/settings/roles",
+    icon: "◆",
+  },
+  {
     label: "Angelina AI Assistant",
     description: "Enable or disable the AI chat assistant",
     href: "/admin/settings/angelina",

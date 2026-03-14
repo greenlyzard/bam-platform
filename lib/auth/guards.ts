@@ -7,13 +7,17 @@ export interface AuthUser {
   id: string;
   email: string;
   role: UserRole;
+  roles: UserRole[];
   firstName: string | null;
   lastName: string | null;
+  tenantId: string | null;
 }
 
+const BAM_TENANT_SLUG = "bam";
+
 /**
- * Get the authenticated user with their profile.
- * Returns null if not authenticated (does not redirect).
+ * Get the authenticated user with their roles.
+ * Checks profile_roles first, falls back to profiles.role.
  */
 export async function getUser(): Promise<AuthUser | null> {
   const supabase = await createClient();
@@ -30,18 +34,42 @@ export async function getUser(): Promise<AuthUser | null> {
     .eq("id", user.id)
     .single();
 
+  // Try profile_roles table first
+  const { data: profileRoles } = await supabase
+    .from("profile_roles")
+    .select("role, tenant_id, is_primary")
+    .eq("user_id", user.id)
+    .eq("is_active", true)
+    .order("is_primary", { ascending: false });
+
+  let roles: UserRole[];
+  let primaryRole: UserRole;
+  let tenantId: string | null = null;
+
+  if (profileRoles && profileRoles.length > 0) {
+    roles = profileRoles.map((pr) => pr.role as UserRole);
+    const primary = profileRoles.find((pr) => pr.is_primary);
+    primaryRole = (primary?.role ?? profileRoles[0].role) as UserRole;
+    tenantId = primary?.tenant_id ?? profileRoles[0].tenant_id ?? null;
+  } else {
+    // Fallback to profiles.role
+    primaryRole = (profile?.role as UserRole) ?? "parent";
+    roles = [primaryRole];
+  }
+
   return {
     id: user.id,
     email: user.email ?? "",
-    role: (profile?.role as UserRole) ?? "parent",
+    role: primaryRole,
+    roles,
     firstName: profile?.first_name ?? null,
     lastName: profile?.last_name ?? null,
+    tenantId,
   };
 }
 
 /**
  * Require authentication. Redirects to /login if not authenticated.
- * Use in server components and server actions.
  */
 export async function requireAuth(): Promise<AuthUser> {
   const user = await getUser();
@@ -50,15 +78,18 @@ export async function requireAuth(): Promise<AuthUser> {
 }
 
 /**
- * Require a specific role (or higher).
- * Redirects to the user's home dashboard if they lack the required role.
+ * Require a specific role. Checks all active roles, not just primary.
+ * Redirects to the user's home dashboard if they lack any of the required roles.
  */
 export async function requireRole(
   ...allowedRoles: UserRole[]
 ): Promise<AuthUser> {
   const user = await requireAuth();
 
-  if (!allowedRoles.includes(user.role)) {
+  // Check if any of the user's roles match any allowed role
+  const hasRole = user.roles.some((r) => allowedRoles.includes(r));
+
+  if (!hasRole) {
     const roleHome: Record<string, string> = {
       super_admin: "/admin/dashboard",
       admin: "/admin/dashboard",
@@ -95,4 +126,23 @@ export async function requireTeacher(): Promise<AuthUser> {
  */
 export async function requireParent(): Promise<AuthUser> {
   return requireRole("parent", "student", "teacher", "admin", "super_admin");
+}
+
+/**
+ * Check if a user has a specific permission key.
+ * Uses profile_roles + role_permissions + permissions tables.
+ */
+export async function hasPermission(permissionKey: string): Promise<boolean> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return false;
+
+  const { data } = await supabase.rpc("has_permission", {
+    perm_key: permissionKey,
+  });
+
+  return !!data;
 }

@@ -9,13 +9,15 @@ export interface SessionWithRole {
   };
   profile: {
     role: Role;
+    roles: Role[];
     full_name: string | null;
+    tenant_id: string | null;
   };
 }
 
 /**
  * Get the authenticated user with their profile role.
- * Returns null if not authenticated.
+ * Checks profile_roles first, falls back to profiles.role.
  */
 export async function getSessionWithRole(): Promise<SessionWithRole | null> {
   const supabase = await createClient();
@@ -31,17 +33,41 @@ export async function getSessionWithRole(): Promise<SessionWithRole | null> {
     .eq("id", user.id)
     .single();
 
+  // Try profile_roles
+  const { data: profileRoles } = await supabase
+    .from("profile_roles")
+    .select("role, tenant_id, is_primary")
+    .eq("user_id", user.id)
+    .eq("is_active", true)
+    .order("is_primary", { ascending: false });
+
+  let primaryRole: Role;
+  let roles: Role[];
+  let tenantId: string | null = null;
+
+  if (profileRoles && profileRoles.length > 0) {
+    roles = profileRoles.map((pr) => pr.role as Role);
+    const primary = profileRoles.find((pr) => pr.is_primary);
+    primaryRole = (primary?.role ?? profileRoles[0].role) as Role;
+    tenantId = primary?.tenant_id ?? profileRoles[0].tenant_id ?? null;
+  } else {
+    primaryRole = (profile?.role as Role) ?? "parent";
+    roles = [primaryRole];
+  }
+
   return {
     user: {
       id: user.id,
       email: user.email ?? "",
     },
     profile: {
-      role: (profile?.role as Role) ?? "parent",
+      role: primaryRole,
+      roles,
       full_name:
         profile?.first_name && profile?.last_name
           ? `${profile.first_name} ${profile.last_name}`
           : profile?.first_name ?? null,
+      tenant_id: tenantId,
     },
   };
 }
