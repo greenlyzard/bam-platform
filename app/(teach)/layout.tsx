@@ -3,6 +3,7 @@ import { AvatarDropdown } from "@/components/layouts/avatar-dropdown";
 import { AngelinaChat } from "@/components/angelina/AngelinaChat";
 import { RoleProvider } from "@/context/RoleContext";
 import { requireRole } from "@/lib/auth/requireRole";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function TeachLayout({
   children,
@@ -11,6 +12,14 @@ export default async function TeachLayout({
 }) {
   const session = await requireRole(["super_admin", "admin", "teacher"]);
   const { role, full_name } = session.profile;
+
+  const supabase = await createClient();
+  const { data: tenant } = await supabase
+    .from("tenants")
+    .select("angelina_enabled")
+    .eq("slug", "bam")
+    .single();
+  const angelinaEnabled = tenant?.angelina_enabled ?? true;
 
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
@@ -60,7 +69,7 @@ export default async function TeachLayout({
         <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-silver bg-white sm:hidden">
           <TeachNav mobile />
         </nav>
-        <AngelinaChat role="teacher" mode="floating" />
+        <AngelinaChat role="teacher" mode="floating" enabled={angelinaEnabled} />
       </div>
     </RoleProvider>
   );

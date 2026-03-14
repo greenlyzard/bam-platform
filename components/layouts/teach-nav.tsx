@@ -10,6 +10,7 @@ const navItems = [
   { label: "My Classes", href: "/teach/classes", icon: "▦" },
   { label: "My Students", href: "/teach/students", icon: "♡" },
   { label: "Report Absence", href: "/teach/report-absence", icon: "✕" },
+  { label: "Substitute Requests", href: "/teach/substitute-requests", icon: "↻" },
   { label: "Chat (Angelina)", href: "/teach/chat", icon: "◈" },
 ];
 

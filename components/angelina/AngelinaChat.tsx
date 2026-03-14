@@ -13,6 +13,7 @@ interface AngelinaChatProps {
   initialMessage?: string;
   placeholder?: string;
   primaryColor?: string;
+  enabled?: boolean;
 }
 
 const SUGGESTED_PROMPTS: Record<string, string[]> = {
@@ -54,7 +55,9 @@ export function AngelinaChat({
   mode,
   initialMessage,
   placeholder = "Type your message...",
+  enabled = true,
 }: AngelinaChatProps) {
+  if (!enabled) return null;
   const [open, setOpen] = useState(mode !== "floating");
   const [messages, setMessages] = useState<Message[]>([
     { role: "assistant", content: GREETING[role] },

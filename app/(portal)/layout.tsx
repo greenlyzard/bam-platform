@@ -21,11 +21,19 @@ export default async function PortalLayout({
 
   // Fetch avatar_url for the user menu
   const supabase = await createClient();
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("avatar_url")
-    .eq("id", session.user.id)
-    .single();
+  const [{ data: profile }, { data: tenant }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("avatar_url")
+      .eq("id", session.user.id)
+      .single(),
+    supabase
+      .from("tenants")
+      .select("angelina_enabled")
+      .eq("slug", "bam")
+      .single(),
+  ]);
+  const angelinaEnabled = tenant?.angelina_enabled ?? true;
 
   return (
     <RoleProvider role={role} fullName={full_name}>
@@ -73,7 +81,7 @@ export default async function PortalLayout({
         <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-silver bg-white sm:hidden">
           <PortalNav mobile />
         </nav>
-        <AngelinaChat role="parent" mode="floating" />
+        <AngelinaChat role="parent" mode="floating" enabled={angelinaEnabled} />
       </div>
     </RoleProvider>
   );

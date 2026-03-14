@@ -91,6 +91,12 @@ const studioSettings: SettingsItem[] = [
 
 const platformSettings: SettingsItem[] = [
   {
+    label: "Angelina AI Assistant",
+    description: "Enable or disable the AI chat assistant",
+    href: "/admin/settings/angelina",
+    icon: "◈",
+  },
+  {
     label: "Module Control",
     description: "Enable/disable platform modules",
     href: "/admin/settings/platform/modules",
@@ -121,8 +127,8 @@ export default async function SettingsPage() {
     .single();
 
   const isDerek = profile?.email === SUPER_EMAIL;
-  const isManager =
-    profile?.role === "super_admin" || profile?.role === "admin";
+  const isSuperAdmin = profile?.role === "super_admin";
+  const isManager = isSuperAdmin || profile?.role === "admin";
 
   return (
     <div className="max-w-3xl space-y-8">
@@ -139,7 +145,7 @@ export default async function SettingsPage() {
       {isManager && (
         <SettingsSection title="Studio Settings" items={studioSettings} />
       )}
-      {isDerek && (
+      {(isDerek || isSuperAdmin) && (
         <SettingsSection title="Platform" items={platformSettings} />
       )}
     </div>

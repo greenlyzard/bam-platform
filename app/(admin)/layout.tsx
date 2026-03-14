@@ -15,7 +15,7 @@ export default async function AdminLayout({
   const { role, full_name } = session.profile;
 
   const supabase = await createClient();
-  const [{ data: settings }, { data: moduleRows }] = await Promise.all([
+  const [{ data: settings }, { data: moduleRows }, { data: tenant }] = await Promise.all([
     supabase.from("studio_settings").select("logo_url").limit(1).single(),
     supabase
       .from("platform_modules")
@@ -23,8 +23,10 @@ export default async function AdminLayout({
         "key, label, icon, href, nav_group, sort_order, platform_enabled, tenant_enabled, nav_visible, requires_role"
       )
       .order("sort_order"),
+    supabase.from("tenants").select("angelina_enabled").eq("slug", "bam").single(),
   ]);
   const logoUrl = settings?.logo_url;
+  const angelinaEnabled = tenant?.angelina_enabled ?? true;
   const userEmail = session.user.email;
 
   const modules: ModuleItem[] = (moduleRows ?? []).map((m) => ({
@@ -87,7 +89,7 @@ export default async function AdminLayout({
         <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-silver bg-white lg:hidden">
           <AdminNav mobile role={role} modules={modules} userEmail={userEmail} />
         </nav>
-        <AngelinaChat role="admin" mode="floating" />
+        <AngelinaChat role="admin" mode="floating" enabled={angelinaEnabled} />
       </div>
     </RoleProvider>
   );
