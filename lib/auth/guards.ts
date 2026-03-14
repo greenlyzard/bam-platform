@@ -34,13 +34,19 @@ export async function getUser(): Promise<AuthUser | null> {
     .eq("id", user.id)
     .single();
 
-  // Try profile_roles table first
-  const { data: profileRoles } = await supabase
-    .from("profile_roles")
-    .select("role, tenant_id, is_primary")
-    .eq("user_id", user.id)
-    .eq("is_active", true)
-    .order("is_primary", { ascending: false });
+  // Try profile_roles table first (gracefully handle table not existing or RLS errors)
+  let profileRoles: Array<{ role: string; tenant_id: string | null; is_primary: boolean }> | null = null;
+  try {
+    const { data, error } = await supabase
+      .from("profile_roles")
+      .select("role, tenant_id, is_primary")
+      .eq("user_id", user.id)
+      .eq("is_active", true)
+      .order("is_primary", { ascending: false });
+    if (!error) profileRoles = data;
+  } catch {
+    // profile_roles table may not exist yet — fall back to profiles.role
+  }
 
   let roles: UserRole[];
   let primaryRole: UserRole;
