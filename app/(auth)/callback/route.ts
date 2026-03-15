@@ -44,16 +44,79 @@ export async function GET(request: NextRequest) {
   let authError: unknown = null;
 
   if (code) {
-    // Flow 1: PKCE code exchange
+    // Flow 1: PKCE code exchange (OAuth, email signup)
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     authError = error;
   } else if (tokenHash && type) {
-    // Flow 2: Magic link / OTP token verification
-    const { error } = await supabase.auth.verifyOtp({
+    // Flow 2: token_hash verification
+    // Supabase may generate pkce_-prefixed hashes even for OTP.
+    // Try multiple strategies to verify the token.
+    const otpType = type as "magiclink" | "email" | "signup" | "recovery" | "email_change";
+    const stripped = tokenHash.startsWith("pkce_") ? tokenHash.slice(5) : null;
+
+    // Strategy A: verifyOtp with the full token_hash as-is
+    const attemptA = await supabase.auth.verifyOtp({
       token_hash: tokenHash,
-      type: type as "magiclink" | "email" | "signup" | "recovery" | "email_change",
+      type: otpType,
     });
-    authError = error;
+
+    if (!attemptA.error) {
+      authError = null;
+    } else {
+      console.warn("[auth:callback] Attempt A failed:", attemptA.error.message);
+
+      // Strategy B: try type 'email' if original was 'magiclink' (or vice versa)
+      const altType = otpType === "magiclink" ? "email" : otpType === "email" ? "magiclink" : null;
+      let attemptBOk = false;
+      if (altType) {
+        const attemptB = await supabase.auth.verifyOtp({
+          token_hash: tokenHash,
+          type: altType,
+        });
+        if (!attemptB.error) {
+          attemptBOk = true;
+        } else {
+          console.warn("[auth:callback] Attempt B failed:", attemptB.error.message);
+        }
+      }
+
+      if (!attemptBOk) {
+        // Strategy C: strip pkce_ prefix and retry verifyOtp
+        if (stripped) {
+          const attemptC = await supabase.auth.verifyOtp({
+            token_hash: stripped,
+            type: otpType,
+          });
+          if (!attemptC.error) {
+            // success
+          } else {
+            console.warn("[auth:callback] Attempt C failed:", attemptC.error.message);
+
+            // Strategy D: try exchangeCodeForSession with the full token_hash
+            const attemptD = await supabase.auth.exchangeCodeForSession(tokenHash);
+            if (!attemptD.error) {
+              // success
+            } else {
+              console.warn("[auth:callback] Attempt D failed:", attemptD.error.message);
+
+              // Strategy E: exchangeCodeForSession with stripped value
+              const attemptE = await supabase.auth.exchangeCodeForSession(stripped);
+              authError = attemptE.error;
+              if (attemptE.error) {
+                console.error("[auth:callback] All strategies failed for pkce_ token");
+              }
+            }
+          }
+        } else {
+          // No pkce_ prefix — original verifyOtp failed, try exchangeCodeForSession
+          const attemptD = await supabase.auth.exchangeCodeForSession(tokenHash);
+          authError = attemptD.error;
+          if (attemptD.error) {
+            console.error("[auth:callback] All strategies failed:", attemptD.error.message);
+          }
+        }
+      }
+    }
   } else {
     // Neither flow — no valid params
     return NextResponse.redirect(
