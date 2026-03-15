@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 
-export default function CallbackPage() {
+function CallbackHandler() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [status, setStatus] = useState("Signing you in...");
@@ -56,5 +56,28 @@ export default function CallbackPage() {
     >
       <p>{status}</p>
     </div>
+  );
+}
+
+export default function CallbackPage() {
+  return (
+    <Suspense
+      fallback={
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            minHeight: "100vh",
+            fontFamily: "Montserrat, sans-serif",
+            color: "#6B5A99",
+          }}
+        >
+          <p>Signing you in...</p>
+        </div>
+      }
+    >
+      <CallbackHandler />
+    </Suspense>
   );
 }
