@@ -11,7 +11,7 @@ export default async function TeachLayout({
   children: React.ReactNode;
 }) {
   const session = await requireRole(["super_admin", "admin", "teacher"]);
-  const { role, full_name } = session.profile;
+  const { role, full_name, avatar_url } = session.profile;
 
   const supabase = await createClient();
   const { data: tenant } = await supabase
@@ -48,6 +48,7 @@ export default async function TeachLayout({
                 initial={full_name?.[0] ?? session.user.email[0]?.toUpperCase() ?? "?"}
                 fullName={full_name ?? ""}
                 email={session.user.email}
+                avatarUrl={avatar_url}
                 profileHref="/teach/settings/profile"
               />
             </div>

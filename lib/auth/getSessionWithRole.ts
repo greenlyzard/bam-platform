@@ -11,6 +11,7 @@ export interface SessionWithRole {
     role: Role;
     roles: Role[];
     full_name: string | null;
+    avatar_url: string | null;
     tenant_id: string | null;
   };
 }
@@ -29,7 +30,7 @@ export async function getSessionWithRole(): Promise<SessionWithRole | null> {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role, first_name, last_name")
+    .select("role, first_name, last_name, preferred_name, avatar_url")
     .eq("id", user.id)
     .single();
 
@@ -70,9 +71,10 @@ export async function getSessionWithRole(): Promise<SessionWithRole | null> {
       role: primaryRole,
       roles,
       full_name:
-        profile?.first_name && profile?.last_name
-          ? `${profile.first_name} ${profile.last_name}`
-          : profile?.first_name ?? null,
+        (profile?.preferred_name ?? profile?.first_name)
+          ? `${profile?.preferred_name ?? profile?.first_name} ${profile?.last_name ?? ''}`.trim()
+          : null,
+      avatar_url: profile?.avatar_url ?? null,
       tenant_id: tenantId,
     },
   };

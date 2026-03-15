@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { requireAuth } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 
@@ -39,5 +40,6 @@ export async function POST(req: NextRequest) {
     .update({ avatar_url: publicUrl })
     .eq("id", user.id);
 
+  revalidatePath("/", "layout");
   return NextResponse.json({ url: publicUrl });
 }

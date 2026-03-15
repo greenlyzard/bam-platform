@@ -12,7 +12,7 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   const session = await requireRole(["super_admin", "admin"]);
-  const { role, full_name } = session.profile;
+  const { role, full_name, avatar_url } = session.profile;
 
   const supabase = await createClient();
   const [{ data: settings }, { data: moduleRows }, { data: tenant }] = await Promise.all([
@@ -69,6 +69,7 @@ export default async function AdminLayout({
                 initial={full_name?.[0] ?? session.user.email[0]?.toUpperCase() ?? "?"}
                 fullName={full_name ?? ""}
                 email={session.user.email}
+                avatarUrl={avatar_url}
               />
             </div>
           </div>

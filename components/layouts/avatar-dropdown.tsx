@@ -7,11 +7,13 @@ export function AvatarDropdown({
   initial,
   fullName,
   email,
+  avatarUrl,
   profileHref = "/admin/settings/profile",
 }: {
   initial: string;
   fullName: string;
   email: string;
+  avatarUrl?: string | null;
   profileHref?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -32,9 +34,13 @@ export function AvatarDropdown({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="h-8 w-8 rounded-full bg-lavender-light flex items-center justify-center text-xs font-semibold text-lavender-dark hover:ring-2 hover:ring-lavender/30 transition-all"
+        className="h-8 w-8 rounded-full bg-lavender-light flex items-center justify-center text-xs font-semibold text-lavender-dark hover:ring-2 hover:ring-lavender/30 transition-all overflow-hidden"
       >
-        {initial}
+        {avatarUrl ? (
+          <img src={avatarUrl} alt={fullName} className="h-full w-full object-cover" />
+        ) : (
+          initial
+        )}
       </button>
 
       {open && (

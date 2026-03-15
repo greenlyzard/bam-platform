@@ -16,23 +16,15 @@ export default async function PortalLayout({
     requireRole(["super_admin", "admin", "parent"]),
     getStudioSettings(),
   ]);
-  const { role, full_name } = session.profile;
+  const { role, full_name, avatar_url } = session.profile;
   const studioName = settings?.studio_name ?? "Ballet Academy & Movement";
 
-  // Fetch avatar_url for the user menu
   const supabase = await createClient();
-  const [{ data: profile }, { data: tenant }] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("avatar_url")
-      .eq("id", session.user.id)
-      .single(),
-    supabase
-      .from("tenants")
-      .select("angelina_enabled")
-      .eq("slug", "bam")
-      .single(),
-  ]);
+  const { data: tenant } = await supabase
+    .from("tenants")
+    .select("angelina_enabled")
+    .eq("slug", "bam")
+    .single();
   const angelinaEnabled = tenant?.angelina_enabled ?? true;
 
   return (
@@ -60,7 +52,7 @@ export default async function PortalLayout({
               <PortalUserMenu
                 fullName={full_name}
                 email={session.user.email}
-                avatarUrl={profile?.avatar_url ?? null}
+                avatarUrl={avatar_url}
               />
             </div>
           </div>
