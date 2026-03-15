@@ -30,7 +30,8 @@ export default async function AdminTimesheetsPage({
     to?: string;
   }>;
 }) {
-  await requireRole("finance_admin", "admin", "super_admin");
+  const currentUser = await requireRole("teacher", "finance_admin", "admin", "super_admin");
+  const isTeacherOnly = currentUser.roles.every((r) => r === "teacher");
   const supabase = await createClient();
   const params = await searchParams;
   const filterStatus = params.status || "submitted";
@@ -47,12 +48,17 @@ export default async function AdminTimesheetsPage({
   const dateFrom = params.from || defaultFrom;
   const dateTo = params.to || defaultTo;
 
-  // Fetch all teachers for dropdown
-  const { data: teacherProfiles } = await supabase
+  // Fetch teachers for dropdown (teacher-only users see only themselves)
+  let teacherQuery = supabase
     .from("teacher_profiles")
     .select("id, first_name, last_name, employment_type")
-    .eq("is_active", true)
-    .order("first_name");
+    .eq("is_active", true);
+
+  if (isTeacherOnly) {
+    teacherQuery = teacherQuery.eq("id", currentUser.id);
+  }
+
+  const { data: teacherProfiles } = await teacherQuery.order("first_name");
 
   const teachers = (teacherProfiles ?? []).map((tp) => ({
     id: tp.id,
@@ -245,6 +251,7 @@ export default async function AdminTimesheetsPage({
       counts={counts}
       csvRows={csvRows}
       entryTypeLabels={ENTRY_TYPE_LABELS}
+      isTeacherOnly={isTeacherOnly}
     />
   );
 }

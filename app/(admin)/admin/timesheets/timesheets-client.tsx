@@ -133,6 +133,7 @@ export function TimesheetsClient({
   counts,
   csvRows,
   entryTypeLabels,
+  isTeacherOnly,
 }: {
   view: string;
   filterStatus: string;
@@ -149,6 +150,7 @@ export function TimesheetsClient({
   counts: Record<string, number>;
   csvRows: CsvRow[];
   entryTypeLabels: Record<string, string>;
+  isTeacherOnly: boolean;
 }) {
   const [quickMode, setQuickMode] = useState(false);
   const [stickyTeacher, setStickyTeacher] = useState("");
