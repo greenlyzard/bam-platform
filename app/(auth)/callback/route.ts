@@ -1,41 +1,40 @@
 import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 
 /**
  * Auth callback handler.
- * Handles two flows:
+ * Handles three flows:
  *   1. PKCE code flow (OAuth, email signup) — exchanges `code` for session
  *   2. Magic link / OTP flow — verifies `token_hash` + `type` params
+ *   3. pkce_-prefixed token_hash — tries verifyOtp then exchangeCodeForSession
+ *
+ * Uses response-based cookie pattern (not next/headers cookies()) so that
+ * session cookies are correctly set on the redirect response.
  */
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type");
-  const redirect = searchParams.get("redirect") ?? null;
+  const redirectParam = searchParams.get("redirect") ?? null;
 
-  const cookieStore = await cookies();
+  // Pre-build a redirect response — cookies will be set on this object.
+  // The destination URL will be updated before returning.
+  const redirectUrl = new URL("/portal/dashboard", origin);
+  const response = NextResponse.redirect(redirectUrl);
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
-      auth: {
-        flowType: "implicit",
-      },
       cookies: {
         getAll() {
-          return cookieStore.getAll();
+          return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Server component — cookie set may fail
-          }
+          cookiesToSet.forEach(({ name, value, options }) => {
+            response.cookies.set(name, value, options);
+          });
         },
       },
     }
@@ -45,76 +44,89 @@ export async function GET(request: NextRequest) {
 
   if (code) {
     // Flow 1: PKCE code exchange (OAuth, email signup)
+    console.log("[auth:callback] Attempting exchangeCodeForSession with code");
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     authError = error;
   } else if (tokenHash && type) {
     // Flow 2: token_hash verification
-    // Supabase may generate pkce_-prefixed hashes even for OTP.
-    // Try multiple strategies to verify the token.
     const otpType = type as "magiclink" | "email" | "signup" | "recovery" | "email_change";
     const stripped = tokenHash.startsWith("pkce_") ? tokenHash.slice(5) : null;
 
+    console.log(`[auth:callback] token_hash received, type=${type}, pkce_prefix=${!!stripped}`);
+
     // Strategy A: verifyOtp with the full token_hash as-is
+    console.log("[auth:callback] Strategy A: verifyOtp full hash, type:", otpType);
     const attemptA = await supabase.auth.verifyOtp({
       token_hash: tokenHash,
       type: otpType,
     });
 
     if (!attemptA.error) {
+      console.log("[auth:callback] Strategy A succeeded");
       authError = null;
     } else {
-      console.warn("[auth:callback] Attempt A failed:", attemptA.error.message);
+      console.warn("[auth:callback] Strategy A failed:", attemptA.error.message);
 
-      // Strategy B: try type 'email' if original was 'magiclink' (or vice versa)
+      // Strategy B: try alternate type (email ↔ magiclink)
       const altType = otpType === "magiclink" ? "email" : otpType === "email" ? "magiclink" : null;
-      let attemptBOk = false;
+      let resolved = false;
+
       if (altType) {
+        console.log("[auth:callback] Strategy B: verifyOtp full hash, alt type:", altType);
         const attemptB = await supabase.auth.verifyOtp({
           token_hash: tokenHash,
           type: altType,
         });
         if (!attemptB.error) {
-          attemptBOk = true;
+          console.log("[auth:callback] Strategy B succeeded");
+          resolved = true;
         } else {
-          console.warn("[auth:callback] Attempt B failed:", attemptB.error.message);
+          console.warn("[auth:callback] Strategy B failed:", attemptB.error.message);
         }
       }
 
-      if (!attemptBOk) {
+      if (!resolved && stripped) {
         // Strategy C: strip pkce_ prefix and retry verifyOtp
-        if (stripped) {
-          const attemptC = await supabase.auth.verifyOtp({
-            token_hash: stripped,
-            type: otpType,
-          });
-          if (!attemptC.error) {
-            // success
-          } else {
-            console.warn("[auth:callback] Attempt C failed:", attemptC.error.message);
-
-            // Strategy D: try exchangeCodeForSession with the full token_hash
-            const attemptD = await supabase.auth.exchangeCodeForSession(tokenHash);
-            if (!attemptD.error) {
-              // success
-            } else {
-              console.warn("[auth:callback] Attempt D failed:", attemptD.error.message);
-
-              // Strategy E: exchangeCodeForSession with stripped value
-              const attemptE = await supabase.auth.exchangeCodeForSession(stripped);
-              authError = attemptE.error;
-              if (attemptE.error) {
-                console.error("[auth:callback] All strategies failed for pkce_ token");
-              }
-            }
-          }
+        console.log("[auth:callback] Strategy C: verifyOtp stripped hash");
+        const attemptC = await supabase.auth.verifyOtp({
+          token_hash: stripped,
+          type: otpType,
+        });
+        if (!attemptC.error) {
+          console.log("[auth:callback] Strategy C succeeded");
+          resolved = true;
         } else {
-          // No pkce_ prefix — original verifyOtp failed, try exchangeCodeForSession
-          const attemptD = await supabase.auth.exchangeCodeForSession(tokenHash);
-          authError = attemptD.error;
-          if (attemptD.error) {
-            console.error("[auth:callback] All strategies failed:", attemptD.error.message);
-          }
+          console.warn("[auth:callback] Strategy C failed:", attemptC.error.message);
         }
+      }
+
+      if (!resolved) {
+        // Strategy D: exchangeCodeForSession with full token_hash
+        console.log("[auth:callback] Strategy D: exchangeCodeForSession full hash");
+        const attemptD = await supabase.auth.exchangeCodeForSession(tokenHash);
+        if (!attemptD.error) {
+          console.log("[auth:callback] Strategy D succeeded");
+          resolved = true;
+        } else {
+          console.warn("[auth:callback] Strategy D failed:", attemptD.error.message);
+        }
+      }
+
+      if (!resolved && stripped) {
+        // Strategy E: exchangeCodeForSession with stripped hash
+        console.log("[auth:callback] Strategy E: exchangeCodeForSession stripped hash");
+        const attemptE = await supabase.auth.exchangeCodeForSession(stripped);
+        if (!attemptE.error) {
+          console.log("[auth:callback] Strategy E succeeded");
+          resolved = true;
+        } else {
+          console.warn("[auth:callback] Strategy E failed:", attemptE.error.message);
+        }
+      }
+
+      if (!resolved) {
+        authError = { message: "All verification strategies failed" };
+        console.error("[auth:callback] All strategies exhausted");
       }
     }
   } else {
@@ -125,15 +137,16 @@ export async function GET(request: NextRequest) {
   }
 
   if (authError) {
-    console.error("[auth:callback] Error:", authError);
+    console.error("[auth:callback] Final error:", authError);
     return NextResponse.redirect(
       new URL("/login?error=auth_callback_failed", origin)
     );
   }
 
   // If there's a redirect param, go there
-  if (redirect) {
-    return NextResponse.redirect(new URL(redirect, origin));
+  if (redirectParam) {
+    response.headers.set("Location", new URL(redirectParam, origin).toString());
+    return response;
   }
 
   // Otherwise, route based on role
@@ -161,7 +174,8 @@ export async function GET(request: NextRequest) {
     };
 
     const home = roleHome[profile?.role ?? "parent"] ?? "/portal/dashboard";
-    return NextResponse.redirect(new URL(home, origin));
+    response.headers.set("Location", new URL(home, origin).toString());
+    return response;
   }
 
   // Session established but no user — shouldn't happen
