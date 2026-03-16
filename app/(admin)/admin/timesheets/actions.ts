@@ -221,6 +221,141 @@ export async function returnTimesheet(formData: FormData) {
   return { success: true };
 }
 
+// ── Submit entry (draft → submitted) ────────────────────────
+
+export async function submitTimesheetEntry(formData: FormData) {
+  const { supabase, user, profile, isAdmin, error: authError } = await requireAuth();
+  if (authError || !user) return { error: authError ?? "Unauthorized" };
+  if (!isAdmin) return { error: "Admin required" };
+
+  const entryId = formData.get("entryId") as string;
+  if (!entryId) return { error: "Entry ID required." };
+
+  const { data: entry } = await supabase
+    .from("timesheet_entries")
+    .select("id, tenant_id, status, timesheet_id")
+    .eq("id", entryId)
+    .single();
+
+  if (!entry) return { error: "Entry not found." };
+  if (entry.status !== "draft") return { error: "Only draft entries can be submitted." };
+
+  const { error } = await supabase
+    .from("timesheet_entries")
+    .update({
+      status: "submitted",
+      submitted_at: new Date().toISOString(),
+    })
+    .eq("id", entryId);
+
+  if (error) {
+    console.error("[admin:submitEntry]", error);
+    return { error: "Failed to submit entry." };
+  }
+
+  // Also update parent timesheet to submitted if still draft
+  const { data: ts } = await supabase
+    .from("timesheets")
+    .select("id, status")
+    .eq("id", entry.timesheet_id)
+    .single();
+
+  if (ts && ts.status === "draft") {
+    await supabase
+      .from("timesheets")
+      .update({
+        status: "submitted",
+        submitted_at: new Date().toISOString(),
+      })
+      .eq("id", ts.id);
+  }
+
+  await logChange(supabase, {
+    tenantId: entry.tenant_id,
+    entryId,
+    changedBy: user.id,
+    changedByName: getAdminName(profile),
+    changeType: "submitted",
+  });
+
+  revalidatePath("/admin/timesheets");
+  return { success: true };
+}
+
+// ── Bulk approve timesheets ─────────────────────────────────
+
+export async function bulkApproveTimesheets(formData: FormData) {
+  const { supabase, user, profile, isAdmin, error: authError } = await requireAuth();
+  if (authError || !user) return { error: authError ?? "Unauthorized" };
+  if (!isAdmin) return { error: "Admin required" };
+
+  const idsRaw = formData.get("timesheetIds") as string;
+  if (!idsRaw) return { error: "No timesheets selected." };
+
+  let timesheetIds: string[];
+  try {
+    timesheetIds = JSON.parse(idsRaw);
+  } catch {
+    return { error: "Invalid timesheet IDs." };
+  }
+
+  const adminName = getAdminName(profile);
+  const now = new Date().toISOString();
+  let approved = 0;
+
+  for (const timesheetId of timesheetIds) {
+    const { data: ts } = await supabase
+      .from("timesheets")
+      .select("id, status, tenant_id")
+      .eq("id", timesheetId)
+      .single();
+
+    if (!ts || ts.status !== "submitted") continue;
+
+    const { error } = await supabase
+      .from("timesheets")
+      .update({
+        status: "approved",
+        reviewed_by: user.id,
+        reviewed_at: now,
+      })
+      .eq("id", timesheetId);
+
+    if (error) continue;
+
+    // Approve all entries in this timesheet
+    const { data: entries } = await supabase
+      .from("timesheet_entries")
+      .select("id")
+      .eq("timesheet_id", timesheetId);
+
+    for (const entry of entries ?? []) {
+      await supabase
+        .from("timesheet_entries")
+        .update({
+          status: "approved",
+          approved_at: now,
+          approved_by: user.id,
+        })
+        .eq("id", entry.id);
+
+      await logChange(supabase, {
+        tenantId: ts.tenant_id,
+        entryId: entry.id,
+        changedBy: user.id,
+        changedByName: adminName,
+        changeType: "approved",
+        note: "Bulk approved",
+      });
+    }
+
+    approved++;
+  }
+
+  revalidatePath("/admin/timesheets");
+  return { success: true, approved };
+}
+
 // ── Entry-level approval actions ────────────────────────────
 
 export async function approveTimesheetEntry(formData: FormData) {

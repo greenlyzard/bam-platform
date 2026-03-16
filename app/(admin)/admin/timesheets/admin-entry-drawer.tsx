@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { adminAddEntry, adminUpdateEntry, adminDeleteEntry } from "./actions";
+import { adminAddEntry, adminUpdateEntry, adminDeleteEntry, submitTimesheetEntry, approveTimesheetEntry } from "./actions";
 
 interface Teacher {
   id: string;
@@ -29,6 +29,9 @@ interface EntryData {
   start_time?: string | null;
   end_time?: string | null;
   production_ids?: string[];
+  class_id?: string | null;
+  schedule_instance_id?: string | null;
+  status?: string;
 }
 
 interface ScheduleInstance {
@@ -307,10 +310,12 @@ export function AdminEditEntryButton({
   entry,
   teachers,
   productions,
+  isAdmin,
 }: {
   entry: EntryData;
   teachers: Teacher[];
   productions: Production[];
+  isAdmin?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -318,7 +323,7 @@ export function AdminEditEntryButton({
     <>
       <button
         onClick={() => setOpen(true)}
-        className="text-xs text-lavender hover:text-lavender-dark font-medium"
+        className="text-base text-lavender hover:text-lavender-dark font-medium p-1"
         title="Edit"
       >
         ✎
@@ -328,6 +333,7 @@ export function AdminEditEntryButton({
           entry={entry}
           teachers={teachers}
           productions={productions}
+          isAdmin={isAdmin}
           onClose={() => setOpen(false)}
         />
       )}
@@ -344,7 +350,7 @@ export function AdminDeleteEntryButton({ entryId }: { entryId: string }) {
     return (
       <button
         onClick={() => setConfirming(true)}
-        className="text-xs text-error hover:text-error/80 font-medium ml-1"
+        className="text-base text-error hover:text-error/80 font-medium ml-1 p-1"
         title="Delete"
       >
         ✕
@@ -354,7 +360,7 @@ export function AdminDeleteEntryButton({ entryId }: { entryId: string }) {
 
   return (
     <span className="inline-flex items-center gap-1">
-      <span className="text-[10px] text-slate">Delete?</span>
+      <span className="text-xs text-slate">Delete?</span>
       <form
         action={async (fd: FormData) => {
           setLoading(true);
@@ -367,14 +373,14 @@ export function AdminDeleteEntryButton({ entryId }: { entryId: string }) {
         <button
           type="submit"
           disabled={loading}
-          className="text-[10px] text-error font-semibold disabled:opacity-50"
+          className="text-xs text-error font-semibold disabled:opacity-50"
         >
           Yes
         </button>
       </form>
       <button
         onClick={() => setConfirming(false)}
-        className="text-[10px] text-slate"
+        className="text-xs text-slate"
       >
         No
       </button>
@@ -389,6 +395,7 @@ function EntryDrawer({
   productions,
   quickMode,
   defaultTeacher,
+  isAdmin,
   onClose,
   onSaved,
 }: {
@@ -397,6 +404,7 @@ function EntryDrawer({
   productions: Production[];
   quickMode?: boolean;
   defaultTeacher?: string;
+  isAdmin?: boolean;
   onClose: () => void;
   onSaved?: (hours: number) => void;
 }) {
@@ -418,11 +426,11 @@ function EntryDrawer({
   const [endTime, setEndTime] = useState(entry?.end_time ?? "");
   const [hours, setHours] = useState(entry?.total_hours?.toString() ?? "");
   const [scheduleInstances, setScheduleInstances] = useState<ScheduleInstance[]>([]);
-  const [selectedInstance, setSelectedInstance] = useState("");
+  const [selectedInstance, setSelectedInstance] = useState(entry?.schedule_instance_id ?? "");
   const [description, setDescription] = useState(entry?.description ?? "");
   const [allClasses, setAllClasses] = useState<ActiveClass[]>([]);
   const [customMode, setCustomMode] = useState(false);
-  const [selectedClassId, setSelectedClassId] = useState("");
+  const [selectedClassId, setSelectedClassId] = useState(entry?.class_id ?? "");
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [subForTeacher, setSubForTeacher] = useState(entry?.sub_for ?? "");
@@ -641,21 +649,6 @@ function EntryDrawer({
             </div>
           )}
 
-          {/* Date */}
-          <div>
-            <label className="block text-sm font-medium text-charcoal mb-1.5">
-              Date *
-            </label>
-            <input
-              name="date"
-              type="date"
-              required
-              value={currentDate}
-              onChange={(e) => setCurrentDate(e.target.value)}
-              className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
-            />
-          </div>
-
           {/* Category */}
           <div>
             <label className="block text-sm font-medium text-charcoal mb-1.5">
@@ -791,16 +784,46 @@ function EntryDrawer({
             </div>
           )}
 
-          {/* Students multi-select (when a class is selected via instance or fallback) */}
-          {(selectedInstance || selectedClassId) && !customMode && students.length > 0 && (
-            <MultiSelectDropdown
-              label="Students (optional)"
-              options={students}
-              selected={selectedStudentIds}
-              onChange={setSelectedStudentIds}
-              placeholder="Select students..."
-            />
+          {/* Description (hidden for class/class_assistant — dropdown covers it) */}
+          <input type="hidden" name="description" value={description} />
+          {!SHOW_SCHEDULE_CLASSES.has(category) && (
+            <div>
+              <label className="block text-sm font-medium text-charcoal mb-1.5">
+                {DESCRIPTION_LABELS[category] ?? "Description"}
+              </label>
+              <input
+                type="text"
+                maxLength={500}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder={
+                  category === "private"
+                    ? "e.g. Sophia Martin"
+                    : category === "rehearsal"
+                      ? "e.g. Nutcracker Act II Corps"
+                      : category === "admin"
+                        ? "e.g. Schedule coordination"
+                        : "Description"
+                }
+                className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
+              />
+            </div>
           )}
+
+          {/* Date */}
+          <div>
+            <label className="block text-sm font-medium text-charcoal mb-1.5">
+              Date *
+            </label>
+            <input
+              name="date"
+              type="date"
+              required
+              value={currentDate}
+              onChange={(e) => setCurrentDate(e.target.value)}
+              className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
+            />
+          </div>
 
           {/* Start / End Time */}
           <div className="grid grid-cols-2 gap-3">
@@ -852,30 +875,26 @@ function EntryDrawer({
             />
           </div>
 
-          {/* Description (hidden for class/class_assistant — dropdown covers it) */}
-          <input type="hidden" name="description" value={description} />
-          {!SHOW_SCHEDULE_CLASSES.has(category) && (
-            <div>
-              <label className="block text-sm font-medium text-charcoal mb-1.5">
-                {DESCRIPTION_LABELS[category] ?? "Description"}
-              </label>
-              <input
-                type="text"
-                maxLength={500}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder={
-                  category === "private"
-                    ? "e.g. Sophia Martin"
-                    : category === "rehearsal"
-                      ? "e.g. Nutcracker Act II Corps"
-                      : category === "admin"
-                        ? "e.g. Schedule coordination"
-                        : "Description"
-                }
-                className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
-              />
-            </div>
+          {/* Students multi-select (when a class is selected via instance or fallback) */}
+          {(selectedInstance || selectedClassId) && !customMode && students.length > 0 && (
+            <MultiSelectDropdown
+              label="Students (optional)"
+              options={students}
+              selected={selectedStudentIds}
+              onChange={setSelectedStudentIds}
+              placeholder="Select students..."
+            />
+          )}
+
+          {/* Productions multi-select */}
+          {productions.length > 0 && (
+            <MultiSelectDropdown
+              label="Tag to Productions (optional)"
+              options={productions}
+              selected={selectedProductionIds}
+              onChange={setSelectedProductionIds}
+              placeholder="Select productions..."
+            />
           )}
 
           {/* Substitute for — teacher dropdown, only for substitute category */}
@@ -900,17 +919,6 @@ function EntryDrawer({
             </div>
           )}
 
-          {/* Productions multi-select */}
-          {productions.length > 0 && (
-            <MultiSelectDropdown
-              label="Tag to Productions (optional)"
-              options={productions}
-              selected={selectedProductionIds}
-              onChange={setSelectedProductionIds}
-              placeholder="Select productions..."
-            />
-          )}
-
           {/* Notes */}
           <div>
             <label className="block text-sm font-medium text-charcoal mb-1.5">
@@ -932,7 +940,7 @@ function EntryDrawer({
             </div>
           )}
 
-          <div className="flex gap-3 pt-2">
+          <div className="flex flex-wrap gap-3 pt-2">
             <button
               type="submit"
               disabled={loading}
@@ -951,6 +959,46 @@ function EntryDrawer({
             >
               {quickMode ? "Done" : "Cancel"}
             </button>
+
+            {/* Submit / Approve buttons for admin in edit mode */}
+            {isEdit && isAdmin && entry?.status === "draft" && (
+              <button
+                type="button"
+                disabled={loading}
+                onClick={async () => {
+                  setLoading(true);
+                  setError("");
+                  const fd = new FormData();
+                  fd.set("entryId", entry.id);
+                  const result = await submitTimesheetEntry(fd);
+                  setLoading(false);
+                  if (result?.error) setError(result.error);
+                  else onClose();
+                }}
+                className="h-11 rounded-lg bg-gold hover:bg-gold-dark text-white font-semibold text-sm px-6 transition-colors disabled:opacity-50"
+              >
+                Submit
+              </button>
+            )}
+            {isEdit && isAdmin && (entry?.status === "submitted" || entry?.status === "flagged") && (
+              <button
+                type="button"
+                disabled={loading}
+                onClick={async () => {
+                  setLoading(true);
+                  setError("");
+                  const fd = new FormData();
+                  fd.set("entryId", entry.id);
+                  const result = await approveTimesheetEntry(fd);
+                  setLoading(false);
+                  if (result?.error) setError(result.error);
+                  else onClose();
+                }}
+                className="h-11 rounded-lg bg-success hover:bg-success/90 text-white font-semibold text-sm px-6 transition-colors disabled:opacity-50"
+              >
+                Approve
+              </button>
+            )}
           </div>
 
           {quickMode && !isEdit && (

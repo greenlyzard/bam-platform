@@ -1,7 +1,8 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, useState, useTransition } from "react";
 import Link from "next/link";
+import { bulkApproveTimesheets } from "./actions";
 import {
   AdminAddEntryButton,
   AdminEditEntryButton,
@@ -70,6 +71,10 @@ interface EntryRow {
   approved_at: string | null;
   adjustment_note: string | null;
   changes: ChangeLogEntry[];
+  class_id: string | null;
+  schedule_instance_id: string | null;
+  start_time: string | null;
+  end_time: string | null;
 }
 
 interface RecentEntryRow extends EntryRow {
@@ -134,6 +139,7 @@ export function TimesheetsClient({
   csvRows,
   entryTypeLabels,
   isTeacherOnly,
+  isAdmin,
 }: {
   view: string;
   filterStatus: string;
@@ -151,11 +157,43 @@ export function TimesheetsClient({
   csvRows: CsvRow[];
   entryTypeLabels: Record<string, string>;
   isTeacherOnly: boolean;
+  isAdmin: boolean;
 }) {
   const [quickMode, setQuickMode] = useState(false);
   const [stickyTeacher, setStickyTeacher] = useState("");
   const [sessionHours, setSessionHours] = useState(0);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkPending, startBulkTransition] = useTransition();
+
+  const visibleTimesheetIds = timesheets.map((ts) => ts.id);
+  const allSelected = visibleTimesheetIds.length > 0 && visibleTimesheetIds.every((id) => selectedIds.has(id));
+
+  function toggleAll() {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(visibleTimesheetIds));
+    }
+  }
+
+  function toggleOne(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function handleBulkApprove() {
+    startBulkTransition(async () => {
+      const fd = new FormData();
+      fd.set("timesheetIds", JSON.stringify([...selectedIds]));
+      await bulkApproveTimesheets(fd);
+      setSelectedIds(new Set());
+    });
+  }
 
   const filterTabs = [
     { key: "submitted", label: "Submitted", count: counts.submitted ?? 0 },
@@ -255,6 +293,25 @@ export function TimesheetsClient({
             })}
           </div>
 
+          {/* Bulk approve bar */}
+          {isAdmin && selectedIds.size > 0 && (
+            <div className="flex items-center gap-3 rounded-lg bg-success/5 border border-success/20 px-4 py-3">
+              <button
+                onClick={handleBulkApprove}
+                disabled={bulkPending}
+                className="h-10 rounded-lg bg-success hover:bg-success/90 text-white font-semibold text-sm px-5 transition-colors disabled:opacity-50"
+              >
+                {bulkPending ? "Approving..." : `Approve ${selectedIds.size} Selected`}
+              </button>
+              <button
+                onClick={() => setSelectedIds(new Set())}
+                className="text-sm text-slate hover:text-charcoal"
+              >
+                Clear selection
+              </button>
+            </div>
+          )}
+
           {/* Timesheets table */}
           {timesheets.length === 0 ? (
             <div className="rounded-xl border border-dashed border-silver bg-white p-8 text-center text-sm text-mist">
@@ -266,6 +323,16 @@ export function TimesheetsClient({
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-silver bg-cloud/50">
+                      {isAdmin && (
+                        <th className="px-4 py-3 w-10">
+                          <input
+                            type="checkbox"
+                            checked={allSelected}
+                            onChange={toggleAll}
+                            className="h-4 w-4 rounded border-silver text-lavender focus:ring-lavender/20"
+                          />
+                        </th>
+                      )}
                       <th className="px-4 py-3 text-left font-medium text-slate">Teacher</th>
                       <th className="px-4 py-3 text-left font-medium text-slate">Status</th>
                       <th className="px-4 py-3 text-right font-medium text-slate">Hours</th>
@@ -281,13 +348,23 @@ export function TimesheetsClient({
                       const badge = STATUS_BADGES[ts.status] ?? STATUS_BADGES.draft;
                       const isExpanded = expandedId === ts.id;
                       const tsEntries = entries.filter((e) => e.timesheet_id === ts.id);
-                      const colCount = filterStatus === "submitted" ? 6 : 5;
+                      const colCount = (filterStatus === "submitted" ? 6 : 5) + (isAdmin ? 1 : 0);
                       return (
                         <Fragment key={ts.id}>
                           <tr
                             className="hover:bg-cloud/30 transition-colors cursor-pointer"
                             onClick={() => setExpandedId(isExpanded ? null : ts.id)}
                           >
+                            {isAdmin && (
+                              <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                                <input
+                                  type="checkbox"
+                                  checked={selectedIds.has(ts.id)}
+                                  onChange={() => toggleOne(ts.id)}
+                                  className="h-4 w-4 rounded border-silver text-lavender focus:ring-lavender/20"
+                                />
+                              </td>
+                            )}
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-2">
                                 <span className="text-xs text-mist shrink-0">{isExpanded ? "▼" : "▶"}</span>
@@ -403,6 +480,7 @@ export function TimesheetsClient({
                                                   entry={{ ...e, teacher_id: ts.teacherId }}
                                                   teachers={teachers}
                                                   productions={productions}
+                                                  isAdmin={isAdmin}
                                                 />
                                                 <AdminDeleteEntryButton entryId={e.id} />
                                               </div>
@@ -599,6 +677,7 @@ export function TimesheetsClient({
                                 entry={{ ...e, teacher_id: e.teacherId }}
                                 teachers={teachers}
                                 productions={productions}
+                                isAdmin={isAdmin}
                               />
                               <AdminDeleteEntryButton entryId={e.id} />
                             </div>
