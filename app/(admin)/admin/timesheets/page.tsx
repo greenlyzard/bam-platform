@@ -66,6 +66,8 @@ export default async function AdminTimesheetsPage({
     employmentType: tp.employment_type,
   }));
 
+  const teacherMap = new Map(teachers.map((t) => [t.id, t]));
+
   // Fetch productions
   const { data: productionRows } = await supabase
     .from("productions")
@@ -81,7 +83,7 @@ export default async function AdminTimesheetsPage({
   let tsQuery = supabase
     .from("timesheets")
     .select(
-      "id, status, total_hours, submitted_at, reviewed_at, rejection_notes, teacher_id, teacher_profiles(first_name, last_name, email, employment_type)"
+      "id, status, total_hours, submitted_at, reviewed_at, rejection_notes, teacher_id, profiles(first_name, last_name, email)"
     )
     .order("submitted_at", { ascending: false });
 
@@ -118,15 +120,15 @@ export default async function AdminTimesheetsPage({
   // Build CSV data
   const csvRows = (allEntries ?? []).map((e) => {
     const ts = allTimesheets.find((t) => t.id === e.timesheet_id);
-    const tp = ts?.teacher_profiles as unknown as {
+    const prof = ts?.profiles as unknown as {
       first_name: string | null;
       last_name: string | null;
       email: string | null;
     } | null;
     return {
       teacher:
-        [tp?.first_name, tp?.last_name].filter(Boolean).join(" ") || "Unknown",
-      email: tp?.email ?? "",
+        [prof?.first_name, prof?.last_name].filter(Boolean).join(" ") || "Unknown",
+      email: prof?.email ?? "",
       date: e.date,
       type: e.entry_type,
       hours: e.total_hours,
@@ -141,7 +143,7 @@ export default async function AdminTimesheetsPage({
     let entryQuery = supabase
       .from("timesheet_entries")
       .select(
-        "id, timesheet_id, date, entry_type, total_hours, description, sub_for, production_id, production_name, event_tag, notes, status, flag_question, flag_response, flagged_at, approved_at, adjustment_note, timesheets!inner(teacher_id, status, teacher_profiles(first_name, last_name, employment_type))"
+        "id, timesheet_id, date, entry_type, total_hours, description, sub_for, production_id, production_name, event_tag, notes, status, flag_question, flag_response, flagged_at, approved_at, adjustment_note, timesheets!inner(teacher_id, status, profiles(first_name, last_name))"
       )
       .gte("date", dateFrom)
       .lte("date", dateTo)
@@ -161,10 +163,10 @@ export default async function AdminTimesheetsPage({
       recentEntries = (recentEntries ?? []).filter((e) => {
         if (params.entryType && e.entry_type !== params.entryType) return false;
         if (params.empType) {
-          const ts = (e as Record<string, unknown>).timesheets as {
-            teacher_profiles: { employment_type: string } | null;
+          const tsJoin = (e as Record<string, unknown>).timesheets as {
+            teacher_id: string;
           } | null;
-          const et = ts?.teacher_profiles?.employment_type;
+          const et = tsJoin?.teacher_id ? teacherMap.get(tsJoin.teacher_id)?.employmentType : undefined;
           if (et !== params.empType) return false;
         }
         return true;
@@ -205,12 +207,12 @@ export default async function AdminTimesheetsPage({
       teachers={teachers}
       productions={productions}
       timesheets={allTimesheets.map((ts) => {
-        const tp = ts.teacher_profiles as unknown as {
+        const prof = ts.profiles as unknown as {
           first_name: string | null;
           last_name: string | null;
           email: string | null;
-          employment_type: string;
         } | null;
+        const teacher = teacherMap.get(ts.teacher_id);
         return {
           id: ts.id,
           status: ts.status,
@@ -219,9 +221,9 @@ export default async function AdminTimesheetsPage({
           reviewedAt: ts.reviewed_at,
           rejectionNotes: ts.rejection_notes,
           teacherId: ts.teacher_id,
-          teacherName: [tp?.first_name, tp?.last_name].filter(Boolean).join(" ") || "Unknown",
-          teacherEmail: tp?.email ?? "",
-          employmentType: tp?.employment_type ?? "w2",
+          teacherName: [prof?.first_name, prof?.last_name].filter(Boolean).join(" ") || "Unknown",
+          teacherEmail: prof?.email ?? "",
+          employmentType: teacher?.employmentType ?? "w2",
         };
       })}
       entries={(allEntries ?? []).map((e) => ({
@@ -232,17 +234,16 @@ export default async function AdminTimesheetsPage({
         const ts = (e as Record<string, unknown>).timesheets as {
           teacher_id: string;
           status: string;
-          teacher_profiles: {
+          profiles: {
             first_name: string | null;
             last_name: string | null;
-            employment_type: string;
           } | null;
         } | null;
         return {
           ...e,
           teacherId: ts?.teacher_id ?? "",
-          teacherName: ts?.teacher_profiles
-            ? [ts.teacher_profiles.first_name, ts.teacher_profiles.last_name].filter(Boolean).join(" ")
+          teacherName: ts?.profiles
+            ? [ts.profiles.first_name, ts.profiles.last_name].filter(Boolean).join(" ")
             : "Unknown",
           timesheetStatus: ts?.status ?? "draft",
           changes: changeLogMap[e.id] ?? [],
