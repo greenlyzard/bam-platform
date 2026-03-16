@@ -518,21 +518,23 @@ export async function adminAddEntry(formData: FormData) {
 
   const d = parsed.data;
 
+  const TENANT_ID = "84d98f72-c82f-414f-8b17-172b802f6993";
+
   const { data: tp } = await supabase
     .from("teacher_profiles")
-    .select("id, tenant_id")
+    .select("id")
     .eq("id", d.teacherProfileId)
     .single();
 
   if (!tp) return { error: "Teacher not found." };
 
-  const timesheet = await getOrCreateTimesheetForTeacher(supabase, tp.id, tp.tenant_id);
+  const timesheet = await getOrCreateTimesheetForTeacher(supabase, tp.id, TENANT_ID);
   if (!timesheet) return { error: "Could not create timesheet." };
 
   const { data: newEntry, error } = await supabase
     .from("timesheet_entries")
     .insert({
-      tenant_id: tp.tenant_id,
+      tenant_id: TENANT_ID,
       timesheet_id: timesheet.id,
       entry_type: CATEGORY_TO_ENTRY_TYPE[d.category] ?? "admin",
       date: d.date,
@@ -573,7 +575,7 @@ export async function adminAddEntry(formData: FormData) {
   }
 
   await logChange(supabase, {
-    tenantId: tp.tenant_id,
+    tenantId: TENANT_ID,
     entryId: newEntry.id,
     changedBy: user.id,
     changedByName: getAdminName(profile),
