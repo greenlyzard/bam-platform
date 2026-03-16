@@ -28,6 +28,7 @@ export default async function AdminTimesheetsPage({
     entryType?: string;
     from?: string;
     to?: string;
+    payPeriod?: string;
   }>;
 }) {
   const currentUser = await requireRole("teacher", "finance_admin", "admin", "super_admin");
@@ -79,6 +80,20 @@ export default async function AdminTimesheetsPage({
     name: p.name,
   }));
 
+  // Fetch pay periods
+  const { data: payPeriodRows } = await supabase
+    .from("pay_periods")
+    .select("id, period_month, period_year, status")
+    .order("period_year", { ascending: false })
+    .order("period_month", { ascending: false });
+
+  const payPeriods = (payPeriodRows ?? []).map((pp) => ({
+    id: pp.id,
+    periodMonth: pp.period_month,
+    periodYear: pp.period_year,
+    status: pp.status,
+  }));
+
   // Fetch timesheets with teacher info
   let tsQuery = supabase
     .from("timesheets")
@@ -89,6 +104,10 @@ export default async function AdminTimesheetsPage({
 
   if (filterStatus !== "all") {
     tsQuery = tsQuery.eq("status", filterStatus);
+  }
+
+  if (params.payPeriod) {
+    tsQuery = tsQuery.eq("pay_period_id", params.payPeriod);
   }
 
   const { data: timesheets } = await tsQuery;
@@ -199,6 +218,8 @@ export default async function AdminTimesheetsPage({
     <TimesheetsClient
       view={view}
       filterStatus={filterStatus}
+      payPeriods={payPeriods}
+      filterPayPeriod={params.payPeriod || ""}
       dateFrom={dateFrom}
       dateTo={dateTo}
       filterTeacher={params.teacher || ""}

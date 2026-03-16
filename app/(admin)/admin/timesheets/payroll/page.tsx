@@ -155,7 +155,7 @@ export default async function PayrollPage({
 
   for (const tp of teacherProfiles ?? []) {
     const rates = rateMap[tp.user_id] ?? null;
-    teacherMap.set(tp.id, {
+    teacherMap.set(tp.user_id, {
       id: tp.id,
       name: [tp.first_name, tp.last_name].filter(Boolean).join(" ") || "Unknown",
       email: tp.email ?? "",

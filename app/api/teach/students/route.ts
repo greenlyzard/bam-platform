@@ -13,8 +13,40 @@ export async function GET(request: NextRequest) {
   }
 
   const classId = request.nextUrl.searchParams.get("classId");
+
+  // When no classId — return all active students (used for private lessons)
   if (!classId) {
-    return NextResponse.json({ error: "classId is required" }, { status: 400 });
+    // Verify caller is admin
+    const { data: role } = await supabase
+      .from("profile_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .eq("is_active", true)
+      .in("role", ["admin", "super_admin", "studio_admin", "finance_admin", "studio_manager", "teacher"])
+      .limit(1)
+      .maybeSingle();
+
+    if (!role) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const { data: allStudents, error } = await supabase
+      .from("students")
+      .select("id, first_name, last_name")
+      .eq("is_active", true)
+      .order("first_name");
+
+    if (error) {
+      console.error("[api/teach/students] all students", error);
+      return NextResponse.json({ error: "Failed to fetch students" }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      students: (allStudents ?? []).map((s) => ({
+        id: s.id,
+        name: `${s.first_name} ${s.last_name}`,
+      })),
+    });
   }
 
   // Verify teacher owns this class or caller is admin

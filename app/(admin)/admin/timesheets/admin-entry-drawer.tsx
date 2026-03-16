@@ -115,7 +115,7 @@ const DESCRIPTION_LABELS: Record<string, string> = {
 };
 
 const SHOW_SCHEDULE_CLASSES = new Set(["class", "class_assistant"]);
-const SHOW_ALL_CLASSES = new Set(["private", "rehearsal", "substitute"]);
+const SHOW_ALL_CLASSES = new Set(["rehearsal", "substitute"]);
 
 // ── Multi-select checkbox dropdown ───────────────────────
 function MultiSelectDropdown({
@@ -433,6 +433,7 @@ function EntryDrawer({
   const [selectedClassId, setSelectedClassId] = useState(entry?.class_id ?? "");
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const [allStudents, setAllStudents] = useState<Student[]>([]);
   const [subForTeacher, setSubForTeacher] = useState(entry?.sub_for ?? "");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -468,6 +469,18 @@ function EntryDrawer({
       .then((d) => setAllClasses(d.classes ?? []))
       .catch(() => setAllClasses([]));
   }, []);
+
+  // Fetch ALL students when category is "private" (no class needed)
+  useEffect(() => {
+    if (category === "private") {
+      fetch("/api/teach/students")
+        .then((r) => r.json())
+        .then((d) => setAllStudents(d.students ?? []))
+        .catch(() => setAllStudents([]));
+    } else {
+      setAllStudents([]);
+    }
+  }, [category]);
 
   // Fetch students when a class is selected (via schedule instance or fallback)
   useEffect(() => {
@@ -808,6 +821,17 @@ function EntryDrawer({
                 className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
               />
             </div>
+          )}
+
+          {/* Students multi-select for private lessons (all active students) */}
+          {category === "private" && allStudents.length > 0 && (
+            <MultiSelectDropdown
+              label="Students"
+              options={allStudents}
+              selected={selectedStudentIds}
+              onChange={setSelectedStudentIds}
+              placeholder="Select students..."
+            />
           )}
 
           {/* Date */}

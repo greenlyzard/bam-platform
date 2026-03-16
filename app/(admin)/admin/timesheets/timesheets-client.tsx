@@ -83,6 +83,13 @@ interface RecentEntryRow extends EntryRow {
   timesheetStatus: string;
 }
 
+interface PayPeriod {
+  id: string;
+  periodMonth: number;
+  periodYear: number;
+  status: string;
+}
+
 interface CsvRow {
   teacher: string;
   email: string;
@@ -114,6 +121,14 @@ const ENTRY_TYPES_LIST = [
   { value: "bonus", label: "Other" },
 ];
 
+function formatTime12h(time: string): string {
+  const [h, m] = time.split(":");
+  const hour = parseInt(h);
+  const ampm = hour >= 12 ? "PM" : "AM";
+  const h12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+  return `${h12}:${m} ${ampm}`;
+}
+
 function buildUrl(params: Record<string, string>): string {
   const search = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) {
@@ -122,9 +137,13 @@ function buildUrl(params: Record<string, string>): string {
   return `/admin/timesheets?${search.toString()}`;
 }
 
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
 export function TimesheetsClient({
   view,
   filterStatus,
+  payPeriods,
+  filterPayPeriod,
   dateFrom,
   dateTo,
   filterTeacher,
@@ -143,6 +162,8 @@ export function TimesheetsClient({
 }: {
   view: string;
   filterStatus: string;
+  payPeriods: PayPeriod[];
+  filterPayPeriod: string;
   dateFrom: string;
   dateTo: string;
   filterTeacher: string;
@@ -293,6 +314,31 @@ export function TimesheetsClient({
             })}
           </div>
 
+          {/* Pay period filter */}
+          {payPeriods.length > 0 && (
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-charcoal">Pay Period:</label>
+              <select
+                value={filterPayPeriod}
+                onChange={(e) => {
+                  window.location.href = buildUrl({
+                    view: "timesheets",
+                    status: filterStatus,
+                    ...(e.target.value ? { payPeriod: e.target.value } : {}),
+                  });
+                }}
+                className="h-9 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:outline-none"
+              >
+                <option value="">All Pay Periods</option>
+                {payPeriods.map((pp) => (
+                  <option key={pp.id} value={pp.id}>
+                    {MONTHS[pp.periodMonth - 1]} {pp.periodYear}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* Bulk approve bar */}
           {isAdmin && selectedIds.size > 0 && (
             <div className="flex items-center gap-3 rounded-lg bg-success/5 border border-success/20 px-4 py-3">
@@ -415,6 +461,7 @@ export function TimesheetsClient({
                                         <th className="px-3 py-2 text-left text-xs font-medium text-slate">Date</th>
                                         <th className="px-3 py-2 text-left text-xs font-medium text-slate">Category</th>
                                         <th className="px-3 py-2 text-left text-xs font-medium text-slate">Description</th>
+                                        <th className="px-3 py-2 text-left text-xs font-medium text-slate">Time</th>
                                         <th className="px-3 py-2 text-right text-xs font-medium text-slate">Hours</th>
                                         <th className="px-3 py-2 text-left text-xs font-medium text-slate">Status</th>
                                         <th className="px-3 py-2 text-right text-xs font-medium text-slate w-32">Actions</th>
@@ -454,6 +501,11 @@ export function TimesheetsClient({
                                                   <EntryChangeLog changes={e.changes} />
                                                 </div>
                                               )}
+                                            </td>
+                                            <td className="px-3 py-2 text-slate whitespace-nowrap text-xs">
+                                              {e.start_time && e.end_time
+                                                ? `${formatTime12h(e.start_time)} – ${formatTime12h(e.end_time)}`
+                                                : e.start_time ? formatTime12h(e.start_time) : "—"}
                                             </td>
                                             <td className="px-3 py-2 text-right font-medium text-charcoal">
                                               {e.total_hours?.toFixed(1)}
