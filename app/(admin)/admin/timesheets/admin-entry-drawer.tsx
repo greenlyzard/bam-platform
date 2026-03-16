@@ -74,32 +74,45 @@ function formatTime12h(time: string): string {
 
 const CATEGORIES = [
   { value: "class", label: "Class" },
+  { value: "class_assistant", label: "Class Assistant" },
   { value: "private", label: "Private" },
   { value: "rehearsal", label: "Rehearsal" },
+  { value: "substitute", label: "Substitute" },
   { value: "admin", label: "Admin" },
+  { value: "training", label: "Training" },
+  { value: "performance", label: "Performance" },
+  { value: "competition", label: "Competition" },
+  { value: "bonus", label: "Bonus" },
   { value: "other", label: "Other" },
 ];
 
 const ENTRY_TYPE_TO_CATEGORY: Record<string, string> = {
   class_lead: "class",
-  class_assistant: "class",
+  class_assistant: "class_assistant",
   private: "private",
   rehearsal: "rehearsal",
   admin: "admin",
-  performance_event: "other",
-  competition: "other",
-  training: "other",
-  substitute: "class",
-  bonus: "other",
+  performance_event: "performance",
+  competition: "competition",
+  training: "training",
+  substitute: "substitute",
+  bonus: "bonus",
 };
 
 const DESCRIPTION_LABELS: Record<string, string> = {
-  class: "Class Name",
   private: "Student Name(s)",
   rehearsal: "Rehearsal / Cast Group",
+  substitute: "Class / Session Name",
   admin: "Task Description",
+  training: "Training Description",
+  performance: "Performance Description",
+  competition: "Competition Description",
+  bonus: "Description",
   other: "Description",
 };
+
+const SHOW_SCHEDULE_CLASSES = new Set(["class", "class_assistant"]);
+const SHOW_ALL_CLASSES = new Set(["private", "rehearsal", "substitute"]);
 
 // ── Multi-select checkbox dropdown ───────────────────────
 function MultiSelectDropdown({
@@ -409,6 +422,7 @@ function EntryDrawer({
   const [selectedClassId, setSelectedClassId] = useState("");
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const [subForTeacher, setSubForTeacher] = useState(entry?.sub_for ?? "");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -516,6 +530,7 @@ function EntryDrawer({
         setSelectedClassId("");
         setCustomMode(false);
         setDescription("");
+        setSubForTeacher("");
         setSelectedStudentIds([]);
         setSelectedProductionIds([]);
         if (formRef.current) {
@@ -650,6 +665,9 @@ function EntryDrawer({
               onChange={(e) => {
                 setCategory(e.target.value);
                 setSelectedInstance("");
+                setSelectedClassId("");
+                setCustomMode(false);
+                setSubForTeacher("");
                 setSelectedStudentIds([]);
               }}
               className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
@@ -663,10 +681,10 @@ function EntryDrawer({
           </div>
 
           {/* Class / Session Selector — three-tier: schedule instances → all classes → custom */}
-          {selectedTeacher && (
+          {selectedTeacher && (SHOW_SCHEDULE_CLASSES.has(category) || SHOW_ALL_CLASSES.has(category)) && (
             <div>
               <label className="block text-sm font-medium text-charcoal mb-1.5">
-                {scheduleInstances.length > 0 ? "Schedule Session" : "Class"}
+                {SHOW_SCHEDULE_CLASSES.has(category) && scheduleInstances.length > 0 ? "Schedule Session" : "Class"}
               </label>
 
               {customMode ? (
@@ -691,7 +709,7 @@ function EntryDrawer({
                     className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
                   />
                 </>
-              ) : scheduleInstances.length > 0 ? (
+              ) : SHOW_SCHEDULE_CLASSES.has(category) && scheduleInstances.length > 0 ? (
                 <select
                   value={selectedInstance}
                   onChange={(e) => {
@@ -831,46 +849,53 @@ function EntryDrawer({
             />
           </div>
 
-          {/* Description */}
-          <div>
-            <label className="block text-sm font-medium text-charcoal mb-1.5">
-              {DESCRIPTION_LABELS[category] ?? "Description"}
-            </label>
-            <input
-              name="description"
-              type="text"
-              maxLength={500}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder={
-                category === "class"
-                  ? "e.g. Intermediate Ballet"
-                  : category === "private"
+          {/* Description (hidden for class/class_assistant — dropdown covers it) */}
+          <input type="hidden" name="description" value={description} />
+          {!SHOW_SCHEDULE_CLASSES.has(category) && (
+            <div>
+              <label className="block text-sm font-medium text-charcoal mb-1.5">
+                {DESCRIPTION_LABELS[category] ?? "Description"}
+              </label>
+              <input
+                type="text"
+                maxLength={500}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder={
+                  category === "private"
                     ? "e.g. Sophia Martin"
                     : category === "rehearsal"
                       ? "e.g. Nutcracker Act II Corps"
                       : category === "admin"
                         ? "e.g. Schedule coordination"
                         : "Description"
-              }
-              className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
-            />
-          </div>
+                }
+                className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
+              />
+            </div>
+          )}
 
-          {/* Sub for */}
-          <div>
-            <label className="block text-sm font-medium text-charcoal mb-1.5">
-              Substitute for (optional)
-            </label>
-            <input
-              name="subFor"
-              type="text"
-              maxLength={200}
-              defaultValue={entry?.sub_for ?? ""}
-              placeholder="e.g. Covering for Sarah Hampton"
-              className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
-            />
-          </div>
+          {/* Substitute for — teacher dropdown, only for substitute category */}
+          {category === "substitute" && (
+            <div>
+              <label className="block text-sm font-medium text-charcoal mb-1.5">
+                Substitute for
+              </label>
+              <select
+                name="subFor"
+                value={subForTeacher}
+                onChange={(e) => setSubForTeacher(e.target.value)}
+                className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
+              >
+                <option value="">Select teacher...</option>
+                {teachers
+                  .filter((t) => t.id !== selectedTeacher)
+                  .map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+              </select>
+            </div>
+          )}
 
           {/* Productions multi-select */}
           {productions.length > 0 && (

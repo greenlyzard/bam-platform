@@ -400,16 +400,25 @@ export async function markEntriesAsPaid(formData: FormData) {
 
 const CATEGORY_TO_ENTRY_TYPE: Record<string, string> = {
   class: "class_lead",
+  class_assistant: "class_assistant",
   private: "private",
   rehearsal: "rehearsal",
+  substitute: "substitute",
   admin: "admin",
+  training: "training",
+  performance: "performance_event",
+  competition: "competition",
+  bonus: "bonus",
   other: "bonus",
 };
 
 const adminEntrySchema = z.object({
   teacherProfileId: z.string().uuid(),
   date: z.string().date(),
-  category: z.enum(["class", "private", "rehearsal", "admin", "other"]),
+  category: z.enum([
+    "class", "class_assistant", "private", "rehearsal", "substitute",
+    "admin", "training", "performance", "competition", "bonus", "other"
+  ]),
   totalHours: z.number().min(0.25).max(24),
   description: z.string().max(500).optional(),
   subFor: z.string().max(200).optional(),
