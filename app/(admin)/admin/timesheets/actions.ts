@@ -543,6 +543,21 @@ export async function adminAddEntry(formData: FormData) {
     return { error: "Failed to add entry." };
   }
 
+  // Save production associations to junction table
+  const productionIdsRaw = formData.get("productionIds") as string;
+  if (productionIdsRaw) {
+    try {
+      const productionIds = JSON.parse(productionIdsRaw) as string[];
+      if (productionIds.length > 0) {
+        const rows = productionIds.map((pid) => ({
+          timesheet_entry_id: newEntry.id,
+          production_id: pid,
+        }));
+        await supabase.from("teacher_hour_productions").insert(rows);
+      }
+    } catch { /* ignore parse errors */ }
+  }
+
   await logChange(supabase, {
     tenantId: tp.tenant_id,
     entryId: newEntry.id,
@@ -612,6 +627,26 @@ export async function adminUpdateEntry(formData: FormData) {
   if (error) {
     console.error("[admin:updateEntry]", error);
     return { error: "Failed to update entry." };
+  }
+
+  // Sync production associations
+  const productionIdsRaw = formData.get("productionIds") as string;
+  if (productionIdsRaw) {
+    try {
+      const productionIds = JSON.parse(productionIdsRaw) as string[];
+      // Delete old associations, insert new
+      await supabase
+        .from("teacher_hour_productions")
+        .delete()
+        .eq("timesheet_entry_id", entryId);
+      if (productionIds.length > 0) {
+        const rows = productionIds.map((pid) => ({
+          timesheet_entry_id: entryId,
+          production_id: pid,
+        }));
+        await supabase.from("teacher_hour_productions").insert(rows);
+      }
+    } catch { /* ignore parse errors */ }
   }
 
   if (oldEntry && oldEntry.total_hours !== d.totalHours) {

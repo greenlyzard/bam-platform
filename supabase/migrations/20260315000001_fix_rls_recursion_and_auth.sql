@@ -120,8 +120,6 @@ CREATE POLICY "admins_manage_roles_table" ON roles
 
 -- ── teacher_profiles (from 20260312000001) ──────────────────
 DROP POLICY IF EXISTS "admins_teacher_profiles" ON teacher_profiles;
-CREATE POLICY "admins_teacher_profiles" ON teacher_profiles
-  FOR ALL USING (public.is_admin());
 
 -- ── rate_definitions (from 20260312000001) ──────────────────
 DROP POLICY IF EXISTS "admins_rate_definitions" ON rate_definitions;

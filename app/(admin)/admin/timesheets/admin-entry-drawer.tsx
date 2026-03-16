@@ -28,6 +28,7 @@ interface EntryData {
   teacher_id?: string;
   start_time?: string | null;
   end_time?: string | null;
+  production_ids?: string[];
 }
 
 interface TeacherClass {
@@ -37,6 +38,11 @@ interface TeacherClass {
   day_name: string | null;
   start_time: string | null;
   end_time: string | null;
+}
+
+interface Student {
+  id: string;
+  name: string;
 }
 
 function computeHours(start: string, end: string): number | null {
@@ -79,11 +85,94 @@ const ENTRY_TYPE_TO_CATEGORY: Record<string, string> = {
 
 const DESCRIPTION_LABELS: Record<string, string> = {
   class: "Class Name",
-  private: "Student Name",
+  private: "Student Name(s)",
   rehearsal: "Rehearsal / Cast Group",
   admin: "Task Description",
   other: "Description",
 };
+
+// ── Multi-select checkbox dropdown ───────────────────────
+function MultiSelectDropdown({
+  label,
+  options,
+  selected,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  options: { id: string; name: string }[];
+  selected: string[];
+  onChange: (ids: string[]) => void;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const toggle = (id: string) => {
+    onChange(
+      selected.includes(id)
+        ? selected.filter((s) => s !== id)
+        : [...selected, id]
+    );
+  };
+
+  const selectedNames = options
+    .filter((o) => selected.includes(o.id))
+    .map((o) => o.name);
+
+  return (
+    <div ref={ref} className="relative">
+      <label className="block text-sm font-medium text-charcoal mb-1.5">
+        {label}
+      </label>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-left text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none flex items-center justify-between"
+      >
+        <span className={selectedNames.length ? "text-charcoal" : "text-mist"}>
+          {selectedNames.length
+            ? selectedNames.length <= 2
+              ? selectedNames.join(", ")
+              : `${selectedNames.length} selected`
+            : placeholder ?? "Select..."}
+        </span>
+        <span className="text-mist text-xs ml-2">{open ? "\u25B2" : "\u25BC"}</span>
+      </button>
+      {open && (
+        <div className="absolute z-20 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-silver bg-white shadow-lg">
+          {options.length === 0 && (
+            <div className="px-3 py-2 text-sm text-mist">No options</div>
+          )}
+          {options.map((o) => (
+            <label
+              key={o.id}
+              className="flex items-center gap-2 px-3 py-2 hover:bg-cloud/50 cursor-pointer text-sm text-charcoal"
+            >
+              <input
+                type="checkbox"
+                checked={selected.includes(o.id)}
+                onChange={() => toggle(o.id)}
+                className="h-4 w-4 rounded border-silver text-lavender focus:ring-lavender/20"
+              />
+              {o.name}
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── Quick Entry Mode bar ──────────────────────────────────
 export function QuickEntryBar({
@@ -293,8 +382,8 @@ function EntryDrawer({
   const [selectedTeacher, setSelectedTeacher] = useState(
     entry?.teacher_id ?? defaultTeacher ?? ""
   );
-  const [selectedProduction, setSelectedProduction] = useState(
-    entry?.production_id ?? ""
+  const [selectedProductionIds, setSelectedProductionIds] = useState<string[]>(
+    entry?.production_ids ?? (entry?.production_id ? [entry.production_id] : [])
   );
   const [currentDate, setCurrentDate] = useState(
     entry?.date ?? new Date().toISOString().split("T")[0]
@@ -305,6 +394,8 @@ function EntryDrawer({
   const [teacherClasses, setTeacherClasses] = useState<TeacherClass[]>([]);
   const [selectedClass, setSelectedClass] = useState("");
   const [description, setDescription] = useState(entry?.description ?? "");
+  const [students, setStudents] = useState<Student[]>([]);
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -332,14 +423,47 @@ function EntryDrawer({
     }
   }, [category, selectedTeacher]);
 
+  // Fetch students when a class is selected
+  useEffect(() => {
+    if (selectedClass) {
+      fetch(`/api/teach/students?classId=${selectedClass}`)
+        .then((r) => r.json())
+        .then((d) => setStudents(d.students ?? []))
+        .catch(() => setStudents([]));
+    } else {
+      setStudents([]);
+      setSelectedStudentIds([]);
+    }
+  }, [selectedClass]);
+
   const handleSubmitAction = useCallback(
     async (formData: FormData) => {
       setLoading(true);
       setError("");
 
-      if (selectedProduction) {
-        const prod = productions.find((p) => p.id === selectedProduction);
-        if (prod) formData.set("productionName", prod.name);
+      // Set production IDs as JSON
+      if (selectedProductionIds.length > 0) {
+        formData.set("productionIds", JSON.stringify(selectedProductionIds));
+        // Also set first production for backward compat
+        const firstProd = productions.find((p) => p.id === selectedProductionIds[0]);
+        if (firstProd) {
+          formData.set("productionId", firstProd.id);
+          formData.set("productionName", firstProd.name);
+        }
+      }
+
+      // Set student IDs
+      if (selectedStudentIds.length > 0) {
+        formData.set("studentIds", JSON.stringify(selectedStudentIds));
+        // Build student names for description if category is private
+        if (category === "private") {
+          const names = students
+            .filter((s) => selectedStudentIds.includes(s.id))
+            .map((s) => s.name);
+          if (names.length > 0 && !formData.get("description")) {
+            formData.set("description", names.join(", "));
+          }
+        }
       }
 
       const hours = parseFloat(formData.get("totalHours") as string) || 0;
@@ -367,6 +491,8 @@ function EntryDrawer({
         setHours("");
         setSelectedClass("");
         setDescription("");
+        setSelectedStudentIds([]);
+        setSelectedProductionIds([]);
         if (formRef.current) {
           const notesInput = formRef.current.querySelector(
             'textarea[name="notes"]'
@@ -381,7 +507,10 @@ function EntryDrawer({
     [
       isEdit,
       quickMode,
-      selectedProduction,
+      selectedProductionIds,
+      selectedStudentIds,
+      students,
+      category,
       productions,
       currentDate,
       onClose,
@@ -496,6 +625,7 @@ function EntryDrawer({
               onChange={(e) => {
                 setCategory(e.target.value);
                 setSelectedClass("");
+                setSelectedStudentIds([]);
               }}
               className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
             >
@@ -533,12 +663,23 @@ function EntryDrawer({
                     {c.name}
                     {c.day_name ? ` (${c.day_name}` : ""}
                     {c.start_time ? ` ${formatTime12h(c.start_time)}` : ""}
-                    {c.end_time ? `–${formatTime12h(c.end_time)}` : ""}
+                    {c.end_time ? `\u2013${formatTime12h(c.end_time)}` : ""}
                     {c.day_name ? ")" : ""}
                   </option>
                 ))}
               </select>
             </div>
+          )}
+
+          {/* Students multi-select (when a class is selected) */}
+          {selectedClass && students.length > 0 && (
+            <MultiSelectDropdown
+              label="Students (optional)"
+              options={students}
+              selected={selectedStudentIds}
+              onChange={setSelectedStudentIds}
+              placeholder="Select students..."
+            />
           )}
 
           {/* Start / End Time */}
@@ -632,42 +773,16 @@ function EntryDrawer({
             />
           </div>
 
-          {/* Production */}
+          {/* Productions multi-select */}
           {productions.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-charcoal mb-1.5">
-                Tag to Production (optional)
-              </label>
-              <select
-                name="productionId"
-                value={selectedProduction}
-                onChange={(e) => setSelectedProduction(e.target.value)}
-                className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
-              >
-                <option value="">None</option>
-                {productions.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Event Tag */}
-          <div>
-            <label className="block text-sm font-medium text-charcoal mb-1.5">
-              Event / Note Tag (optional)
-            </label>
-            <input
-              name="eventTag"
-              type="text"
-              maxLength={200}
-              defaultValue={entry?.event_tag ?? ""}
-              placeholder="e.g. Spring Showcase Audition"
-              className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
+            <MultiSelectDropdown
+              label="Tag to Productions (optional)"
+              options={productions}
+              selected={selectedProductionIds}
+              onChange={setSelectedProductionIds}
+              placeholder="Select productions..."
             />
-          </div>
+          )}
 
           {/* Notes */}
           <div>
