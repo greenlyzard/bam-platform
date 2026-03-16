@@ -83,7 +83,7 @@ export default async function AdminTimesheetsPage({
   let tsQuery = supabase
     .from("timesheets")
     .select(
-      "id, status, total_hours, submitted_at, reviewed_at, rejection_notes, teacher_id, profiles(first_name, last_name, email)"
+      "id, status, total_hours, submitted_at, reviewed_at, rejection_notes, teacher_id, profiles!teacher_id(first_name, last_name, email)"
     )
     .order("submitted_at", { ascending: false });
 
@@ -143,7 +143,7 @@ export default async function AdminTimesheetsPage({
     let entryQuery = supabase
       .from("timesheet_entries")
       .select(
-        "id, timesheet_id, date, entry_type, total_hours, description, sub_for, production_id, production_name, event_tag, notes, status, flag_question, flag_response, flagged_at, approved_at, adjustment_note, timesheets!inner(teacher_id, status, profiles(first_name, last_name))"
+        "id, timesheet_id, date, entry_type, total_hours, description, sub_for, production_id, production_name, event_tag, notes, status, flag_question, flag_response, flagged_at, approved_at, adjustment_note, timesheets!inner(teacher_id, status, profiles!teacher_id(first_name, last_name))"
       )
       .gte("date", dateFrom)
       .lte("date", dateTo)
