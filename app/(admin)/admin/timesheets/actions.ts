@@ -280,6 +280,9 @@ export async function adjustTimesheetEntry(formData: FormData) {
     productionName: formData.get("productionName") || undefined,
     eventTag: formData.get("eventTag") || undefined,
     notes: formData.get("notes") || undefined,
+    startTime: formData.get("startTime") || undefined,
+    endTime: formData.get("endTime") || undefined,
+    classId: formData.get("classId") || undefined,
   });
 
   if (!parsed.success) {
@@ -301,6 +304,9 @@ export async function adjustTimesheetEntry(formData: FormData) {
       production_name: d.productionName || null,
       event_tag: d.eventTag || null,
       notes: d.notes || null,
+      start_time: d.startTime || null,
+      end_time: d.endTime || null,
+      class_id: d.classId || null,
       status: "adjusted",
       adjusted_by: user.id,
       adjustment_note: adjustmentNote.trim(),
@@ -402,13 +408,16 @@ const adminEntrySchema = z.object({
   teacherProfileId: z.string().uuid(),
   date: z.string().date(),
   category: z.enum(["class", "private", "rehearsal", "admin", "other"]),
-  totalHours: z.number().min(0.5).max(24),
+  totalHours: z.number().min(0.25).max(24),
   description: z.string().max(500).optional(),
   subFor: z.string().max(200).optional(),
   productionId: z.string().uuid().optional(),
   productionName: z.string().max(200).optional(),
   eventTag: z.string().max(200).optional(),
   notes: z.string().max(2000).optional(),
+  startTime: z.string().optional(),
+  endTime: z.string().optional(),
+  classId: z.string().uuid().optional(),
 });
 
 async function getOrCreateTimesheetForTeacher(
@@ -485,6 +494,9 @@ export async function adminAddEntry(formData: FormData) {
     productionName: formData.get("productionName") || undefined,
     eventTag: formData.get("eventTag") || undefined,
     notes: formData.get("notes") || undefined,
+    startTime: formData.get("startTime") || undefined,
+    endTime: formData.get("endTime") || undefined,
+    classId: formData.get("classId") || undefined,
   });
 
   if (!parsed.success) {
@@ -518,6 +530,9 @@ export async function adminAddEntry(formData: FormData) {
       production_name: d.productionName || null,
       event_tag: d.eventTag || null,
       notes: d.notes || null,
+      start_time: d.startTime || null,
+      end_time: d.endTime || null,
+      class_id: d.classId || null,
       status: "draft",
     })
     .select("id")
@@ -558,6 +573,9 @@ export async function adminUpdateEntry(formData: FormData) {
     productionName: formData.get("productionName") || undefined,
     eventTag: formData.get("eventTag") || undefined,
     notes: formData.get("notes") || undefined,
+    startTime: formData.get("startTime") || undefined,
+    endTime: formData.get("endTime") || undefined,
+    classId: formData.get("classId") || undefined,
   });
 
   if (!parsed.success) {
@@ -585,6 +603,9 @@ export async function adminUpdateEntry(formData: FormData) {
       production_name: d.productionName || null,
       event_tag: d.eventTag || null,
       notes: d.notes || null,
+      start_time: d.startTime || null,
+      end_time: d.endTime || null,
+      class_id: d.classId || null,
     })
     .eq("id", entryId);
 

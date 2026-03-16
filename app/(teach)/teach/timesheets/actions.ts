@@ -36,6 +36,9 @@ const entrySchema = z.object({
   productionName: z.string().max(200).optional(),
   eventTag: z.string().max(200).optional(),
   notes: z.string().max(2000).optional(),
+  startTime: z.string().optional(),
+  endTime: z.string().optional(),
+  classId: z.string().uuid().optional(),
 });
 
 /** Get or create a draft timesheet for this teacher / current pay period */
@@ -155,6 +158,9 @@ export async function addTimesheetEntry(formData: FormData) {
     productionName: formData.get("productionName") || undefined,
     eventTag: formData.get("eventTag") || undefined,
     notes: formData.get("notes") || undefined,
+    startTime: formData.get("startTime") || undefined,
+    endTime: formData.get("endTime") || undefined,
+    classId: formData.get("classId") || undefined,
   });
 
   if (!parsed.success) {
@@ -181,6 +187,9 @@ export async function addTimesheetEntry(formData: FormData) {
     production_name: parsed.data.productionName || null,
     event_tag: parsed.data.eventTag || null,
     notes: parsed.data.notes || null,
+    start_time: parsed.data.startTime || null,
+    end_time: parsed.data.endTime || null,
+    class_id: parsed.data.classId || null,
   });
 
   if (error) {
@@ -214,6 +223,9 @@ export async function updateTimesheetEntry(formData: FormData) {
     productionName: formData.get("productionName") || undefined,
     eventTag: formData.get("eventTag") || undefined,
     notes: formData.get("notes") || undefined,
+    startTime: formData.get("startTime") || undefined,
+    endTime: formData.get("endTime") || undefined,
+    classId: formData.get("classId") || undefined,
   });
 
   if (!parsed.success) {
@@ -252,6 +264,9 @@ export async function updateTimesheetEntry(formData: FormData) {
       production_name: parsed.data.productionName || null,
       event_tag: parsed.data.eventTag || null,
       notes: parsed.data.notes || null,
+      start_time: parsed.data.startTime || null,
+      end_time: parsed.data.endTime || null,
+      class_id: parsed.data.classId || null,
     })
     .eq("id", entryId);
 

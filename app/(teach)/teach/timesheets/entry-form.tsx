@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   addTimesheetEntry,
   updateTimesheetEntry,
@@ -47,11 +47,39 @@ interface Entry {
   production_name?: string | null;
   event_tag?: string | null;
   notes?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
 }
 
 interface Production {
   id: string;
   name: string;
+}
+
+interface TeacherClass {
+  id: string;
+  name: string;
+  day_of_week: number | null;
+  day_name: string | null;
+  start_time: string | null;
+  end_time: string | null;
+}
+
+function computeHours(start: string, end: string): number | null {
+  const [sh, sm] = start.split(":").map(Number);
+  const [eh, em] = end.split(":").map(Number);
+  if (isNaN(sh) || isNaN(sm) || isNaN(eh) || isNaN(em)) return null;
+  const diff = (eh * 60 + em) - (sh * 60 + sm);
+  if (diff <= 0) return null;
+  return Math.round((diff / 60) * 100) / 100;
+}
+
+function formatTime12h(time: string): string {
+  const [h, m] = time.split(":");
+  const hour = parseInt(h);
+  const ampm = hour >= 12 ? "PM" : "AM";
+  const h12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+  return `${h12}:${m} ${ampm}`;
 }
 
 export function AddEntryForm({
@@ -114,8 +142,35 @@ function EntryFormCard({
   const [selectedProduction, setSelectedProduction] = useState(
     entry?.production_id ?? ""
   );
+  const [startTime, setStartTime] = useState(entry?.start_time ?? "");
+  const [endTime, setEndTime] = useState(entry?.end_time ?? "");
+  const [hours, setHours] = useState(entry?.total_hours?.toString() ?? "");
+  const [teacherClasses, setTeacherClasses] = useState<TeacherClass[]>([]);
+  const [selectedClass, setSelectedClass] = useState("");
+  const [description, setDescription] = useState(entry?.description ?? "");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Auto-calculate hours when times change
+  useEffect(() => {
+    if (startTime && endTime) {
+      const computed = computeHours(startTime, endTime);
+      if (computed) setHours(computed.toString());
+    }
+  }, [startTime, endTime]);
+
+  // Fetch teacher's classes when category = class
+  useEffect(() => {
+    if (category === "class") {
+      fetch("/api/teach/classes")
+        .then((r) => r.json())
+        .then((d) => setTeacherClasses(d.classes ?? []))
+        .catch(() => setTeacherClasses([]));
+    } else {
+      setTeacherClasses([]);
+      setSelectedClass("");
+    }
+  }, [category]);
 
   async function handleSubmit(formData: FormData) {
     setLoading(true);
@@ -166,7 +221,7 @@ function EntryFormCard({
           </div>
         )}
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-medium text-charcoal mb-1">
               Date *
@@ -189,7 +244,10 @@ function EntryFormCard({
               name="category"
               required
               value={category}
-              onChange={(e) => setCategory(e.target.value)}
+              onChange={(e) => {
+                setCategory(e.target.value);
+                setSelectedClass("");
+              }}
               className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
             >
               {CATEGORIES.map((c) => (
@@ -199,41 +257,110 @@ function EntryFormCard({
               ))}
             </select>
           </div>
+        </div>
+
+        {/* Class Dropdown (when category = class) */}
+        {category === "class" && teacherClasses.length > 0 && (
+          <div>
+            <label className="block text-xs font-medium text-charcoal mb-1">
+              Select Class
+            </label>
+            <select
+              name="classId"
+              value={selectedClass}
+              onChange={(e) => {
+                const cls = teacherClasses.find((c) => c.id === e.target.value);
+                setSelectedClass(e.target.value);
+                if (cls) {
+                  setDescription(cls.name);
+                  if (cls.start_time) setStartTime(cls.start_time.slice(0, 5));
+                  if (cls.end_time) setEndTime(cls.end_time.slice(0, 5));
+                }
+              }}
+              className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
+            >
+              <option value="">Select a class...</option>
+              {teacherClasses.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                  {c.day_name ? ` (${c.day_name}` : ""}
+                  {c.start_time ? ` ${formatTime12h(c.start_time)}` : ""}
+                  {c.end_time ? `–${formatTime12h(c.end_time)}` : ""}
+                  {c.day_name ? ")" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Start / End Time + Hours */}
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-charcoal mb-1">
+              Start Time
+            </label>
+            <input
+              name="startTime"
+              type="time"
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+              className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-charcoal mb-1">
+              End Time
+            </label>
+            <input
+              name="endTime"
+              type="time"
+              value={endTime}
+              onChange={(e) => setEndTime(e.target.value)}
+              className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
+            />
+          </div>
           <div>
             <label className="block text-xs font-medium text-charcoal mb-1">
               Hours *
+              {startTime && endTime && (
+                <span className="ml-1 text-[10px] font-normal text-mist">(auto)</span>
+              )}
             </label>
             <input
               name="totalHours"
               type="number"
-              step="0.5"
-              min="0.5"
+              step="0.25"
+              min="0.25"
               max="24"
               required
-              defaultValue={entry?.total_hours?.toString() ?? ""}
+              value={hours}
+              onChange={(e) => setHours(e.target.value)}
               placeholder="1.5"
               className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
             />
           </div>
-          <div>
-            <label className="block text-xs font-medium text-charcoal mb-1">
-              {DESCRIPTION_LABELS[category] ?? "Description"}
-            </label>
-            <input
-              name="description"
-              type="text"
-              maxLength={500}
-              defaultValue={entry?.description ?? ""}
-              placeholder={
-                category === "class"
-                  ? "e.g. Intermediate Ballet"
-                  : category === "private"
-                  ? "e.g. Sophia Martin"
-                  : "Description"
-              }
-              className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
-            />
-          </div>
+        </div>
+
+        {/* Description */}
+        <div>
+          <label className="block text-xs font-medium text-charcoal mb-1">
+            {DESCRIPTION_LABELS[category] ?? "Description"}
+          </label>
+          <input
+            name="description"
+            type="text"
+            maxLength={500}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder={
+              category === "class"
+                ? "e.g. Intermediate Ballet"
+                : category === "private"
+                ? "e.g. Sophia Martin"
+                : "Description"
+            }
+            className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
+          />
         </div>
 
         {/* Sub for */}
