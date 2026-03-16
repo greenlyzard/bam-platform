@@ -31,13 +31,16 @@ interface EntryData {
   production_ids?: string[];
 }
 
-interface TeacherClass {
+interface ScheduleInstance {
   id: string;
-  name: string;
-  day_of_week: number | null;
-  day_name: string | null;
+  event_type: string;
+  event_date: string;
   start_time: string | null;
   end_time: string | null;
+  class_id: string | null;
+  class_name: string | null;
+  production_id: string | null;
+  notes: string | null;
 }
 
 interface Student {
@@ -391,8 +394,8 @@ function EntryDrawer({
   const [startTime, setStartTime] = useState(entry?.start_time ?? "");
   const [endTime, setEndTime] = useState(entry?.end_time ?? "");
   const [hours, setHours] = useState(entry?.total_hours?.toString() ?? "");
-  const [teacherClasses, setTeacherClasses] = useState<TeacherClass[]>([]);
-  const [selectedClass, setSelectedClass] = useState("");
+  const [scheduleInstances, setScheduleInstances] = useState<ScheduleInstance[]>([]);
+  const [selectedInstance, setSelectedInstance] = useState("");
   const [description, setDescription] = useState(entry?.description ?? "");
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
@@ -410,23 +413,24 @@ function EntryDrawer({
     }
   }, [startTime, endTime]);
 
-  // Fetch teacher's classes when teacher changes and category is "class"
+  // Fetch schedule instances when teacher AND date are both set
   useEffect(() => {
-    if (category === "class" && selectedTeacher) {
-      fetch(`/api/teach/classes?teacherId=${selectedTeacher}`)
+    if (selectedTeacher && currentDate) {
+      fetch(`/api/admin/schedule-instances?teacherId=${selectedTeacher}&date=${currentDate}`)
         .then((r) => r.json())
-        .then((d) => setTeacherClasses(d.classes ?? []))
-        .catch(() => setTeacherClasses([]));
+        .then((d) => setScheduleInstances(d.instances ?? []))
+        .catch(() => setScheduleInstances([]));
     } else {
-      setTeacherClasses([]);
-      setSelectedClass("");
+      setScheduleInstances([]);
+      setSelectedInstance("");
     }
-  }, [category, selectedTeacher]);
+  }, [selectedTeacher, currentDate]);
 
-  // Fetch students when a class is selected
+  // Fetch students when a schedule instance with a class is selected
   useEffect(() => {
-    if (selectedClass) {
-      fetch(`/api/teach/students?classId=${selectedClass}`)
+    const inst = scheduleInstances.find((i) => i.id === selectedInstance);
+    if (inst?.class_id) {
+      fetch(`/api/teach/students?classId=${inst.class_id}`)
         .then((r) => r.json())
         .then((d) => setStudents(d.students ?? []))
         .catch(() => setStudents([]));
@@ -434,7 +438,7 @@ function EntryDrawer({
       setStudents([]);
       setSelectedStudentIds([]);
     }
-  }, [selectedClass]);
+  }, [selectedInstance, scheduleInstances]);
 
   const handleSubmitAction = useCallback(
     async (formData: FormData) => {
@@ -489,7 +493,7 @@ function EntryDrawer({
         setStartTime("");
         setEndTime("");
         setHours("");
-        setSelectedClass("");
+        setSelectedInstance("");
         setDescription("");
         setSelectedStudentIds([]);
         setSelectedProductionIds([]);
@@ -624,7 +628,7 @@ function EntryDrawer({
               value={category}
               onChange={(e) => {
                 setCategory(e.target.value);
-                setSelectedClass("");
+                setSelectedInstance("");
                 setSelectedStudentIds([]);
               }}
               className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
@@ -637,42 +641,46 @@ function EntryDrawer({
             </select>
           </div>
 
-          {/* Class Dropdown (when category = class and teacher selected) */}
-          {category === "class" && selectedTeacher && teacherClasses.length > 0 && (
+          {/* Schedule Instance Dropdown (when teacher + date selected) */}
+          {selectedTeacher && scheduleInstances.length > 0 && (
             <div>
               <label className="block text-sm font-medium text-charcoal mb-1.5">
-                Select Class
+                Schedule Session
               </label>
               <select
-                name="classId"
-                value={selectedClass}
+                value={selectedInstance}
                 onChange={(e) => {
-                  const cls = teacherClasses.find((c) => c.id === e.target.value);
-                  setSelectedClass(e.target.value);
-                  if (cls) {
-                    setDescription(cls.name);
-                    if (cls.start_time) setStartTime(cls.start_time.slice(0, 5));
-                    if (cls.end_time) setEndTime(cls.end_time.slice(0, 5));
+                  const inst = scheduleInstances.find((i) => i.id === e.target.value);
+                  setSelectedInstance(e.target.value);
+                  if (inst) {
+                    if (inst.class_name) setDescription(inst.class_name);
+                    if (inst.start_time) setStartTime(inst.start_time.slice(0, 5));
+                    if (inst.end_time) setEndTime(inst.end_time.slice(0, 5));
+                    if (inst.production_id) {
+                      setSelectedProductionIds((prev) =>
+                        prev.includes(inst.production_id!) ? prev : [...prev, inst.production_id!]
+                      );
+                    }
                   }
                 }}
                 className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
               >
-                <option value="">Select a class...</option>
-                {teacherClasses.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                    {c.day_name ? ` (${c.day_name}` : ""}
-                    {c.start_time ? ` ${formatTime12h(c.start_time)}` : ""}
-                    {c.end_time ? `\u2013${formatTime12h(c.end_time)}` : ""}
-                    {c.day_name ? ")" : ""}
+                <option value="">Select a session...</option>
+                {scheduleInstances.map((inst) => (
+                  <option key={inst.id} value={inst.id}>
+                    {inst.class_name ?? inst.event_type}
+                    {inst.start_time ? ` ${formatTime12h(inst.start_time)}` : ""}
+                    {inst.end_time ? `\u2013${formatTime12h(inst.end_time)}` : ""}
                   </option>
                 ))}
               </select>
+              <input type="hidden" name="scheduleInstanceId" value={selectedInstance} />
+              <input type="hidden" name="classId" value={scheduleInstances.find((i) => i.id === selectedInstance)?.class_id ?? ""} />
             </div>
           )}
 
-          {/* Students multi-select (when a class is selected) */}
-          {selectedClass && students.length > 0 && (
+          {/* Students multi-select (when a session with a class is selected) */}
+          {selectedInstance && students.length > 0 && (
             <MultiSelectDropdown
               label="Students (optional)"
               options={students}

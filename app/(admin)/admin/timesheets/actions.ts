@@ -283,6 +283,7 @@ export async function adjustTimesheetEntry(formData: FormData) {
     startTime: formData.get("startTime") || undefined,
     endTime: formData.get("endTime") || undefined,
     classId: formData.get("classId") || undefined,
+    scheduleInstanceId: formData.get("scheduleInstanceId") || undefined,
   });
 
   if (!parsed.success) {
@@ -307,6 +308,7 @@ export async function adjustTimesheetEntry(formData: FormData) {
       start_time: d.startTime || null,
       end_time: d.endTime || null,
       class_id: d.classId || null,
+      schedule_instance_id: d.scheduleInstanceId || null,
       status: "adjusted",
       adjusted_by: user.id,
       adjustment_note: adjustmentNote.trim(),
@@ -418,6 +420,7 @@ const adminEntrySchema = z.object({
   startTime: z.string().optional(),
   endTime: z.string().optional(),
   classId: z.string().uuid().optional(),
+  scheduleInstanceId: z.string().uuid().optional(),
 });
 
 async function getOrCreateTimesheetForTeacher(
@@ -497,6 +500,7 @@ export async function adminAddEntry(formData: FormData) {
     startTime: formData.get("startTime") || undefined,
     endTime: formData.get("endTime") || undefined,
     classId: formData.get("classId") || undefined,
+    scheduleInstanceId: formData.get("scheduleInstanceId") || undefined,
   });
 
   if (!parsed.success) {
@@ -533,6 +537,7 @@ export async function adminAddEntry(formData: FormData) {
       start_time: d.startTime || null,
       end_time: d.endTime || null,
       class_id: d.classId || null,
+      schedule_instance_id: d.scheduleInstanceId || null,
       status: "draft",
     })
     .select("id")
@@ -591,6 +596,7 @@ export async function adminUpdateEntry(formData: FormData) {
     startTime: formData.get("startTime") || undefined,
     endTime: formData.get("endTime") || undefined,
     classId: formData.get("classId") || undefined,
+    scheduleInstanceId: formData.get("scheduleInstanceId") || undefined,
   });
 
   if (!parsed.success) {
@@ -621,6 +627,7 @@ export async function adminUpdateEntry(formData: FormData) {
       start_time: d.startTime || null,
       end_time: d.endTime || null,
       class_id: d.classId || null,
+      schedule_instance_id: d.scheduleInstanceId || null,
     })
     .eq("id", entryId);
 
