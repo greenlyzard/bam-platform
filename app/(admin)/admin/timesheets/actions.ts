@@ -4,14 +4,14 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-const ALLOWED_ROLES = ["finance_admin", "admin", "super_admin"];
+const ADMIN_ROLES = ["finance_admin", "admin", "super_admin"];
 
-async function requireFinanceAdmin() {
+async function requireAuth() {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { supabase, user: null, profile: null, error: "Unauthorized" };
+  if (!user) return { supabase, user: null, profile: null, isAdmin: false, teacherProfileId: null as string | null, error: "Unauthorized" };
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -19,11 +19,65 @@ async function requireFinanceAdmin() {
     .eq("id", user.id)
     .single();
 
-  if (!profile || !ALLOWED_ROLES.includes(profile.role)) {
-    return { supabase, user: null, profile: null, error: "Finance Admin required" };
+  if (!profile) return { supabase, user: null, profile: null, isAdmin: false, teacherProfileId: null as string | null, error: "Unauthorized" };
+
+  const isAdmin = ADMIN_ROLES.includes(profile.role);
+
+  // If teacher, look up their teacher_profile_id
+  let teacherProfileId: string | null = null;
+  if (profile.role === "teacher") {
+    const { data: tp } = await supabase
+      .from("teacher_profiles")
+      .select("id")
+      .eq("user_id", user.id)
+      .single();
+    teacherProfileId = tp?.id ?? null;
   }
 
-  return { supabase, user, profile, error: null };
+  // Must be admin or teacher
+  if (!isAdmin && profile.role !== "teacher") {
+    return { supabase, user: null, profile: null, isAdmin: false, teacherProfileId: null as string | null, error: "Unauthorized" };
+  }
+
+  return { supabase, user, profile, isAdmin, teacherProfileId, error: null };
+}
+
+async function verifyTeacherEntryAccess(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  entryId: string,
+  teacherProfileId: string
+): Promise<{ allowed: boolean; error?: string }> {
+  const { data: entry } = await supabase
+    .from("timesheet_entries")
+    .select("id, timesheet_id, timesheets!inner(teacher_id, status)")
+    .eq("id", entryId)
+    .single();
+
+  if (!entry) return { allowed: false, error: "Entry not found." };
+
+  const ts = (entry as any).timesheets;
+  if (ts.teacher_id !== teacherProfileId) return { allowed: false, error: "Not your entry." };
+  if (!["draft", "rejected"].includes(ts.status)) return { allowed: false, error: "Timesheet is not editable." };
+
+  return { allowed: true };
+}
+
+async function verifyTeacherTimesheetAccess(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  timesheetId: string,
+  teacherProfileId: string
+): Promise<{ allowed: boolean; error?: string }> {
+  const { data: ts } = await supabase
+    .from("timesheets")
+    .select("id, teacher_id, status")
+    .eq("id", timesheetId)
+    .single();
+
+  if (!ts) return { allowed: false, error: "Timesheet not found." };
+  if (ts.teacher_id !== teacherProfileId) return { allowed: false, error: "Not your timesheet." };
+  if (!["draft", "rejected"].includes(ts.status)) return { allowed: false, error: "Timesheet is not editable." };
+
+  return { allowed: true };
 }
 
 function getAdminName(profile: { first_name: string | null; last_name: string | null } | null): string {
@@ -61,8 +115,9 @@ async function logChange(
 // ── Timesheet-level actions ─────────────────────────────────
 
 export async function approveTimesheet(formData: FormData) {
-  const { supabase, user, profile, error: authError } = await requireFinanceAdmin();
+  const { supabase, user, profile, isAdmin, error: authError } = await requireAuth();
   if (authError || !user) return { error: authError ?? "Unauthorized" };
+  if (!isAdmin) return { error: "Admin required" };
 
   const timesheetId = formData.get("timesheetId") as string;
 
@@ -122,8 +177,9 @@ export async function approveTimesheet(formData: FormData) {
 }
 
 export async function returnTimesheet(formData: FormData) {
-  const { supabase, user, error: authError } = await requireFinanceAdmin();
+  const { supabase, user, isAdmin, error: authError } = await requireAuth();
   if (authError || !user) return { error: authError ?? "Unauthorized" };
+  if (!isAdmin) return { error: "Admin required" };
 
   const timesheetId = formData.get("timesheetId") as string;
   const notes = (formData.get("notes") as string) || null;
@@ -168,8 +224,9 @@ export async function returnTimesheet(formData: FormData) {
 // ── Entry-level approval actions ────────────────────────────
 
 export async function approveTimesheetEntry(formData: FormData) {
-  const { supabase, user, profile, error: authError } = await requireFinanceAdmin();
+  const { supabase, user, profile, isAdmin, error: authError } = await requireAuth();
   if (authError || !user) return { error: authError ?? "Unauthorized" };
+  if (!isAdmin) return { error: "Admin required" };
 
   const entryId = formData.get("entryId") as string;
   if (!entryId) return { error: "Entry ID required." };
@@ -209,8 +266,9 @@ export async function approveTimesheetEntry(formData: FormData) {
 }
 
 export async function flagTimesheetEntry(formData: FormData) {
-  const { supabase, user, profile, error: authError } = await requireFinanceAdmin();
+  const { supabase, user, profile, isAdmin, error: authError } = await requireAuth();
   if (authError || !user) return { error: authError ?? "Unauthorized" };
+  if (!isAdmin) return { error: "Admin required" };
 
   const entryId = formData.get("entryId") as string;
   const question = formData.get("question") as string;
@@ -253,8 +311,9 @@ export async function flagTimesheetEntry(formData: FormData) {
 }
 
 export async function adjustTimesheetEntry(formData: FormData) {
-  const { supabase, user, profile, error: authError } = await requireFinanceAdmin();
+  const { supabase, user, profile, isAdmin, error: authError } = await requireAuth();
   if (authError || !user) return { error: authError ?? "Unauthorized" };
+  if (!isAdmin) return { error: "Admin required" };
 
   const entryId = formData.get("entryId") as string;
   const adjustmentNote = formData.get("adjustmentNote") as string;
@@ -353,8 +412,9 @@ export async function adjustTimesheetEntry(formData: FormData) {
 // ── Mark entries as paid ────────────────────────────────────
 
 export async function markEntriesAsPaid(formData: FormData) {
-  const { supabase, user, profile, error: authError } = await requireFinanceAdmin();
+  const { supabase, user, profile, isAdmin, error: authError } = await requireAuth();
   if (authError || !user) return { error: authError ?? "Unauthorized" };
+  if (!isAdmin) return { error: "Admin required" };
 
   const dateFrom = formData.get("dateFrom") as string;
   const dateTo = formData.get("dateTo") as string;
@@ -492,7 +552,7 @@ async function getOrCreateTimesheetForTeacher(
 }
 
 export async function adminAddEntry(formData: FormData) {
-  const { supabase, user, profile, error: authError } = await requireFinanceAdmin();
+  const { supabase, user, profile, isAdmin, teacherProfileId, error: authError } = await requireAuth();
   if (authError || !user) return { error: authError ?? "Unauthorized" };
 
   const parsed = adminEntrySchema.safeParse({
@@ -518,6 +578,12 @@ export async function adminAddEntry(formData: FormData) {
 
   const d = parsed.data;
 
+  // Teachers can only add entries to their own timesheet
+  if (!isAdmin) {
+    if (!teacherProfileId) return { error: "Teacher profile not found." };
+    if (d.teacherProfileId !== teacherProfileId) return { error: "You can only add entries to your own timesheet." };
+  }
+
   const TENANT_ID = "84d98f72-c82f-414f-8b17-172b802f6993";
 
   const { data: tp } = await supabase
@@ -530,6 +596,13 @@ export async function adminAddEntry(formData: FormData) {
 
   const timesheet = await getOrCreateTimesheetForTeacher(supabase, tp.id, TENANT_ID);
   if (!timesheet) return { error: "Could not create timesheet." };
+
+  // Teachers: verify timesheet is editable
+  if (!isAdmin) {
+    if (!["draft", "rejected"].includes(timesheet.status)) {
+      return { error: "Timesheet is not editable." };
+    }
+  }
 
   const { data: newEntry, error } = await supabase
     .from("timesheet_entries")
@@ -588,11 +661,18 @@ export async function adminAddEntry(formData: FormData) {
 }
 
 export async function adminUpdateEntry(formData: FormData) {
-  const { supabase, user, profile, error: authError } = await requireFinanceAdmin();
+  const { supabase, user, profile, isAdmin, teacherProfileId, error: authError } = await requireAuth();
   if (authError || !user) return { error: authError ?? "Unauthorized" };
 
   const entryId = formData.get("entryId") as string;
   if (!entryId) return { error: "Entry ID required." };
+
+  // Teacher: ownership + status check. Admin: skip.
+  if (!isAdmin) {
+    if (!teacherProfileId) return { error: "Teacher profile not found." };
+    const access = await verifyTeacherEntryAccess(supabase, entryId, teacherProfileId);
+    if (!access.allowed) return { error: access.error! };
+  }
 
   const parsed = adminEntrySchema.omit({ teacherProfileId: true }).safeParse({
     date: formData.get("date"),
@@ -685,11 +765,18 @@ export async function adminUpdateEntry(formData: FormData) {
 }
 
 export async function adminDeleteEntry(formData: FormData) {
-  const { supabase, user, profile, error: authError } = await requireFinanceAdmin();
+  const { supabase, user, profile, isAdmin, teacherProfileId, error: authError } = await requireAuth();
   if (authError || !user) return { error: authError ?? "Unauthorized" };
 
   const entryId = formData.get("entryId") as string;
   if (!entryId) return { error: "Entry ID required." };
+
+  // Teacher: ownership + status check. Admin: skip.
+  if (!isAdmin) {
+    if (!teacherProfileId) return { error: "Teacher profile not found." };
+    const access = await verifyTeacherEntryAccess(supabase, entryId, teacherProfileId);
+    if (!access.allowed) return { error: access.error! };
+  }
 
   const { data: entry } = await supabase
     .from("timesheet_entries")
