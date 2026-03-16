@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import Link from "next/link";
 import {
   AdminAddEntryButton,
@@ -155,6 +155,7 @@ export function TimesheetsClient({
   const [quickMode, setQuickMode] = useState(false);
   const [stickyTeacher, setStickyTeacher] = useState("");
   const [sessionHours, setSessionHours] = useState(0);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const filterTabs = [
     { key: "submitted", label: "Submitted", count: counts.submitted ?? 0 },
@@ -278,43 +279,154 @@ export function TimesheetsClient({
                   <tbody className="divide-y divide-silver">
                     {timesheets.map((ts) => {
                       const badge = STATUS_BADGES[ts.status] ?? STATUS_BADGES.draft;
+                      const isExpanded = expandedId === ts.id;
+                      const tsEntries = entries.filter((e) => e.timesheet_id === ts.id);
+                      const colCount = filterStatus === "submitted" ? 6 : 5;
                       return (
-                        <tr key={ts.id} className="hover:bg-cloud/30 transition-colors">
-                          <td className="px-4 py-3">
-                            <div>
-                              <span className="font-medium text-charcoal">{ts.teacherName}</span>
-                              {ts.teacherEmail && (
-                                <p className="text-xs text-mist">{ts.teacherEmail}</p>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${badge.bg} ${badge.text}`}>
-                              {badge.label}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-right font-medium text-charcoal">
-                            {ts.totalHours.toFixed(1)}
-                          </td>
-                          <td className="px-4 py-3 text-slate">
-                            {ts.submittedAt
-                              ? new Date(ts.submittedAt).toLocaleDateString("en-US", {
-                                  month: "short",
-                                  day: "numeric",
-                                  hour: "numeric",
-                                  minute: "2-digit",
-                                })
-                              : "—"}
-                          </td>
-                          <td className="px-4 py-3 text-xs text-slate max-w-[200px] truncate">
-                            {ts.rejectionNotes ?? "—"}
-                          </td>
-                          {filterStatus === "submitted" && (
-                            <td className="px-4 py-3 text-right">
-                              <ReviewActions timesheetId={ts.id} />
+                        <Fragment key={ts.id}>
+                          <tr
+                            className="hover:bg-cloud/30 transition-colors cursor-pointer"
+                            onClick={() => setExpandedId(isExpanded ? null : ts.id)}
+                          >
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-mist shrink-0">{isExpanded ? "▼" : "▶"}</span>
+                                <div>
+                                  <span className="font-medium text-charcoal">{ts.teacherName}</span>
+                                  {ts.teacherEmail && (
+                                    <p className="text-xs text-mist">{ts.teacherEmail}</p>
+                                  )}
+                                </div>
+                              </div>
                             </td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${badge.bg} ${badge.text}`}>
+                                {badge.label}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-right font-medium text-charcoal">
+                              {ts.totalHours.toFixed(1)}
+                            </td>
+                            <td className="px-4 py-3 text-slate">
+                              {ts.submittedAt
+                                ? new Date(ts.submittedAt).toLocaleDateString("en-US", {
+                                    month: "short",
+                                    day: "numeric",
+                                    hour: "numeric",
+                                    minute: "2-digit",
+                                  })
+                                : "—"}
+                            </td>
+                            <td className="px-4 py-3 text-xs text-slate max-w-[200px] truncate">
+                              {ts.rejectionNotes ?? "—"}
+                            </td>
+                            {filterStatus === "submitted" && (
+                              <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                                <ReviewActions timesheetId={ts.id} />
+                              </td>
+                            )}
+                          </tr>
+                          {isExpanded && (
+                            <tr>
+                              <td colSpan={colCount} className="bg-cloud/20 px-4 py-4">
+                                {tsEntries.length === 0 ? (
+                                  <p className="text-sm text-mist text-center py-4">No entries yet.</p>
+                                ) : (
+                                  <table className="w-full text-sm">
+                                    <thead>
+                                      <tr className="border-b border-silver/60">
+                                        <th className="px-3 py-2 text-left text-xs font-medium text-slate">Date</th>
+                                        <th className="px-3 py-2 text-left text-xs font-medium text-slate">Category</th>
+                                        <th className="px-3 py-2 text-left text-xs font-medium text-slate">Description</th>
+                                        <th className="px-3 py-2 text-right text-xs font-medium text-slate">Hours</th>
+                                        <th className="px-3 py-2 text-left text-xs font-medium text-slate">Status</th>
+                                        <th className="px-3 py-2 text-right text-xs font-medium text-slate w-32">Actions</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-silver/40">
+                                      {tsEntries.map((e) => {
+                                        const entryBadge = STATUS_BADGES[e.status] ?? STATUS_BADGES.draft;
+                                        return (
+                                          <tr key={e.id} className="hover:bg-cloud/30 transition-colors">
+                                            <td className="px-3 py-2 text-charcoal whitespace-nowrap">
+                                              {new Date(e.date + "T12:00:00").toLocaleDateString("en-US", {
+                                                month: "short",
+                                                day: "numeric",
+                                              })}
+                                            </td>
+                                            <td className="px-3 py-2 text-slate">
+                                              {entryTypeLabels[e.entry_type] ?? e.entry_type}
+                                            </td>
+                                            <td className="px-3 py-2 text-charcoal max-w-[200px]">
+                                              <div className="truncate">{e.description ?? "—"}</div>
+                                              {e.flag_question && (
+                                                <div className="mt-1 text-xs text-warning bg-warning/5 rounded px-2 py-1">
+                                                  Q: {e.flag_question}
+                                                  {e.flag_response && (
+                                                    <div className="mt-0.5 text-charcoal">A: {e.flag_response}</div>
+                                                  )}
+                                                </div>
+                                              )}
+                                              {e.adjustment_note && (
+                                                <div className="mt-1 text-xs text-info bg-info/5 rounded px-2 py-1">
+                                                  Adjusted: {e.adjustment_note}
+                                                </div>
+                                              )}
+                                              {e.changes.length > 0 && (
+                                                <div className="mt-1">
+                                                  <EntryChangeLog changes={e.changes} />
+                                                </div>
+                                              )}
+                                            </td>
+                                            <td className="px-3 py-2 text-right font-medium text-charcoal">
+                                              {e.total_hours?.toFixed(1)}
+                                            </td>
+                                            <td className="px-3 py-2">
+                                              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${entryBadge.bg} ${entryBadge.text}`}>
+                                                {entryBadge.label}
+                                              </span>
+                                            </td>
+                                            <td className="px-3 py-2 text-right">
+                                              <div className="flex justify-end gap-1 items-center">
+                                                {(e.status === "submitted" || e.status === "flagged") && (
+                                                  <>
+                                                    <EntryApproveButton entryId={e.id} />
+                                                    {e.status !== "flagged" && (
+                                                      <EntryFlagButton
+                                                        entryId={e.id}
+                                                        teacherName={ts.teacherName}
+                                                      />
+                                                    )}
+                                                  </>
+                                                )}
+                                                <AdminEditEntryButton
+                                                  entry={{ ...e, teacher_id: ts.teacherId }}
+                                                  teachers={teachers}
+                                                  productions={productions}
+                                                />
+                                                <AdminDeleteEntryButton entryId={e.id} />
+                                              </div>
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                )}
+                                <div className="mt-3 flex items-center justify-between">
+                                  <AdminAddEntryButton
+                                    teachers={teachers}
+                                    productions={productions}
+                                    defaultTeacherId={ts.teacherId}
+                                  />
+                                  <span className="text-xs text-mist">
+                                    {tsEntries.length} {tsEntries.length === 1 ? "entry" : "entries"} · {tsEntries.reduce((s, e) => s + (e.total_hours ?? 0), 0).toFixed(1)} hrs
+                                  </span>
+                                </div>
+                              </td>
+                            </tr>
                           )}
-                        </tr>
+                        </Fragment>
                       );
                     })}
                   </tbody>

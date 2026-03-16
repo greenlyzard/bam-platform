@@ -264,15 +264,18 @@ export function AdminAddEntryButton({
   productions,
   quickMode,
   stickyTeacher,
+  defaultTeacherId,
   onEntryAdded,
 }: {
   teachers: Teacher[];
   productions: Production[];
   quickMode?: boolean;
   stickyTeacher?: string;
+  defaultTeacherId?: string;
   onEntryAdded?: (hours: number) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const resolvedTeacher = defaultTeacherId || stickyTeacher;
 
   return (
     <>
@@ -287,7 +290,7 @@ export function AdminAddEntryButton({
           teachers={teachers}
           productions={productions}
           quickMode={quickMode}
-          defaultTeacher={stickyTeacher}
+          defaultTeacher={resolvedTeacher}
           onClose={() => setOpen(false)}
           onSaved={(hours) => {
             onEntryAdded?.(hours);
