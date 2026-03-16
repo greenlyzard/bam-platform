@@ -43,6 +43,13 @@ interface ScheduleInstance {
   notes: string | null;
 }
 
+interface ActiveClass {
+  id: string;
+  name: string;
+  start_time: string | null;
+  end_time: string | null;
+}
+
 interface Student {
   id: string;
   name: string;
@@ -397,6 +404,9 @@ function EntryDrawer({
   const [scheduleInstances, setScheduleInstances] = useState<ScheduleInstance[]>([]);
   const [selectedInstance, setSelectedInstance] = useState("");
   const [description, setDescription] = useState(entry?.description ?? "");
+  const [allClasses, setAllClasses] = useState<ActiveClass[]>([]);
+  const [customMode, setCustomMode] = useState(false);
+  const [selectedClassId, setSelectedClassId] = useState("");
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [error, setError] = useState("");
@@ -426,11 +436,20 @@ function EntryDrawer({
     }
   }, [selectedTeacher, currentDate]);
 
-  // Fetch students when a schedule instance with a class is selected
+  // Fetch all active classes (once on mount, for fallback dropdown)
+  useEffect(() => {
+    fetch("/api/admin/classes")
+      .then((r) => r.json())
+      .then((d) => setAllClasses(d.classes ?? []))
+      .catch(() => setAllClasses([]));
+  }, []);
+
+  // Fetch students when a class is selected (via schedule instance or fallback)
   useEffect(() => {
     const inst = scheduleInstances.find((i) => i.id === selectedInstance);
-    if (inst?.class_id) {
-      fetch(`/api/teach/students?classId=${inst.class_id}`)
+    const classId = inst?.class_id ?? (selectedClassId || null);
+    if (classId && !customMode) {
+      fetch(`/api/teach/students?classId=${classId}`)
         .then((r) => r.json())
         .then((d) => setStudents(d.students ?? []))
         .catch(() => setStudents([]));
@@ -438,7 +457,7 @@ function EntryDrawer({
       setStudents([]);
       setSelectedStudentIds([]);
     }
-  }, [selectedInstance, scheduleInstances]);
+  }, [selectedInstance, scheduleInstances, selectedClassId, customMode]);
 
   const handleSubmitAction = useCallback(
     async (formData: FormData) => {
@@ -494,6 +513,8 @@ function EntryDrawer({
         setEndTime("");
         setHours("");
         setSelectedInstance("");
+        setSelectedClassId("");
+        setCustomMode(false);
         setDescription("");
         setSelectedStudentIds([]);
         setSelectedProductionIds([]);
@@ -641,46 +662,116 @@ function EntryDrawer({
             </select>
           </div>
 
-          {/* Schedule Instance Dropdown (when teacher + date selected) */}
-          {selectedTeacher && scheduleInstances.length > 0 && (
+          {/* Class / Session Selector — three-tier: schedule instances → all classes → custom */}
+          {selectedTeacher && (
             <div>
               <label className="block text-sm font-medium text-charcoal mb-1.5">
-                Schedule Session
+                {scheduleInstances.length > 0 ? "Schedule Session" : "Class"}
               </label>
-              <select
-                value={selectedInstance}
-                onChange={(e) => {
-                  const inst = scheduleInstances.find((i) => i.id === e.target.value);
-                  setSelectedInstance(e.target.value);
-                  if (inst) {
-                    if (inst.class_name) setDescription(inst.class_name);
-                    if (inst.start_time) setStartTime(inst.start_time.slice(0, 5));
-                    if (inst.end_time) setEndTime(inst.end_time.slice(0, 5));
-                    if (inst.production_id) {
-                      setSelectedProductionIds((prev) =>
-                        prev.includes(inst.production_id!) ? prev : [...prev, inst.production_id!]
-                      );
+
+              {customMode ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCustomMode(false);
+                      setDescription("");
+                    }}
+                    className="text-xs text-lavender hover:text-lavender-dark font-medium mb-1.5"
+                  >
+                    &larr; Back to list
+                  </button>
+                  <input
+                    name="customClassName"
+                    type="text"
+                    maxLength={500}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Enter class or session name..."
+                    className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
+                  />
+                </>
+              ) : scheduleInstances.length > 0 ? (
+                <select
+                  value={selectedInstance}
+                  onChange={(e) => {
+                    if (e.target.value === "__custom__") {
+                      setCustomMode(true);
+                      setSelectedInstance("");
+                      setSelectedClassId("");
+                      setDescription("");
+                      return;
                     }
-                  }
-                }}
-                className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
-              >
-                <option value="">Select a session...</option>
-                {scheduleInstances.map((inst) => (
-                  <option key={inst.id} value={inst.id}>
-                    {inst.class_name ?? inst.event_type}
-                    {inst.start_time ? ` ${formatTime12h(inst.start_time)}` : ""}
-                    {inst.end_time ? `\u2013${formatTime12h(inst.end_time)}` : ""}
-                  </option>
-                ))}
-              </select>
+                    const inst = scheduleInstances.find((i) => i.id === e.target.value);
+                    setSelectedInstance(e.target.value);
+                    setSelectedClassId("");
+                    if (inst) {
+                      if (inst.class_name) setDescription(inst.class_name);
+                      if (inst.start_time) setStartTime(inst.start_time.slice(0, 5));
+                      if (inst.end_time) setEndTime(inst.end_time.slice(0, 5));
+                      if (inst.production_id) {
+                        setSelectedProductionIds((prev) =>
+                          prev.includes(inst.production_id!) ? prev : [...prev, inst.production_id!]
+                        );
+                      }
+                    }
+                  }}
+                  className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
+                >
+                  <option value="">Select a session...</option>
+                  {scheduleInstances.map((inst) => (
+                    <option key={inst.id} value={inst.id}>
+                      {inst.class_name ?? inst.event_type}
+                      {inst.start_time ? ` ${formatTime12h(inst.start_time)}` : ""}
+                      {inst.end_time ? `\u2013${formatTime12h(inst.end_time)}` : ""}
+                    </option>
+                  ))}
+                  <option value="__custom__">+ Other / Custom</option>
+                </select>
+              ) : allClasses.length > 0 ? (
+                <select
+                  value={selectedClassId}
+                  onChange={(e) => {
+                    if (e.target.value === "__custom__") {
+                      setCustomMode(true);
+                      setSelectedClassId("");
+                      setDescription("");
+                      return;
+                    }
+                    setSelectedClassId(e.target.value);
+                    setSelectedInstance("");
+                    const cls = allClasses.find((c) => c.id === e.target.value);
+                    if (cls) {
+                      setDescription(cls.name);
+                      if (cls.start_time) setStartTime(cls.start_time.slice(0, 5));
+                      if (cls.end_time) setEndTime(cls.end_time.slice(0, 5));
+                    }
+                  }}
+                  className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
+                >
+                  <option value="">Select a class...</option>
+                  {allClasses.map((cls) => (
+                    <option key={cls.id} value={cls.id}>
+                      {cls.name}
+                      {cls.start_time ? ` ${formatTime12h(cls.start_time)}` : ""}
+                      {cls.end_time ? `\u2013${formatTime12h(cls.end_time)}` : ""}
+                    </option>
+                  ))}
+                  <option value="__custom__">+ Other / Custom</option>
+                </select>
+              ) : null}
+
               <input type="hidden" name="scheduleInstanceId" value={selectedInstance} />
-              <input type="hidden" name="classId" value={scheduleInstances.find((i) => i.id === selectedInstance)?.class_id ?? ""} />
+              <input type="hidden" name="classId" value={
+                scheduleInstances.find((i) => i.id === selectedInstance)?.class_id
+                ?? selectedClassId
+                ?? ""
+              } />
             </div>
           )}
 
-          {/* Students multi-select (when a session with a class is selected) */}
-          {selectedInstance && students.length > 0 && (
+          {/* Students multi-select (when a class is selected via instance or fallback) */}
+          {(selectedInstance || selectedClassId) && !customMode && students.length > 0 && (
             <MultiSelectDropdown
               label="Students (optional)"
               options={students}
