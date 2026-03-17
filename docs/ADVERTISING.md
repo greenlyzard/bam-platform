@@ -45,7 +45,7 @@ BAM's advertising model should be built to attract PE-backed brands and distribu
 
 ### 2.1 Tier Overview
 
-BAM operates on a freemium SaaS model. Studios are onboarded at no cost (Free Tier) and are progressively upsold to paid tiers as their needs grow. Advertising is the primary mechanism enabling the free tier.
+BAM operates on a freemium SaaS model. Studios are onboarded at no cost (Free Tier) and are progressively upsold to paid tiers as their needs grow. The presence of advertising in the platform is the primary mechanism enabling the free tier.
 
 | Tier | Name | Monthly Cost | Ad Exposure | Feature Gate |
 |------|------|--------------|-------------|--------------|
@@ -70,6 +70,7 @@ studio_tier: 0 | 1 | 2 | 3
 - Paid Tier studios see reduced or no ads; their parent/student app views may also be ad-reduced depending on tier.
 - Studios cannot opt out of ads on the Free Tier without upgrading.
 - Parent and student-facing views on Free Tier studios will display relevant, contextually appropriate ads.
+- Teacher-facing views are always ad-free regardless of studio tier.
 
 ---
 
@@ -85,15 +86,17 @@ studio_tier: 0 | 1 | 2 | 3
 | STORE_HERO | BAM Store / product discovery section | Full-bleed hero image | Reserved for premium sponsors |
 | PROFILE_SIDEBAR | Student/parent profile page | Sidebar card | Interest-targeted |
 | COMPETITION_PRE | Before competition schedule view loads | Interstitial (optional) | High engagement moment |
+| LMS_PRE_ROLL | Before LMS modules, learning routines, and lessons | Short video pre-roll | High engagement; Phase 2 |
 | COSTUME_CONTEXT | Near casting/costume assignment features | Native card | Weissman-class advertisers ideal here |
 | ANGELINA_SUGGESTED | Inline within Angelina AI chat responses | Sponsored suggestion | Highest contextual relevance |
 
 ### 3.2 Ad Rendering Rules
 
 - Ads are rendered only when `studio_tier === 0` (or as configured per placement for Tier 1).
-- Ad content is fetched from the BAM Ad Server or a third-party ad network.
+- Ad content is fetched from BAM's internal ad server (see Section 11).
 - All ads must be labeled "Sponsored" per platform policy and FTC guidelines.
 - Ads are never rendered in safety-critical flows: emergency contact screens, incident reports, or injury-related content.
+- Teacher-facing views are always ad-free regardless of studio tier.
 
 ### 3.3 Ad Targeting Data (First-Party)
 
@@ -116,7 +119,6 @@ studio_tier: 0 | 1 | 2 | 3
 Advertisers access BAM's self-serve portal at `ads.balletacademyandmovement.com` (subdomain TBD).
 
 Onboarding flow:
-
 1. Account creation (business email, company name, billing)
 2. Campaign type selection: Display, Native, Sponsored Suggestion (Angelina), Affiliate
 3. Audience targeting configuration
@@ -164,7 +166,7 @@ Onboarding flow:
 Trigger Event (e.g., costume assignment notification)
   → In-app card: "Weissman is offering BAM families 20% off — tap to claim"
   → Tap reveals: "Share your name and email with Weissman to receive your discount?"
-    [Yes, share] [No thanks]
+    [Yes, share]  [No thanks]
   → On confirm: parent profile data sent to advertiser CRM (name, email only)
   → Parent receives branded welcome email from advertiser
   → Conversion logged in advertiser dashboard
@@ -301,13 +303,14 @@ Maximum 3 touches per upgrade event before backing off for 14 days.
 | Views class schedule for new session | New dance shoes / apparel offer |
 | Receives recital notification | Flowers, recital gifts, photography |
 | Views student progress notes | Private lesson packages, training tools |
+| Opens LMS module or lesson | Relevant dancewear / training equipment offer |
 
 ### 7.4 Upsell Message Delivery Channels
 
 - In-app modal (highest conversion, used for hard gate moments)
 - Angelina chat suggestion (contextual, lower friction)
 - Push notification (max 1/week for upsell content)
-- Email (new template: UPSELL_TRIGGER_EMAIL — see SUPABASE_EMAIL_TEMPLATES.md)
+- Email (new template: `UPSELL_TRIGGER_EMAIL` — see `SUPABASE_EMAIL_TEMPLATES.md`)
 - Dashboard banner (persistent but dismissible for 7 days)
 
 ### 7.5 AI Upsell Intelligence Schema
@@ -351,6 +354,8 @@ Maximum 3 touches per upgrade event before backing off for 14 days.
 | Opt-In Data Packages | Advertisers pay premium for verified opt-in parent contacts | Must be structured carefully for compliance |
 | Studio SaaS Subscriptions | Tier upgrade revenue driven by Angelina upsell engine | Primary long-term revenue |
 | Sponsored Angelina Suggestions | Premium placement within Angelina chat responses | Highest CPM, limited inventory |
+| BAM Marketplace Transaction Fees | Direct brand-to-family sales across all studio tenants | Long-term revenue; see Section 11 |
+| AI-Recommended Checkout | Angelina-driven direct-to-checkout product recommendations | Highest conversion; Phase 3 |
 
 ---
 
@@ -360,7 +365,7 @@ Maximum 3 touches per upgrade event before backing off for 14 days.
 - Opt-in consent records must be retained with full consent text version for a minimum of 3 years.
 - GDPR and CCPA considerations apply depending on studio geography. A consent management layer must be implemented before advertising goes live.
 - Ad content is subject to BAM review and approval. No gambling, alcohol, political, or adult content permitted.
-- FTC disclosure requirements: all sponsored content must be clearly labeled.
+- FTC disclosure requirements: all sponsored content must be clearly labeled "Sponsored."
 
 ---
 
@@ -368,20 +373,59 @@ Maximum 3 touches per upgrade event before backing off for 14 days.
 
 | File | Implication |
 |---|---|
-| ROLE_BASED_NAV_AND_ACCESS.md | Must add `studio_tier` to tenant schema. All nav and feature gate logic must check `studio_tier`. Ad placement zones must be defined as renderable UI regions with tier-conditional logic. |
-| RESOURCE_INTELLIGENCE.md | RI features are gated at Tier 2. Angelina must reference RI feature teasers as upsell triggers. |
-| ENROLLMENT_QUIZ_SPEC.md | Enrollment flow is a high-value opt-in moment. Consider inserting advertiser offer card post-quiz completion. |
-| CASTING_AND_REHEARSAL.md | Costume assignment events are primary triggers for costumeware advertiser placements. Casting completion webhook should fire an ad trigger event. |
-| SUPABASE_EMAIL_TEMPLATES.md | New templates required: UPSELL_TRIGGER_EMAIL, ADVERTISER_OPT_IN_CONFIRMATION, ADVERTISER_WELCOME. |
-| TEACHER_PORTAL.md | Teacher-facing views should be ad-free regardless of studio tier. Ads are parent/student-facing only. |
-| PAYROLL_AND_COMPENSATION.md | Payroll export is a Tier 2 gate trigger for Angelina upsell. Gate must fire the upsell event before blocking the action. |
+| `ROLE_BASED_NAV_AND_ACCESS.md` | Must add `studio_tier` to tenant schema. All nav and feature gate logic must check `studio_tier`. Ad placement zones must be defined as renderable UI regions with tier-conditional logic. |
+| `RESOURCE_INTELLIGENCE.md` | RI features are gated at Tier 2. Angelina must reference RI feature teasers as upsell triggers. |
+| `ENROLLMENT_QUIZ_SPEC.md` | Enrollment flow is a high-value opt-in moment. Consider inserting advertiser offer card post-quiz completion. |
+| `CASTING_AND_REHEARSAL.md` | Costume assignment events are primary triggers for costumeware advertiser placements. Casting completion webhook should fire an ad trigger event. |
+| `SUPABASE_EMAIL_TEMPLATES.md` | New templates required: `UPSELL_TRIGGER_EMAIL`, `ADVERTISER_OPT_IN_CONFIRMATION`, `ADVERTISER_WELCOME`. |
+| `TEACHER_PORTAL.md` | Teacher-facing views are always ad-free regardless of studio tier. Ads are parent/student-facing only. |
+| `PAYROLL_AND_COMPENSATION.md` | Payroll export is a Tier 2 gate trigger for Angelina upsell. Gate must fire the upsell event before blocking the action. |
 
 ---
 
-## 11. Open Questions & Future Considerations
+## 11. Decisions & Future Roadmap
 
-- **Ad server decision:** Build lightweight internal ad server vs. third-party (Google Ad Manager, Kevel). Recommendation: start with direct-sold placements managed internally; evaluate ad server when volume justifies it.
-- **Video pre-roll:** TikTok-style short video ads within the app (e.g., before competition schedule loads). Evaluate in Phase 2.
-- **BAM Marketplace:** Long-term, BAM could operate its own marketplace where verified dance brands sell directly to BAM families, with BAM taking a transaction fee.
-- **Influencer / Creator Program:** Dance teachers and studio owners as micro-influencers promoting brands through BAM. Affiliate links tracked at the teacher level.
-- **White-label ad network:** As BAM scales, first-party audience data could be packaged as a standalone ad product sold to brands outside the platform.
+### 11.1 Ad Server — DECIDED: Internal First
+
+Build a lightweight internal ad server to manage direct-sold placements. Evaluate third-party platforms (Google Ad Manager, Kevel) only when volume justifies the infrastructure cost. Internal placements keep margin intact and give BAM full control over targeting logic and inventory.
+
+**Phase 1:** Direct-sold placements managed internally via an `ad_campaigns` table and placement rendering logic in the app.  
+**Phase 2:** Evaluate third-party ad server if impression volume exceeds internal management capacity.
+
+### 11.2 Video Pre-Roll — DECIDED: Phase 2
+
+TikTok-style short video ads will be supported in two high-engagement contexts:
+
+- Before competition schedule views load
+- Before LMS modules, learning routines, and lesson content
+
+Video pre-roll requires Cloudflare Stream or equivalent CDN. Coordinate with Cloudflare Stream API token setup already planned for the platform.
+
+### 11.3 BAM Marketplace — DECIDED: Build
+
+BAM will operate its own marketplace where verified dance brands sell directly to BAM families, with BAM taking a transaction fee. The marketplace is available across all studio tenants — including studios on the free tier — making it a platform-wide revenue driver independent of subscription tier.
+
+**Long-term vision:** The BAM Marketplace becomes the primary commerce destination for dance families nationwide, powered by verified purchase intent data from the platform.
+
+### 11.4 Influencer / Creator Program — DECIDED: Dual-Track Attribution
+
+Dance teachers and studio owners will serve as micro-influencers promoting brands through BAM. Two attribution tracks:
+
+1. **BAM-native affiliate links:** Tracked at the teacher level within the platform, with BAM earning a commission split.
+2. **Existing affiliate program integration:** Teachers connect their existing affiliate accounts (Amazon Associates, ShareASale, Impact.com, etc.) so that conversions are measurable on the brand's own ROAS infrastructure as well as BAM's. This is critical for brands that need to attribute spend through their existing affiliate program reporting.
+
+### 11.5 White-Label Ad Network & AI-Driven Commerce — DECIDED: Build
+
+As BAM scales, first-party audience data will be packaged as a standalone ad product sold to brands outside the platform. The AI layer (Angelina and the recommendation engine) will power this evolution through three phases:
+
+**Phase 1 — Smart Advertising:** Angelina delivers contextually relevant sponsored suggestions within chat and in-app placements. AI optimizes placement timing and creative selection based on parent behavior signals.
+
+**Phase 2 — Product Recommendations:** Angelina proactively recommends specific products to parents based on their child's class enrollment, upcoming events, and purchase history. Example: "Your daughter's Nutcracker costume requires flesh-tone tights — here are three options from Capezio with direct links."
+
+**Phase 3 — Direct-to-Checkout:** Angelina completes the full purchase loop within the BAM app. Parents go from recommendation to checkout without leaving the platform. BAM takes a transaction fee on all purchases. Integration via Shopify Buy Button or native checkout with Stripe.
+
+**White-label opportunity:** The BAM ad network and AI recommendation engine can be licensed to other youth activity platforms (gymnastics, swimming, soccer) as a standalone product, with BAM's dance audience data as the anchor segment for lookalike modeling.
+
+---
+
+*End of ADVERTISING.md — commit to `docs/claude/ADVERTISING.md` in the bam-platform repo.*
