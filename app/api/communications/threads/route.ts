@@ -11,16 +11,7 @@ export async function GET(req: NextRequest) {
   const user = await requireAuth();
   const supabase = await createClient();
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (
-    !profile ||
-    !["super_admin", "admin", "teacher"].includes(profile.role)
-  ) {
+  if (!["super_admin", "admin", "teacher"].includes(user.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -48,7 +39,7 @@ export async function GET(req: NextRequest) {
     .range(offset, offset + limit - 1);
 
   // Teacher: only see assigned threads
-  if (profile.role === "teacher") {
+  if (user.role === "teacher") {
     query = query.eq("assigned_to", user.id);
   }
 
@@ -128,16 +119,7 @@ export async function POST(req: NextRequest) {
   const user = await requireAuth();
   const supabase = await createClient();
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, first_name, last_name, email")
-    .eq("id", user.id)
-    .single();
-
-  if (
-    !profile ||
-    !["super_admin", "admin", "teacher"].includes(profile.role)
-  ) {
+  if (!["super_admin", "admin", "teacher"].includes(user.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -203,7 +185,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Send email with reply-to
-  const senderName = [profile.first_name, profile.last_name]
+  const senderName = [user.firstName, user.lastName]
     .filter(Boolean)
     .join(" ") || "Ballet Academy and Movement";
 
@@ -226,7 +208,7 @@ export async function POST(req: NextRequest) {
     direction: "outbound",
     senderId: user.id,
     senderName,
-    senderEmail: profile.email,
+    senderEmail: user.email,
     subject,
     bodyHtml: body_html,
   });

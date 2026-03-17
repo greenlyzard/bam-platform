@@ -33,6 +33,7 @@ export async function sendAnnouncement(announcementId: string): Promise<{
     // Resolve recipient profile IDs based on audience
     const recipientProfiles = await resolveRecipients(
       supabase,
+      announcement.tenant_id,
       announcement.audience,
       announcement.audience_filter
     );
@@ -138,28 +139,49 @@ export async function sendAnnouncement(announcementId: string): Promise<{
 
 async function resolveRecipients(
   supabase: Awaited<ReturnType<typeof createClient>>,
+  tenantId: string,
   audience: string,
   audienceFilter: Record<string, unknown> | null
 ): Promise<Array<{ id: string; email: string | null }>> {
   const profileSet = new Map<string, string | null>();
 
   if (audience === "all_parents" || audience === "all") {
-    const { data: parents } = await supabase
-      .from("profiles")
-      .select("id, email")
-      .eq("role", "parent");
-    for (const p of parents ?? []) {
-      profileSet.set(p.id, p.email);
+    const { data: parentRoles } = await supabase
+      .from("profile_roles")
+      .select("user_id")
+      .eq("tenant_id", tenantId)
+      .eq("role", "parent")
+      .eq("is_active", true);
+
+    const parentIds = (parentRoles ?? []).map((pr) => pr.user_id);
+    if (parentIds.length > 0) {
+      const { data: parents } = await supabase
+        .from("profiles")
+        .select("id, email")
+        .in("id", parentIds);
+      for (const p of parents ?? []) {
+        profileSet.set(p.id, p.email);
+      }
     }
   }
 
   if (audience === "teachers" || audience === "all") {
-    const { data: teachers } = await supabase
-      .from("profiles")
-      .select("id, email")
-      .eq("role", "teacher");
-    for (const t of teachers ?? []) {
-      profileSet.set(t.id, t.email);
+    const { data: teacherRoles } = await supabase
+      .from("profile_roles")
+      .select("user_id")
+      .eq("tenant_id", tenantId)
+      .eq("role", "teacher")
+      .eq("is_active", true);
+
+    const teacherIds = (teacherRoles ?? []).map((tr) => tr.user_id);
+    if (teacherIds.length > 0) {
+      const { data: teachers } = await supabase
+        .from("profiles")
+        .select("id, email")
+        .in("id", teacherIds);
+      for (const t of teachers ?? []) {
+        profileSet.set(t.id, t.email);
+      }
     }
   }
 

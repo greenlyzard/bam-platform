@@ -6,16 +6,7 @@ export async function GET(req: NextRequest) {
   const user = await requireAuth();
   const supabase = await createClient();
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (
-    !profile ||
-    !["super_admin", "admin", "teacher"].includes(profile.role)
-  ) {
+  if (!["super_admin", "admin", "teacher"].includes(user.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

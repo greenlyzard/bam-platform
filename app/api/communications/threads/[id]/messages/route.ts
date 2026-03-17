@@ -12,16 +12,7 @@ export async function POST(
   const user = await requireAuth();
   const supabase = await createClient();
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, first_name, last_name, email")
-    .eq("id", user.id)
-    .single();
-
-  if (
-    !profile ||
-    !["super_admin", "admin", "teacher"].includes(profile.role)
-  ) {
+  if (!["super_admin", "admin", "teacher"].includes(user.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -37,7 +28,7 @@ export async function POST(
   }
 
   // Teacher: can only reply to assigned threads
-  if (profile.role === "teacher" && thread.assigned_to !== user.id) {
+  if (user.role === "teacher" && thread.assigned_to !== user.id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -53,7 +44,7 @@ export async function POST(
 
   // Send email to thread contact
   if (thread.contact_email) {
-    const senderName = [profile.first_name, profile.last_name]
+    const senderName = [user.firstName, user.lastName]
       .filter(Boolean)
       .join(" ") || "Ballet Academy and Movement";
 
@@ -78,10 +69,10 @@ export async function POST(
     threadId,
     direction: "outbound",
     senderId: user.id,
-    senderName: [profile.first_name, profile.last_name]
+    senderName: [user.firstName, user.lastName]
       .filter(Boolean)
       .join(" "),
-    senderEmail: profile.email,
+    senderEmail: user.email,
     bodyHtml: body_html,
     bodyText: body_text ?? null,
   });

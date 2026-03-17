@@ -10,16 +10,7 @@ export async function GET(
   const user = await requireAuth();
   const supabase = await createClient();
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (
-    !profile ||
-    !["super_admin", "admin", "teacher"].includes(profile.role)
-  ) {
+  if (!["super_admin", "admin", "teacher"].includes(user.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -35,7 +26,7 @@ export async function GET(
   }
 
   // Teacher scope check
-  if (profile.role === "teacher" && thread.assigned_to !== user.id) {
+  if (user.role === "teacher" && thread.assigned_to !== user.id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -70,13 +61,7 @@ export async function PATCH(
   const user = await requireAuth();
   const supabase = await createClient();
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile || !["super_admin", "admin"].includes(profile.role)) {
+  if (!["super_admin", "admin"].includes(user.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
