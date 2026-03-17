@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { MessageThread } from "@/components/communications/MessageThread";
+import { ChannelView } from "@/components/communications/ChannelView";
 
 interface Announcement {
   id: string;
@@ -42,11 +43,13 @@ const STATUS_STYLES: Record<string, string> = {
 export function CommunicationsDashboard({
   announcements,
   userId,
+  isAdmin,
 }: {
   announcements: Announcement[];
   userId: string;
+  isAdmin: boolean;
 }) {
-  const [tab, setTab] = useState<"announcements" | "messages">("announcements");
+  const [tab, setTab] = useState<"channels" | "announcements" | "messages">("channels");
   const [threads, setThreads] = useState<ThreadPreview[]>([]);
   const [threadsLoaded, setThreadsLoaded] = useState(false);
   const [selectedThread, setSelectedThread] = useState<string | null>(null);
@@ -92,6 +95,16 @@ export function CommunicationsDashboard({
       {/* Tab bar */}
       <div className="flex gap-1 border-b border-silver mb-6">
         <button
+          onClick={() => setTab("channels")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            tab === "channels"
+              ? "border-lavender text-lavender-dark"
+              : "border-transparent text-mist hover:text-charcoal"
+          }`}
+        >
+          Channels
+        </button>
+        <button
           onClick={() => setTab("announcements")}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
             tab === "announcements"
@@ -115,6 +128,11 @@ export function CommunicationsDashboard({
           Messages
         </button>
       </div>
+
+      {/* Channels tab */}
+      {tab === "channels" && (
+        <ChannelView userId={userId} isAdmin={isAdmin} />
+      )}
 
       {/* Announcements tab */}
       {tab === "announcements" && (

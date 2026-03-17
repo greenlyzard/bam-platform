@@ -5,6 +5,7 @@ import { CommunicationsDashboard } from "./CommunicationsDashboard";
 export default async function CommunicationsPage() {
   const user = await requireAdmin();
   const supabase = await createClient();
+  const isAdmin = ["super_admin", "admin"].includes(user.role);
 
   // Get tenant
   const { data: tenant } = await supabase
@@ -46,20 +47,29 @@ export default async function CommunicationsPage() {
             Communications
           </h1>
           <p className="mt-1 text-sm text-slate">
-            Send announcements and manage parent and teacher messages.
+            Channels, announcements, and the unified inbox.
           </p>
         </div>
-        <a
-          href="/admin/communications/new"
-          className="inline-flex h-10 items-center rounded-lg bg-lavender px-5 text-sm font-semibold text-white hover:bg-lavender-dark transition-colors"
-        >
-          New Announcement
-        </a>
+        <div className="flex gap-2">
+          <a
+            href="/admin/communications/inbox"
+            className="inline-flex h-10 items-center rounded-lg border border-silver px-5 text-sm font-medium text-slate hover:bg-cloud transition-colors"
+          >
+            Inbox
+          </a>
+          <a
+            href="/admin/communications/new"
+            className="inline-flex h-10 items-center rounded-lg bg-lavender px-5 text-sm font-semibold text-white hover:bg-lavender-dark transition-colors"
+          >
+            New Announcement
+          </a>
+        </div>
       </div>
 
       <CommunicationsDashboard
         announcements={formattedAnnouncements}
         userId={user.id}
+        isAdmin={isAdmin}
       />
     </div>
   );

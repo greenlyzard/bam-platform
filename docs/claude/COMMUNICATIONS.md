@@ -1,10 +1,24 @@
 # Communications Module — Claude Code Context
 
-## Two Messaging Systems
+## Three Messaging Systems
 
-The platform has two separate messaging systems with different tables and purposes.
+The platform has three messaging systems with different tables and purposes.
 
-### 1. Admin Inbox (unified staff inbox)
+### 1. Channels (Phase 1 — group and DM chat)
+
+Tables: `channels`, `channel_members`, `channel_messages`
+
+- Group chat for classes, productions, admin groups, DMs
+- `channels.type` distinguishes: class_group, production_group, admin_group, direct_message, etc.
+- `channel_members` tracks membership with role (owner/admin/member), last_read_at, is_muted
+- `channel_messages` has text `content`, `message_type` (text/system), optional `reply_to_id`
+- Unread counts derived from `channel_members.last_read_at` vs message `created_at`
+- RLS: members can read/write their channels; admins see all via `profile_roles`
+
+**API routes:** `app/api/communications/channels/`, `channels/[id]/`, `channels/[id]/messages/`
+**UI:** `components/communications/ChannelView.tsx` — sidebar + chat view + create modal
+
+### 2. Admin Inbox (unified email/SMS inbox)
 
 Tables: `communication_threads`, `communication_messages`, `communication_attachments`, `communication_thread_reads`
 
@@ -16,16 +30,10 @@ Tables: `communication_threads`, `communication_messages`, `communication_attach
 
 **Lib files:** `lib/communications/thread.ts` (token generation, getOrCreateThread, appendMessage)
 
-### 2. Parent Portal P2P Messaging
+### 3. Legacy P2P Messaging (DROPPED)
 
-Tables: `message_threads`, `messages`
-
-- Parent/teacher direct messaging within the portal
-- `message_threads` uses `participant_ids` (uuid array) for membership
-- `messages` has `body` (text only), `sender_id`, `read_at`
-- Teachers cannot see parent last names (privacy rule in code)
-
-**API routes:** `app/api/communications/messages/route.ts`, `app/api/communications/messages/[threadId]/route.ts`
+Tables `message_threads` and `messages` have been dropped and replaced by channels.
+The old API routes at `app/api/communications/messages/` still exist but reference dropped tables.
 
 ### 3. Announcements
 
@@ -52,6 +60,15 @@ Tables: `class_reminders`
 ## Schema Quick Reference
 
 ```
+channels: id, tenant_id, name, description, type, icon_url, is_archived,
+          created_by, class_id, production_id, last_message_at, pinned_post_id
+
+channel_members: id, channel_id, profile_id, role (owner/admin/member),
+                 joined_at, last_read_at, is_muted
+
+channel_messages: id, channel_id, sender_id, content, message_type (text/system),
+                  reply_to_id, edited_at, deleted_at, created_at
+
 communication_threads: id, tenant_id, thread_token, subject, thread_type, state, priority, channel,
                        family_id, lead_id, staff_user_id, contact_name, contact_email,
                        assigned_to, created_by, unread_count, message_count, last_message_at
@@ -59,10 +76,6 @@ communication_threads: id, tenant_id, thread_token, subject, thread_type, state,
 communication_messages: id, tenant_id, thread_id, direction, sender_id, sender_name, sender_email,
                         subject, body_html, body_text, matched, message_id_header, in_reply_to,
                         template_slug, created_at
-
-message_threads: id, tenant_id, subject, participant_ids (uuid[]), class_id, last_message_at
-
-messages: id, tenant_id, thread_id, sender_id, body, read_at, created_at
 
 announcements: id, tenant_id, created_by, title, body_html, audience, audience_filter,
                channel, status, sent_at, recipient_count
