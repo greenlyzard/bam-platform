@@ -6,7 +6,30 @@ interface GroupMember {
   id: string;
   name: string;
   email: string | null;
-  source: string; // "teacher" | "parent" | "cast_parent"
+  source: string;
+}
+
+const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function formatTime12h(time: string | null): string {
+  if (!time) return "";
+  const [h, m] = time.split(":").map(Number);
+  const ampm = h >= 12 ? "PM" : "AM";
+  const hour = h % 12 || 12;
+  return m === 0 ? `${hour} ${ampm}` : `${hour}:${String(m).padStart(2, "0")} ${ampm}`;
+}
+
+function formatClassLabel(cls: {
+  name: string;
+  day_of_week: number | null;
+  start_time: string | null;
+  end_time: string | null;
+}): string {
+  if (cls.day_of_week != null && cls.start_time && cls.end_time) {
+    const day = DAY_NAMES[cls.day_of_week];
+    return `${day} ${formatTime12h(cls.start_time)}\u2013${formatTime12h(cls.end_time)} \u00b7 ${cls.name}`;
+  }
+  return cls.name;
 }
 
 /**
@@ -52,7 +75,9 @@ export async function GET(
 
     let groupMembers: GroupMember[] = [];
 
-    if (groupType === "class") {
+    if (groupType === "preset") {
+      groupMembers = await getPresetMembers(supabase, channelId, groupId);
+    } else if (groupType === "class") {
       groupMembers = await getClassMembers(supabase, groupId);
     } else if (groupType === "production") {
       groupMembers = await getProductionMembers(supabase, groupId);
@@ -71,8 +96,10 @@ export async function GET(
   const [classesRes, productionsRes] = await Promise.all([
     supabase
       .from("classes")
-      .select("id, name, style, level, season, teacher_id")
+      .select("id, name, style, level, season, teacher_id, day_of_week, start_time, end_time")
       .eq("is_active", true)
+      .order("day_of_week")
+      .order("start_time")
       .order("name"),
     supabase
       .from("productions")
@@ -105,7 +132,7 @@ export async function GET(
 
   const classes = (classesRes.data ?? []).map((c) => ({
     id: c.id,
-    name: c.name,
+    name: formatClassLabel(c),
     type: "class" as const,
     detail: [c.style, c.level, c.season].filter(Boolean).join(" · "),
     teacher: c.teacher_id ? teacherMap[c.teacher_id] ?? null : null,
@@ -119,7 +146,13 @@ export async function GET(
     teacher: null,
   }));
 
-  return NextResponse.json({ groups: [...classes, ...productions] });
+  const presets = [
+    { id: "all_teachers", name: "All Teachers", type: "preset" as const, detail: "All active teachers", teacher: null },
+    { id: "all_parents", name: "All Parents", type: "preset" as const, detail: "All active parents", teacher: null },
+    { id: "all_staff", name: "All Staff", type: "preset" as const, detail: "All admins and teachers", teacher: null },
+  ];
+
+  return NextResponse.json({ groups: [...presets, ...classes, ...productions] });
 }
 
 /**
@@ -216,16 +249,23 @@ async function getProductionMembers(
 
   const { data: castEntries } = await supabase
     .from("casting")
-    .select("student_id, students(parent_id)")
+    .select("student_id, role, students(parent_id, first_name, last_name)")
     .in("production_dance_id", danceIds);
 
-  const parentIds = [
-    ...new Set(
-      (castEntries ?? [])
-        .map((c: any) => c.students?.parent_id)
-        .filter(Boolean) as string[]
-    ),
-  ];
+  // Build a map of parent_id → best casting info (student name + role)
+  const parentCastInfo = new Map<string, { studentName: string; role: string }>();
+  for (const c of castEntries ?? []) {
+    const student = (c as any).students;
+    if (!student?.parent_id) continue;
+    const studentName = [student.first_name, student.last_name].filter(Boolean).join(" ");
+    const existing = parentCastInfo.get(student.parent_id);
+    // Keep the first one found (or could combine, but first is fine)
+    if (!existing) {
+      parentCastInfo.set(student.parent_id, { studentName, role: c.role });
+    }
+  }
+
+  const parentIds = [...parentCastInfo.keys()];
 
   if (parentIds.length > 0) {
     const { data: parents } = await supabase
@@ -234,14 +274,75 @@ async function getProductionMembers(
       .in("id", parentIds);
 
     for (const p of parents ?? []) {
+      const info = parentCastInfo.get(p.id);
+      const source = info
+        ? `Parent of ${info.studentName} (${info.role})`
+        : "Cast Parent";
       profileMap.set(p.id, {
         id: p.id,
         name: [p.first_name, p.last_name].filter(Boolean).join(" "),
         email: p.email,
-        source: "cast_parent",
+        source,
       });
     }
   }
 
   return Array.from(profileMap.values());
+}
+
+/**
+ * Get preset group members by role from profile_roles, scoped to channel's tenant
+ */
+async function getPresetMembers(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  channelId: string,
+  presetId: string
+): Promise<GroupMember[]> {
+  // Get tenant_id from the channel
+  const { data: channel } = await supabase
+    .from("channels")
+    .select("tenant_id")
+    .eq("id", channelId)
+    .single();
+
+  if (!channel?.tenant_id) return [];
+
+  const roleFilter: Record<string, string[]> = {
+    all_teachers: ["teacher"],
+    all_parents: ["parent"],
+    all_staff: ["admin", "super_admin", "teacher", "front_desk"],
+  };
+
+  const roles = roleFilter[presetId];
+  if (!roles) return [];
+
+  const { data: roleEntries } = await supabase
+    .from("profile_roles")
+    .select("user_id, role")
+    .eq("tenant_id", channel.tenant_id)
+    .eq("is_active", true)
+    .in("role", roles);
+
+  const userIds = [...new Set((roleEntries ?? []).map((r) => r.user_id))];
+  if (userIds.length === 0) return [];
+
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id, first_name, last_name, email")
+    .in("id", userIds);
+
+  // Build a role label map
+  const roleLabels: Record<string, string> = {};
+  for (const r of roleEntries ?? []) {
+    if (!roleLabels[r.user_id]) {
+      roleLabels[r.user_id] = r.role;
+    }
+  }
+
+  return (profiles ?? []).map((p) => ({
+    id: p.id,
+    name: [p.first_name, p.last_name].filter(Boolean).join(" "),
+    email: p.email,
+    source: roleLabels[p.id] ?? presetId,
+  }));
 }

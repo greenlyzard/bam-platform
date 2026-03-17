@@ -47,7 +47,7 @@ interface SearchResult {
 interface GroupOption {
   id: string;
   name: string;
-  type: "class" | "production";
+  type: "class" | "production" | "preset";
   detail: string;
   teacher: string | null;
 }
@@ -750,6 +750,7 @@ function MemberPanel({
     cast_parent: "Cast Parent",
   };
 
+  const presetGroups = groups.filter((g) => g.type === "preset");
   const classGroups = groups.filter((g) => g.type === "class");
   const productionGroups = groups.filter((g) => g.type === "production");
   const addableCount = groupMembers.filter((m) => !m.already_member).length;
@@ -781,6 +782,15 @@ function MemberPanel({
             className="w-full rounded-lg border border-silver px-3 py-1.5 text-xs bg-white focus:outline-none focus:border-lavender focus:ring-1 focus:ring-lavender"
           >
             <option value="">Browse by Group...</option>
+            {presetGroups.length > 0 && (
+              <optgroup label="Quick Add">
+                {presetGroups.map((g) => (
+                  <option key={g.id} value={`preset:${g.id}`}>
+                    {g.name}
+                  </option>
+                ))}
+              </optgroup>
+            )}
             {classGroups.length > 0 && (
               <optgroup label="Classes">
                 {classGroups.map((g) => (
