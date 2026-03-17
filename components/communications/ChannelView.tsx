@@ -44,6 +44,22 @@ interface SearchResult {
   tenant_role: string;
 }
 
+interface GroupOption {
+  id: string;
+  name: string;
+  type: "class" | "production";
+  detail: string;
+  teacher: string | null;
+}
+
+interface GroupMember {
+  id: string;
+  name: string;
+  email: string | null;
+  source: string;
+  already_member: boolean;
+}
+
 // ── Type Labels ───────────────────────────────────────────────
 
 const TYPE_LABELS: Record<string, string> = {
@@ -577,10 +593,56 @@ function MemberPanel({
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [adding, setAdding] = useState<string | null>(null);
+  const [addingAll, setAddingAll] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Debounced search
+  // Group browsing state
+  const [groups, setGroups] = useState<GroupOption[]>([]);
+  const [groupsLoaded, setGroupsLoaded] = useState(false);
+  const [selectedGroup, setSelectedGroup] = useState("");
+  const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
+  const [loadingGroupMembers, setLoadingGroupMembers] = useState(false);
+
+  // Load groups list once when panel opens (admin only)
+  useEffect(() => {
+    if (!canManage || groupsLoaded) return;
+    (async () => {
+      const res = await fetch(
+        `/api/communications/channels/${channelId}/members/groups`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setGroups(data.groups ?? []);
+      }
+      setGroupsLoaded(true);
+    })();
+  }, [canManage, channelId, groupsLoaded]);
+
+  // Load group members when a group is selected
+  useEffect(() => {
+    if (!selectedGroup) {
+      setGroupMembers([]);
+      return;
+    }
+
+    const group = groups.find((g) => `${g.type}:${g.id}` === selectedGroup);
+    if (!group) return;
+
+    setLoadingGroupMembers(true);
+    (async () => {
+      const res = await fetch(
+        `/api/communications/channels/${channelId}/members/groups?group_type=${group.type}&group_id=${group.id}`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setGroupMembers(data.members ?? []);
+      }
+      setLoadingGroupMembers(false);
+    })();
+  }, [selectedGroup, channelId, groups]);
+
+  // Debounced name search
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
@@ -620,9 +682,38 @@ function MemberPanel({
     if (res.ok) {
       setSearch("");
       setSearchResults([]);
+      // Update group member status if viewing a group
+      setGroupMembers((prev) =>
+        prev.map((m) =>
+          m.id === profileId ? { ...m, already_member: true } : m
+        )
+      );
       onChanged();
     }
     setAdding(null);
+  }
+
+  async function addAllGroupMembers() {
+    const toAdd = groupMembers.filter((m) => !m.already_member);
+    if (toAdd.length === 0) return;
+
+    setAddingAll(true);
+    for (const m of toAdd) {
+      await fetch(
+        `/api/communications/channels/${channelId}/members`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ profile_id: m.id }),
+        }
+      );
+    }
+    // Mark all as added
+    setGroupMembers((prev) =>
+      prev.map((m) => ({ ...m, already_member: true }))
+    );
+    onChanged();
+    setAddingAll(false);
   }
 
   async function removeMember(profileId: string) {
@@ -653,6 +744,16 @@ function MemberPanel({
     member: "bg-cloud text-mist",
   };
 
+  const SOURCE_LABELS: Record<string, string> = {
+    teacher: "Teacher",
+    parent: "Parent",
+    cast_parent: "Cast Parent",
+  };
+
+  const classGroups = groups.filter((g) => g.type === "class");
+  const productionGroups = groups.filter((g) => g.type === "production");
+  const addableCount = groupMembers.filter((m) => !m.already_member).length;
+
   return (
     <div className="w-72 shrink-0 border-l border-silver bg-white flex flex-col overflow-hidden">
       {/* Panel header */}
@@ -666,47 +767,146 @@ function MemberPanel({
         </button>
       </div>
 
-      {/* Search to add */}
+      {/* Add members controls */}
       {canManage && (
-        <div className="shrink-0 px-4 py-3 border-b border-silver">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search users to add..."
-            className="w-full rounded-lg border border-silver px-3 py-1.5 text-xs focus:outline-none focus:border-lavender focus:ring-1 focus:ring-lavender"
-          />
-          {/* Search results dropdown */}
-          {(searching || searchResults.length > 0) && search.trim().length >= 2 && (
-            <div className="mt-2 max-h-48 overflow-y-auto rounded-lg border border-silver bg-white shadow-sm">
-              {searching ? (
-                <div className="px-3 py-2 text-xs text-mist">Searching...</div>
-              ) : searchResults.length === 0 ? (
-                <div className="px-3 py-2 text-xs text-mist">No users found</div>
+        <div className="shrink-0 px-4 py-3 border-b border-silver space-y-2">
+          {/* Browse by Group */}
+          <select
+            value={selectedGroup}
+            onChange={(e) => {
+              setSelectedGroup(e.target.value);
+              setSearch("");
+              setSearchResults([]);
+            }}
+            className="w-full rounded-lg border border-silver px-3 py-1.5 text-xs bg-white focus:outline-none focus:border-lavender focus:ring-1 focus:ring-lavender"
+          >
+            <option value="">Browse by Group...</option>
+            {classGroups.length > 0 && (
+              <optgroup label="Classes">
+                {classGroups.map((g) => (
+                  <option key={g.id} value={`class:${g.id}`}>
+                    {g.name}{g.teacher ? ` (${g.teacher})` : ""}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            {productionGroups.length > 0 && (
+              <optgroup label="Productions">
+                {productionGroups.map((g) => (
+                  <option key={g.id} value={`production:${g.id}`}>
+                    {g.name}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+          </select>
+
+          {/* Group members list */}
+          {selectedGroup && (
+            <div className="rounded-lg border border-silver bg-cloud/20 max-h-52 overflow-y-auto">
+              {loadingGroupMembers ? (
+                <div className="px-3 py-2 text-xs text-mist">Loading...</div>
+              ) : groupMembers.length === 0 ? (
+                <div className="px-3 py-2 text-xs text-mist">
+                  No members in this group
+                </div>
               ) : (
-                searchResults.map((r) => (
-                  <div
-                    key={r.id}
-                    className="flex items-center justify-between gap-2 px-3 py-2 hover:bg-cloud/50 border-b border-silver/30 last:border-b-0"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-medium text-charcoal truncate">
-                        {r.name}
-                      </p>
-                      <p className="text-[10px] text-mist truncate">
-                        {r.tenant_role} {r.email ? `· ${r.email}` : ""}
-                      </p>
+                <>
+                  {/* Add All button */}
+                  {addableCount > 0 && (
+                    <div className="px-3 py-2 border-b border-silver/30">
+                      <button
+                        onClick={addAllGroupMembers}
+                        disabled={addingAll}
+                        className="w-full rounded bg-lavender px-2 py-1 text-[10px] font-semibold text-white hover:bg-lavender-dark disabled:opacity-50 transition-colors"
+                      >
+                        {addingAll
+                          ? "Adding..."
+                          : `Add All (${addableCount})`}
+                      </button>
                     </div>
-                    <button
-                      onClick={() => addMember(r.id)}
-                      disabled={adding === r.id}
-                      className="shrink-0 rounded bg-lavender px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-lavender-dark disabled:opacity-50"
+                  )}
+                  {groupMembers.map((m) => (
+                    <div
+                      key={m.id}
+                      className="flex items-center justify-between gap-2 px-3 py-1.5 border-b border-silver/20 last:border-b-0"
                     >
-                      {adding === r.id ? "..." : "Add"}
-                    </button>
-                  </div>
-                ))
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-medium text-charcoal truncate">
+                          {m.name}
+                        </p>
+                        <p className="text-[10px] text-mist">
+                          {SOURCE_LABELS[m.source] ?? m.source}
+                        </p>
+                      </div>
+                      {m.already_member ? (
+                        <span className="text-[10px] text-mist shrink-0">
+                          Added
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => addMember(m.id)}
+                          disabled={adding === m.id}
+                          className="shrink-0 rounded bg-lavender px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-lavender-dark disabled:opacity-50"
+                        >
+                          {adding === m.id ? "..." : "Add"}
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </>
               )}
             </div>
+          )}
+
+          {/* Name search */}
+          {!selectedGroup && (
+            <>
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search users by name..."
+                className="w-full rounded-lg border border-silver px-3 py-1.5 text-xs focus:outline-none focus:border-lavender focus:ring-1 focus:ring-lavender"
+              />
+              {(searching || searchResults.length > 0) &&
+                search.trim().length >= 2 && (
+                  <div className="max-h-48 overflow-y-auto rounded-lg border border-silver bg-white shadow-sm">
+                    {searching ? (
+                      <div className="px-3 py-2 text-xs text-mist">
+                        Searching...
+                      </div>
+                    ) : searchResults.length === 0 ? (
+                      <div className="px-3 py-2 text-xs text-mist">
+                        No users found
+                      </div>
+                    ) : (
+                      searchResults.map((r) => (
+                        <div
+                          key={r.id}
+                          className="flex items-center justify-between gap-2 px-3 py-2 hover:bg-cloud/50 border-b border-silver/30 last:border-b-0"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-medium text-charcoal truncate">
+                              {r.name}
+                            </p>
+                            <p className="text-[10px] text-mist truncate">
+                              {r.tenant_role}
+                              {r.email ? ` · ${r.email}` : ""}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => addMember(r.id)}
+                            disabled={adding === r.id}
+                            className="shrink-0 rounded bg-lavender px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-lavender-dark disabled:opacity-50"
+                          >
+                            {adding === r.id ? "..." : "Add"}
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+            </>
           )}
         </div>
       )}
