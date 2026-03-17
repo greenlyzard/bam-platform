@@ -28,10 +28,20 @@ interface ChannelMessage {
 }
 
 interface ChannelMember {
+  id: string;
   profile_id: string;
   role: string;
   name: string;
+  email: string | null;
+  is_muted: boolean;
   joined_at: string;
+}
+
+interface SearchResult {
+  id: string;
+  name: string;
+  email: string | null;
+  tenant_role: string;
 }
 
 // ── Type Labels ───────────────────────────────────────────────
@@ -249,6 +259,15 @@ export function ChannelView({
             loading={msgLoading}
             onSend={handleSendMessage}
             onBack={() => setMobilePanel("list")}
+            onMembersChanged={async () => {
+              const res = await fetch(
+                `/api/communications/channels/${selectedChannel.id}`
+              );
+              if (res.ok) {
+                const data = await res.json();
+                setMembers(data.members ?? []);
+              }
+            }}
           />
         ) : (
           <div className="flex-1 flex items-center justify-center">
@@ -335,6 +354,7 @@ function ChatView({
   loading,
   onSend,
   onBack,
+  onMembersChanged,
 }: {
   channel: Channel;
   messages: ChannelMessage[];
@@ -344,6 +364,7 @@ function ChatView({
   loading: boolean;
   onSend: (content: string) => void;
   onBack: () => void;
+  onMembersChanged: () => void;
 }) {
   const [showMembers, setShowMembers] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -352,80 +373,80 @@ function ChatView({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Can current user manage members? (admin or channel owner/admin)
+  const currentMembership = members.find((m) => m.profile_id === userId);
+  const canManage =
+    isAdmin || currentMembership?.role === "owner" || currentMembership?.role === "admin";
+
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="shrink-0 border-b border-silver px-4 py-3">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onBack}
-            className="md:hidden text-sm text-lavender mr-1"
-          >
-            ← Back
-          </button>
-          <span className="text-lg">{TYPE_ICONS[channel.type] ?? "💬"}</span>
-          <div className="min-w-0 flex-1">
-            <h2 className="text-sm font-semibold text-charcoal truncate">
-              {channel.name}
-            </h2>
-            {channel.description && (
-              <p className="text-xs text-mist truncate">{channel.description}</p>
-            )}
+    <div className="flex h-full relative">
+      <div className="flex flex-col flex-1 min-w-0">
+        {/* Header */}
+        <div className="shrink-0 border-b border-silver px-4 py-3">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onBack}
+              className="md:hidden text-sm text-lavender mr-1"
+            >
+              ← Back
+            </button>
+            <span className="text-lg">{TYPE_ICONS[channel.type] ?? "💬"}</span>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-sm font-semibold text-charcoal truncate">
+                {channel.name}
+              </h2>
+              {channel.description && (
+                <p className="text-xs text-mist truncate">{channel.description}</p>
+              )}
+            </div>
+            <span className="text-[10px] rounded-full bg-lavender/10 px-2 py-0.5 text-lavender-dark font-medium uppercase">
+              {TYPE_LABELS[channel.type] ?? channel.type}
+            </span>
+            <button
+              onClick={() => setShowMembers(!showMembers)}
+              className={`rounded-md border px-2 py-1 text-xs transition-colors ${
+                showMembers
+                  ? "border-lavender bg-lavender/10 text-lavender-dark"
+                  : "border-silver text-slate hover:bg-cloud"
+              }`}
+            >
+              {members.length} members
+            </button>
           </div>
-          <span className="text-[10px] rounded-full bg-lavender/10 px-2 py-0.5 text-lavender-dark font-medium uppercase">
-            {TYPE_LABELS[channel.type] ?? channel.type}
-          </span>
-          <button
-            onClick={() => setShowMembers(!showMembers)}
-            className="rounded-md border border-silver px-2 py-1 text-xs text-slate hover:bg-cloud transition-colors"
-          >
-            {members.length} members
-          </button>
         </div>
 
-        {/* Members panel */}
-        {showMembers && (
-          <div className="mt-3 border-t border-silver pt-3">
-            <div className="flex flex-wrap gap-2">
-              {members.map((m) => (
-                <span
-                  key={m.profile_id}
-                  className="inline-flex items-center gap-1 rounded-full bg-cloud px-2.5 py-1 text-xs"
-                >
-                  <span className="w-4 h-4 rounded-full bg-lavender/20 flex items-center justify-center text-[8px] font-bold text-lavender">
-                    {m.name[0]?.toUpperCase() ?? "?"}
-                  </span>
-                  <span className="text-charcoal">{m.name}</span>
-                  {m.role !== "member" && (
-                    <span className="text-[10px] text-mist">({m.role})</span>
-                  )}
-                </span>
-              ))}
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {loading ? (
+            <div className="text-center text-sm text-mist py-8">
+              Loading messages...
             </div>
-          </div>
-        )}
+          ) : messages.length === 0 ? (
+            <div className="text-center text-sm text-mist py-8">
+              No messages yet. Start the conversation!
+            </div>
+          ) : (
+            messages.map((msg) => (
+              <ChatBubble key={msg.id} message={msg} />
+            ))
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Message Input */}
+        <MessageInput onSend={onSend} />
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {loading ? (
-          <div className="text-center text-sm text-mist py-8">
-            Loading messages...
-          </div>
-        ) : messages.length === 0 ? (
-          <div className="text-center text-sm text-mist py-8">
-            No messages yet. Start the conversation!
-          </div>
-        ) : (
-          messages.map((msg) => (
-            <ChatBubble key={msg.id} message={msg} />
-          ))
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Message Input */}
-      <MessageInput onSend={onSend} />
+      {/* Members slide-out panel */}
+      {showMembers && (
+        <MemberPanel
+          channelId={channel.id}
+          members={members}
+          canManage={canManage}
+          onClose={() => setShowMembers(false)}
+          onChanged={onMembersChanged}
+        />
+      )}
     </div>
   );
 }
@@ -533,6 +554,210 @@ function MessageInput({ onSend }: { onSend: (content: string) => void }) {
       <p className="text-[10px] text-mist mt-1">
         Enter to send, Shift+Enter for new line
       </p>
+    </div>
+  );
+}
+
+// ── Member Panel (slide-out) ──────────────────────────────────
+
+function MemberPanel({
+  channelId,
+  members,
+  canManage,
+  onClose,
+  onChanged,
+}: {
+  channelId: string;
+  members: ChannelMember[];
+  canManage: boolean;
+  onClose: () => void;
+  onChanged: () => void;
+}) {
+  const [search, setSearch] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [adding, setAdding] = useState<string | null>(null);
+  const [removing, setRemoving] = useState<string | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Debounced search
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (search.trim().length < 2) {
+      setSearchResults([]);
+      setSearching(false);
+      return;
+    }
+
+    setSearching(true);
+    debounceRef.current = setTimeout(async () => {
+      const res = await fetch(
+        `/api/communications/channels/${channelId}/members?search=${encodeURIComponent(search.trim())}`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setSearchResults(data.results ?? []);
+      }
+      setSearching(false);
+    }, 300);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [search, channelId]);
+
+  async function addMember(profileId: string) {
+    setAdding(profileId);
+    const res = await fetch(
+      `/api/communications/channels/${channelId}/members`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profile_id: profileId }),
+      }
+    );
+    if (res.ok) {
+      setSearch("");
+      setSearchResults([]);
+      onChanged();
+    }
+    setAdding(null);
+  }
+
+  async function removeMember(profileId: string) {
+    setRemoving(profileId);
+    const res = await fetch(
+      `/api/communications/channels/${channelId}/members`,
+      {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profile_id: profileId }),
+      }
+    );
+    if (res.ok) {
+      onChanged();
+    }
+    setRemoving(null);
+  }
+
+  const ROLE_LABELS: Record<string, string> = {
+    owner: "Owner",
+    admin: "Admin",
+    member: "Member",
+  };
+
+  const ROLE_STYLES: Record<string, string> = {
+    owner: "bg-gold/10 text-gold-dark",
+    admin: "bg-lavender/10 text-lavender-dark",
+    member: "bg-cloud text-mist",
+  };
+
+  return (
+    <div className="w-72 shrink-0 border-l border-silver bg-white flex flex-col overflow-hidden">
+      {/* Panel header */}
+      <div className="shrink-0 px-4 py-3 border-b border-silver flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-charcoal">Members</h3>
+        <button
+          onClick={onClose}
+          className="text-mist hover:text-charcoal text-lg leading-none"
+        >
+          ×
+        </button>
+      </div>
+
+      {/* Search to add */}
+      {canManage && (
+        <div className="shrink-0 px-4 py-3 border-b border-silver">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search users to add..."
+            className="w-full rounded-lg border border-silver px-3 py-1.5 text-xs focus:outline-none focus:border-lavender focus:ring-1 focus:ring-lavender"
+          />
+          {/* Search results dropdown */}
+          {(searching || searchResults.length > 0) && search.trim().length >= 2 && (
+            <div className="mt-2 max-h-48 overflow-y-auto rounded-lg border border-silver bg-white shadow-sm">
+              {searching ? (
+                <div className="px-3 py-2 text-xs text-mist">Searching...</div>
+              ) : searchResults.length === 0 ? (
+                <div className="px-3 py-2 text-xs text-mist">No users found</div>
+              ) : (
+                searchResults.map((r) => (
+                  <div
+                    key={r.id}
+                    className="flex items-center justify-between gap-2 px-3 py-2 hover:bg-cloud/50 border-b border-silver/30 last:border-b-0"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium text-charcoal truncate">
+                        {r.name}
+                      </p>
+                      <p className="text-[10px] text-mist truncate">
+                        {r.tenant_role} {r.email ? `· ${r.email}` : ""}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => addMember(r.id)}
+                      disabled={adding === r.id}
+                      className="shrink-0 rounded bg-lavender px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-lavender-dark disabled:opacity-50"
+                    >
+                      {adding === r.id ? "..." : "Add"}
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Current members list */}
+      <div className="flex-1 overflow-y-auto">
+        {members.map((m) => (
+          <div
+            key={m.profile_id}
+            className="flex items-center gap-2.5 px-4 py-2.5 border-b border-silver/30 hover:bg-cloud/30"
+          >
+            {/* Avatar */}
+            <div className="shrink-0 w-7 h-7 rounded-full bg-lavender/10 flex items-center justify-center text-xs font-semibold text-lavender">
+              {(m.name[0] ?? "?").toUpperCase()}
+            </div>
+
+            {/* Name + role */}
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium text-charcoal truncate">
+                {m.name}
+              </p>
+              <span
+                className={`inline-block rounded-full px-1.5 py-0.5 text-[9px] font-medium ${
+                  ROLE_STYLES[m.role] ?? ROLE_STYLES.member
+                }`}
+              >
+                {ROLE_LABELS[m.role] ?? m.role}
+              </span>
+            </div>
+
+            {/* Remove button */}
+            {canManage && m.role !== "owner" && (
+              <button
+                onClick={() => removeMember(m.profile_id)}
+                disabled={removing === m.profile_id}
+                className="shrink-0 rounded border border-silver px-1.5 py-0.5 text-[10px] text-mist hover:text-error hover:border-error/30 transition-colors disabled:opacity-50"
+                title="Remove member"
+              >
+                {removing === m.profile_id ? "..." : "×"}
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Footer count */}
+      <div className="shrink-0 px-4 py-2 border-t border-silver bg-cloud/20">
+        <p className="text-[10px] text-mist text-center">
+          {members.length} member{members.length !== 1 ? "s" : ""}
+        </p>
+      </div>
     </div>
   );
 }
