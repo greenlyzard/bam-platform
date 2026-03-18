@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
+import { isTeacherOnly } from "@/lib/auth/role-check";
 
 export async function GET(req: NextRequest) {
   const user = await requireAuth();
@@ -15,11 +16,17 @@ export async function GET(req: NextRequest) {
 
   const supabase = await createClient();
   const pattern = `%${q}%`;
+  const teacherOnly = isTeacherOnly(user);
+
+  // Teacher-only: search by name only (not email), since they can't see emails
+  const orFilter = teacherOnly
+    ? `first_name.ilike.${pattern},last_name.ilike.${pattern}`
+    : `first_name.ilike.${pattern},last_name.ilike.${pattern},email.ilike.${pattern}`;
 
   const { data: profiles } = await supabase
     .from("profiles")
     .select("id, first_name, last_name, email, role")
-    .or(`first_name.ilike.${pattern},last_name.ilike.${pattern},email.ilike.${pattern}`)
+    .or(orFilter)
     .limit(20);
 
   const results = (profiles ?? [])
@@ -28,7 +35,7 @@ export async function GET(req: NextRequest) {
       id: p.id,
       name:
         [p.first_name, p.last_name].filter(Boolean).join(" ") || p.email || "",
-      email: p.email,
+      email: teacherOnly ? null : p.email,
       role: p.role ?? "parent",
     }));
 

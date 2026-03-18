@@ -6,12 +6,18 @@ import {
   generateThreadToken,
   appendMessage,
 } from "@/lib/communications/thread";
+import { isTeacherOnly } from "@/lib/auth/role-check";
 
 export async function GET(req: NextRequest) {
   const user = await requireAuth();
   const supabase = await createClient();
 
   if (!["super_admin", "admin", "teacher"].includes(user.role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  // Teacher-only users cannot access email threads
+  if (isTeacherOnly(user)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -120,6 +126,11 @@ export async function POST(req: NextRequest) {
   const supabase = await createClient();
 
   if (!["super_admin", "admin", "teacher"].includes(user.role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  // Teacher-only users cannot create email threads
+  if (isTeacherOnly(user)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

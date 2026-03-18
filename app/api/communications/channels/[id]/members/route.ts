@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
+import { isTeacherOnly } from "@/lib/auth/role-check";
 
 /**
  * GET /api/communications/channels/[id]/members?search=name
@@ -80,12 +81,13 @@ export async function GET(
       .or(`first_name.ilike.${searchPattern},last_name.ilike.${searchPattern}`)
       .limit(20);
 
+    const teacherOnly = isTeacherOnly(user);
     const results = (profiles ?? [])
       .filter((p) => !existingIds.includes(p.id))
       .map((p) => ({
         id: p.id,
         name: [p.first_name, p.last_name].filter(Boolean).join(" "),
-        email: p.email,
+        email: teacherOnly ? null : p.email,
         tenant_role: roleMap[p.id] ?? "unknown",
       }));
 
@@ -101,6 +103,7 @@ export async function GET(
     .eq("channel_id", channelId)
     .order("joined_at", { ascending: true });
 
+  const teacherOnly = isTeacherOnly(user);
   const enriched = (members ?? []).map((m: any) => ({
     id: m.id,
     profile_id: m.profile_id,
@@ -110,7 +113,7 @@ export async function GET(
     name: [m.profiles?.first_name, m.profiles?.last_name]
       .filter(Boolean)
       .join(" "),
-    email: m.profiles?.email ?? null,
+    email: teacherOnly ? null : (m.profiles?.email ?? null),
   }));
 
   return NextResponse.json({ members: enriched });
@@ -209,7 +212,7 @@ export async function POST(
     {
       ...member,
       name,
-      email: profile?.email ?? null,
+      email: isTeacherOnly(user) ? null : (profile?.email ?? null),
       is_muted: false,
     },
     { status: 201 }

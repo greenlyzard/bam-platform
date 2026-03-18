@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
+import { isTeacherOnly } from "@/lib/auth/role-check";
 
 export async function GET(
   _req: NextRequest,
@@ -11,6 +12,11 @@ export async function GET(
   const supabase = await createClient();
 
   if (!["super_admin", "admin", "teacher"].includes(user.role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  // Teacher-only users cannot access email threads
+  if (isTeacherOnly(user)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

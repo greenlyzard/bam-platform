@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
+import { isTeacherOnly } from "@/lib/auth/role-check";
 
 interface GroupMember {
   id: string;
@@ -83,9 +84,11 @@ export async function GET(
       groupMembers = await getProductionMembers(supabase, groupId);
     }
 
-    // Mark who is already in the channel
+    // Mark who is already in the channel; redact email for teacher-only users
+    const teacherOnly = isTeacherOnly(user);
     const results = groupMembers.map((m) => ({
       ...m,
+      email: teacherOnly ? null : m.email,
       already_member: existingIds.has(m.id),
     }));
 
