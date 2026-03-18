@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { markAttendance } from "./actions";
+import { useRouter } from "next/navigation";
+import { markAttendance, logHoursFromAttendance } from "./actions";
+import type { AttendanceResult } from "./actions";
 
 interface ClassOption {
   id: string;
@@ -31,7 +33,16 @@ const statusStyles: Record<AttendanceStatus, string> = {
   late: "bg-warning/10 text-warning border-warning/30",
 };
 
+function formatTime12h(time: string): string {
+  const [h, m] = time.split(":");
+  const hour = parseInt(h);
+  const ampm = hour >= 12 ? "PM" : "AM";
+  const h12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+  return `${h12}:${m} ${ampm}`;
+}
+
 export function AttendanceMarker({ classes }: { classes: ClassOption[] }) {
+  const router = useRouter();
   const [selectedClassId, setSelectedClassId] = useState("");
   const [date, setDate] = useState(
     new Date().toISOString().split("T")[0]
@@ -44,6 +55,13 @@ export function AttendanceMarker({ classes }: { classes: ClassOption[] }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  // Modal state for timesheet prompt
+  const [showTimesheetModal, setShowTimesheetModal] = useState(false);
+  const [timesheetDetails, setTimesheetDetails] = useState<
+    AttendanceResult["classDetails"] | null
+  >(null);
+  const [loggingHours, setLoggingHours] = useState(false);
 
   // Use URL param to preselect class
   useEffect(() => {
@@ -65,12 +83,10 @@ export function AttendanceMarker({ classes }: { classes: ClassOption[] }) {
       const data = await res.json();
       if (data.roster) {
         setRoster(data.roster);
-        // Pre-fill existing attendance
         const existing: Record<string, AttendanceStatus> = {};
         for (const rec of data.attendance ?? []) {
           existing[rec.student_id] = rec.status as AttendanceStatus;
         }
-        // Default all students to "present" if no existing record
         const merged: Record<string, AttendanceStatus> = {};
         for (const r of data.roster) {
           const sid = r.students?.id ?? r.student_id;
@@ -125,7 +141,42 @@ export function AttendanceMarker({ classes }: { classes: ClassOption[] }) {
       setError(result.error);
     } else {
       setSuccess("Attendance saved.");
+
+      // Show timesheet prompt if hours haven't been logged yet
+      if (result.classDetails && !result.classDetails.alreadyLogged) {
+        setTimesheetDetails(result.classDetails);
+        setShowTimesheetModal(true);
+      }
     }
+  }
+
+  async function handleLogHours() {
+    if (!timesheetDetails) return;
+    setLoggingHours(true);
+
+    const result = await logHoursFromAttendance({
+      classId: timesheetDetails.classId,
+      className: timesheetDetails.className,
+      date: timesheetDetails.date,
+      startTime: timesheetDetails.startTime,
+      endTime: timesheetDetails.endTime,
+      hours: timesheetDetails.hours,
+    });
+
+    setLoggingHours(false);
+
+    if (result?.error) {
+      setError(result.error);
+      setShowTimesheetModal(false);
+    } else {
+      setShowTimesheetModal(false);
+      router.push("/teach/timesheets");
+    }
+  }
+
+  function handleSkipHours() {
+    setShowTimesheetModal(false);
+    setTimesheetDetails(null);
   }
 
   return (
@@ -176,7 +227,7 @@ export function AttendanceMarker({ classes }: { classes: ClassOption[] }) {
           {error}
         </div>
       )}
-      {success && (
+      {success && !showTimesheetModal && (
         <div className="rounded-lg bg-success/10 border border-success/20 px-4 py-3 text-sm text-success">
           {success}
         </div>
@@ -254,6 +305,79 @@ export function AttendanceMarker({ classes }: { classes: ClassOption[] }) {
             >
               {saving ? "Saving..." : "Save Attendance"}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Feature 1 — Timesheet prompt modal */}
+      {showTimesheetModal && timesheetDetails && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-charcoal/40">
+          <div className="mx-4 w-full max-w-md rounded-2xl bg-white shadow-xl">
+            <div className="px-6 pt-6 pb-2">
+              <h2 className="text-lg font-heading font-semibold text-charcoal">
+                Log Hours for This Session?
+              </h2>
+              <p className="mt-1 text-sm text-slate">
+                Would you like to log a timesheet entry for the class you just
+                took attendance for?
+              </p>
+            </div>
+
+            <div className="px-6 py-4 space-y-3">
+              <div className="rounded-lg bg-cloud/50 p-4 space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-slate">Class</span>
+                  <span className="font-medium text-charcoal">
+                    {timesheetDetails.className}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate">Date</span>
+                  <span className="font-medium text-charcoal">
+                    {new Date(
+                      timesheetDetails.date + "T12:00:00"
+                    ).toLocaleDateString("en-US", {
+                      weekday: "short",
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </span>
+                </div>
+                {timesheetDetails.startTime && timesheetDetails.endTime && (
+                  <div className="flex justify-between">
+                    <span className="text-slate">Time</span>
+                    <span className="font-medium text-charcoal">
+                      {formatTime12h(timesheetDetails.startTime)} –{" "}
+                      {formatTime12h(timesheetDetails.endTime)}
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between border-t border-silver pt-2">
+                  <span className="text-slate font-medium">Hours</span>
+                  <span className="font-semibold text-lavender-dark text-base">
+                    {timesheetDetails.hours.toFixed(1)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 px-6 pb-6">
+              <button
+                type="button"
+                onClick={handleSkipHours}
+                className="flex-1 h-10 rounded-lg border border-silver bg-white text-sm font-medium text-slate hover:bg-cloud transition-colors"
+              >
+                Skip
+              </button>
+              <button
+                type="button"
+                onClick={handleLogHours}
+                disabled={loggingHours}
+                className="flex-1 h-10 rounded-lg bg-lavender hover:bg-lavender-dark text-white text-sm font-semibold transition-colors disabled:opacity-50"
+              >
+                {loggingHours ? "Logging..." : "Log Hours"}
+              </button>
+            </div>
           </div>
         </div>
       )}

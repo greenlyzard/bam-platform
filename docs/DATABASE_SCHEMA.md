@@ -639,6 +639,27 @@ Legacy teacher hour logging (pre-timesheet module). May be superseded by `timesh
 
 ---
 
+### `notifications`
+In-app notifications for check-in alerts, late pickup, system messages.
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| id | uuid | NO | gen_random_uuid() |
+| tenant_id | uuid | YES | null |
+| recipient_id | uuid | NO | null |
+| notification_type | text | NO | null |
+| title | text | NO | null |
+| body | text | YES | null |
+| metadata | jsonb | YES | '{}' |
+| is_read | boolean | NO | false |
+| read_at | timestamptz | YES | null |
+| created_at | timestamptz | NO | now() |
+
+**Valid notification_type values:** `checkin`, `late_pickup`, `system`
+**RLS:** Users can read/update own notifications. Admins and service role can insert.
+
+---
+
 ## Other Tables (Schema Not Yet Fully Documented)
 
 These tables exist but their full column schemas have not been captured.
@@ -734,6 +755,7 @@ before writing queries against any of these.
 | 20260316000001 | Timesheet total_hours trigger |
 | 20260317000000 | Families, family contacts, student guardians |
 | 20260319000000 | Student profiles, address columns, extended contacts |
+| 20260319100000 | Attendance bridge — notifications table, cross-ref indexes |
 
 ---
 

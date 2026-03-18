@@ -7,6 +7,7 @@ const navItems = [
   { label: "Timesheets", href: "/teach/timesheets", icon: "▤" },
   { label: "Log Hours", href: "/teach/hours", icon: "◷" },
   { label: "My Schedule", href: "/teach/schedule", icon: "▥" },
+  { label: "Attendance", href: "/teach/attendance", icon: "✓" },
   { label: "My Classes", href: "/teach/classes", icon: "▦" },
   { label: "My Students", href: "/teach/students", icon: "♡" },
   { label: "Report Absence", href: "/teach/report-absence", icon: "✕" },
