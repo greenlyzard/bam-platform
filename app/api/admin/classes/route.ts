@@ -14,8 +14,10 @@ export async function GET() {
 
   const { data: classes, error } = await supabase
     .from("classes")
-    .select("id, name, start_time, end_time")
+    .select("id, name, day_of_week, start_time, end_time")
     .eq("is_active", true)
+    .order("day_of_week")
+    .order("start_time")
     .order("name");
 
   if (error) {

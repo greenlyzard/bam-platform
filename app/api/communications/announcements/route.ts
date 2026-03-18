@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const validAudiences = ["all_parents", "class", "season", "teachers", "all"];
+  const validAudiences = ["all_parents", "class", "season", "teachers", "all", "specific_people"];
   if (!validAudiences.includes(body.audience)) {
     return Response.json({ error: "Invalid audience" }, { status: 400 });
   }

@@ -207,6 +207,19 @@ async function resolveRecipients(
     }
   }
 
+  if (audience === "specific_people" && audienceFilter) {
+    const profileIds = (audienceFilter as { profile_ids?: string[] }).profile_ids ?? [];
+    if (profileIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, email")
+        .in("id", profileIds);
+      for (const p of profiles ?? []) {
+        profileSet.set(p.id, p.email);
+      }
+    }
+  }
+
   if (audience === "class" && audienceFilter) {
     const classIds = (audienceFilter as { class_ids?: string[] }).class_ids ?? [];
     if (classIds.length > 0) {
