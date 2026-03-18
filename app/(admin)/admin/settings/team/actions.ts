@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { sendEmail } from "@/lib/resend/emails";
-import { renderEmailHtml } from "@/lib/email/layout";
+import { renderEmailHtml, DEFAULT_LOGO_URL } from "@/lib/email/layout";
 
 export async function inviteTeamMember(formData: FormData) {
   const supabase = await createClient();
@@ -60,6 +60,17 @@ export async function inviteTeamMember(formData: FormData) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://portal.balletacademyandmovement.com";
   const setupUrl = `${appUrl}/auth/accept-invite?token=${invite.token}`;
 
+  // Fetch logo URL from studio_settings
+  let logoUrl = DEFAULT_LOGO_URL;
+  try {
+    const { data: settings } = await supabase
+      .from("studio_settings")
+      .select("logo_url")
+      .limit(1)
+      .single();
+    if (settings?.logo_url) logoUrl = settings.logo_url;
+  } catch { /* use default */ }
+
   const html = renderEmailHtml({
     headerText: "You're Invited!",
     bodyHtml: `<p>Hi ${firstName},</p>
@@ -67,6 +78,7 @@ export async function inviteTeamMember(formData: FormData) {
 <p>Click the button below to set up your account. This link expires in 7 days.</p>`,
     buttonText: "Set Up Your Account",
     buttonUrl: setupUrl,
+    logoUrl,
   });
 
   try {
@@ -117,6 +129,17 @@ export async function approveTeacher(profileId: string) {
     .single();
 
   if (teacher?.email) {
+    // Fetch logo URL from studio_settings
+    let logoUrl = DEFAULT_LOGO_URL;
+    try {
+      const { data: settings } = await supabase
+        .from("studio_settings")
+        .select("logo_url")
+        .limit(1)
+        .single();
+      if (settings?.logo_url) logoUrl = settings.logo_url;
+    } catch { /* use default */ }
+
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://portal.balletacademyandmovement.com";
     const html = renderEmailHtml({
       headerText: "Welcome to the Team!",
@@ -124,6 +147,7 @@ export async function approveTeacher(profileId: string) {
 <p>Your account has been approved! You can now sign in to the Teacher Portal to view your schedule, log hours, and manage your classes.</p>`,
       buttonText: "Go to Teacher Portal",
       buttonUrl: `${appUrl}/teach/dashboard`,
+      logoUrl,
     });
 
     try {
@@ -174,11 +198,23 @@ export async function rejectTeacher(profileId: string) {
   if (updateError) return { error: updateError.message };
 
   if (teacher?.email) {
+    // Fetch logo URL from studio_settings
+    let logoUrl = DEFAULT_LOGO_URL;
+    try {
+      const { data: settings } = await supabase
+        .from("studio_settings")
+        .select("logo_url")
+        .limit(1)
+        .single();
+      if (settings?.logo_url) logoUrl = settings.logo_url;
+    } catch { /* use default */ }
+
     const html = renderEmailHtml({
       headerText: "Application Update",
       bodyHtml: `<p>Hi ${teacher.first_name ?? "there"},</p>
 <p>Thank you for your interest in joining Ballet Academy &amp; Movement. After review, we're unable to approve your account at this time.</p>
 <p>If you believe this was a mistake, please contact us at <a href="mailto:dance@bamsocal.com" style="color:#9C8BBF;">dance@bamsocal.com</a>.</p>`,
+      logoUrl,
     });
 
     try {

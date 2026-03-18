@@ -8,18 +8,35 @@ interface ClassOption {
   level: string;
 }
 
+interface StaffSender {
+  id: string;
+  name: string;
+}
+
 export function AnnouncementForm() {
   const [title, setTitle] = useState("");
   const [bodyHtml, setBodyHtml] = useState("");
   const [audience, setAudience] = useState("all_parents");
   const [selectedClassIds, setSelectedClassIds] = useState<string[]>([]);
   const [channel, setChannel] = useState("email");
+  const [senderAlias, setSenderAlias] = useState("studio");
+  const [staffSenders, setStaffSenders] = useState<StaffSender[]>([]);
   const [classes, setClasses] = useState<ClassOption[]>([]);
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{
     type: "success" | "error";
     message: string;
   } | null>(null);
+
+  // Load staff senders on mount
+  useEffect(() => {
+    fetch("/api/admin/staff-senders")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.senders) setStaffSenders(data.senders);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (audience === "class") {
@@ -52,6 +69,10 @@ export function AnnouncementForm() {
               ? { class_ids: selectedClassIds }
               : undefined,
           channel,
+          sender_name:
+            senderAlias !== "studio"
+              ? staffSenders.find((s) => s.id === senderAlias)?.name
+              : undefined,
           send: true,
         }),
       });
@@ -98,6 +119,31 @@ export function AnnouncementForm() {
           className="w-full rounded-lg border border-silver px-3 py-2 text-sm text-charcoal placeholder:text-mist focus:border-lavender focus:outline-none focus:ring-1 focus:ring-lavender"
           required
         />
+      </div>
+
+      {/* Send As */}
+      <div>
+        <label className="block text-sm font-medium text-charcoal mb-1">
+          Send As
+        </label>
+        <select
+          value={senderAlias}
+          onChange={(e) => setSenderAlias(e.target.value)}
+          className="w-full rounded-lg border border-silver px-3 py-2 text-sm text-charcoal focus:border-lavender focus:outline-none focus:ring-1 focus:ring-lavender"
+        >
+          {staffSenders.map((sender) => (
+            <option key={sender.id} value={sender.id}>
+              {sender.name}
+            </option>
+          ))}
+        </select>
+        {senderAlias !== "studio" && (
+          <p className="mt-1 text-xs text-mist">
+            Will appear as &ldquo;
+            {staffSenders.find((s) => s.id === senderAlias)?.name} via Ballet
+            Academy and Movement&rdquo;
+          </p>
+        )}
       </div>
 
       {/* Body */}

@@ -1,6 +1,19 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandInput,
+  CommandList,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+} from "@/components/ui/command";
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -600,7 +613,8 @@ function MemberPanel({
   // Group browsing state
   const [groups, setGroups] = useState<GroupOption[]>([]);
   const [groupsLoaded, setGroupsLoaded] = useState(false);
-  const [selectedGroup, setSelectedGroup] = useState("");
+  const [selectedGroup, setSelectedGroup] = useState<GroupOption | null>(null);
+  const [groupPickerOpen, setGroupPickerOpen] = useState(false);
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
   const [loadingGroupMembers, setLoadingGroupMembers] = useState(false);
 
@@ -626,13 +640,10 @@ function MemberPanel({
       return;
     }
 
-    const group = groups.find((g) => `${g.type}:${g.id}` === selectedGroup);
-    if (!group) return;
-
     setLoadingGroupMembers(true);
     (async () => {
       const res = await fetch(
-        `/api/communications/channels/${channelId}/members/groups?group_type=${group.type}&group_id=${group.id}`
+        `/api/communications/channels/${channelId}/members/groups?group_type=${selectedGroup.type}&group_id=${selectedGroup.id}`
       );
       if (res.ok) {
         const data = await res.json();
@@ -640,7 +651,7 @@ function MemberPanel({
       }
       setLoadingGroupMembers(false);
     })();
-  }, [selectedGroup, channelId, groups]);
+  }, [selectedGroup, channelId]);
 
   // Debounced name search
   useEffect(() => {
@@ -772,44 +783,107 @@ function MemberPanel({
       {canManage && (
         <div className="shrink-0 px-4 py-3 border-b border-silver space-y-2">
           {/* Browse by Group */}
-          <select
-            value={selectedGroup}
-            onChange={(e) => {
-              setSelectedGroup(e.target.value);
-              setSearch("");
-              setSearchResults([]);
-            }}
-            className="w-full rounded-lg border border-silver px-3 py-1.5 text-xs bg-white focus:outline-none focus:border-lavender focus:ring-1 focus:ring-lavender"
-          >
-            <option value="">Browse by Group...</option>
-            {presetGroups.length > 0 && (
-              <optgroup label="Quick Add">
-                {presetGroups.map((g) => (
-                  <option key={g.id} value={`preset:${g.id}`}>
-                    {g.name}
-                  </option>
-                ))}
-              </optgroup>
-            )}
-            {classGroups.length > 0 && (
-              <optgroup label="Classes">
-                {classGroups.map((g) => (
-                  <option key={g.id} value={`class:${g.id}`}>
-                    {g.name}{g.teacher ? ` (${g.teacher})` : ""}
-                  </option>
-                ))}
-              </optgroup>
-            )}
-            {productionGroups.length > 0 && (
-              <optgroup label="Productions">
-                {productionGroups.map((g) => (
-                  <option key={g.id} value={`production:${g.id}`}>
-                    {g.name}
-                  </option>
-                ))}
-              </optgroup>
-            )}
-          </select>
+          {selectedGroup ? (
+            <div className="flex items-center gap-1.5">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-lavender/15 border border-lavender/30 pl-2.5 pr-1 py-1 text-xs font-medium text-lavender-dark max-w-full">
+                <span className="truncate">{selectedGroup.name}</span>
+                <button
+                  onClick={() => {
+                    setSelectedGroup(null);
+                    setGroupMembers([]);
+                  }}
+                  className="shrink-0 rounded-full p-0.5 hover:bg-lavender/20 transition-colors"
+                  aria-label="Clear group"
+                >
+                  <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </span>
+            </div>
+          ) : (
+            <Popover open={groupPickerOpen} onOpenChange={setGroupPickerOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  className="w-full flex items-center justify-between rounded-lg border border-silver px-3 py-1.5 text-xs text-mist bg-white hover:border-lavender/50 transition-colors focus:outline-none focus:border-lavender focus:ring-1 focus:ring-lavender"
+                >
+                  <span>Browse by Group...</span>
+                  <svg className="h-3.5 w-3.5 text-mist" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="p-0">
+                <Command>
+                  <CommandInput placeholder="Search groups..." />
+                  <CommandList>
+                    <CommandEmpty>No groups found.</CommandEmpty>
+                    {presetGroups.length > 0 && (
+                      <CommandGroup heading="Quick Add">
+                        {presetGroups.map((g) => (
+                          <CommandItem
+                            key={g.id}
+                            value={g.name}
+                            onSelect={() => {
+                              setSelectedGroup(g);
+                              setGroupPickerOpen(false);
+                              setSearch("");
+                              setSearchResults([]);
+                            }}
+                          >
+                            <span className="mr-2 text-sm">⚡</span>
+                            {g.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    )}
+                    {classGroups.length > 0 && (
+                      <CommandGroup heading="Classes">
+                        {classGroups.map((g) => (
+                          <CommandItem
+                            key={g.id}
+                            value={`${g.name} ${g.teacher ?? ""}`}
+                            onSelect={() => {
+                              setSelectedGroup(g);
+                              setGroupPickerOpen(false);
+                              setSearch("");
+                              setSearchResults([]);
+                            }}
+                          >
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-xs font-medium text-charcoal">{g.name}</span>
+                              {g.teacher && (
+                                <span className="text-[10px] text-mist">{g.teacher}</span>
+                              )}
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    )}
+                    {productionGroups.length > 0 && (
+                      <CommandGroup heading="Productions">
+                        {productionGroups.map((g) => (
+                          <CommandItem
+                            key={g.id}
+                            value={g.name}
+                            onSelect={() => {
+                              setSelectedGroup(g);
+                              setGroupPickerOpen(false);
+                              setSearch("");
+                              setSearchResults([]);
+                            }}
+                          >
+                            <span className="mr-2 text-sm">🎭</span>
+                            {g.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    )}
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          )}
 
           {/* Group members list */}
           {selectedGroup && (

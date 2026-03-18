@@ -1,6 +1,10 @@
 import { Resend } from "resend";
 import { createClient } from "@/lib/supabase/server";
-import { renderEmailHtml } from "@/lib/email/layout";
+import { renderEmailHtml, DEFAULT_LOGO_URL } from "@/lib/email/layout";
+
+const DEFAULT_REPLY_TO = "dance@bamsocal.com";
+const FROM_EMAIL = "hello@balletacademyandmovement.com";
+const STUDIO_NAME = "Ballet Academy and Movement";
 
 /**
  * Resolve recipients, send emails, and update announcement status.
@@ -28,6 +32,22 @@ export async function sendAnnouncement(announcementId: string): Promise<{
     .from("announcements")
     .update({ status: "sending" })
     .eq("id", announcementId);
+
+  // Fetch logo URL from studio_settings
+  let logoUrl = DEFAULT_LOGO_URL;
+  try {
+    const { data: settings } = await supabase
+      .from("studio_settings")
+      .select("logo_url")
+      .limit(1)
+      .single();
+    if (settings?.logo_url) logoUrl = settings.logo_url;
+  } catch { /* use default */ }
+
+  // Build from field based on sender_name
+  const fromField = announcement.sender_name
+    ? `${announcement.sender_name} via ${STUDIO_NAME} <${FROM_EMAIL}>`
+    : `${STUDIO_NAME} <${FROM_EMAIL}>`;
 
   try {
     // Resolve recipient profile IDs based on audience
@@ -63,6 +83,7 @@ export async function sendAnnouncement(announcementId: string): Promise<{
         bodyHtml: announcement.body_html,
         buttonText: "View in Portal",
         buttonUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? "https://portal.balletacademyandmovement.com"}/portal/messages`,
+        logoUrl,
       });
 
       const emailRecipients = recipientProfiles
@@ -76,8 +97,9 @@ export async function sendAnnouncement(announcementId: string): Promise<{
         for (let i = 0; i < emailRecipients.length; i += 50) {
           const batch = emailRecipients.slice(i, i + 50);
           const batchEmails = batch.map((to) => ({
-            from: "Ballet Academy and Movement <hello@balletacademyandmovement.com>",
+            from: fromField,
             to,
+            replyTo: DEFAULT_REPLY_TO,
             subject: announcement.title,
             html,
           }));

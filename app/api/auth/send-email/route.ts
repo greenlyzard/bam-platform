@@ -6,6 +6,9 @@ import { renderEmailHtml } from "@/lib/email/layout";
 const FROM_EMAIL =
   process.env.RESEND_FROM_EMAIL ?? "hello@balletacademyandmovement.com";
 const FROM_NAME = "Ballet Academy and Movement";
+const DEFAULT_REPLY_TO = "dance@bamsocal.com";
+const DEFAULT_LOGO_URL =
+  "https://portal.balletacademyandmovement.com/BAM%20Logos_Pink%20Circle-Favicon.png";
 
 /**
  * Supabase Auth Email Hook — edge runtime for zero cold start.
@@ -80,6 +83,7 @@ export async function POST(req: NextRequest) {
     bodyHtml,
     buttonText,
     buttonUrl: confirmationUrl,
+    logoUrl: DEFAULT_LOGO_URL,
   });
 
   // Send via Resend REST API directly (edge-compatible, no SDK needed)
@@ -99,6 +103,7 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         from: `${FROM_NAME} <${FROM_EMAIL}>`,
         to: [recipientEmail],
+        reply_to: DEFAULT_REPLY_TO,
         subject,
         html,
       }),

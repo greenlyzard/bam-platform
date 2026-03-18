@@ -14,13 +14,15 @@ interface SendEmailParams {
   replyTo?: string;
 }
 
+const DEFAULT_REPLY_TO = "dance@bamsocal.com";
+
 export async function sendEmail({ to, subject, html, replyTo }: SendEmailParams) {
   const { data, error } = await getResend().emails.send({
     from: `${FROM_NAME} <${FROM_EMAIL}>`,
     to: Array.isArray(to) ? to : [to],
     subject,
     html,
-    replyTo,
+    replyTo: replyTo ?? DEFAULT_REPLY_TO,
   });
 
   if (error) {

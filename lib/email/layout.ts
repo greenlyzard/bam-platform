@@ -2,18 +2,23 @@
  * BAM branded email HTML layout.
  * Uses inline styles for maximum email client compatibility.
  */
+export const DEFAULT_LOGO_URL =
+  "https://portal.balletacademyandmovement.com/BAM%20Logos_Pink%20Circle-Favicon.png";
+
 export function renderEmailHtml({
   headerText,
   bodyHtml,
   buttonText,
   buttonUrl,
   footerText,
+  logoUrl,
 }: {
   headerText?: string | null;
   bodyHtml: string;
   buttonText?: string | null;
   buttonUrl?: string | null;
   footerText?: string | null;
+  logoUrl?: string | null;
 }): string {
   const button =
     buttonText && buttonUrl
@@ -49,6 +54,11 @@ export function renderEmailHtml({
           <!-- Lavender header bar -->
           <tr>
             <td style="background-color: #9C8BBF; padding: 24px 32px; border-radius: 16px 16px 0 0; text-align: center;">
+              ${
+                logoUrl
+                  ? `<img src="${escapeHtml(logoUrl)}" alt="Ballet Academy and Movement" width="48" height="48" style="display: block; margin: 0 auto 12px auto; width: 48px; height: 48px; border: 0; outline: none;" />`
+                  : ""
+              }
               <p style="margin: 0; font-family: 'Cormorant Garamond', Georgia, serif; font-size: 22px; font-weight: 600; color: #ffffff; letter-spacing: 0.5px;">
                 Ballet Academy and Movement
               </p>

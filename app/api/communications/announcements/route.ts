@@ -96,6 +96,7 @@ export async function POST(req: NextRequest) {
     audience?: string;
     audience_filter?: Record<string, unknown>;
     channel?: string;
+    sender_name?: string;
     send?: boolean;
   };
 
@@ -137,6 +138,7 @@ export async function POST(req: NextRequest) {
       audience: body.audience,
       audience_filter: body.audience_filter ?? null,
       channel: body.channel ?? "email",
+      sender_name: body.sender_name || null,
       status: "draft",
     })
     .select("id, status")

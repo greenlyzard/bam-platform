@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
-import { renderEmailHtml } from "@/lib/email/layout";
+import { renderEmailHtml, DEFAULT_LOGO_URL } from "@/lib/email/layout";
 import { Resend } from "resend";
 
 function getResend() {
@@ -10,6 +10,7 @@ function getResend() {
 const FROM_EMAIL =
   process.env.RESEND_FROM_EMAIL ?? "hello@balletacademyandmovement.com";
 const FROM_NAME = "Ballet Academy and Movement";
+const DEFAULT_REPLY_TO = "dance@bamsocal.com";
 const PORTAL_URL = "https://portal.balletacademyandmovement.com";
 
 export async function POST(req: NextRequest) {
@@ -59,8 +60,20 @@ export async function POST(req: NextRequest) {
     linkData?.properties?.action_link ?? `${PORTAL_URL}/login`;
   const firstName = profile.first_name ?? "Teacher";
 
+  // Fetch logo URL from studio_settings
+  let logoUrl = DEFAULT_LOGO_URL;
+  try {
+    const { data: settings } = await supabase
+      .from("studio_settings")
+      .select("logo_url")
+      .limit(1)
+      .single();
+    if (settings?.logo_url) logoUrl = settings.logo_url;
+  } catch { /* use default */ }
+
   const html = renderEmailHtml({
     headerText: "Welcome to Ballet Academy and Movement",
+    logoUrl,
     bodyHtml: `
       <p>Hi ${firstName},</p>
       <p>Your teacher portal account is ready! Here's everything you need to get started:</p>
@@ -87,6 +100,7 @@ export async function POST(req: NextRequest) {
   const { error: sendError } = await getResend().emails.send({
     from: `${FROM_NAME} <${FROM_EMAIL}>`,
     to: [profile.email],
+    replyTo: DEFAULT_REPLY_TO,
     subject: "Welcome to Ballet Academy and Movement — Your Teacher Portal is Ready",
     html,
   });

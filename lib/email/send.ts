@@ -1,6 +1,23 @@
 import { Resend } from "resend";
 import { createClient } from "@/lib/supabase/server";
-import { renderEmailHtml } from "./layout";
+import { renderEmailHtml, DEFAULT_LOGO_URL } from "./layout";
+
+const DEFAULT_REPLY_TO = "dance@bamsocal.com";
+
+async function fetchLogoUrl(
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<string> {
+  try {
+    const { data } = await supabase
+      .from("studio_settings")
+      .select("logo_url")
+      .limit(1)
+      .single();
+    return data?.logo_url || DEFAULT_LOGO_URL;
+  } catch {
+    return DEFAULT_LOGO_URL;
+  }
+}
 
 /**
  * Send a branded email using a stored template.
@@ -22,6 +39,9 @@ export async function sendEmail(
 
   const resend = new Resend(process.env.RESEND_API_KEY);
   const supabase = await createClient();
+
+  // Fetch logo URL from studio settings
+  const logoUrl = await fetchLogoUrl(supabase);
 
   // Fetch template
   const { data: template, error: fetchError } = await supabase
@@ -62,10 +82,11 @@ export async function sendEmail(
     buttonText,
     buttonUrl,
     footerText: template.footer_text,
+    logoUrl,
   });
 
-  // Build reply-to: thread token takes priority over template default
-  let replyTo = template.reply_to || undefined;
+  // Build reply-to: thread token takes priority over template default, fallback to studio email
+  let replyTo: string = template.reply_to || DEFAULT_REPLY_TO;
   if (options?.threadToken) {
     replyTo = `reply+${options.threadToken}@mail.balletacademyandmovement.com`;
   }
@@ -111,6 +132,9 @@ export async function sendRawEmail({
   }
 
   const resend = new Resend(process.env.RESEND_API_KEY);
+  const supabase = await createClient();
+  const logoUrl = await fetchLogoUrl(supabase);
+
   const senderName = fromName ?? "Ballet Academy and Movement";
   const senderEmail =
     fromEmail ?? process.env.RESEND_FROM_EMAIL ?? "hello@balletacademyandmovement.com";
@@ -118,11 +142,12 @@ export async function sendRawEmail({
   const html = renderEmailHtml({
     bodyHtml,
     footerText: null,
+    logoUrl,
   });
 
   const replyTo = threadToken
     ? `reply+${threadToken}@mail.balletacademyandmovement.com`
-    : undefined;
+    : DEFAULT_REPLY_TO;
 
   const { error: sendError } = await resend.emails.send({
     from: `${senderName} <${senderEmail}>`,

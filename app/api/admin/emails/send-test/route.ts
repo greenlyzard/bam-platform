@@ -1,7 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
-import { renderEmailHtml } from "@/lib/email/layout";
+import { renderEmailHtml, DEFAULT_LOGO_URL } from "@/lib/email/layout";
 import { Resend } from "resend";
 import { NextRequest, NextResponse } from "next/server";
+
+const DEFAULT_REPLY_TO = "dance@bamsocal.com";
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
@@ -71,12 +73,24 @@ export async function POST(req: NextRequest) {
   const replacePlaceholders = (text: string) =>
     text.replace(/\{\{(\w+)\}\}/g, (match, key) => sampleVars[key] ?? match);
 
+  // Fetch logo URL from studio_settings
+  let logoUrl = DEFAULT_LOGO_URL;
+  try {
+    const { data: settings } = await supabase
+      .from("studio_settings")
+      .select("logo_url")
+      .limit(1)
+      .single();
+    if (settings?.logo_url) logoUrl = settings.logo_url;
+  } catch { /* use default */ }
+
   const html = renderEmailHtml({
     headerText: header_text ? replacePlaceholders(header_text) : null,
     bodyHtml: replacePlaceholders(body_html),
     buttonText: button_text ? replacePlaceholders(button_text) : null,
     buttonUrl: button_url ? replacePlaceholders(button_url) : null,
     footerText: footer_text || null,
+    logoUrl,
   });
 
   if (!process.env.RESEND_API_KEY) {
@@ -91,7 +105,7 @@ export async function POST(req: NextRequest) {
   const { error: sendError } = await resend.emails.send({
     from: `${from_name || "Ballet Academy and Movement"} <${from_email || "hello@balletacademyandmovement.com"}>`,
     to: recipientEmail,
-    replyTo: reply_to || undefined,
+    replyTo: reply_to || DEFAULT_REPLY_TO,
     subject: `[TEST] ${replacePlaceholders(subject)}`,
     html,
   });
