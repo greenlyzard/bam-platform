@@ -1,15 +1,17 @@
 import { createClient } from "@/lib/supabase/server";
 
 // Re-export types and constants from types.ts (safe for client imports)
-export type { ScheduleClass, ClassSession, AdminTask } from "./types";
+export type { ScheduleClass, ClassSession, AdminTask, ScheduleInstance } from "./types";
 export {
   CLASS_TYPE_COLORS,
   CLASS_TYPE_BG,
   PRIORITY_BADGES,
   TASK_TYPE_LABELS,
+  LEVEL_COLORS,
+  getLevelColor,
 } from "./types";
 
-import type { ScheduleClass, ClassSession, AdminTask } from "./types";
+import type { ScheduleClass, ClassSession, AdminTask, ScheduleInstance } from "./types";
 
 // ── Query functions ────────────────────────────────────────────
 
@@ -334,4 +336,153 @@ export async function getProductions(): Promise<Array<{ id: string; name: string
     .select("id, name")
     .order("name");
   return data ?? [];
+}
+
+// ── Schedule Instances (actual schedule data) ────────────────
+
+export async function getRooms(): Promise<Array<{ id: string; name: string }>> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("rooms")
+    .select("id, name")
+    .order("name");
+  return data ?? [];
+}
+
+export async function getScheduleInstances(filters: {
+  startDate: string;
+  endDate: string;
+  teacherId?: string;
+  level?: string;
+  style?: string;
+  roomId?: string;
+  dayOfWeek?: string;
+  tenantId?: string;
+}): Promise<ScheduleInstance[]> {
+  const supabase = await createClient();
+
+  let query = supabase
+    .from("schedule_instances")
+    .select("id, tenant_id, class_id, teacher_id, room_id, event_type, event_date, start_time, end_time, status, cancellation_reason, substitute_teacher_id, notes, is_trial_eligible, production_id")
+    .gte("event_date", filters.startDate)
+    .lte("event_date", filters.endDate)
+    .order("event_date")
+    .order("start_time");
+
+  if (filters.tenantId) {
+    query = query.eq("tenant_id", filters.tenantId);
+  }
+  if (filters.teacherId) {
+    query = query.eq("teacher_id", filters.teacherId);
+  }
+  if (filters.roomId) {
+    query = query.eq("room_id", filters.roomId);
+  }
+
+  const { data: instances, error } = await query;
+
+  if (error) {
+    console.error("[schedule:getInstances]", error);
+    return [];
+  }
+
+  if (!instances || instances.length === 0) return [];
+
+  // Get class info for enrichment
+  const classIds = [...new Set(instances.map((i) => i.class_id).filter(Boolean) as string[])];
+  const classMap: Record<string, { name: string; level: string | null; style: string | null; enrolled_count: number; max_students: number | null }> = {};
+  if (classIds.length > 0) {
+    const { data: classes } = await supabase
+      .from("classes")
+      .select("id, name, level, style, enrolled_count, max_students")
+      .in("id", classIds);
+    for (const c of classes ?? []) {
+      classMap[c.id] = {
+        name: c.name,
+        level: c.level,
+        style: c.style,
+        enrolled_count: c.enrolled_count ?? 0,
+        max_students: c.max_students,
+      };
+    }
+  }
+
+  // Get room names
+  const roomIds = [...new Set(instances.map((i) => i.room_id).filter(Boolean) as string[])];
+  const roomMap: Record<string, string> = {};
+  if (roomIds.length > 0) {
+    const { data: rooms } = await supabase
+      .from("rooms")
+      .select("id, name")
+      .in("id", roomIds);
+    for (const r of rooms ?? []) {
+      roomMap[r.id] = r.name;
+    }
+  }
+
+  // Get teacher names
+  const teacherIds = new Set<string>();
+  for (const i of instances) {
+    if (i.teacher_id) teacherIds.add(i.teacher_id);
+    if (i.substitute_teacher_id) teacherIds.add(i.substitute_teacher_id);
+  }
+  const teacherMap: Record<string, { name: string; initials: string }> = {};
+  if (teacherIds.size > 0) {
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, first_name, last_name")
+      .in("id", [...teacherIds]);
+    for (const p of profiles ?? []) {
+      const name = [p.first_name, p.last_name].filter(Boolean).join(" ");
+      const initials = [p.first_name?.[0], p.last_name?.[0]].filter(Boolean).join("");
+      teacherMap[p.id] = { name, initials };
+    }
+  }
+
+  let enriched: ScheduleInstance[] = instances.map((i) => ({
+    ...i,
+    is_trial_eligible: i.is_trial_eligible ?? false,
+    className: i.class_id ? (classMap[i.class_id]?.name ?? null) : null,
+    classLevel: i.class_id ? (classMap[i.class_id]?.level ?? null) : null,
+    classStyle: i.class_id ? (classMap[i.class_id]?.style ?? null) : null,
+    teacherName: i.teacher_id ? (teacherMap[i.teacher_id]?.name ?? null) : null,
+    teacherInitials: i.teacher_id ? (teacherMap[i.teacher_id]?.initials ?? null) : null,
+    subTeacherName: i.substitute_teacher_id ? (teacherMap[i.substitute_teacher_id]?.name ?? null) : null,
+    roomName: i.room_id ? (roomMap[i.room_id] ?? null) : null,
+    enrolledCount: i.class_id ? (classMap[i.class_id]?.enrolled_count ?? 0) : 0,
+    maxStudents: i.class_id ? (classMap[i.class_id]?.max_students ?? null) : null,
+  }));
+
+  // Client-side filters that need enriched data
+  if (filters.level) {
+    enriched = enriched.filter((i) =>
+      i.classLevel?.toLowerCase().includes(filters.level!.toLowerCase())
+    );
+  }
+  if (filters.style) {
+    enriched = enriched.filter((i) =>
+      i.classStyle?.toLowerCase().includes(filters.style!.toLowerCase())
+    );
+  }
+  if (filters.dayOfWeek) {
+    const dow = parseInt(filters.dayOfWeek, 10);
+    enriched = enriched.filter((i) => {
+      const d = new Date(i.event_date + "T00:00:00");
+      return d.getDay() === dow;
+    });
+  }
+
+  return enriched;
+}
+
+export async function getDistinctLevels(): Promise<string[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("classes")
+    .select("level")
+    .eq("is_active", true)
+    .not("level", "is", null);
+
+  const levels = [...new Set((data ?? []).map((c) => c.level).filter(Boolean) as string[])];
+  return levels.sort();
 }

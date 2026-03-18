@@ -1,139 +1,200 @@
 import { requireParent } from "@/lib/auth/guards";
-import { getMyEnrollments } from "@/lib/queries/portal";
-import { ClassCard } from "@/components/bam/ClassCard";
-import { EmptyState } from "@/components/bam/empty-state";
+import { createClient } from "@/lib/supabase/server";
+import { PortalScheduleView } from "./schedule-view";
 
-const DAY_NAMES = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-];
+export default async function PortalSchedulePage() {
+  const user = await requireParent();
+  const supabase = await createClient();
 
-export default async function SchedulePage() {
-  await requireParent();
-  const enrollments = await getMyEnrollments();
+  // Get students
+  const { data: students } = await supabase
+    .from("students")
+    .select("id, first_name, last_name, date_of_birth, current_level")
+    .eq("parent_id", user.id)
+    .eq("active", true)
+    .order("first_name");
 
-  // Group by day of week
-  const byDay: Record<
-    number,
-    typeof enrollments
-  > = {};
+  const studentIds = (students ?? []).map((s) => s.id);
 
-  for (const enrollment of enrollments) {
-    const classRaw = enrollment.classes as unknown;
-    const classData = (
-      Array.isArray(classRaw) ? classRaw[0] : classRaw
-    ) as {
+  // Get active enrollments with class info
+  let enrollments: Array<{
+    id: string;
+    student_id: string;
+    class_id: string;
+    status: string;
+    classes: {
       id: string;
       name: string;
-      style: string;
-      level: string;
+      style: string | null;
+      level: string | null;
       day_of_week: number | null;
       start_time: string | null;
       end_time: string | null;
       room: string | null;
+      teacher_id: string | null;
+      max_students: number | null;
+      enrolled_count: number;
     } | null;
+  }> = [];
 
-    const day = classData?.day_of_week;
-    if (day == null) continue;
-    if (!byDay[day]) byDay[day] = [];
-    byDay[day].push(enrollment);
+  if (studentIds.length > 0) {
+    const { data } = await supabase
+      .from("enrollments")
+      .select(
+        `id, student_id, class_id, status,
+         classes (id, name, style, level, day_of_week, start_time, end_time, room, teacher_id, max_students, enrolled_count)`
+      )
+      .in("student_id", studentIds)
+      .in("status", ["active", "trial"]);
+
+    enrollments = (data ?? []).map((e) => ({
+      ...e,
+      classes: Array.isArray(e.classes) ? e.classes[0] : e.classes,
+    }));
   }
 
-  // Sort each day's classes by start_time
-  for (const day of Object.keys(byDay)) {
-    byDay[Number(day)].sort((a, b) => {
-      const aRaw = a.classes as unknown;
-      const aClass = (Array.isArray(aRaw) ? aRaw[0] : aRaw) as { start_time: string | null } | null;
-      const bRaw = b.classes as unknown;
-      const bClass = (Array.isArray(bRaw) ? bRaw[0] : bRaw) as { start_time: string | null } | null;
-      return (aClass?.start_time ?? "").localeCompare(bClass?.start_time ?? "");
+  // Get upcoming schedule instances for enrolled classes (next 30 days)
+  const enrolledClassIds = [...new Set(enrollments.map((e) => e.class_id))];
+  const today = new Date().toISOString().split("T")[0];
+  const future = new Date();
+  future.setDate(future.getDate() + 30);
+  const futureStr = future.toISOString().split("T")[0];
+
+  let instances: Array<{
+    id: string;
+    class_id: string;
+    event_date: string;
+    start_time: string;
+    end_time: string;
+    status: string;
+    room_id: string | null;
+    teacher_id: string | null;
+    notes: string | null;
+  }> = [];
+
+  if (enrolledClassIds.length > 0) {
+    const { data } = await supabase
+      .from("schedule_instances")
+      .select("id, class_id, event_date, start_time, end_time, status, room_id, teacher_id, notes")
+      .in("class_id", enrolledClassIds)
+      .gte("event_date", today)
+      .lte("event_date", futureStr)
+      .neq("status", "cancelled")
+      .order("event_date")
+      .order("start_time");
+    instances = data ?? [];
+  }
+
+  // Get teacher names for enrolled classes + instances
+  const allTeacherIds = new Set<string>();
+  for (const e of enrollments) {
+    if (e.classes?.teacher_id) allTeacherIds.add(e.classes.teacher_id);
+  }
+  for (const i of instances) {
+    if (i.teacher_id) allTeacherIds.add(i.teacher_id);
+  }
+  const teacherNames: Record<string, string> = {};
+  if (allTeacherIds.size > 0) {
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, first_name, last_name")
+      .in("id", [...allTeacherIds]);
+    for (const p of profiles ?? []) {
+      teacherNames[p.id] = [p.first_name, p.last_name].filter(Boolean).join(" ");
+    }
+  }
+
+  // Get room names
+  const roomIds = [...new Set(instances.map((i) => i.room_id).filter(Boolean) as string[])];
+  const roomNames: Record<string, string> = {};
+  if (roomIds.length > 0) {
+    const { data: rooms } = await supabase
+      .from("rooms")
+      .select("id, name")
+      .in("id", roomIds);
+    for (const r of rooms ?? []) {
+      roomNames[r.id] = r.name;
+    }
+  }
+
+  // Get recommended classes: active, not already enrolled, matching age/level
+  let recommended: Array<{
+    id: string;
+    name: string;
+    style: string | null;
+    level: string | null;
+    day_of_week: number | null;
+    start_time: string | null;
+    end_time: string | null;
+    room: string | null;
+    teacher_id: string | null;
+    max_students: number | null;
+    enrolled_count: number;
+    age_min: number | null;
+    age_max: number | null;
+  }> = [];
+
+  if (students && students.length > 0) {
+    const { data: allClasses } = await supabase
+      .from("classes")
+      .select("id, name, style, level, day_of_week, start_time, end_time, room, teacher_id, max_students, enrolled_count, age_min, age_max")
+      .eq("is_active", true)
+      .order("name");
+
+    // Calculate student ages
+    const studentAges = (students ?? []).map((s) => {
+      if (!s.date_of_birth) return null;
+      const dob = new Date(s.date_of_birth);
+      const age = Math.floor((Date.now() - dob.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+      return { ...s, age };
+    });
+
+    const studentLevels = new Set((students ?? []).map((s) => s.current_level).filter(Boolean));
+
+    recommended = (allClasses ?? []).filter((cls) => {
+      // Exclude already enrolled
+      if (enrolledClassIds.includes(cls.id)) return false;
+      // Exclude full classes
+      if (cls.max_students && cls.enrolled_count >= cls.max_students) return false;
+
+      // Check age/level match for any student
+      let matchesAny = false;
+      for (const sa of studentAges) {
+        if (!sa) continue;
+        const ageOk =
+          (!cls.age_min || sa.age >= cls.age_min) &&
+          (!cls.age_max || sa.age <= cls.age_max);
+        const levelOk = !cls.level || !sa.current_level || cls.level === sa.current_level || studentLevels.has(cls.level);
+        if (ageOk && levelOk) {
+          matchesAny = true;
+          break;
+        }
+      }
+      return matchesAny;
     });
   }
 
-  // Get sorted days (Monday first: 1,2,3,4,5,6,0)
-  const sortedDays = Object.keys(byDay)
-    .map(Number)
-    .sort((a, b) => {
-      const aKey = a === 0 ? 7 : a;
-      const bKey = b === 0 ? 7 : b;
-      return aKey - bKey;
-    });
+  // Check if any teacher has private lesson availability
+  const { count: privateCount } = await supabase
+    .from("classes")
+    .select("id", { count: "exact", head: true })
+    .eq("is_active", true)
+    .ilike("style", "%private%");
+
+  const hasPrivateLessons = (privateCount ?? 0) > 0;
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-heading font-semibold text-charcoal">
-          Weekly Schedule
-        </h1>
-        <p className="mt-1 text-sm text-slate">
-          Your dancers&apos; enrolled classes by day.
-        </p>
-      </div>
-
-      {enrollments.length === 0 ? (
-        <EmptyState
-          icon="▦"
-          title="No classes yet"
-          description="Once your dancers are enrolled in classes, their weekly schedule will appear here."
-          actionLabel="Browse Classes"
-          actionHref="/portal/schedule"
-        />
-      ) : (
-        <div className="space-y-6">
-          {sortedDays.map((day) => (
-            <section key={day}>
-              <h2 className="text-base font-heading font-semibold text-charcoal mb-3">
-                {DAY_NAMES[day]}
-              </h2>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {byDay[day].map((enrollment) => {
-                  const studentRaw = enrollment.students as unknown;
-                  const student = (
-                    Array.isArray(studentRaw) ? studentRaw[0] : studentRaw
-                  ) as {
-                    id: string;
-                    first_name: string;
-                    last_name: string;
-                  } | null;
-                  const classRaw2 = enrollment.classes as unknown;
-                  const classData = (
-                    Array.isArray(classRaw2) ? classRaw2[0] : classRaw2
-                  ) as {
-                    id: string;
-                    name: string;
-                    style: string;
-                    level: string;
-                    day_of_week: number | null;
-                    start_time: string | null;
-                    end_time: string | null;
-                    room: string | null;
-                  } | null;
-
-                  if (!classData) return null;
-
-                  return (
-                    <ClassCard
-                      key={enrollment.id}
-                      classData={classData}
-                      studentName={
-                        student
-                          ? `${student.first_name} ${student.last_name}`
-                          : undefined
-                      }
-                      status={enrollment.status}
-                    />
-                  );
-                })}
-              </div>
-            </section>
-          ))}
-        </div>
-      )}
+      <PortalScheduleView
+        userId={user.id}
+        students={students ?? []}
+        enrollments={enrollments}
+        instances={instances}
+        teacherNames={teacherNames}
+        roomNames={roomNames}
+        recommended={recommended}
+        hasPrivateLessons={hasPrivateLessons}
+      />
     </div>
   );
 }

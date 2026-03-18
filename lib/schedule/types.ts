@@ -82,6 +82,63 @@ export interface AdminTask {
   teacherName?: string | null;
 }
 
+// ── Schedule Instance (from schedule_instances table) ──────────
+
+export interface ScheduleInstance {
+  id: string;
+  tenant_id: string;
+  class_id: string | null;
+  teacher_id: string | null;
+  room_id: string | null;
+  event_type: string;
+  event_date: string;
+  start_time: string;
+  end_time: string;
+  status: string;
+  cancellation_reason: string | null;
+  substitute_teacher_id: string | null;
+  notes: string | null;
+  is_trial_eligible: boolean;
+  production_id: string | null;
+  // Enriched fields
+  className?: string | null;
+  classLevel?: string | null;
+  classStyle?: string | null;
+  teacherName?: string | null;
+  teacherInitials?: string | null;
+  subTeacherName?: string | null;
+  roomName?: string | null;
+  enrolledCount?: number;
+  maxStudents?: number | null;
+}
+
+// ── Level colors (for schedule display) ───────────────────────
+
+export const LEVEL_COLORS: Record<string, string> = {
+  Petite: "#F4C6D4",
+  "Pre-Ballet": "#D4C6F4",
+  Beginner: "#B8A9E0",
+  Intermediate: "#9C8BBF",
+  Advanced: "#6B5B9E",
+  "Open/Adult": "#A8C5A0",
+  Rehearsal: "#E8C96B",
+  Performance: "#F0E0C0",
+  Trial: "#7EC8C8",
+  Private: "#E8A896",
+};
+
+export function getLevelColor(level: string | null | undefined): string {
+  if (!level) return "#9C8BBF";
+  // Exact match first
+  if (LEVEL_COLORS[level]) return LEVEL_COLORS[level];
+  // Partial match
+  const lower = level.toLowerCase();
+  for (const [key, color] of Object.entries(LEVEL_COLORS)) {
+    if (lower.includes(key.toLowerCase())) return color;
+  }
+  return "#9C8BBF";
+}
+
 // ── Color constants ────────────────────────────────────────────
 
 export const CLASS_TYPE_COLORS: Record<string, string> = {

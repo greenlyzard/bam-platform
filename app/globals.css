@@ -89,3 +89,11 @@ h3 {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Print styles for schedule */
+@media print {
+  body { background: white !important; }
+  nav, header, footer, .print\:hidden { display: none !important; }
+  .print\:block { display: block !important; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
