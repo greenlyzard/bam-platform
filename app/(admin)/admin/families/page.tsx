@@ -2,6 +2,8 @@ import { requireAdmin } from "@/lib/auth/guards";
 import { getFamilies } from "@/lib/queries/families";
 import Link from "next/link";
 
+export const metadata = { title: "Families — Admin" };
+
 export default async function FamiliesPage({
   searchParams,
 }: {
@@ -19,7 +21,7 @@ export default async function FamiliesPage({
             Families
           </h1>
           <p className="mt-1 text-sm text-slate">
-            Family directory with contacts, students, and account balances.
+            {families.length} {families.length === 1 ? "family" : "families"}
           </p>
         </div>
         <Link
@@ -60,10 +62,7 @@ export default async function FamiliesPage({
                   Students
                 </th>
                 <th className="text-right px-4 py-3 font-medium text-slate">
-                  Credit Balance
-                </th>
-                <th className="text-right px-4 py-3 font-medium text-slate">
-                  Actions
+                  Credit
                 </th>
               </tr>
             </thead>
@@ -71,7 +70,7 @@ export default async function FamiliesPage({
               {families.length === 0 && (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={5}
                     className="px-4 py-12 text-center text-sm text-mist"
                   >
                     {q
@@ -107,7 +106,7 @@ export default async function FamiliesPage({
                     </td>
                     <td className="px-4 py-3 text-slate">{contactName}</td>
                     <td className="px-4 py-3 text-slate">
-                      {family.billing_email || "-"}
+                      {family.billing_email || profile?.email || "-"}
                     </td>
                     <td className="px-4 py-3 text-center text-slate">
                       {(family as { student_count?: number }).student_count ?? 0}
@@ -116,14 +115,6 @@ export default async function FamiliesPage({
                       {family.account_credit > 0
                         ? `$${Number(family.account_credit).toFixed(2)}`
                         : "-"}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <Link
-                        href={`/admin/families/${family.id}`}
-                        className="text-xs text-lavender hover:text-lavender-dark font-medium"
-                      >
-                        View
-                      </Link>
                     </td>
                   </tr>
                 );

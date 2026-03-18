@@ -104,6 +104,27 @@ export interface FamilyContact {
   updated_at: string;
 }
 
+export type GuardianRelationship = 'mother' | 'father' | 'stepparent' | 'grandparent' | 'guardian' | 'sibling' | 'other';
+
+export interface StudentGuardian {
+  id: string;
+  student_id: string;
+  profile_id: string;
+  relationship: GuardianRelationship;
+  is_primary: boolean;
+  is_billing: boolean;
+  is_emergency: boolean;
+  portal_access: boolean;
+  created_at: string;
+  // Enriched fields
+  first_name?: string | null;
+  last_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  email_opt_in?: boolean;
+  sms_opt_in?: boolean;
+}
+
 export interface EnrollmentWindow {
   id: string;
   tenant_id: string;

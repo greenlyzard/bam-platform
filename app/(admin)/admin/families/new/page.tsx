@@ -1,8 +1,8 @@
 import { requireAdmin } from "@/lib/auth/guards";
-import { FamilyForm } from "../[id]/family-form";
 import Link from "next/link";
+import { AddFamilyWizard } from "./add-family-wizard";
 
-export const metadata = { title: "New Family — Families" };
+export const metadata = { title: "Add Family — Families" };
 
 export default async function NewFamilyPage() {
   await requireAdmin();
@@ -20,11 +20,11 @@ export default async function NewFamilyPage() {
           Add New Family
         </h1>
         <p className="mt-1 text-sm text-slate">
-          Create a family record to associate students, contacts, and billing.
+          Create a family with guardians and students.
         </p>
       </div>
 
-      <FamilyForm isNew />
+      <AddFamilyWizard />
     </div>
   );
 }

@@ -5,8 +5,9 @@ import {
   getFamilyStudents,
   getFamilyContacts,
   getFamilyEnrollments,
+  getUniqueFamilyGuardians,
 } from "@/lib/queries/families";
-import { FamilyForm } from "./family-form";
+import { FamilyDetail } from "./family-detail";
 import { CommunicationsTab } from "@/components/communications/CommunicationsTab";
 import Link from "next/link";
 
@@ -30,12 +31,14 @@ export default async function FamilyDetailPage({
   await requireAdmin();
   const { id } = await params;
 
-  const [family, students, contacts, enrollments] = await Promise.all([
-    getFamilyById(id),
-    getFamilyStudents(id),
-    getFamilyContacts(id),
-    getFamilyEnrollments(id),
-  ]);
+  const [family, students, contacts, enrollments, guardians] =
+    await Promise.all([
+      getFamilyById(id),
+      getFamilyStudents(id),
+      getFamilyContacts(id),
+      getFamilyEnrollments(id),
+      getUniqueFamilyGuardians(id),
+    ]);
 
   if (!family) notFound();
 
@@ -53,11 +56,12 @@ export default async function FamilyDetailPage({
         </h1>
       </div>
 
-      <FamilyForm
+      <FamilyDetail
         family={family}
         students={students}
         contacts={contacts}
         enrollments={enrollments as never[]}
+        guardians={guardians}
       />
 
       <CommunicationsTab familyId={id} />

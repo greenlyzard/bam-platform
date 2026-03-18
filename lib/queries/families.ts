@@ -198,6 +198,161 @@ export async function searchFamiliesForEnrollment(query: string) {
 }
 
 /**
+ * Fetch guardians for a student via student_guardians, enriched with profile data.
+ */
+export async function getStudentGuardians(studentId: string) {
+  const supabase = await createClient();
+
+  const { data: guardians, error } = await supabase
+    .from("student_guardians")
+    .select("id, student_id, profile_id, relationship, is_primary, is_billing, is_emergency, portal_access, created_at")
+    .eq("student_id", studentId)
+    .order("is_primary", { ascending: false });
+
+  if (error || !guardians?.length) return [];
+
+  const profileIds = guardians.map((g) => g.profile_id);
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id, first_name, last_name, email, phone, email_opt_in, sms_opt_in")
+    .in("id", profileIds);
+
+  const profileMap: Record<string, { first_name: string | null; last_name: string | null; email: string | null; phone: string | null; email_opt_in: boolean; sms_opt_in: boolean }> = {};
+  for (const p of profiles ?? []) {
+    profileMap[p.id] = p;
+  }
+
+  return guardians.map((g) => {
+    const profile = profileMap[g.profile_id];
+    return {
+      ...g,
+      first_name: profile?.first_name ?? null,
+      last_name: profile?.last_name ?? null,
+      email: profile?.email ?? null,
+      phone: profile?.phone ?? null,
+      email_opt_in: profile?.email_opt_in ?? true,
+      sms_opt_in: profile?.sms_opt_in ?? true,
+    };
+  });
+}
+
+/**
+ * Get all guardians for all students in a family.
+ * Returns a map of studentId → guardian[].
+ */
+export async function getFamilyGuardians(familyId: string) {
+  const supabase = await createClient();
+
+  // Get student IDs for this family
+  const { data: students } = await supabase
+    .from("students")
+    .select("id")
+    .eq("family_id", familyId);
+
+  if (!students?.length) return {};
+
+  const studentIds = students.map((s) => s.id);
+
+  const { data: guardians, error } = await supabase
+    .from("student_guardians")
+    .select("id, student_id, profile_id, relationship, is_primary, is_billing, is_emergency, portal_access, created_at")
+    .in("student_id", studentIds)
+    .order("is_primary", { ascending: false });
+
+  if (error || !guardians?.length) return {};
+
+  // Enrich with profile data
+  const profileIds = [...new Set(guardians.map((g) => g.profile_id))];
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id, first_name, last_name, email, phone, email_opt_in, sms_opt_in")
+    .in("id", profileIds);
+
+  const profileMap: Record<string, { first_name: string | null; last_name: string | null; email: string | null; phone: string | null; email_opt_in: boolean; sms_opt_in: boolean }> = {};
+  for (const p of profiles ?? []) {
+    profileMap[p.id] = p;
+  }
+
+  const result: Record<string, Array<typeof guardians[0] & { first_name: string | null; last_name: string | null; email: string | null; phone: string | null; email_opt_in: boolean; sms_opt_in: boolean }>> = {};
+  for (const g of guardians) {
+    const profile = profileMap[g.profile_id];
+    const enriched = {
+      ...g,
+      first_name: profile?.first_name ?? null,
+      last_name: profile?.last_name ?? null,
+      email: profile?.email ?? null,
+      phone: profile?.phone ?? null,
+      email_opt_in: profile?.email_opt_in ?? true,
+      sms_opt_in: profile?.sms_opt_in ?? true,
+    };
+    if (!result[g.student_id]) result[g.student_id] = [];
+    result[g.student_id].push(enriched);
+  }
+
+  return result;
+}
+
+/**
+ * Get unique guardians across all students in a family (deduped by profile_id).
+ */
+export async function getUniqueFamilyGuardians(familyId: string) {
+  const guardianMap = await getFamilyGuardians(familyId);
+  const seen = new Set<string>();
+  const unique: Array<{
+    profile_id: string;
+    first_name: string | null;
+    last_name: string | null;
+    email: string | null;
+    phone: string | null;
+    email_opt_in: boolean;
+    sms_opt_in: boolean;
+    relationships: Array<{ student_id: string; relationship: string; is_primary: boolean; is_billing: boolean; is_emergency: boolean; portal_access: boolean; guardian_id: string }>;
+  }> = [];
+
+  for (const guardians of Object.values(guardianMap)) {
+    for (const g of guardians) {
+      if (seen.has(g.profile_id)) {
+        // Add relationship to existing entry
+        const existing = unique.find((u) => u.profile_id === g.profile_id);
+        if (existing) {
+          existing.relationships.push({
+            student_id: g.student_id,
+            relationship: g.relationship,
+            is_primary: g.is_primary,
+            is_billing: g.is_billing,
+            is_emergency: g.is_emergency,
+            portal_access: g.portal_access,
+            guardian_id: g.id,
+          });
+        }
+        continue;
+      }
+      seen.add(g.profile_id);
+      unique.push({
+        profile_id: g.profile_id,
+        first_name: g.first_name,
+        last_name: g.last_name,
+        email: g.email,
+        phone: g.phone,
+        email_opt_in: g.email_opt_in,
+        sms_opt_in: g.sms_opt_in,
+        relationships: [{
+          student_id: g.student_id,
+          relationship: g.relationship,
+          is_primary: g.is_primary,
+          is_billing: g.is_billing,
+          is_emergency: g.is_emergency,
+          portal_access: g.portal_access,
+          guardian_id: g.id,
+        }],
+      });
+    }
+  }
+
+  return unique;
+}
+
+/**
  * Get enrollments for a specific class (admin view).
  */
 export async function getClassEnrollments(classId: string) {

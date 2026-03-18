@@ -468,3 +468,193 @@ export async function adminDropStudent(formData: FormData) {
   revalidatePath(`/admin/schedule/classes/${enrollment.class_id}`);
   return { success: true };
 }
+
+// ── Guardian Schemas ────────────────────────────────────────
+
+const guardianSchema = z.object({
+  student_id: z.string().uuid(),
+  profile_id: z.string().uuid(),
+  relationship: z.enum(["mother", "father", "stepparent", "grandparent", "guardian", "sibling", "other"]),
+  is_primary: z.coerce.boolean().default(false),
+  is_billing: z.coerce.boolean().default(false),
+  is_emergency: z.coerce.boolean().default(false),
+  portal_access: z.coerce.boolean().default(true),
+});
+
+const updateGuardianSchema = z.object({
+  id: z.string().uuid(),
+  relationship: z.enum(["mother", "father", "stepparent", "grandparent", "guardian", "sibling", "other"]),
+  is_primary: z.coerce.boolean().default(false),
+  is_billing: z.coerce.boolean().default(false),
+  is_emergency: z.coerce.boolean().default(false),
+  portal_access: z.coerce.boolean().default(true),
+});
+
+// ── Guardian Actions ────────────────────────────────────────
+
+export async function addGuardian(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const parsed = guardianSchema.safeParse({
+    student_id: formData.get("student_id"),
+    profile_id: formData.get("profile_id"),
+    relationship: formData.get("relationship"),
+    is_primary: formData.get("is_primary"),
+    is_billing: formData.get("is_billing"),
+    is_emergency: formData.get("is_emergency"),
+    portal_access: formData.get("portal_access") ?? "true",
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  const { error } = await supabase.from("student_guardians").insert({
+    student_id: parsed.data.student_id,
+    profile_id: parsed.data.profile_id,
+    relationship: parsed.data.relationship,
+    is_primary: parsed.data.is_primary,
+    is_billing: parsed.data.is_billing,
+    is_emergency: parsed.data.is_emergency,
+    portal_access: parsed.data.portal_access,
+  });
+
+  if (error) {
+    if (error.code === "23505") {
+      return { error: "This guardian is already linked to this student" };
+    }
+    console.error("[families:addGuardian]", error);
+    return { error: "Failed to add guardian" };
+  }
+
+  revalidatePath("/admin/families");
+  return { success: true };
+}
+
+export async function updateGuardian(formData: FormData) {
+  const supabase = await createClient();
+
+  const parsed = updateGuardianSchema.safeParse({
+    id: formData.get("id"),
+    relationship: formData.get("relationship"),
+    is_primary: formData.get("is_primary"),
+    is_billing: formData.get("is_billing"),
+    is_emergency: formData.get("is_emergency"),
+    portal_access: formData.get("portal_access") ?? "true",
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  const { error } = await supabase
+    .from("student_guardians")
+    .update({
+      relationship: parsed.data.relationship,
+      is_primary: parsed.data.is_primary,
+      is_billing: parsed.data.is_billing,
+      is_emergency: parsed.data.is_emergency,
+      portal_access: parsed.data.portal_access,
+    })
+    .eq("id", parsed.data.id);
+
+  if (error) {
+    console.error("[families:updateGuardian]", error);
+    return { error: "Failed to update guardian" };
+  }
+
+  revalidatePath("/admin/families");
+  return { success: true };
+}
+
+export async function removeGuardian(formData: FormData) {
+  const supabase = await createClient();
+
+  const id = formData.get("id") as string;
+  if (!id) return { error: "Guardian ID required" };
+
+  const { error } = await supabase
+    .from("student_guardians")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    console.error("[families:removeGuardian]", error);
+    return { error: "Failed to remove guardian" };
+  }
+
+  revalidatePath("/admin/families");
+  return { success: true };
+}
+
+/**
+ * Create a new profile and link as guardian to a student.
+ * Used in the Add Family flow when no existing profile is found.
+ */
+export async function createProfileAndLinkGuardian(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const firstName = formData.get("first_name") as string;
+  const lastName = formData.get("last_name") as string;
+  const email = formData.get("email") as string;
+  const phone = formData.get("phone") as string;
+  const studentId = formData.get("student_id") as string;
+  const relationship = formData.get("relationship") as string;
+  const isPrimary = formData.get("is_primary") === "true";
+  const isBilling = formData.get("is_billing") === "true";
+  const isEmergency = formData.get("is_emergency") === "true";
+
+  if (!firstName || !lastName) {
+    return { error: "First and last name are required" };
+  }
+  if (!studentId) {
+    return { error: "Student ID is required" };
+  }
+
+  // Create the profile
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .insert({
+      first_name: firstName,
+      last_name: lastName,
+      email: email || null,
+      phone: phone || null,
+      role: "parent",
+    })
+    .select("id")
+    .single();
+
+  if (profileError) {
+    console.error("[families:createProfileAndLink]", profileError);
+    return { error: "Failed to create profile" };
+  }
+
+  // Link as guardian
+  const { error: guardianError } = await supabase
+    .from("student_guardians")
+    .insert({
+      student_id: studentId,
+      profile_id: profile.id,
+      relationship: relationship || "guardian",
+      is_primary: isPrimary,
+      is_billing: isBilling,
+      is_emergency: isEmergency,
+      portal_access: true,
+    });
+
+  if (guardianError) {
+    console.error("[families:createProfileAndLink:guardian]", guardianError);
+    return { error: "Profile created but failed to link as guardian" };
+  }
+
+  revalidatePath("/admin/families");
+  return { success: true, profileId: profile.id };
+}
