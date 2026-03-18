@@ -24,12 +24,13 @@ async function requireAuth() {
   const isAdmin = ADMIN_ROLES.includes(profile.role);
 
   // If teacher, look up their teacher_profile_id
+  // teacher_profiles VIEW uses `id` (= profiles.id), not `user_id`
   let teacherProfileId: string | null = null;
   if (profile.role === "teacher") {
     const { data: tp } = await supabase
       .from("teacher_profiles")
       .select("id")
-      .eq("user_id", user.id)
+      .eq("id", user.id)
       .single();
     teacherProfileId = tp?.id ?? null;
   }
@@ -632,31 +633,22 @@ async function getOrCreateTimesheetForTeacher(
   teacherProfileId: string,
   tenantId: string
 ) {
-  const { data: existing } = await supabase
-    .from("timesheets")
-    .select("id, status")
-    .eq("teacher_id", teacherProfileId)
-    .in("status", ["draft", "rejected"])
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (existing) return existing;
-
   const now = new Date();
   const month = now.getMonth() + 1;
   const year = now.getFullYear();
 
+  // Find or create pay period for this tenant + month
   let { data: payPeriod } = await supabase
     .from("pay_periods")
     .select("id")
+    .eq("tenant_id", tenantId)
     .eq("period_month", month)
     .eq("period_year", year)
     .maybeSingle();
 
   if (!payPeriod) {
     const deadline = new Date(year, month - 1, 26);
-    const { data: created } = await supabase
+    const { data: created, error: ppErr } = await supabase
       .from("pay_periods")
       .insert({
         tenant_id: tenantId,
@@ -667,12 +659,29 @@ async function getOrCreateTimesheetForTeacher(
       })
       .select("id")
       .single();
+
+    if (ppErr) {
+      console.error("[admin:getOrCreateTimesheet] pay_period insert error:", ppErr);
+      return null;
+    }
     payPeriod = created;
   }
 
   if (!payPeriod) return null;
 
-  const { data: newTs } = await supabase
+  // Look for any existing timesheet for this teacher + pay period (any status)
+  const { data: existing } = await supabase
+    .from("timesheets")
+    .select("id, status")
+    .eq("tenant_id", tenantId)
+    .eq("teacher_id", teacherProfileId)
+    .eq("pay_period_id", payPeriod.id)
+    .maybeSingle();
+
+  if (existing) return existing;
+
+  // Create a new draft timesheet
+  const { data: newTs, error: tsErr } = await supabase
     .from("timesheets")
     .insert({
       tenant_id: tenantId,
@@ -682,6 +691,11 @@ async function getOrCreateTimesheetForTeacher(
     })
     .select("id, status")
     .single();
+
+  if (tsErr) {
+    console.error("[admin:getOrCreateTimesheet] timesheet insert error:", tsErr);
+    return null;
+  }
 
   return newTs;
 }
@@ -719,8 +733,7 @@ export async function adminAddEntry(formData: FormData) {
     if (d.teacherProfileId !== teacherProfileId) return { error: "You can only add entries to your own timesheet." };
   }
 
-  const TENANT_ID = "84d98f72-c82f-414f-8b17-172b802f6993";
-
+  // Verify teacher exists in teacher_profiles VIEW
   const { data: tp } = await supabase
     .from("teacher_profiles")
     .select("id")
@@ -729,7 +742,19 @@ export async function adminAddEntry(formData: FormData) {
 
   if (!tp) return { error: "Teacher not found." };
 
-  const timesheet = await getOrCreateTimesheetForTeacher(supabase, tp.id, TENANT_ID);
+  // Get tenant_id from profile_roles (profiles has no tenant_id)
+  const { data: teacherRole } = await supabase
+    .from("profile_roles")
+    .select("tenant_id")
+    .eq("user_id", d.teacherProfileId)
+    .eq("is_active", true)
+    .limit(1)
+    .single();
+
+  const tenantId = teacherRole?.tenant_id;
+  if (!tenantId) return { error: "Teacher has no active tenant." };
+
+  const timesheet = await getOrCreateTimesheetForTeacher(supabase, tp.id, tenantId);
   if (!timesheet) return { error: "Could not create timesheet." };
 
   // Teachers: verify timesheet is editable
@@ -742,7 +767,7 @@ export async function adminAddEntry(formData: FormData) {
   const { data: newEntry, error } = await supabase
     .from("timesheet_entries")
     .insert({
-      tenant_id: TENANT_ID,
+      tenant_id: tenantId,
       timesheet_id: timesheet.id,
       entry_type: CATEGORY_TO_ENTRY_TYPE[d.category] ?? "admin",
       date: d.date,
@@ -783,7 +808,7 @@ export async function adminAddEntry(formData: FormData) {
   }
 
   await logChange(supabase, {
-    tenantId: TENANT_ID,
+    tenantId: tenantId,
     entryId: newEntry.id,
     changedBy: user.id,
     changedByName: getAdminName(profile),

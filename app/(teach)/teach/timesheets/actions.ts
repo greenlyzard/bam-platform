@@ -51,20 +51,11 @@ async function getOrCreateTimesheet(
   const month = now.getMonth() + 1;
   const year = now.getFullYear();
 
-  // Try to find existing timesheet for this month
-  const { data: existing } = await supabase
-    .from("timesheets")
-    .select("id, status")
-    .eq("teacher_id", teacherProfileId)
-    .limit(1)
-    .maybeSingle();
-
-  if (existing) return existing;
-
-  // Find or create a pay period
+  // Find or create pay period for this tenant + month
   let { data: payPeriod } = await supabase
     .from("pay_periods")
     .select("id")
+    .eq("tenant_id", tenantId)
     .eq("period_month", month)
     .eq("period_year", year)
     .maybeSingle();
@@ -90,13 +81,26 @@ async function getOrCreateTimesheet(
     payPeriod = created;
   }
 
-  // Create the timesheet
+  if (!payPeriod) return null;
+
+  // Look for existing timesheet for this teacher + pay period (any status)
+  const { data: existing } = await supabase
+    .from("timesheets")
+    .select("id, status")
+    .eq("tenant_id", tenantId)
+    .eq("teacher_id", teacherProfileId)
+    .eq("pay_period_id", payPeriod.id)
+    .maybeSingle();
+
+  if (existing) return existing;
+
+  // Create new draft timesheet
   const { data: newTs, error: tsError } = await supabase
     .from("timesheets")
     .insert({
       tenant_id: tenantId,
       teacher_id: teacherProfileId,
-      pay_period_id: payPeriod!.id,
+      pay_period_id: payPeriod.id,
       status: "draft",
     })
     .select("id, status")
@@ -116,13 +120,27 @@ async function getTeacherContext(supabase: Awaited<ReturnType<typeof createClien
   } = await supabase.auth.getUser();
   if (!user) return null;
 
+  // teacher_profiles VIEW uses `id` (= profiles.id), not `user_id`
+  // and has no `tenant_id` — get that from profile_roles
   const { data: tp } = await supabase
     .from("teacher_profiles")
-    .select("id, tenant_id")
-    .eq("user_id", user.id)
+    .select("id")
+    .eq("id", user.id)
     .single();
 
-  return tp;
+  if (!tp) return null;
+
+  const { data: role } = await supabase
+    .from("profile_roles")
+    .select("tenant_id")
+    .eq("user_id", user.id)
+    .eq("is_active", true)
+    .limit(1)
+    .single();
+
+  if (!role?.tenant_id) return null;
+
+  return { id: tp.id, tenant_id: role.tenant_id };
 }
 
 function isPeriodLocked(): boolean {
