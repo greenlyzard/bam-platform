@@ -435,6 +435,7 @@ function EntryDrawer({
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [allStudents, setAllStudents] = useState<Student[]>([]);
   const [subForTeacher, setSubForTeacher] = useState(entry?.sub_for ?? "");
+  const [notes, setNotes] = useState(entry?.notes ?? "");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -555,14 +556,9 @@ function EntryDrawer({
         setCustomMode(false);
         setDescription("");
         setSubForTeacher("");
+        setNotes("");
         setSelectedStudentIds([]);
         setSelectedProductionIds([]);
-        if (formRef.current) {
-          const notesInput = formRef.current.querySelector(
-            'textarea[name="notes"]'
-          ) as HTMLTextAreaElement | null;
-          if (notesInput) notesInput.value = "";
-        }
       } else {
         onSaved?.(hours);
         onClose();
@@ -952,7 +948,8 @@ function EntryDrawer({
               name="notes"
               maxLength={2000}
               rows={3}
-              defaultValue={entry?.notes ?? ""}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
               placeholder="Additional notes..."
               className="w-full rounded-lg border border-silver bg-white px-3 py-2 text-sm text-charcoal placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none resize-none"
             />

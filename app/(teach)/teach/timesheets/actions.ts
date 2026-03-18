@@ -130,17 +130,18 @@ async function getTeacherContext(supabase: Awaited<ReturnType<typeof createClien
 
   if (!tp) return null;
 
-  const { data: role } = await supabase
+  // Use array query — user may have multiple active roles (e.g. super_admin + teacher)
+  const { data: roles } = await supabase
     .from("profile_roles")
     .select("tenant_id")
     .eq("user_id", user.id)
     .eq("is_active", true)
-    .limit(1)
-    .single();
+    .limit(1);
 
-  if (!role?.tenant_id) return null;
+  const tenantId = roles?.[0]?.tenant_id;
+  if (!tenantId) return null;
 
-  return { id: tp.id, tenant_id: role.tenant_id };
+  return { id: tp.id, tenant_id: tenantId };
 }
 
 function isPeriodLocked(): boolean {

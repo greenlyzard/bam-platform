@@ -632,19 +632,24 @@ async function getOrCreateTimesheetForTeacher(
   supabase: Awaited<ReturnType<typeof createClient>>,
   teacherProfileId: string,
   tenantId: string
-) {
+): Promise<{ id: string; status: string } | { error: string }> {
   const now = new Date();
   const month = now.getMonth() + 1;
   const year = now.getFullYear();
 
   // Find or create pay period for this tenant + month
-  let { data: payPeriod } = await supabase
+  let { data: payPeriod, error: ppFetchErr } = await supabase
     .from("pay_periods")
     .select("id")
     .eq("tenant_id", tenantId)
     .eq("period_month", month)
     .eq("period_year", year)
     .maybeSingle();
+
+  if (ppFetchErr) {
+    console.error("[admin:getOrCreateTimesheet] pay_period fetch error:", ppFetchErr);
+    return { error: `Pay period lookup failed: ${ppFetchErr.message}` };
+  }
 
   if (!payPeriod) {
     const deadline = new Date(year, month - 1, 26);
@@ -662,21 +667,26 @@ async function getOrCreateTimesheetForTeacher(
 
     if (ppErr) {
       console.error("[admin:getOrCreateTimesheet] pay_period insert error:", ppErr);
-      return null;
+      return { error: `Could not create pay period: ${ppErr.message}` };
     }
     payPeriod = created;
   }
 
-  if (!payPeriod) return null;
+  if (!payPeriod) return { error: "Pay period could not be resolved." };
 
   // Look for any existing timesheet for this teacher + pay period (any status)
-  const { data: existing } = await supabase
+  const { data: existing, error: tsFetchErr } = await supabase
     .from("timesheets")
     .select("id, status")
     .eq("tenant_id", tenantId)
     .eq("teacher_id", teacherProfileId)
     .eq("pay_period_id", payPeriod.id)
     .maybeSingle();
+
+  if (tsFetchErr) {
+    console.error("[admin:getOrCreateTimesheet] timesheet fetch error:", tsFetchErr);
+    return { error: `Timesheet lookup failed: ${tsFetchErr.message}` };
+  }
 
   if (existing) return existing;
 
@@ -694,10 +704,10 @@ async function getOrCreateTimesheetForTeacher(
 
   if (tsErr) {
     console.error("[admin:getOrCreateTimesheet] timesheet insert error:", tsErr);
-    return null;
+    return { error: `Could not create timesheet: ${tsErr.message}` };
   }
 
-  return newTs;
+  return newTs ?? { error: "Timesheet creation returned no data." };
 }
 
 export async function adminAddEntry(formData: FormData) {
@@ -742,20 +752,22 @@ export async function adminAddEntry(formData: FormData) {
 
   if (!tp) return { error: "Teacher not found." };
 
-  // Get tenant_id from profile_roles (profiles has no tenant_id)
-  const { data: teacherRole } = await supabase
+  // Get tenant_id from profile_roles (profiles has no tenant_id).
+  // Use maybeSingle — teachers like Amanda may have multiple active roles
+  // (e.g. super_admin + teacher), so .single() would fail.
+  const { data: teacherRoles } = await supabase
     .from("profile_roles")
     .select("tenant_id")
     .eq("user_id", d.teacherProfileId)
     .eq("is_active", true)
-    .limit(1)
-    .single();
+    .limit(1);
 
-  const tenantId = teacherRole?.tenant_id;
-  if (!tenantId) return { error: "Teacher has no active tenant." };
+  const tenantId = teacherRoles?.[0]?.tenant_id;
+  if (!tenantId) return { error: "Teacher has no active tenant role." };
 
-  const timesheet = await getOrCreateTimesheetForTeacher(supabase, tp.id, tenantId);
-  if (!timesheet) return { error: "Could not create timesheet." };
+  const timesheetResult = await getOrCreateTimesheetForTeacher(supabase, tp.id, tenantId);
+  if ("error" in timesheetResult) return { error: timesheetResult.error };
+  const timesheet = timesheetResult;
 
   // Teachers: verify timesheet is editable
   if (!isAdmin) {
@@ -789,7 +801,7 @@ export async function adminAddEntry(formData: FormData) {
 
   if (error || !newEntry) {
     console.error("[admin:addEntry]", error);
-    return { error: "Failed to add entry." };
+    return { error: `Failed to add entry: ${error?.message ?? "unknown error"}` };
   }
 
   // Save production associations to junction table
