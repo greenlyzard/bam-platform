@@ -14,11 +14,11 @@ export default async function TimesheetsPage() {
   });
   const isLocked = now.getDate() > 26;
 
-  // Get teacher_profile
+  // Get teacher_profile — VIEW uses `id` (= profiles.id), not `user_id`
   const { data: teacherProfile } = await supabase
     .from("teacher_profiles")
     .select("id, employment_type")
-    .eq("user_id", user.id)
+    .eq("id", user.id)
     .single();
 
   const employmentType = teacherProfile?.employment_type ?? "w2";

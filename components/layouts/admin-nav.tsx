@@ -35,7 +35,7 @@ const GROUP_ORDER = [
 
 const mobileItems = [
   { label: "Home", href: "/admin/dashboard", icon: "⌂" },
-  { label: "Classes", href: "/admin/classes", icon: "▦" },
+  { label: "Timesheets", href: "/admin/timesheets", icon: "▤" },
   { label: "Comms", href: "/admin/communications", icon: "✉" },
   { label: "Students", href: "/admin/students", icon: "♡" },
   { label: "More", href: "/admin/settings", icon: "⋯" },
