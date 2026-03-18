@@ -36,6 +36,7 @@
 - `profile_roles`, `tenants`, `rooms`, `schedule_instances`
 - `timesheets`, `timesheet_entries`, `timesheet_entry_changes`
 - `pay_periods`, `productions`, `seasons`
+- `families`, `extended_contacts`
 - All communications tables (channels, messages, etc. — planned)
 
 ---
@@ -74,6 +75,16 @@ Core user record. Created automatically by `handle_new_user()` trigger on auth.u
 | stripe_customer_id | text | YES | null |
 | onboarding_complete | boolean | YES | false |
 | is_teacher | boolean | YES | false |
+| email_opt_in | boolean | YES | true |
+| sms_opt_in | boolean | YES | true |
+| address_line_1 | text | YES | null |
+| address_line_2 | text | YES | null |
+| city | text | YES | null |
+| state | text | YES | null |
+| zip_code | text | YES | null |
+| country | text | YES | 'US' |
+| latitude | numeric | YES | null |
+| longitude | numeric | YES | null |
 | created_at | timestamptz | YES | now() |
 | updated_at | timestamptz | YES | now() |
 
@@ -148,19 +159,33 @@ Student records linked to a parent profile.
 |--------|------|----------|---------|
 | id | uuid | NO | gen_random_uuid() |
 | parent_id | uuid | NO | null |
+| family_id | uuid | YES | null |
 | first_name | text | NO | null |
 | last_name | text | NO | null |
+| preferred_name | text | YES | null |
 | date_of_birth | date | NO | null |
 | age_group | text | YES | null |
 | current_level | text | YES | null |
 | medical_notes | text | YES | null |
 | emergency_contact | jsonb | YES | null |
 | photo_consent | boolean | YES | false |
+| media_consent | boolean | YES | false |
+| media_consent_date | timestamptz | YES | null |
+| avatar_url | text | YES | null |
+| address_line_1 | text | YES | null |
+| address_line_2 | text | YES | null |
+| city | text | YES | null |
+| state | text | YES | null |
+| zip_code | text | YES | null |
+| country | text | YES | 'US' |
+| latitude | numeric | YES | null |
+| longitude | numeric | YES | null |
+| trial_used | boolean | YES | false |
 | active | boolean | YES | true |
 | created_at | timestamptz | YES | now() |
 | updated_at | timestamptz | YES | now() |
 
-**Notes:** No `tenant_id`. `parent_id` → `profiles.id`. Use `active` not `is_active`.
+**Notes:** No `tenant_id`. `parent_id` → `profiles.id`. `family_id` → `families.id`. Use `active` not `is_active`.
 
 ---
 
@@ -213,7 +238,112 @@ Links students to classes.
 | cancelled_at | timestamptz | YES | null |
 | created_at | timestamptz | YES | now() |
 
-**Notes:** No `tenant_id`.
+**Notes:** No `tenant_id`. Added columns: `enrollment_type`, `family_id`, `billing_override`, `override_amount`.
+
+Additional columns:
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| enrollment_type | text | YES | 'regular' |
+| family_id | uuid | YES | null |
+| billing_override | boolean | YES | false |
+| override_amount | integer | YES | null |
+
+---
+
+### `families`
+Family grouping for billing and contact management.
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| id | uuid | NO | gen_random_uuid() |
+| tenant_id | uuid | NO | null |
+| family_name | text | NO | null |
+| primary_contact_id | uuid | YES | null |
+| billing_email | text | YES | null |
+| billing_phone | text | YES | null |
+| stripe_customer_id | text | YES | null |
+| stripe_payment_method_last4 | text | YES | null |
+| account_credit | numeric | YES | 0 |
+| notes | text | YES | null |
+| created_at | timestamptz | NO | now() |
+| updated_at | timestamptz | NO | now() |
+
+**Notes:** HAS `tenant_id`. `primary_contact_id` → `profiles.id`.
+
+---
+
+### `family_contacts`
+Legacy contact records within a family.
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| id | uuid | NO | gen_random_uuid() |
+| family_id | uuid | NO | null |
+| first_name | text | YES | null |
+| last_name | text | YES | null |
+| email | text | YES | null |
+| phone | text | YES | null |
+| relationship | text | YES | null |
+| is_primary | boolean | YES | false |
+| is_emergency | boolean | YES | false |
+| created_at | timestamptz | NO | now() |
+
+---
+
+### `student_guardians`
+Links students to guardian profiles with role flags.
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| id | uuid | NO | gen_random_uuid() |
+| student_id | uuid | NO | null |
+| profile_id | uuid | NO | null |
+| relationship | text | NO | 'parent' |
+| is_primary | boolean | NO | false |
+| is_billing | boolean | NO | false |
+| is_emergency | boolean | NO | false |
+| portal_access | boolean | NO | true |
+| created_at | timestamptz | NO | now() |
+
+**Notes:** Uses `profile_id` (exception to the `user_id` convention). UNIQUE on (student_id, profile_id).
+
+---
+
+### `extended_contacts`
+Additional contacts (grandparents, nannies, etc.) with notification preferences.
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| id | uuid | NO | gen_random_uuid() |
+| tenant_id | uuid | NO | null |
+| first_name | text | NO | null |
+| last_name | text | NO | null |
+| email | text | YES | null |
+| phone | text | YES | null |
+| relationship | text | YES | null |
+| notify_live_stream | boolean | YES | false |
+| notify_recordings | boolean | YES | false |
+| notify_photos | boolean | YES | false |
+| notes | text | YES | null |
+| created_at | timestamptz | NO | now() |
+| updated_at | timestamptz | NO | now() |
+
+**Notes:** HAS `tenant_id`. Linked to students via `extended_contact_students`.
+
+---
+
+### `extended_contact_students`
+Join table linking extended contacts to students.
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| id | uuid | NO | gen_random_uuid() |
+| extended_contact_id | uuid | NO | null |
+| student_id | uuid | NO | null |
+| created_at | timestamptz | NO | now() |
+
+**Notes:** UNIQUE on (extended_contact_id, student_id). RLS: admins via `is_admin()`, parents can read contacts for their own students via `student_guardians`.
 
 ---
 
@@ -602,6 +732,8 @@ before writing queries against any of these.
 | 20260315000004 | Pay periods — add class_id column |
 | 20260315000005 | Create timesheets and timesheet_entries |
 | 20260316000001 | Timesheet total_hours trigger |
+| 20260317000000 | Families, family contacts, student guardians |
+| 20260319000000 | Student profiles, address columns, extended contacts |
 
 ---
 

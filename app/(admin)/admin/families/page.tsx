@@ -55,11 +55,14 @@ export default async function FamiliesPage({
                 <th className="text-left px-4 py-3 font-medium text-slate">
                   Primary Contact
                 </th>
-                <th className="text-left px-4 py-3 font-medium text-slate">
-                  Email
-                </th>
                 <th className="text-center px-4 py-3 font-medium text-slate">
                   Students
+                </th>
+                <th className="text-right px-4 py-3 font-medium text-slate">
+                  Monthly Tuition
+                </th>
+                <th className="text-center px-4 py-3 font-medium text-slate">
+                  Media Consent
                 </th>
                 <th className="text-right px-4 py-3 font-medium text-slate">
                   Credit
@@ -70,7 +73,7 @@ export default async function FamiliesPage({
               {families.length === 0 && (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={6}
                     className="px-4 py-12 text-center text-sm text-mist"
                   >
                     {q
@@ -90,6 +93,11 @@ export default async function FamiliesPage({
                       .filter(Boolean)
                       .join(" ")
                   : "-";
+                const f = family as {
+                  student_count?: number;
+                  all_consented?: boolean;
+                  monthly_tuition_cents?: number;
+                };
 
                 return (
                   <tr
@@ -104,12 +112,34 @@ export default async function FamiliesPage({
                         {family.family_name}
                       </Link>
                     </td>
-                    <td className="px-4 py-3 text-slate">{contactName}</td>
-                    <td className="px-4 py-3 text-slate">
-                      {family.billing_email || profile?.email || "-"}
+                    <td className="px-4 py-3">
+                      <div className="text-slate">{contactName}</div>
+                      <div className="text-xs text-mist">
+                        {family.billing_email || profile?.email || ""}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-center text-slate">
-                      {(family as { student_count?: number }).student_count ?? 0}
+                      {f.student_count ?? 0}
+                    </td>
+                    <td className="px-4 py-3 text-right text-slate">
+                      {(f.monthly_tuition_cents ?? 0) > 0
+                        ? `$${((f.monthly_tuition_cents ?? 0) / 100).toFixed(2)}`
+                        : "-"}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {(f.student_count ?? 0) > 0 ? (
+                        <span
+                          className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
+                            f.all_consented
+                              ? "bg-[#5A9E6F]/10 text-[#5A9E6F]"
+                              : "bg-[#C45B5B]/10 text-[#C45B5B]"
+                          }`}
+                        >
+                          {f.all_consented ? "All Clear" : "Missing"}
+                        </span>
+                      ) : (
+                        <span className="text-mist">-</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right text-slate">
                       {family.account_credit > 0

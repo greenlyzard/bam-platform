@@ -6,6 +6,7 @@ import {
   getFamilyContacts,
   getFamilyEnrollments,
   getUniqueFamilyGuardians,
+  getFamilyExtendedContacts,
 } from "@/lib/queries/families";
 import { FamilyDetail } from "./family-detail";
 import { CommunicationsTab } from "@/components/communications/CommunicationsTab";
@@ -31,13 +32,14 @@ export default async function FamilyDetailPage({
   await requireAdmin();
   const { id } = await params;
 
-  const [family, students, contacts, enrollments, guardians] =
+  const [family, students, contacts, enrollments, guardians, extendedContacts] =
     await Promise.all([
       getFamilyById(id),
       getFamilyStudents(id),
       getFamilyContacts(id),
       getFamilyEnrollments(id),
       getUniqueFamilyGuardians(id),
+      getFamilyExtendedContacts(id),
     ]);
 
   if (!family) notFound();
@@ -62,6 +64,7 @@ export default async function FamilyDetailPage({
         contacts={contacts}
         enrollments={enrollments as never[]}
         guardians={guardians}
+        extendedContacts={extendedContacts}
       />
 
       <CommunicationsTab familyId={id} />

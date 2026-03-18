@@ -35,25 +35,71 @@ export async function getFamilies(search?: string) {
     return [];
   }
 
-  // Get student counts per family
+  // Get students with media_consent per family
   const familyIds = (data ?? []).map((f) => f.id);
   if (familyIds.length === 0) return data ?? [];
 
-  const { data: studentCounts } = await supabase
+  const { data: students } = await supabase
     .from("students")
-    .select("family_id")
+    .select("id, family_id, media_consent")
     .in("family_id", familyIds);
 
   const countMap: Record<string, number> = {};
-  for (const s of studentCounts ?? []) {
+  const consentMap: Record<string, boolean> = {};
+  for (const s of students ?? []) {
     if (s.family_id) {
       countMap[s.family_id] = (countMap[s.family_id] ?? 0) + 1;
+      // All children must have consent for family to show green
+      if (consentMap[s.family_id] === undefined) {
+        consentMap[s.family_id] = s.media_consent;
+      } else if (!s.media_consent) {
+        consentMap[s.family_id] = false;
+      }
+    }
+  }
+
+  // Get tuition totals from active enrollments
+  const studentIds = (students ?? []).map((s) => s.id);
+  let tuitionMap: Record<string, number> = {};
+  if (studentIds.length > 0) {
+    const { data: enrollments } = await supabase
+      .from("enrollments")
+      .select("student_id, class_id")
+      .in("student_id", studentIds)
+      .in("status", ["active", "trial"]);
+
+    if (enrollments?.length) {
+      const classIds = [...new Set(enrollments.map((e) => e.class_id))];
+      const { data: classes } = await supabase
+        .from("classes")
+        .select("id, fee_cents")
+        .in("id", classIds);
+
+      const feeMap: Record<string, number> = {};
+      for (const c of classes ?? []) {
+        feeMap[c.id] = c.fee_cents ?? 0;
+      }
+
+      // Map student_id to family_id
+      const studentFamilyMap: Record<string, string> = {};
+      for (const s of students ?? []) {
+        if (s.family_id) studentFamilyMap[s.id] = s.family_id;
+      }
+
+      for (const e of enrollments) {
+        const familyId = studentFamilyMap[e.student_id];
+        if (familyId) {
+          tuitionMap[familyId] = (tuitionMap[familyId] ?? 0) + (feeMap[e.class_id] ?? 0);
+        }
+      }
     }
   }
 
   return (data ?? []).map((f) => ({
     ...f,
     student_count: countMap[f.id] ?? 0,
+    all_consented: consentMap[f.id] ?? true,
+    monthly_tuition_cents: tuitionMap[f.id] ?? 0,
   }));
 }
 
@@ -350,6 +396,44 @@ export async function getUniqueFamilyGuardians(familyId: string) {
   }
 
   return unique;
+}
+
+/**
+ * Get all extended contacts for all students in a family.
+ */
+export async function getFamilyExtendedContacts(familyId: string) {
+  const supabase = await createClient();
+
+  const { data: students } = await supabase
+    .from("students")
+    .select("id")
+    .eq("family_id", familyId);
+
+  if (!students?.length) return [];
+
+  const studentIds = students.map((s) => s.id);
+
+  const { data: links } = await supabase
+    .from("extended_contact_students")
+    .select("extended_contact_id, student_id")
+    .in("student_id", studentIds);
+
+  if (!links?.length) return [];
+
+  const contactIds = [...new Set(links.map((l) => l.extended_contact_id))];
+
+  const { data: contacts, error } = await supabase
+    .from("extended_contacts")
+    .select("*")
+    .in("id", contactIds)
+    .order("last_name");
+
+  if (error) {
+    console.error("[families:getFamilyExtendedContacts]", error);
+    return [];
+  }
+
+  return contacts ?? [];
 }
 
 /**
