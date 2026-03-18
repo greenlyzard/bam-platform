@@ -2,7 +2,7 @@ import { requireAdmin } from "@/lib/auth/guards";
 import { AnnouncementForm } from "@/components/communications/AnnouncementForm";
 
 export default async function NewAnnouncementPage() {
-  await requireAdmin();
+  const user = await requireAdmin();
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -25,7 +25,7 @@ export default async function NewAnnouncementPage() {
       </div>
 
       <div className="rounded-xl border border-silver bg-white p-6">
-        <AnnouncementForm />
+        <AnnouncementForm userRole={user.role} userId={user.id} />
       </div>
     </div>
   );

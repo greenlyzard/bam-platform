@@ -1,6 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface ClassOption {
   id: string;
@@ -13,7 +21,12 @@ interface StaffSender {
   name: string;
 }
 
-export function AnnouncementForm() {
+interface AnnouncementFormProps {
+  userRole: string;
+  userId: string;
+}
+
+export function AnnouncementForm({ userRole, userId }: AnnouncementFormProps) {
   const [title, setTitle] = useState("");
   const [bodyHtml, setBodyHtml] = useState("");
   const [audience, setAudience] = useState("all_parents");
@@ -27,6 +40,15 @@ export function AnnouncementForm() {
     type: "success" | "error";
     message: string;
   } | null>(null);
+
+  const isAdmin = userRole === "admin" || userRole === "super_admin";
+
+  // Filter senders based on role
+  const filteredSenders = useMemo(() => {
+    if (isAdmin) return staffSenders;
+    // Teachers see only the studio option and themselves
+    return staffSenders.filter((s) => s.id === "studio" || s.id === userId);
+  }, [staffSenders, isAdmin, userId]);
 
   // Load staff senders on mount
   useEffect(() => {
@@ -71,7 +93,7 @@ export function AnnouncementForm() {
           channel,
           sender_name:
             senderAlias !== "studio"
-              ? staffSenders.find((s) => s.id === senderAlias)?.name
+              ? filteredSenders.find((s) => s.id === senderAlias)?.name
               : undefined,
           send: true,
         }),
@@ -126,21 +148,27 @@ export function AnnouncementForm() {
         <label className="block text-sm font-medium text-charcoal mb-1">
           Send As
         </label>
-        <select
-          value={senderAlias}
-          onChange={(e) => setSenderAlias(e.target.value)}
-          className="w-full rounded-lg border border-silver px-3 py-2 text-sm text-charcoal focus:border-lavender focus:outline-none focus:ring-1 focus:ring-lavender"
-        >
-          {staffSenders.map((sender) => (
-            <option key={sender.id} value={sender.id}>
-              {sender.name}
-            </option>
-          ))}
-        </select>
+        <Select value={senderAlias} onValueChange={setSenderAlias}>
+          <SelectTrigger>
+            <SelectValue placeholder="Select sender" />
+          </SelectTrigger>
+          <SelectContent>
+            {filteredSenders.map((sender) => (
+              <SelectItem key={sender.id} value={sender.id}>
+                {sender.name}
+              </SelectItem>
+            ))}
+            {filteredSenders.length === 0 && (
+              <SelectItem value="studio" disabled>
+                Loading...
+              </SelectItem>
+            )}
+          </SelectContent>
+        </Select>
         {senderAlias !== "studio" && (
           <p className="mt-1 text-xs text-mist">
             Will appear as &ldquo;
-            {staffSenders.find((s) => s.id === senderAlias)?.name} via Ballet
+            {filteredSenders.find((s) => s.id === senderAlias)?.name} via Ballet
             Academy and Movement&rdquo;
           </p>
         )}
