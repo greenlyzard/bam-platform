@@ -39,25 +39,25 @@ export async function GET(req: NextRequest) {
     if (settings?.logo_url) logoUrl = settings.logo_url;
   } catch { /* use default */ }
 
-  // Get all parents with active enrollments
-  const { data: enrollments } = await supabase
-    .from("enrollments")
-    .select("student_id, students(parent_id)")
-    .in("status", ["active", "trial"]);
-
-  const parentIds = [
-    ...new Set(
-      (enrollments ?? [])
-        .map((e: any) => e.students?.parent_id)
-        .filter(Boolean) as string[]
-    ),
-  ];
-
-  if (parentIds.length === 0 || !process.env.RESEND_API_KEY) {
+  if (!process.env.RESEND_API_KEY) {
     return NextResponse.json({
       success: true,
       sent: 0,
-      reason: parentIds.length === 0 ? "no_parents" : "no_api_key",
+      reason: "no_api_key",
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // Get all active tenants
+  const { data: tenants } = await supabase
+    .from("tenants")
+    .select("id, name");
+
+  if (!tenants || tenants.length === 0) {
+    return NextResponse.json({
+      success: true,
+      sent: 0,
+      reason: "no_tenants",
       timestamp: new Date().toISOString(),
     });
   }
@@ -66,46 +66,91 @@ export async function GET(req: NextRequest) {
   let sent = 0;
   let failed = 0;
 
-  // Process in batches of 10
-  for (let i = 0; i < parentIds.length; i += 10) {
-    const batch = parentIds.slice(i, i + 10);
+  for (const tenant of tenants) {
+    // Get parent user_ids scoped to this tenant via profile_roles
+    const { data: parentRoles } = await supabase
+      .from("profile_roles")
+      .select("user_id")
+      .eq("tenant_id", tenant.id)
+      .eq("role", "parent")
+      .eq("is_active", true);
 
-    const emailBatch: Array<{
-      from: string;
-      to: string;
-      replyTo: string;
-      subject: string;
-      html: string;
-    }> = [];
+    const tenantParentIds = (parentRoles ?? []).map((r) => r.user_id);
+    if (tenantParentIds.length === 0) continue;
 
-    for (const pid of batch) {
-      const data = await buildDigestForParent(supabase, pid, weekStart);
-      if (!data) continue;
+    // Get students belonging to these parents
+    const { data: students } = await supabase
+      .from("students")
+      .select("id, parent_id")
+      .in("parent_id", tenantParentIds)
+      .eq("active", true);
 
-      const { data: parent } = await supabase
-        .from("profiles")
-        .select("email")
-        .eq("id", pid)
-        .single();
+    const studentIds = (students ?? []).map((s) => s.id);
+    if (studentIds.length === 0) continue;
 
-      if (!parent?.email) continue;
-
-      emailBatch.push({
-        from: FROM,
-        to: parent.email,
-        replyTo: DEFAULT_REPLY_TO,
-        subject: `Your Weekly Schedule — ${data.weekLabel}`,
-        html: renderDigestEmail(data, logoUrl),
-      });
+    const studentParentMap = new Map<string, string>();
+    for (const s of students ?? []) {
+      studentParentMap.set(s.id, s.parent_id);
     }
 
-    if (emailBatch.length > 0) {
-      try {
-        await resend.batch.send(emailBatch);
-        sent += emailBatch.length;
-      } catch (err) {
-        console.error("[cron:weekly-digest] Batch send error:", err);
-        failed += emailBatch.length;
+    // Get active enrollments
+    const { data: enrollments } = await supabase
+      .from("enrollments")
+      .select("student_id")
+      .in("student_id", studentIds)
+      .in("status", ["active", "trial"]);
+
+    const parentIds = [
+      ...new Set(
+        (enrollments ?? [])
+          .map((e) => studentParentMap.get(e.student_id))
+          .filter(Boolean) as string[]
+      ),
+    ];
+
+    if (parentIds.length === 0) continue;
+
+    // Process in batches of 10
+    for (let i = 0; i < parentIds.length; i += 10) {
+      const batch = parentIds.slice(i, i + 10);
+
+      const emailBatch: Array<{
+        from: string;
+        to: string;
+        replyTo: string;
+        subject: string;
+        html: string;
+      }> = [];
+
+      for (const pid of batch) {
+        const data = await buildDigestForParent(supabase, pid, weekStart);
+        if (!data) continue;
+
+        const { data: parent } = await supabase
+          .from("profiles")
+          .select("email")
+          .eq("id", pid)
+          .single();
+
+        if (!parent?.email) continue;
+
+        emailBatch.push({
+          from: FROM,
+          to: parent.email,
+          replyTo: DEFAULT_REPLY_TO,
+          subject: `Your Weekly Schedule — ${data.weekLabel}`,
+          html: renderDigestEmail(data, logoUrl),
+        });
+      }
+
+      if (emailBatch.length > 0) {
+        try {
+          await resend.batch.send(emailBatch);
+          sent += emailBatch.length;
+        } catch (err) {
+          console.error("[cron:weekly-digest] Batch send error:", err);
+          failed += emailBatch.length;
+        }
       }
     }
   }
@@ -114,7 +159,6 @@ export async function GET(req: NextRequest) {
     success: true,
     sent,
     failed,
-    total: parentIds.length,
     timestamp: new Date().toISOString(),
   });
 }

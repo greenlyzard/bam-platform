@@ -20,8 +20,13 @@ const FROM = "Ballet Academy and Movement <hello@balletacademyandmovement.com>";
  * If no profile_id, sends to all parents with active enrollments.
  */
 export async function POST(req: NextRequest) {
-  await requireAdmin();
+  const user = await requireAdmin();
   const supabase = await createClient();
+  const tenantId = user.tenantId;
+
+  if (!tenantId) {
+    return NextResponse.json({ error: "No tenant" }, { status: 400 });
+  }
   const body = await req.json();
 
   const weekStart = body.week_start
@@ -79,7 +84,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Bulk send to all parents with active enrollments
-  const parentIds = await getParentsWithActiveEnrollments(supabase);
+  const parentIds = await getParentsWithActiveEnrollments(supabase, tenantId);
 
   if (parentIds.length === 0) {
     return NextResponse.json({ success: true, sent: 0, weekLabel: formatWeekLabel(weekStart) });
@@ -151,8 +156,13 @@ export async function POST(req: NextRequest) {
  * Preview digest data for a specific parent without sending.
  */
 export async function GET(req: NextRequest) {
-  await requireAdmin();
+  const user = await requireAdmin();
   const supabase = await createClient();
+  const tenantId = user.tenantId;
+
+  if (!tenantId) {
+    return NextResponse.json({ error: "No tenant" }, { status: 400 });
+  }
 
   const { searchParams } = new URL(req.url);
   const profileId = searchParams.get("profile_id");
@@ -164,7 +174,7 @@ export async function GET(req: NextRequest) {
 
   // If no profile_id, return list of eligible parents
   if (!profileId) {
-    const parentIds = await getParentsWithActiveEnrollments(supabase);
+    const parentIds = await getParentsWithActiveEnrollments(supabase, tenantId);
 
     // Get parent details
     if (parentIds.length === 0) {
@@ -211,19 +221,53 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ data, html, weekLabel: data.weekLabel });
 }
 
-/** Get all parent IDs who have at least one child with an active enrollment */
+/**
+ * Get parent IDs scoped to tenant who have at least one child with an active enrollment.
+ * Tenant scoping goes through profile_roles (profiles has no tenant_id).
+ */
 async function getParentsWithActiveEnrollments(
-  supabase: Awaited<ReturnType<typeof createClient>>
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  tenantId: string
 ): Promise<string[]> {
+  // 1. Get all active parent user_ids in this tenant via profile_roles
+  const { data: parentRoles } = await supabase
+    .from("profile_roles")
+    .select("user_id")
+    .eq("tenant_id", tenantId)
+    .eq("role", "parent")
+    .eq("is_active", true);
+
+  const tenantParentIds = (parentRoles ?? []).map((r) => r.user_id);
+  if (tenantParentIds.length === 0) return [];
+
+  // 2. Get students belonging to these parents
+  const { data: students } = await supabase
+    .from("students")
+    .select("id, parent_id")
+    .in("parent_id", tenantParentIds)
+    .eq("active", true);
+
+  const studentIds = (students ?? []).map((s) => s.id);
+  if (studentIds.length === 0) return [];
+
+  // Build student → parent map
+  const studentParentMap = new Map<string, string>();
+  for (const s of students ?? []) {
+    studentParentMap.set(s.id, s.parent_id);
+  }
+
+  // 3. Get active enrollments for these students
   const { data: enrollments } = await supabase
     .from("enrollments")
-    .select("student_id, students(parent_id)")
+    .select("student_id")
+    .in("student_id", studentIds)
     .in("status", ["active", "trial"]);
 
+  // 4. Map back to parent IDs
   const parentIds = [
     ...new Set(
       (enrollments ?? [])
-        .map((e: any) => e.students?.parent_id)
+        .map((e) => studentParentMap.get(e.student_id))
         .filter(Boolean) as string[]
     ),
   ];
