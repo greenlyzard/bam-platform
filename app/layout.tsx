@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, Montserrat } from "next/font/google";
 import "./globals.css";
-import { ChatbotWidget } from "@/components/bam/chatbot-widget";
 import { ThemeProvider } from "@/components/bam/theme-provider";
 import { getStudioSettings } from "@/lib/queries/studio-settings";
 
@@ -78,7 +77,6 @@ export default async function RootLayout({
         <ThemeProvider presetId={themePreset} customColors={customColors}>
           {children}
         </ThemeProvider>
-        <ChatbotWidget />
       </body>
     </html>
   );
