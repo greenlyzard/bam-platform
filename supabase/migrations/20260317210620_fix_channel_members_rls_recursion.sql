@@ -15,7 +15,7 @@
 -- Returns true if the given user is a member of the given channel.
 -- SECURITY DEFINER executes as the function owner (postgres),
 -- bypassing RLS on channel_members.
-CREATE OR REPLACE FUNCTION is_channel_member(p_channel_id uuid, p_user_id uuid)
+CREATE OR REPLACE FUNCTION is_channel_member(p_channel_id uuid, p_profile_id uuid)
 RETURNS boolean
 LANGUAGE sql
 STABLE
@@ -25,7 +25,7 @@ AS $$
   SELECT EXISTS (
     SELECT 1 FROM channel_members
     WHERE channel_id = p_channel_id
-      AND profile_id = p_user_id
+      AND profile_id = p_profile_id
   );
 $$;
 
