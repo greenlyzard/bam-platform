@@ -26,9 +26,10 @@
 
 ### Resource Conflict Detection
 - On save: check if any assigned room resource overlaps with another class in the same time slot
-- **Warning with override** — not a hard block
+- Warning with override — not a hard block
 - Warning message: "Studio 1 is already assigned to [Class Name] at this time"
 - Admin confirms override to proceed
+- Room capacity warning: if class enrollment count meets or exceeds room capacity, admin is warned
 
 ---
 
@@ -43,8 +44,9 @@
 ### Saved Views
 - Admin can save a named view configuration (column selection + sort + filters)
 - Views saved per user by default
-- **Admins can share views with other admins on the same tenant** — shared views appear in a "Shared Views" section separate from "My Views"
+- Admins can share views with other admins on the same tenant — shared views appear in a "Shared Views" section separate from "My Views"
 - Only Studio Admin and above can share views
+- Saved embed configurations follow the same sharing rules as saved views
 - "Default View" can be pinned — loads automatically when admin opens Classes
 - Views listed in a dropdown at top of page
 - Views can be renamed or deleted
@@ -65,17 +67,22 @@
 - Click a block to open class detail drawer
 
 ### Drag-to-Reschedule
+- Available in Day view, Week view, and Month view
 - Studio Admin and Studio Manager (if permission granted) can drag class blocks to reschedule
 - Dragging updates: day_of_week, start_time, end_time
 - On drop: resource conflict check fires automatically
 - Warning shown if room conflict detected — admin confirms or cancels
-- Change logged in class audit history
+- After successful reschedule: admin is prompted "Would you like to notify enrolled families?"
+- Prompt pre-populates a draft message with: class name, old time, new time
+- Notification is NOT sent automatically — admin reviews and sends manually
+- Change logged in class audit history (admin-only — not visible to teachers)
 
-### Toggle Between Views
+### View Types
 - List View (default)
-- Calendar View — Day layout (all rooms, one day)
-- Calendar View — Week layout (one room, full week)
-- Admin can set their default view preference (saved with user preferences)
+- Calendar — Day layout: all rooms on Y axis, time on X axis
+- Calendar — Week layout: one room or all rooms, full week
+- Calendar — Month layout: dot/count indicator per day — click to expand and see class details
+- Admin can set default view preference (saved with user preferences)
 
 ---
 
@@ -105,27 +112,34 @@
 ## 5. iFrame Embed Widget — Enhanced
 
 ### Changes from Current State
-- **Remove** period and year filters from embed builder UI
-- **Add** Room filter (show only classes in selected room)
-- **Add** Teacher filter
-- **Add** Season filter (select which active season to display)
-- **Add** Dark mode variant toggle (for studios with dark-themed websites)
+- Remove period and year filters from embed builder UI
+- Add Room filter (show only classes in selected room)
+- Add Teacher filter
+- Add Season filter (select which active season to display)
+- Add Dark mode variant toggle
+- Add Custom color overrides
 
 ### Filter-to-Embed Flow
 - Admin applies filters in Classes list view
 - Clicks "Generate Embed" button
 - Embed builder opens pre-filled with current filter state
 - Admin can adjust before copying
-- Embed code includes: season_id, program_type, room_ids (optional), teacher_ids (optional), day_of_week (optional), theme (light/dark)
+- Embed code includes: season_id, program_type, room_ids (optional), teacher_ids (optional), day_of_week (optional), theme (light/dark/custom)
 
-### Dark Mode Variant
-- Toggle in embed builder: Light / Dark
-- Dark mode uses: dark background, light text, muted borders
-- Studio can further customize colors in embed settings
-- Default: light
+### Theme & Color Options
+| Option | Description |
+|---|---|
+| Light | Default — cream background, charcoal text, lavender accents |
+| Dark | Dark background, light text, muted borders |
+| Custom | Admin sets: background color, text color, accent color, card color |
+
+- Custom colors validated for accessibility — contrast ratio warning shown if combination fails WCAG AA
+- Custom colors saved with the embed configuration
+- Preview updates in real time as colors are adjusted
 
 ### Saved Embed Configurations
 - Admin can save named embed configurations (e.g. "Monday Classes Widget", "Studio 1 Schedule")
+- Saved configs are shareable between admins on the same tenant (same rules as saved views)
 - Saved configs listed in embed builder for quick access
 - Editing a saved config regenerates the embed code
 
@@ -147,17 +161,14 @@
 | # | Decision |
 |---|----------|
 | 1 | Resource conflicts: warning with override — not a hard block |
-| 2 | Saved views: shareable between admins on the same tenant by Studio Admin and above |
-| 3 | Drag-to-reschedule: yes — Studio Admin, and Studio Manager if permission granted |
-| 4 | Banner images: optional — classes appear in all views regardless. Two sizes: 400x400 square icon and 1920x1080 banner |
-| 5 | Embed widget dark mode: yes — light/dark toggle in embed builder |
-
----
-
-## 8. Open Questions
-
-- [ ] Should saved embed configurations be shareable between admins (same as views)?
-- [ ] Should drag-to-reschedule be available in the week view as well as day view?
-- [ ] Should class audit history (reschedule log) be visible to teachers?
-- [ ] Should the embed widget support custom color overrides beyond light/dark?
-- [ ] When a class is rescheduled via drag-and-drop, should enrolled families be notified automatically?
+| 2 | Room capacity: warning when enrollment meets or exceeds room capacity |
+| 3 | Saved views: shareable between Studio Admin and above on the same tenant |
+| 4 | Saved embed configs: shareable between admins on same tenant (same rules as views) |
+| 5 | Drag-to-reschedule: available in Day, Week, and Month views |
+| 6 | Drag-to-reschedule permissions: Studio Admin, and Studio Manager if permission granted |
+| 7 | Class audit/reschedule history: admin-only — not visible to teachers |
+| 8 | Reschedule notification: not automatic — admin prompted with pre-populated draft message (class name, old time, new time) |
+| 9 | Banner images: optional — two sizes: 400x400 square icon and 1920x1080 banner |
+| 10 | Month calendar view: dot/count indicator per day — click to expand |
+| 11 | Custom embed colors: validated for accessibility with WCAG AA contrast ratio warning |
+| 12 | Embed widget: light/dark toggle plus full custom color overrides |
