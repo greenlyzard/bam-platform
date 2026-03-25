@@ -186,7 +186,7 @@ export async function addStudentToFamily(formData: FormData) {
     .eq("id", parsed.data.family_id)
     .single();
 
-  const { error } = await supabase.from("students").insert({
+  const { data: newStudent, error } = await supabase.from("students").insert({
     tenant_id: tenantId,
     family_id: parsed.data.family_id,
     parent_id: family?.primary_contact_id ?? null,
@@ -197,11 +197,23 @@ export async function addStudentToFamily(formData: FormData) {
     medical_notes: parsed.data.medical_notes || null,
     allergy_notes: parsed.data.allergy_notes || null,
     photo_consent: parsed.data.photo_consent ?? false,
-  });
+  }).select("id").single();
 
-  if (error) {
+  if (error || !newStudent) {
     console.error("[families:addStudent]", error);
     return { error: "Failed to add student" };
+  }
+
+  // Also insert into student_families junction table
+  try {
+    await supabase.from("student_families").insert({
+      tenant_id: tenantId,
+      student_id: newStudent.id,
+      family_id: parsed.data.family_id,
+      is_primary: true,
+    });
+  } catch (e) {
+    console.warn("[families:addStudent] student_families insert failed — table may not exist yet", e);
   }
 
   revalidatePath(`/admin/families/${parsed.data.family_id}`);
@@ -657,4 +669,104 @@ export async function createProfileAndLinkGuardian(formData: FormData) {
 
   revalidatePath("/admin/families");
   return { success: true, profileId: profile.id };
+}
+
+// ── Search students for linking ─────────────────────────────
+export async function searchStudentsForLinking(formData: FormData) {
+  const supabase = await createClient();
+  const query = (formData.get("query") as string ?? "").trim();
+  if (query.length < 2) return { students: [] };
+
+  const { data } = await supabase
+    .from("students")
+    .select("id, first_name, last_name, date_of_birth, current_level, family_id, families(family_name)")
+    .or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%`)
+    .eq("active", true)
+    .order("first_name")
+    .limit(20);
+
+  const students = (data ?? []).map((s: any) => {
+    const fam = Array.isArray(s.families) ? s.families[0] : s.families;
+    return {
+      id: s.id,
+      first_name: s.first_name,
+      last_name: s.last_name,
+      date_of_birth: s.date_of_birth,
+      current_level: s.current_level,
+      family_name: fam?.family_name ?? null,
+    };
+  });
+
+  return { students };
+}
+
+// ── Link existing student to family ─────────────────────────
+export async function linkStudentToFamily(formData: FormData) {
+  const supabase = await createClient();
+  const studentId = formData.get("studentId") as string;
+  const familyId = formData.get("familyId") as string;
+  const relationship = (formData.get("relationship") as string) || null;
+
+  if (!studentId || !familyId) return { error: "Missing required fields" };
+
+  const tenantId = await getTenantId();
+  if (!tenantId) return { error: "Tenant not found" };
+
+  const { error } = await supabase.from("student_families").insert({
+    tenant_id: tenantId,
+    student_id: studentId,
+    family_id: familyId,
+    is_primary: false,
+    relationship,
+  });
+
+  if (error) {
+    if (error.code === "23505") return { error: "Student is already linked to this family" };
+    console.error("[families:linkStudent]", error);
+    return { error: error.message };
+  }
+
+  revalidatePath(`/admin/families/${familyId}`);
+  return { success: true };
+}
+
+// ── Remove student from family ──────────────────────────────
+export async function unlinkStudentFromFamily(formData: FormData) {
+  const supabase = await createClient();
+  const studentId = formData.get("studentId") as string;
+  const familyId = formData.get("familyId") as string;
+
+  if (!studentId || !familyId) return { error: "Missing required fields" };
+
+  // Check if this is the only family link
+  const { count } = await supabase
+    .from("student_families")
+    .select("id", { count: "exact", head: true })
+    .eq("student_id", studentId);
+
+  // Check if this is the primary link
+  const { data: link } = await supabase
+    .from("student_families")
+    .select("id, is_primary")
+    .eq("student_id", studentId)
+    .eq("family_id", familyId)
+    .single();
+
+  if (link?.is_primary && (count ?? 0) <= 1) {
+    return { error: "Cannot remove student from their only primary family. Assign another primary family first." };
+  }
+
+  const { error } = await supabase
+    .from("student_families")
+    .delete()
+    .eq("student_id", studentId)
+    .eq("family_id", familyId);
+
+  if (error) {
+    console.error("[families:unlinkStudent]", error);
+    return { error: error.message };
+  }
+
+  revalidatePath(`/admin/families/${familyId}`);
+  return { success: true };
 }

@@ -12,6 +12,9 @@ import {
   addGuardian,
   removeGuardian,
   createProfileAndLinkGuardian,
+  searchStudentsForLinking,
+  linkStudentToFamily,
+  unlinkStudentFromFamily,
 } from "../actions";
 import { addExtendedContact, removeExtendedContact } from "../../students/actions";
 import {
@@ -175,6 +178,13 @@ export function FamilyDetail({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAddStudent, setShowAddStudent] = useState(false);
+  const [addStudentTab, setAddStudentTab] = useState<"search" | "create">("search");
+  const [studentSearchQ, setStudentSearchQ] = useState("");
+  const [studentSearchResults, setStudentSearchResults] = useState<{ id: string; first_name: string; last_name: string; date_of_birth: string | null; current_level: string | null; family_name: string | null }[]>([]);
+  const [studentSearching, setStudentSearching] = useState(false);
+  const [linkRelationship, setLinkRelationship] = useState("");
+  const [confirmUnlinkId, setConfirmUnlinkId] = useState<string | null>(null);
+  const [unlinkError, setUnlinkError] = useState("");
   const [showAddGuardian, setShowAddGuardian] = useState(false);
   const [showAddExtended, setShowAddExtended] = useState(false);
   const [addStudentGender, setAddStudentGender] = useState("");
@@ -241,6 +251,51 @@ export function FamilyDetail({
       setError(result.error);
     } else {
       setShowAddStudent(false);
+      router.refresh();
+    }
+  }
+
+  async function handleSearchStudents() {
+    if (studentSearchQ.length < 2) return;
+    setStudentSearching(true);
+    const fd = new FormData();
+    fd.set("query", studentSearchQ);
+    const result = await searchStudentsForLinking(fd);
+    setStudentSearchResults("students" in result ? result.students : []);
+    setStudentSearching(false);
+  }
+
+  async function handleLinkStudent(studentId: string) {
+    setSaving(true);
+    const fd = new FormData();
+    fd.set("studentId", studentId);
+    fd.set("familyId", family.id);
+    fd.set("relationship", linkRelationship);
+    const result = await linkStudentToFamily(fd);
+    setSaving(false);
+    if ("error" in result && result.error) {
+      setError(result.error);
+    } else {
+      setShowAddStudent(false);
+      setStudentSearchQ("");
+      setStudentSearchResults([]);
+      setLinkRelationship("");
+      router.refresh();
+    }
+  }
+
+  async function handleUnlinkStudent(studentId: string) {
+    setSaving(true);
+    setUnlinkError("");
+    const fd = new FormData();
+    fd.set("studentId", studentId);
+    fd.set("familyId", family.id);
+    const result = await unlinkStudentFromFamily(fd);
+    setSaving(false);
+    if ("error" in result && result.error) {
+      setUnlinkError(result.error);
+    } else {
+      setConfirmUnlinkId(null);
       router.refresh();
     }
   }
@@ -359,26 +414,106 @@ export function FamilyDetail({
         </div>
 
         {showAddStudent && (
-          <form onSubmit={handleAddStudent} className="rounded-lg border border-silver/50 bg-cloud/30 p-4 space-y-3">
-            <input type="hidden" name="family_id" value={family.id} />
-            <div className="grid gap-3 sm:grid-cols-2">
-              <input name="first_name" required placeholder="First name *" className="h-9 rounded-lg border border-silver bg-white px-3 text-sm" />
-              <input name="last_name" required placeholder="Last name *" className="h-9 rounded-lg border border-silver bg-white px-3 text-sm" />
-              <input name="date_of_birth" type="date" required className="h-9 rounded-lg border border-silver bg-white px-3 text-sm" />
-              <input type="hidden" name="gender" value={addStudentGender} />
-              <SimpleSelect
-                value={addStudentGender}
-                onValueChange={setAddStudentGender}
-                options={[
-                  { value: "female", label: "Female" },
-                  { value: "male", label: "Male" },
-                  { value: "other", label: "Other" },
-                ]}
-                placeholder="Gender"
-              />
+          <div className="rounded-lg border border-silver/50 bg-cloud/30 p-4 space-y-3">
+            {/* Tab toggle */}
+            <div className="flex gap-1 rounded-lg bg-silver/30 p-0.5">
+              <button
+                onClick={() => setAddStudentTab("search")}
+                className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${addStudentTab === "search" ? "bg-white text-charcoal shadow-sm" : "text-slate hover:text-charcoal"}`}
+              >
+                Search Existing
+              </button>
+              <button
+                onClick={() => setAddStudentTab("create")}
+                className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${addStudentTab === "create" ? "bg-white text-charcoal shadow-sm" : "text-slate hover:text-charcoal"}`}
+              >
+                Create New
+              </button>
             </div>
-            <button type="submit" disabled={saving} className="h-9 rounded-lg bg-lavender hover:bg-lavender-dark text-white text-sm font-semibold px-4 disabled:opacity-50">Add Student</button>
-          </form>
+
+            {addStudentTab === "search" ? (
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  <input
+                    value={studentSearchQ}
+                    onChange={(e) => setStudentSearchQ(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleSearchStudents()}
+                    placeholder="Search by name (min 2 chars)..."
+                    className="flex-1 h-9 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal placeholder:text-mist focus:border-lavender focus:outline-none"
+                  />
+                  <button
+                    onClick={handleSearchStudents}
+                    disabled={studentSearchQ.length < 2 || studentSearching}
+                    className="h-9 rounded-lg bg-lavender hover:bg-lavender-dark text-white text-xs font-semibold px-3 disabled:opacity-50"
+                  >
+                    {studentSearching ? "..." : "Search"}
+                  </button>
+                </div>
+                {/* Relationship selector */}
+                <SimpleSelect
+                  value={linkRelationship || "__none__"}
+                  onValueChange={(val) => setLinkRelationship(val === "__none__" ? "" : val)}
+                  options={[
+                    { value: "__none__", label: "Relationship (optional)" },
+                    { value: "Mother", label: "Mother" },
+                    { value: "Father", label: "Father" },
+                    { value: "Guardian", label: "Guardian" },
+                    { value: "Stepparent", label: "Stepparent" },
+                    { value: "Other", label: "Other" },
+                  ]}
+                  placeholder="Relationship (optional)"
+                />
+                {/* Results */}
+                {studentSearchResults.length > 0 && (
+                  <div className="divide-y divide-silver/50 max-h-48 overflow-y-auto rounded-lg border border-silver bg-white">
+                    {studentSearchResults.map((s) => (
+                      <div key={s.id} className="flex items-center justify-between px-3 py-2">
+                        <div>
+                          <p className="text-sm font-medium text-charcoal">{s.first_name} {s.last_name}</p>
+                          <p className="text-xs text-mist">
+                            {s.date_of_birth ?? ""}
+                            {s.current_level ? ` · ${s.current_level}` : ""}
+                            {s.family_name ? ` · ${s.family_name}` : ""}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => handleLinkStudent(s.id)}
+                          disabled={saving}
+                          className="text-xs text-lavender hover:text-lavender-dark font-semibold disabled:opacity-50"
+                        >
+                          Link
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {studentSearchResults.length === 0 && studentSearchQ.length >= 2 && !studentSearching && (
+                  <p className="text-xs text-mist">No students found.</p>
+                )}
+              </div>
+            ) : (
+              <form onSubmit={handleAddStudent} className="space-y-3">
+                <input type="hidden" name="family_id" value={family.id} />
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <input name="first_name" required placeholder="First name *" className="h-9 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal placeholder:text-mist focus:border-lavender focus:outline-none" />
+                  <input name="last_name" required placeholder="Last name *" className="h-9 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal placeholder:text-mist focus:border-lavender focus:outline-none" />
+                  <input name="date_of_birth" type="date" required className="h-9 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:outline-none" />
+                  <input type="hidden" name="gender" value={addStudentGender} />
+                  <SimpleSelect
+                    value={addStudentGender}
+                    onValueChange={setAddStudentGender}
+                    options={[
+                      { value: "female", label: "Female" },
+                      { value: "male", label: "Male" },
+                      { value: "other", label: "Other" },
+                    ]}
+                    placeholder="Gender"
+                  />
+                </div>
+                <button type="submit" disabled={saving} className="h-9 rounded-lg bg-lavender hover:bg-lavender-dark text-white text-sm font-semibold px-4 disabled:opacity-50">Create & Add</button>
+              </form>
+            )}
+          </div>
         )}
 
         {students.length === 0 ? (
@@ -388,36 +523,58 @@ export function FamilyDetail({
             {students.map((s) => {
               const age = calculateAge(s.date_of_birth);
               const enrollCount = activeEnrollments.filter((e) => e.student_id === s.id).length;
+              const isPrimary = s.family_id === family.id;
+              const isUnlinking = confirmUnlinkId === s.id;
               return (
-                <Link
+                <div
                   key={s.id}
-                  href={`/admin/students/${s.id}`}
-                  className="flex items-center gap-3 rounded-lg border border-silver/50 bg-cloud/20 p-3 hover:bg-lavender/5 transition-colors"
+                  className="flex items-center gap-3 rounded-lg border border-silver/50 bg-cloud/20 p-3"
                 >
-                  <div className="w-12 h-12 rounded-full bg-cloud flex items-center justify-center overflow-hidden border border-silver shrink-0">
-                    {s.avatar_url ? (
-                      <img src={s.avatar_url} alt={s.first_name} className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="text-sm font-medium text-lavender">{s.first_name[0]}{s.last_name[0]}</span>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-charcoal text-sm truncate">
-                      {s.preferred_name || s.first_name} {s.last_name}
-                    </p>
-                    <p className="text-xs text-mist">
-                      Age {age} &middot; {s.current_level ?? "No level"} &middot; {enrollCount} class{enrollCount !== 1 ? "es" : ""}
-                    </p>
-                  </div>
+                  <Link href={`/admin/students/${s.id}`} className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity">
+                    <div className="w-12 h-12 rounded-full bg-cloud flex items-center justify-center overflow-hidden border border-silver shrink-0">
+                      {s.avatar_url ? (
+                        <img src={s.avatar_url} alt={s.first_name} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-sm font-medium text-lavender">{s.first_name[0]}{s.last_name[0]}</span>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-medium text-charcoal text-sm truncate">
+                          {s.preferred_name || s.first_name} {s.last_name}
+                        </p>
+                        {isPrimary && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-lavender/10 text-lavender-dark font-medium shrink-0">Primary</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-mist">
+                        Age {age} &middot; {s.current_level ?? "No level"} &middot; {enrollCount} class{enrollCount !== 1 ? "es" : ""}
+                      </p>
+                    </div>
+                  </Link>
                   <div className="flex flex-col gap-1 items-end shrink-0">
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${s.active ? "bg-[#5A9E6F]/10 text-[#5A9E6F]" : "bg-[#9E99A7]/10 text-[#9E99A7]"}`}>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${s.active ? "bg-success/10 text-success" : "bg-mist/10 text-mist"}`}>
                       {s.active ? "Active" : "Inactive"}
                     </span>
-                    {!s.media_consent && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#C45B5B]/10 text-[#C45B5B]">No Consent</span>
+                    {!isUnlinking ? (
+                      <button
+                        onClick={() => { setConfirmUnlinkId(s.id); setUnlinkError(""); }}
+                        className="text-[10px] text-error hover:text-error/80"
+                      >
+                        Remove
+                      </button>
+                    ) : (
+                      <span className="flex items-center gap-1">
+                        <span className="text-[10px] text-slate">Remove?</span>
+                        <button onClick={() => handleUnlinkStudent(s.id)} disabled={saving} className="text-[10px] text-error font-semibold disabled:opacity-50">Yes</button>
+                        <button onClick={() => setConfirmUnlinkId(null)} className="text-[10px] text-slate">No</button>
+                      </span>
+                    )}
+                    {isUnlinking && unlinkError && (
+                      <p className="text-[10px] text-error max-w-[150px] text-right">{unlinkError}</p>
                     )}
                   </div>
-                </Link>
+                </div>
               );
             })}
           </div>
