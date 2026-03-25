@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { inviteTeamMember } from "./actions";
+import { SimpleSelect } from "@/components/ui/select";
 
 const ROLE_OPTIONS = [
   { value: "teacher", label: "Teacher" },
@@ -15,6 +16,7 @@ export function InviteForm() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+  const [role, setRole] = useState("");
 
   async function handleSubmit(formData: FormData) {
     setLoading(true);
@@ -72,18 +74,14 @@ export function InviteForm() {
           placeholder="Email address"
           className="w-full h-11 rounded-lg border border-silver bg-white px-4 text-sm placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
         />
-        <select
-          name="role"
-          required
-          className="w-full h-11 rounded-lg border border-silver bg-white px-4 text-sm text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
-        >
-          <option value="">Select role...</option>
-          {ROLE_OPTIONS.map((r) => (
-            <option key={r.value} value={r.value}>
-              {r.label}
-            </option>
-          ))}
-        </select>
+        <input type="hidden" name="role" value={role} />
+        <SimpleSelect
+          value={role}
+          onValueChange={setRole}
+          options={ROLE_OPTIONS}
+          placeholder="Select role..."
+          className="w-full"
+        />
         <button
           type="submit"
           disabled={loading}

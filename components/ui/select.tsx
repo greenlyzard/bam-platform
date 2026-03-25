@@ -15,13 +15,30 @@ const SelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      "flex h-10 w-full items-center justify-between rounded-lg border border-silver bg-white px-3 py-2 text-sm text-charcoal",
-      "placeholder:text-mist",
-      "focus:border-lavender focus:outline-none focus:ring-1 focus:ring-lavender",
+      "flex h-10 w-full items-center justify-between rounded-md px-3 py-2 text-sm",
       "disabled:cursor-not-allowed disabled:opacity-50",
       "[&>span]:line-clamp-1",
       className
     )}
+    style={{
+      fontFamily: "inherit",
+      backgroundColor: "#fff",
+      borderWidth: "1px",
+      borderStyle: "solid",
+      borderColor: "var(--color-silver)",
+      color: "var(--color-charcoal)",
+      outline: "none",
+    }}
+    onFocus={(e) => {
+      e.currentTarget.style.borderColor = "var(--color-lavender)";
+      e.currentTarget.style.boxShadow = "0 0 0 2px color-mix(in srgb, var(--color-lavender) 20%, transparent)";
+      props.onFocus?.(e);
+    }}
+    onBlur={(e) => {
+      e.currentTarget.style.borderColor = "var(--color-silver)";
+      e.currentTarget.style.boxShadow = "none";
+      props.onBlur?.(e);
+    }}
     {...props}
   >
     {children}
@@ -31,7 +48,8 @@ const SelectTrigger = React.forwardRef<
         height="12"
         viewBox="0 0 12 12"
         fill="none"
-        className="ml-2 shrink-0 text-mist"
+        className="ml-2 shrink-0"
+        style={{ color: "var(--color-mist)" }}
       >
         <path
           d="M3 4.5L6 7.5L9 4.5"
@@ -54,7 +72,7 @@ const SelectContent = React.forwardRef<
     <SelectPrimitive.Content
       ref={ref}
       className={cn(
-        "relative z-50 max-h-72 min-w-[8rem] overflow-hidden rounded-xl border border-silver bg-white shadow-lg",
+        "relative z-50 max-h-72 min-w-[8rem] overflow-hidden rounded-xl shadow-lg",
         "data-[state=open]:animate-in data-[state=closed]:animate-out",
         "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
         "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
@@ -63,6 +81,13 @@ const SelectContent = React.forwardRef<
           "data-[side=bottom]:translate-y-1 data-[side=top]:-translate-y-1",
         className
       )}
+      style={{
+        fontFamily: "inherit",
+        backgroundColor: "#fff",
+        borderWidth: "1px",
+        borderStyle: "solid",
+        borderColor: "var(--color-silver)",
+      }}
       position={position}
       {...props}
     >
@@ -86,7 +111,8 @@ const SelectLabel = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SelectPrimitive.Label
     ref={ref}
-    className={cn("px-2 py-1.5 text-xs font-medium text-mist", className)}
+    className={cn("px-2 py-1.5 text-xs font-medium", className)}
+    style={{ color: "var(--color-mist)", fontFamily: "inherit" }}
     {...props}
   />
 ));
@@ -95,39 +121,65 @@ SelectLabel.displayName = SelectPrimitive.Label.displayName;
 const SelectItem = React.forwardRef<
   React.ComponentRef<typeof SelectPrimitive.Item>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item>
->(({ className, children, ...props }, ref) => (
-  <SelectPrimitive.Item
-    ref={ref}
-    className={cn(
-      "relative flex w-full cursor-pointer select-none items-center rounded-lg py-2 px-2 pr-8 text-sm text-charcoal outline-none",
-      "focus:bg-lavender/10 focus:text-charcoal",
-      "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-      className
-    )}
-    {...props}
-  >
-    <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
-    <span className="absolute right-2 flex h-4 w-4 items-center justify-center">
-      <SelectPrimitive.ItemIndicator>
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 12 12"
-          fill="none"
-          className="text-lavender"
-        >
-          <path
-            d="M2 6L5 9L10 3"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </SelectPrimitive.ItemIndicator>
-    </span>
-  </SelectPrimitive.Item>
-));
+>(({ className, children, ...props }, ref) => {
+  const itemRef = React.useRef<HTMLDivElement | null>(null);
+
+  return (
+    <SelectPrimitive.Item
+      ref={(node) => {
+        itemRef.current = node;
+        if (typeof ref === "function") ref(node);
+        else if (ref) ref.current = node;
+      }}
+      className={cn(
+        "relative flex w-full cursor-pointer select-none items-center rounded-lg py-2 px-2 pr-8 text-sm outline-none",
+        "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        className
+      )}
+      style={{
+        fontFamily: "inherit",
+        color: "var(--color-charcoal)",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.backgroundColor = "color-mix(in srgb, var(--color-lavender) 10%, transparent)";
+      }}
+      onMouseLeave={(e) => {
+        const isHighlighted = e.currentTarget.getAttribute("data-highlighted") !== null;
+        if (!isHighlighted) {
+          e.currentTarget.style.backgroundColor = "transparent";
+        }
+      }}
+      onFocus={(e) => {
+        e.currentTarget.style.backgroundColor = "color-mix(in srgb, var(--color-lavender) 10%, transparent)";
+      }}
+      onBlur={(e) => {
+        e.currentTarget.style.backgroundColor = "transparent";
+      }}
+      {...props}
+    >
+      <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+      <span className="absolute right-2 flex h-4 w-4 items-center justify-center">
+        <SelectPrimitive.ItemIndicator>
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 12 12"
+            fill="none"
+            style={{ color: "var(--color-lavender)" }}
+          >
+            <path
+              d="M2 6L5 9L10 3"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </SelectPrimitive.ItemIndicator>
+      </span>
+    </SelectPrimitive.Item>
+  );
+});
 SelectItem.displayName = SelectPrimitive.Item.displayName;
 
 const SelectSeparator = React.forwardRef<
@@ -136,11 +188,52 @@ const SelectSeparator = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SelectPrimitive.Separator
     ref={ref}
-    className={cn("-mx-1 my-1 h-px bg-silver", className)}
+    className={cn("-mx-1 my-1 h-px", className)}
+    style={{ backgroundColor: "var(--color-silver)" }}
     {...props}
   />
 ));
 SelectSeparator.displayName = SelectPrimitive.Separator.displayName;
+
+// Backwards-compatible alias
+const BamSelect = Select;
+
+// ── SimpleSelect — flat-props wrapper for common dropdowns ──
+interface SimpleSelectOption {
+  value: string;
+  label: string;
+}
+
+function SimpleSelect({
+  value,
+  onValueChange,
+  options,
+  placeholder = "Select...",
+  className,
+  disabled,
+}: {
+  value: string;
+  onValueChange: (value: string) => void;
+  options: SimpleSelectOption[];
+  placeholder?: string;
+  className?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <Select value={value} onValueChange={onValueChange} disabled={disabled}>
+      <SelectTrigger className={className}>
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((opt) => (
+          <SelectItem key={opt.value} value={opt.value}>
+            {opt.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
 
 export {
   Select,
@@ -151,4 +244,6 @@ export {
   SelectLabel,
   SelectItem,
   SelectSeparator,
+  BamSelect,
+  SimpleSelect,
 };

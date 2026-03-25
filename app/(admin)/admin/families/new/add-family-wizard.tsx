@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { SimpleSelect } from "@/components/ui/select";
 import {
   createFamily,
   addStudentToFamily,
@@ -247,6 +248,8 @@ export function AddFamilyWizard() {
       fd.set("family_name", familyName);
       fd.set("billing_email", guardian.email);
       fd.set("billing_phone", guardian.phone);
+      fd.set("primary_contact_id", "");
+      fd.set("notes", "");
 
       const familyResult = await createFamily(fd);
       if ("error" in familyResult && familyResult.error) {
@@ -519,19 +522,14 @@ export function AddFamilyWizard() {
 
           <div>
             <label className={LABEL}>Relationship *</label>
-            <select
+            <SimpleSelect
               value={guardian.relationship}
-              onChange={(e) =>
-                setGuardian((g) => ({ ...g, relationship: e.target.value }))
+              onValueChange={(val) =>
+                setGuardian((g) => ({ ...g, relationship: val }))
               }
-              className={INPUT}
-            >
-              {RELATIONSHIPS.map((r) => (
-                <option key={r.value} value={r.value}>
-                  {r.label}
-                </option>
-              ))}
-            </select>
+              options={RELATIONSHIPS}
+              className="w-full"
+            />
           </div>
 
           <div className="flex justify-end">
@@ -622,18 +620,18 @@ export function AddFamilyWizard() {
                   </div>
                   <div>
                     <label className={LABEL}>Gender</label>
-                    <select
+                    <SimpleSelect
                       value={s.gender}
-                      onChange={(e) =>
-                        updateStudent(i, "gender", e.target.value)
+                      onValueChange={(val) =>
+                        updateStudent(i, "gender", val)
                       }
-                      className={INPUT_SM}
-                    >
-                      <option value="">Optional</option>
-                      <option value="female">Female</option>
-                      <option value="male">Male</option>
-                      <option value="other">Other</option>
-                    </select>
+                      options={[
+                        { value: "female", label: "Female" },
+                        { value: "male", label: "Male" },
+                        { value: "other", label: "Other" },
+                      ]}
+                      placeholder="Optional"
+                    />
                   </div>
                 </div>
                 <div>
@@ -786,23 +784,17 @@ export function AddFamilyWizard() {
                   </div>
                   <div>
                     <label className={LABEL}>Relationship</label>
-                    <select
+                    <SimpleSelect
                       value={ag.relationship}
-                      onChange={(e) =>
+                      onValueChange={(val) =>
                         updateAdditionalGuardian(
                           i,
                           "relationship",
-                          e.target.value
+                          val
                         )
                       }
-                      className={INPUT_SM}
-                    >
-                      {RELATIONSHIPS.map((r) => (
-                        <option key={r.value} value={r.value}>
-                          {r.label}
-                        </option>
-                      ))}
-                    </select>
+                      options={RELATIONSHIPS}
+                    />
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-4">

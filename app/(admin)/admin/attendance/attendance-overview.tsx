@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
+import { SimpleSelect } from "@/components/ui/select";
 
 interface SessionRow {
   classId: string;
@@ -51,6 +53,8 @@ export function AttendanceOverview({
   dateTo: string;
   filterTeacher: string;
 }) {
+  const [teacherFilter, setTeacherFilter] = useState(filterTeacher || "all");
+
   // Group rows by date
   const grouped: Record<string, SessionRow[]> = {};
   for (const row of rows) {
@@ -155,18 +159,15 @@ export function AttendanceOverview({
             <label className="block text-xs font-medium text-charcoal mb-1">
               Teacher
             </label>
-            <select
-              name="teacher"
-              defaultValue={filterTeacher}
-              className="h-9 rounded-lg border border-silver bg-white px-3 text-sm focus:border-lavender focus:outline-none"
-            >
-              <option value="">All Teachers</option>
-              {teachers.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
+            <input type="hidden" name="teacher" value={teacherFilter === "all" ? "" : teacherFilter} />
+            <SimpleSelect
+              value={teacherFilter}
+              onValueChange={setTeacherFilter}
+              options={[
+                { value: "all", label: "All Teachers" },
+                ...teachers.map((t) => ({ value: t.id, label: t.name })),
+              ]}
+            />
           </div>
           <button
             type="submit"

@@ -70,6 +70,24 @@ const studioSettings: SettingsItem[] = [
     icon: "✉",
   },
   {
+    label: "Disciplines",
+    description: "Dance disciplines offered at the studio",
+    href: "/admin/settings/disciplines",
+    icon: "▸",
+  },
+  {
+    label: "Curriculum",
+    description: "Teaching methodologies and curriculum styles",
+    href: "/admin/settings/curriculum",
+    icon: "▹",
+  },
+  {
+    label: "Studio Calendar",
+    description: "Closure dates and schedule exceptions",
+    href: "/admin/settings/studio-calendar",
+    icon: "▦",
+  },
+  {
     label: "Compliance Settings",
     description: "Required documents, expiration rules",
     href: "/admin/settings/compliance",

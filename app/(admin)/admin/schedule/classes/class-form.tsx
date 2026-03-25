@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { SimpleSelect } from "@/components/ui/select";
 import { upsertClass } from "@/lib/schedule/actions";
 
 const CLASS_TYPES = [
@@ -230,7 +231,7 @@ export function ClassForm({
     "w-full h-11 rounded-lg border border-silver bg-white px-4 text-sm focus:border-lavender focus:ring-1 focus:ring-lavender outline-none";
   const labelClass = "block text-sm font-medium text-charcoal mb-1.5";
   const selectClass =
-    "w-full h-11 rounded-lg border border-silver bg-white px-4 text-sm focus:border-lavender focus:ring-1 focus:ring-lavender outline-none";
+    "appearance-none w-full h-11 bg-white border border-silver rounded-md px-3 text-sm text-charcoal focus:outline-none focus:border-lavender focus:ring-2 focus:ring-lavender/20 cursor-pointer";
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -332,32 +333,24 @@ export function ClassForm({
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className={labelClass}>Class Type</label>
-            <select
+            <SimpleSelect
               value={form.class_type}
-              onChange={(e) => update("class_type", e.target.value)}
-              className={selectClass}
-            >
-              {CLASS_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
+              onValueChange={(val) => update("class_type", val)}
+              options={CLASS_TYPES}
+              placeholder="Select type..."
+              className="w-full"
+            />
           </div>
 
           <div>
             <label className={labelClass}>Program Division</label>
-            <select
+            <SimpleSelect
               value={form.program_division}
-              onChange={(e) => update("program_division", e.target.value)}
-              className={selectClass}
-            >
-              {PROGRAM_DIVISIONS.map((p) => (
-                <option key={p.value} value={p.value}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
+              onValueChange={(val) => update("program_division", val)}
+              options={PROGRAM_DIVISIONS.filter((p) => p.value !== "")}
+              placeholder="Select program..."
+              className="w-full"
+            />
           </div>
         </div>
 
@@ -420,18 +413,16 @@ export function ClassForm({
 
         <div>
           <label className={labelClass}>Linked Production</label>
-          <select
+          <SimpleSelect
             value={form.production_id}
-            onChange={(e) => update("production_id", e.target.value)}
-            className={selectClass}
-          >
-            <option value="">None</option>
-            {productions.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+            onValueChange={(val) => update("production_id", val === "__none__" ? "" : val)}
+            options={[
+              { value: "__none__", label: "None" },
+              ...productions.map((p) => ({ value: p.id, label: p.name })),
+            ]}
+            placeholder="None"
+            className="w-full"
+          />
         </div>
       </div>
 
@@ -525,18 +516,13 @@ export function ClassForm({
 
         <div>
           <label className={labelClass}>Lead Teacher</label>
-          <select
+          <SimpleSelect
             value={form.lead_teacher_id}
-            onChange={(e) => update("lead_teacher_id", e.target.value)}
-            className={selectClass}
-          >
-            <option value="">Select teacher...</option>
-            {teachers.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
+            onValueChange={(val) => update("lead_teacher_id", val)}
+            options={teachers.map((t) => ({ value: t.id, label: t.name }))}
+            placeholder="Select teacher..."
+            className="w-full"
+          />
         </div>
 
         <div>
@@ -699,17 +685,13 @@ export function ClassForm({
 
         <div>
           <label className={labelClass}>Status</label>
-          <select
+          <SimpleSelect
             value={form.status}
-            onChange={(e) => update("status", e.target.value)}
-            className={selectClass}
-          >
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
+            onValueChange={(val) => update("status", val)}
+            options={STATUS_OPTIONS}
+            placeholder="Select status..."
+            className="w-full"
+          />
         </div>
 
         <div className="flex items-center gap-3">

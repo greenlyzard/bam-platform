@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { formatCurrency } from "@/lib/utils";
+import { SimpleSelect } from "@/components/ui/select";
 
 interface EnrollmentRow {
   id: string;
@@ -98,31 +99,23 @@ export function EnrollmentsTable({
           className="h-10 rounded-lg border border-silver bg-white px-4 text-sm placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none w-64"
         />
 
-        <select
+        <SimpleSelect
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
-        >
-          <option value="all">All statuses</option>
-          {statuses.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
+          onValueChange={setStatusFilter}
+          options={[
+            { value: "all", label: "All statuses" },
+            ...statuses.map((s) => ({ value: s, label: s })),
+          ]}
+        />
 
-        <select
+        <SimpleSelect
           value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
-          className="h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
-        >
-          <option value="all">All types</option>
-          {types.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
+          onValueChange={setTypeFilter}
+          options={[
+            { value: "all", label: "All types" },
+            ...types.map((t) => ({ value: t, label: t })),
+          ]}
+        />
 
         <span className="flex items-center text-xs text-mist ml-auto">
           {filtered.length} enrollment{filtered.length !== 1 ? "s" : ""}

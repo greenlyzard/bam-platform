@@ -6,6 +6,7 @@ import {
   updateTimesheetEntry,
   deleteTimesheetEntry,
 } from "./actions";
+import { SimpleSelect } from "@/components/ui/select";
 
 const CATEGORIES = [
   { value: "class", label: "Class" },
@@ -353,23 +354,17 @@ function EntryFormCard({
             <label className="block text-xs font-medium text-charcoal mb-1">
               Category *
             </label>
-            <select
-              name="category"
-              required
+            <input type="hidden" name="category" value={category} />
+            <SimpleSelect
               value={category}
-              onChange={(e) => {
-                setCategory(e.target.value);
+              onValueChange={(val) => {
+                setCategory(val);
                 setSelectedClass("");
                 setSelectedStudentIds([]);
               }}
-              className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
-            >
-              {CATEGORIES.map((c) => (
-                <option key={c.value} value={c.value}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
+              options={CATEGORIES}
+              className="w-full"
+            />
           </div>
         </div>
 
@@ -379,31 +374,25 @@ function EntryFormCard({
             <label className="block text-xs font-medium text-charcoal mb-1">
               Select Class
             </label>
-            <select
-              name="classId"
+            <input type="hidden" name="classId" value={selectedClass} />
+            <SimpleSelect
               value={selectedClass}
-              onChange={(e) => {
-                const cls = teacherClasses.find((c) => c.id === e.target.value);
-                setSelectedClass(e.target.value);
+              onValueChange={(val) => {
+                const cls = teacherClasses.find((c) => c.id === val);
+                setSelectedClass(val);
                 if (cls) {
                   setDescription(cls.name);
                   if (cls.start_time) setStartTime(cls.start_time.slice(0, 5));
                   if (cls.end_time) setEndTime(cls.end_time.slice(0, 5));
                 }
               }}
-              className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
-            >
-              <option value="">Select a class...</option>
-              {teacherClasses.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                  {c.day_name ? ` (${c.day_name}` : ""}
-                  {c.start_time ? ` ${formatTime12h(c.start_time)}` : ""}
-                  {c.end_time ? `\u2013${formatTime12h(c.end_time)}` : ""}
-                  {c.day_name ? ")" : ""}
-                </option>
-              ))}
-            </select>
+              options={teacherClasses.map((c) => ({
+                value: c.id,
+                label: `${c.name}${c.day_name ? ` (${c.day_name}` : ""}${c.start_time ? ` ${formatTime12h(c.start_time)}` : ""}${c.end_time ? `\u2013${formatTime12h(c.end_time)}` : ""}${c.day_name ? ")" : ""}`,
+              }))}
+              placeholder="Select a class..."
+              className="w-full"
+            />
           </div>
         )}
 

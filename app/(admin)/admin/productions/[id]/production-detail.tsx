@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { SimpleSelect } from "@/components/ui/select";
 import {
   updateProduction,
   updateApprovalStatus,
@@ -320,6 +321,9 @@ function DancesTab({
   const [showCreate, setShowCreate] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [newDanceDiscipline, setNewDanceDiscipline] = useState(Object.keys(DISCIPLINE_LABELS)[0]);
+  const [addDanceId, setAddDanceId] = useState("");
+  const [addPerfType, setAddPerfType] = useState("recital");
 
   // Filter out dances already in this production
   const existingDanceIds = new Set(prodDances.map((pd) => pd.dance_id));
@@ -398,11 +402,13 @@ function DancesTab({
           <p className="text-xs font-semibold text-charcoal">Create New Dance</p>
           <div className="grid gap-3 sm:grid-cols-3">
             <input name="title" type="text" required placeholder="Dance title" className="h-9 rounded-lg border border-silver px-3 text-sm" />
-            <select name="discipline" required className="h-9 rounded-lg border border-silver px-3 text-sm bg-white">
-              {Object.entries(DISCIPLINE_LABELS).map(([k, v]) => (
-                <option key={k} value={k}>{v}</option>
-              ))}
-            </select>
+            <input type="hidden" name="discipline" value={newDanceDiscipline} />
+            <SimpleSelect
+              value={newDanceDiscipline}
+              onValueChange={setNewDanceDiscipline}
+              options={Object.entries(DISCIPLINE_LABELS).map(([k, v]) => ({ value: k, label: v }))}
+              className="w-full"
+            />
             <input name="level" type="text" placeholder="Level (e.g. 3B)" className="h-9 rounded-lg border border-silver px-3 text-sm" />
           </div>
           <div className="flex gap-2 justify-end">
@@ -419,20 +425,28 @@ function DancesTab({
         <form onSubmit={handleAddDance} className="rounded-xl border border-lavender/30 bg-lavender/5 p-4 space-y-3">
           <p className="text-xs font-semibold text-charcoal">Add Dance to Production</p>
           <div className="grid gap-3 sm:grid-cols-3">
-            <select name="dance_id" required className="h-9 rounded-lg border border-silver px-3 text-sm bg-white">
-              <option value="">Select a dance...</option>
-              {available.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.title} — {DISCIPLINE_LABELS[d.discipline] ?? d.discipline}
-                  {d.level ? ` (${d.level})` : ""}
-                </option>
-              ))}
-            </select>
-            <select name="performance_type" required className="h-9 rounded-lg border border-silver px-3 text-sm bg-white">
-              <option value="recital">Recital</option>
-              <option value="competition">Competition</option>
-              <option value="showcase">Showcase</option>
-            </select>
+            <input type="hidden" name="dance_id" value={addDanceId} />
+            <SimpleSelect
+              value={addDanceId}
+              onValueChange={setAddDanceId}
+              options={available.map((d) => ({
+                value: d.id,
+                label: `${d.title} — ${DISCIPLINE_LABELS[d.discipline] ?? d.discipline}${d.level ? ` (${d.level})` : ""}`,
+              }))}
+              placeholder="Select a dance..."
+              className="w-full"
+            />
+            <input type="hidden" name="performance_type" value={addPerfType} />
+            <SimpleSelect
+              value={addPerfType}
+              onValueChange={setAddPerfType}
+              options={[
+                { value: "recital", label: "Recital" },
+                { value: "competition", label: "Competition" },
+                { value: "showcase", label: "Showcase" },
+              ]}
+              className="w-full"
+            />
             <input name="performance_order" type="number" defaultValue={prodDances.length + 1} min={0} placeholder="Order" className="h-9 rounded-lg border border-silver px-3 text-sm" />
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -588,15 +602,11 @@ function CastingTab({
           </div>
           <div>
             <label className="block text-xs font-semibold text-charcoal mb-1">Role</label>
-            <select
+            <SimpleSelect
               value={castRole}
-              onChange={(e) => setCastRole(e.target.value)}
-              className="h-9 rounded-lg border border-silver px-3 text-sm bg-white"
-            >
-              {Object.entries(ROLE_LABELS).map(([k, v]) => (
-                <option key={k} value={k}>{v}</option>
-              ))}
-            </select>
+              onValueChange={setCastRole}
+              options={Object.entries(ROLE_LABELS).map(([k, v]) => ({ value: k, label: v }))}
+            />
           </div>
         </div>
 
@@ -680,6 +690,8 @@ function RehearsalsTab({
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [rehearsalPdId, setRehearsalPdId] = useState("");
+  const [rehearsalType, setRehearsalType] = useState("rehearsal");
 
   async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -735,17 +747,21 @@ function RehearsalsTab({
         <form onSubmit={handleCreate} className="rounded-xl border border-lavender/30 bg-lavender/5 p-4 space-y-3">
           <p className="text-xs font-semibold text-charcoal">New Rehearsal</p>
           <div className="grid gap-3 sm:grid-cols-2">
-            <select name="production_dance_id" required className="h-9 rounded-lg border border-silver px-3 text-sm bg-white">
-              <option value="">Select dance...</option>
-              {prodDances.map((pd) => (
-                <option key={pd.id} value={pd.id}>{pd.danceTitle}</option>
-              ))}
-            </select>
-            <select name="rehearsal_type" className="h-9 rounded-lg border border-silver px-3 text-sm bg-white">
-              {Object.entries(REHEARSAL_TYPE_LABELS).map(([k, v]) => (
-                <option key={k} value={k}>{v}</option>
-              ))}
-            </select>
+            <input type="hidden" name="production_dance_id" value={rehearsalPdId} />
+            <SimpleSelect
+              value={rehearsalPdId}
+              onValueChange={setRehearsalPdId}
+              options={prodDances.map((pd) => ({ value: pd.id, label: pd.danceTitle }))}
+              placeholder="Select dance..."
+              className="w-full"
+            />
+            <input type="hidden" name="rehearsal_type" value={rehearsalType} />
+            <SimpleSelect
+              value={rehearsalType}
+              onValueChange={setRehearsalType}
+              options={Object.entries(REHEARSAL_TYPE_LABELS).map(([k, v]) => ({ value: k, label: v }))}
+              className="w-full"
+            />
             <input name="rehearsal_date" type="date" required className="h-9 rounded-lg border border-silver px-3 text-sm" />
             <div className="flex gap-2">
               <input name="start_time" type="time" required placeholder="Start" className="h-9 flex-1 rounded-lg border border-silver px-3 text-sm" />

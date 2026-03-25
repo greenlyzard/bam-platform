@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { ComposeModal } from "./ComposeModal";
+import { SimpleSelect } from "@/components/ui/select";
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -279,22 +280,16 @@ export function InboxLayout({
       >
         {/* Mobile header */}
         <div className="md:hidden flex items-center justify-between p-3 border-b border-silver">
-          <select
+          <SimpleSelect
             value={activeFolder}
-            onChange={(e) => {
-              setActiveFolder(e.target.value);
+            onValueChange={(val) => {
+              setActiveFolder(val);
               setSelectedThread(null);
             }}
-            className="rounded-lg border border-silver px-3 py-1.5 text-sm bg-white"
-          >
-            {FOLDERS.filter((f) => f.key !== "_divider" && (!f.adminOnly || isAdmin)).map(
-              (f) => (
-                <option key={f.key} value={f.key}>
-                  {f.label}
-                </option>
-              )
+            options={FOLDERS.filter((f) => f.key !== "_divider" && (!f.adminOnly || isAdmin)).map(
+              (f) => ({ value: f.key, label: f.label })
             )}
-          </select>
+          />
           <button
             onClick={() => setShowCompose(true)}
             className="rounded-lg bg-lavender px-3 py-1.5 text-sm font-semibold text-white"
@@ -514,22 +509,18 @@ function ThreadDetail({
         {isAdmin && (
           <div className="flex items-center gap-2 flex-wrap">
             {/* Assign dropdown */}
-            <select
-              value={thread.assigned_to ?? ""}
-              onChange={(e) =>
+            <SimpleSelect
+              value={thread.assigned_to ?? "unassigned"}
+              onValueChange={(val) =>
                 onUpdate(thread.id, {
-                  assigned_to: e.target.value || null,
+                  assigned_to: val === "unassigned" ? null : val,
                 })
               }
-              className="rounded-md border border-silver px-2 py-1 text-xs bg-white"
-            >
-              <option value="">Unassigned</option>
-              {staffList.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: "unassigned", label: "Unassigned" },
+                ...staffList.map((s) => ({ value: s.id, label: s.name })),
+              ]}
+            />
 
             {/* Actions dropdown */}
             <div className="relative">

@@ -5,6 +5,7 @@ import {
   CLASS_TYPE_COLORS,
 } from "@/lib/schedule/queries";
 import Link from "next/link";
+import { FormSelect } from "./form-select";
 
 export const metadata = {
   title: "Classes — Schedule — Studio Admin",
@@ -138,54 +139,33 @@ export default async function ClassesPage({
 
       {/* Filters */}
       <form className="flex flex-wrap gap-3">
-        <select
+        <FormSelect
           name="classType"
           defaultValue={params.classType ?? ""}
-          className="h-10 rounded-lg border border-silver bg-white px-3 text-sm focus:border-lavender focus:ring-1 focus:ring-lavender outline-none"
-        >
-          {CLASS_TYPE_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+          options={CLASS_TYPE_OPTIONS.filter((o) => o.value !== "")}
+          placeholder="All Types"
+        />
 
-        <select
+        <FormSelect
           name="programDivision"
           defaultValue={params.programDivision ?? ""}
-          className="h-10 rounded-lg border border-silver bg-white px-3 text-sm focus:border-lavender focus:ring-1 focus:ring-lavender outline-none"
-        >
-          {PROGRAM_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+          options={PROGRAM_OPTIONS.filter((o) => o.value !== "")}
+          placeholder="All Programs"
+        />
 
-        <select
+        <FormSelect
           name="status"
           defaultValue={params.status ?? ""}
-          className="h-10 rounded-lg border border-silver bg-white px-3 text-sm focus:border-lavender focus:ring-1 focus:ring-lavender outline-none"
-        >
-          {STATUS_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+          options={STATUS_OPTIONS.filter((o) => o.value !== "")}
+          placeholder="All Statuses"
+        />
 
-        <select
+        <FormSelect
           name="teacherId"
           defaultValue={params.teacherId ?? ""}
-          className="h-10 rounded-lg border border-silver bg-white px-3 text-sm focus:border-lavender focus:ring-1 focus:ring-lavender outline-none"
-        >
-          <option value="">All Teachers</option>
-          {teachers.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}
-            </option>
-          ))}
-        </select>
+          options={teachers.map((t) => ({ value: t.id, label: t.name }))}
+          placeholder="All Teachers"
+        />
 
         <button
           type="submit"

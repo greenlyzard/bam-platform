@@ -37,6 +37,8 @@
 - `timesheets`, `timesheet_entries`, `timesheet_entry_changes`
 - `pay_periods`, `productions`, `seasons`
 - `families`, `extended_contacts`
+- `class_teachers`, `disciplines`, `dance_curriculum`
+- `class_pricing_rules`, `class_phases`, `studio_closures`
 - All communications tables (channels, messages, etc. — planned)
 
 ---
@@ -197,7 +199,6 @@ Class templates (not specific scheduled occurrences — those are `schedule_inst
 | id | uuid | NO | gen_random_uuid() |
 | name | text | NO | null |
 | style | text | NO | null |
-| level | text | NO | null |
 | age_min | integer | YES | null |
 | age_max | integer | YES | null |
 | max_students | integer | YES | 10 |
@@ -214,10 +215,30 @@ Class templates (not specific scheduled occurrences — those are `schedule_inst
 | notes | text | YES | null |
 | enrolled_count | integer | NO | 0 |
 | status | text | NO | 'active' |
+| short_description | text | YES | null |
+| medium_description | text | YES | null |
+| long_description | text | YES | null |
+| gender | text | YES | 'any' |
+| levels | text[] | YES | null |
+| discipline_ids | uuid[] | YES | null |
+| curriculum_ids | uuid[] | YES | null |
+| days_of_week | integer[] | YES | null |
+| start_date | date | YES | null |
+| end_date | date | YES | null |
+| season_id | uuid | YES | null |
+| max_enrollment | integer | YES | null |
+| show_capacity_public | boolean | YES | false |
+| online_registration | boolean | YES | true |
+| is_hidden | boolean | YES | false |
+| is_new | boolean | YES | false |
+| new_expires_at | date | YES | null |
+| is_rehearsal | boolean | YES | false |
+| is_performance | boolean | YES | false |
 | created_at | timestamptz | YES | now() |
 | updated_at | timestamptz | YES | now() |
 
 **CRITICAL: No `tenant_id` column.** Never filter classes by tenant_id.
+**Note:** `level` column was dropped — replaced by `levels` text array.
 
 ---
 
@@ -660,6 +681,112 @@ In-app notifications for check-in alerts, late pickup, system messages.
 
 ---
 
+### `class_teachers`
+Links teachers to classes with roles.
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| id | uuid | NO | gen_random_uuid() |
+| class_id | uuid | NO | null |
+| teacher_id | uuid | NO | null |
+| role | text | NO | 'lead' |
+| is_primary | boolean | YES | false |
+| tenant_id | uuid | NO | null |
+| created_at | timestamptz | YES | now() |
+
+**Notes:** HAS `tenant_id`. UNIQUE on (class_id, teacher_id). Valid role values: `lead`, `assistant`, `accompanist`, `observer`.
+
+---
+
+### `disciplines`
+Dance disciplines offered at the studio.
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| id | uuid | NO | gen_random_uuid() |
+| tenant_id | uuid | NO | null |
+| name | text | NO | null |
+| description | text | YES | null |
+| is_active | boolean | YES | true |
+| sort_order | integer | YES | 0 |
+| created_at | timestamptz | YES | now() |
+
+**Notes:** HAS `tenant_id`. Referenced by `classes.discipline_ids` array.
+
+---
+
+### `dance_curriculum`
+Teaching methodologies and curriculum styles.
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| id | uuid | NO | gen_random_uuid() |
+| tenant_id | uuid | NO | null |
+| name | text | NO | null |
+| description | text | YES | null |
+| is_active | boolean | YES | true |
+| sort_order | integer | YES | 0 |
+| created_at | timestamptz | YES | now() |
+
+**Notes:** HAS `tenant_id`. Referenced by `classes.curriculum_ids` array.
+
+---
+
+### `class_pricing_rules`
+Tiered pricing per class (early bird, full price, etc.).
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| id | uuid | NO | gen_random_uuid() |
+| class_id | uuid | NO | null |
+| tenant_id | uuid | NO | null |
+| label | text | NO | null |
+| deadline | date | YES | null |
+| amount | numeric(10,2) | NO | null |
+| discount_type | text | YES | null |
+| discount_value | numeric(10,2) | YES | null |
+| is_base_price | boolean | YES | false |
+| sort_order | integer | YES | 0 |
+| created_at | timestamptz | YES | now() |
+
+**Notes:** HAS `tenant_id`. Valid discount_type: `flat`, `percentage`.
+
+---
+
+### `class_phases`
+Technique/rehearsal/performance phases within a class season.
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| id | uuid | NO | gen_random_uuid() |
+| class_id | uuid | NO | null |
+| tenant_id | uuid | NO | null |
+| phase | text | NO | null |
+| start_date | date | NO | null |
+| end_date | date | NO | null |
+| notes | text | YES | null |
+| production_id | uuid | YES | null |
+| created_at | timestamptz | YES | now() |
+
+**Notes:** HAS `tenant_id`. Valid phase values: `technique`, `rehearsal`, `performance`.
+
+---
+
+### `studio_closures`
+Days the studio is closed (holidays, breaks, etc.).
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| id | uuid | NO | gen_random_uuid() |
+| tenant_id | uuid | NO | null |
+| closed_date | date | NO | null |
+| reason | text | YES | null |
+| created_at | timestamptz | YES | now() |
+
+**Notes:** HAS `tenant_id`. UNIQUE on (tenant_id, closed_date).
+
+---
+
 ## Other Tables (Schema Not Yet Fully Documented)
 
 These tables exist but their full column schemas have not been captured.
@@ -756,6 +883,9 @@ before writing queries against any of these.
 | 20260317000000 | Families, family contacts, student guardians |
 | 20260319000000 | Student profiles, address columns, extended contacts |
 | 20260319100000 | Attendance bridge — notifications table, cross-ref indexes |
+| 20260319200000 | Device tokens and notification preferences |
+| 20260318215218 | Class management — extend classes, class_teachers, disciplines, dance_curriculum, pricing rules, phases, studio closures |
+| 20260318221239 | Add Attendance to admin nav (platform_modules) |
 
 ---
 

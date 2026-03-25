@@ -8,6 +8,7 @@ import {
   themeToCssVars,
   type ThemeColors,
 } from "@/lib/theme/themes";
+import { SimpleSelect } from "@/components/ui/select";
 import { updateThemeSettings } from "./actions";
 
 interface ThemeEditorProps {
@@ -328,25 +329,21 @@ export function ThemeEditor({
             <label className="block text-sm font-medium text-charcoal mb-1.5">
               Heading Font
             </label>
-            <select
+            <SimpleSelect
               value={headingFont}
-              onChange={(e) => setHeadingFont(e.target.value)}
-              className="w-full h-11 rounded-lg border border-silver bg-white px-4 text-sm text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
-            >
-              {FONT_OPTIONS.filter((f) => f.category === "serif").map((f) => (
-                <option key={f.value} value={f.value}>
-                  {f.label}
-                </option>
-              ))}
-              <option disabled>───────────</option>
-              {FONT_OPTIONS.filter((f) => f.category === "sans-serif").map(
-                (f) => (
-                  <option key={f.value} value={f.value}>
-                    {f.label}
-                  </option>
-                )
-              )}
-            </select>
+              onValueChange={setHeadingFont}
+              options={[
+                ...FONT_OPTIONS.filter((f) => f.category === "serif").map((f) => ({
+                  value: f.value,
+                  label: f.label,
+                })),
+                ...FONT_OPTIONS.filter((f) => f.category === "sans-serif").map((f) => ({
+                  value: f.value,
+                  label: f.label,
+                })),
+              ]}
+              className="w-full"
+            />
             <p
               className="mt-2 text-lg text-charcoal"
               style={{ fontFamily: `'${headingFont}', serif` }}
@@ -358,25 +355,21 @@ export function ThemeEditor({
             <label className="block text-sm font-medium text-charcoal mb-1.5">
               Body Font
             </label>
-            <select
+            <SimpleSelect
               value={bodyFont}
-              onChange={(e) => setBodyFont(e.target.value)}
-              className="w-full h-11 rounded-lg border border-silver bg-white px-4 text-sm text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
-            >
-              {FONT_OPTIONS.filter((f) => f.category === "sans-serif").map(
-                (f) => (
-                  <option key={f.value} value={f.value}>
-                    {f.label}
-                  </option>
-                )
-              )}
-              <option disabled>───────────</option>
-              {FONT_OPTIONS.filter((f) => f.category === "serif").map((f) => (
-                <option key={f.value} value={f.value}>
-                  {f.label}
-                </option>
-              ))}
-            </select>
+              onValueChange={setBodyFont}
+              options={[
+                ...FONT_OPTIONS.filter((f) => f.category === "sans-serif").map((f) => ({
+                  value: f.value,
+                  label: f.label,
+                })),
+                ...FONT_OPTIONS.filter((f) => f.category === "serif").map((f) => ({
+                  value: f.value,
+                  label: f.label,
+                })),
+              ]}
+              className="w-full"
+            />
             <p
               className="mt-2 text-sm text-charcoal"
               style={{ fontFamily: `'${bodyFont}', sans-serif` }}

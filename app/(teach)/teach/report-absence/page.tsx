@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { SimpleSelect } from "@/components/ui/select";
 
 interface UpcomingInstance {
   id: string;
@@ -123,24 +124,16 @@ export default function ReportAbsencePage() {
           {loading ? (
             <p className="text-sm text-mist">Loading your schedule...</p>
           ) : instances.length > 0 ? (
-            <select
+            <SimpleSelect
               value={selectedInstance}
-              onChange={(e) => setSelectedInstance(e.target.value)}
-              className="w-full rounded-lg border border-silver px-3 py-2 text-sm focus:outline-none focus:border-lavender"
-              required
-            >
-              <option value="">Choose a class...</option>
-              {instances.map((inst) => (
-                <option key={inst.id} value={inst.id}>
-                  {inst.className ?? "Class"} —{" "}
-                  {new Date(inst.event_date + "T00:00:00").toLocaleDateString(
-                    "en-US",
-                    { weekday: "short", month: "short", day: "numeric" }
-                  )}{" "}
-                  {formatTime(inst.start_time)}
-                </option>
-              ))}
-            </select>
+              onValueChange={setSelectedInstance}
+              options={instances.map((inst) => ({
+                value: inst.id,
+                label: `${inst.className ?? "Class"} — ${new Date(inst.event_date + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} ${formatTime(inst.start_time)}`,
+              }))}
+              placeholder="Choose a class..."
+              className="w-full"
+            />
           ) : (
             <div className="rounded-lg border border-dashed border-silver px-3 py-4 text-center">
               <p className="text-sm text-mist">

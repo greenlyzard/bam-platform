@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { logHours } from "./actions";
+import { SimpleSelect } from "@/components/ui/select";
 
 interface LogHoursFormProps {
   classes: { id: string; name: string }[];
@@ -11,6 +12,8 @@ export function LogHoursForm({ classes }: LogHoursFormProps) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [category, setCategory] = useState("class");
+  const [classId, setClassId] = useState("");
 
   async function handleSubmit(formData: FormData) {
     setLoading(true);
@@ -98,18 +101,19 @@ export function LogHoursForm({ classes }: LogHoursFormProps) {
           >
             Category *
           </label>
-          <select
-            id="category"
-            name="category"
-            required
-            className="w-full h-11 rounded-lg border border-silver bg-white px-4 text-base text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
-          >
-            <option value="class">Class</option>
-            <option value="private">Private Lesson</option>
-            <option value="rehearsal">Rehearsal</option>
-            <option value="admin">Admin</option>
-            <option value="sub">Substitute</option>
-          </select>
+          <input type="hidden" name="category" value={category} />
+          <SimpleSelect
+            value={category}
+            onValueChange={setCategory}
+            options={[
+              { value: "class", label: "Class" },
+              { value: "private", label: "Private Lesson" },
+              { value: "rehearsal", label: "Rehearsal" },
+              { value: "admin", label: "Admin" },
+              { value: "sub", label: "Substitute" },
+            ]}
+            className="w-full"
+          />
         </div>
 
         <div>
@@ -120,18 +124,14 @@ export function LogHoursForm({ classes }: LogHoursFormProps) {
             Class{" "}
             <span className="text-mist font-normal">(optional)</span>
           </label>
-          <select
-            id="classId"
-            name="classId"
-            className="w-full h-11 rounded-lg border border-silver bg-white px-4 text-base text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
-          >
-            <option value="">No specific class</option>
-            {classes.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+          <input type="hidden" name="classId" value={classId} />
+          <SimpleSelect
+            value={classId}
+            onValueChange={setClassId}
+            options={classes.map((c) => ({ value: c.id, label: c.name }))}
+            placeholder="No specific class"
+            className="w-full"
+          />
         </div>
 
         <div>

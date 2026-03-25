@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { SimpleSelect } from "@/components/ui/select";
 
 interface EmbedFormData {
   name: string;
@@ -140,15 +141,15 @@ export function EmbedForm({
         <label className="block text-sm font-medium text-charcoal mb-1">
           Display Mode
         </label>
-        <select
+        <SimpleSelect
           value={form.display_mode}
-          onChange={(e) => setForm((f) => ({ ...f, display_mode: e.target.value }))}
-          className="rounded-lg border border-silver px-3 py-2 text-sm focus:outline-none focus:border-lavender"
-        >
-          <option value="week">Week</option>
-          <option value="list">List</option>
-          <option value="day">Day</option>
-        </select>
+          onValueChange={(val) => setForm((f) => ({ ...f, display_mode: val }))}
+          options={[
+            { value: "week", label: "Week" },
+            { value: "list", label: "List" },
+            { value: "day", label: "Day" },
+          ]}
+        />
       </div>
 
       {/* Default Days */}

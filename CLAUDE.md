@@ -299,5 +299,13 @@ Full strategy: `docs/marketing/local-seo-strategy.md`
 
 ---
 
-*Last updated: March 2026*  
+## 14. UI Component Guidelines
+
+- Use `SimpleSelect` from `components/ui/select.tsx` for all simple dropdowns — it takes `value`, `onValueChange`, `options` (array of `{value, label}`), `placeholder` as flat props and is fully theme-aware via CSS variables. It renders the Radix UI compound pattern internally.
+- For complex select needs (grouped options, custom rendering), use the compound `Select`/`SelectTrigger`/`SelectContent`/`SelectItem` exports from the same file.
+- Native `<select>` elements are acceptable for server-rendered forms or where Radix overhead is unnecessary — use the standardized classes: `appearance-none bg-white border border-silver rounded-md px-3 py-1.5 text-sm text-charcoal focus:outline-none focus:border-lavender focus:ring-2 focus:ring-lavender/20 cursor-pointer`.
+
+---
+
+*Last updated: March 2026*
 *Update whenever a major decision is made, a module ships, a table is added, or strategy shifts.*

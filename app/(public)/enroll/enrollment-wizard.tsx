@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { enrollStudent, bookTrialClass } from "./actions";
 import { useCart } from "@/lib/cart-context";
+import { SimpleSelect } from "@/components/ui/select";
 
 // ─── Types ──────────────────────────────────────────────
 
@@ -298,6 +299,7 @@ export function EnrollmentWizard({ classes }: { classes: ClassInfo[] }) {
   >([]);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authMode, setAuthMode] = useState<"signin" | "signup">("signup");
+  const [referralSource, setReferralSource] = useState("");
   const [enrollResult, setEnrollResult] = useState<{
     status: "active" | "waitlist";
     className: string;
@@ -1439,18 +1441,23 @@ export function EnrollmentWizard({ classes }: { classes: ClassInfo[] }) {
             )}
 
             {authMode === "signup" && (
-              <select
-                name="referralSource"
-                className="w-full h-11 rounded-lg border border-silver bg-white px-4 text-sm text-slate focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
-              >
-                <option value="">How did you hear about us?</option>
-                <option value="google">Google search</option>
-                <option value="instagram">Instagram</option>
-                <option value="friend">Friend referral</option>
-                <option value="performance">Saw a performance</option>
-                <option value="yelp">Yelp</option>
-                <option value="other">Other</option>
-              </select>
+              <>
+                <input type="hidden" name="referralSource" value={referralSource} />
+                <SimpleSelect
+                  value={referralSource}
+                  onValueChange={setReferralSource}
+                  options={[
+                    { value: "google", label: "Google search" },
+                    { value: "instagram", label: "Instagram" },
+                    { value: "friend", label: "Friend referral" },
+                    { value: "performance", label: "Saw a performance" },
+                    { value: "yelp", label: "Yelp" },
+                    { value: "other", label: "Other" },
+                  ]}
+                  placeholder="How did you hear about us?"
+                  className="w-full"
+                />
+              </>
             )}
 
             {authMode === "signin" && (

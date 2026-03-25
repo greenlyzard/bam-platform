@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
+import Link from "next/link";
 import {
   getWeeklyUtilization,
   getTeacherLoadSummary,
@@ -46,6 +47,12 @@ export default async function ResourcesPage() {
         <p className="mt-1 text-sm text-slate">
           Room utilization, AI recommendations, and teacher workload analysis.
         </p>
+        <Link
+          href="/admin/resources/manage"
+          className="inline-flex items-center mt-2 text-xs text-lavender hover:text-lavender-dark font-medium transition-colors"
+        >
+          Manage Resources →
+        </Link>
       </div>
 
       {/* Weekly Room Grid */}

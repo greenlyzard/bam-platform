@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { SimpleSelect } from "@/components/ui/select";
 
 interface Conversation {
   id: string;
@@ -145,20 +146,20 @@ export default function AngelinaDashboard() {
       {/* Filter for "all" tab */}
       {tab === "all" && (
         <div className="flex gap-2 mb-4">
-          <select
+          <SimpleSelect
             value={roleFilter}
-            onChange={(e) => {
-              setRoleFilter(e.target.value);
+            onValueChange={(val) => {
+              setRoleFilter(val);
               setPage(1);
             }}
-            className="text-sm border border-silver rounded-lg px-3 py-1.5 bg-white"
-          >
-            <option value="">All roles</option>
-            <option value="public">Public</option>
-            <option value="parent">Parent</option>
-            <option value="teacher">Teacher</option>
-            <option value="admin">Admin</option>
-          </select>
+            options={[
+              { value: "public", label: "Public" },
+              { value: "parent", label: "Parent" },
+              { value: "teacher", label: "Teacher" },
+              { value: "admin", label: "Admin" },
+            ]}
+            placeholder="All roles"
+          />
         </div>
       )}
 

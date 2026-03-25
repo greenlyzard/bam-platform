@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { SimpleSelect } from "@/components/ui/select";
 import {
   createFamily,
   updateFamily,
@@ -98,6 +99,7 @@ export function FamilyForm({
   const [showAddStudent, setShowAddStudent] = useState(false);
   const [showAddContact, setShowAddContact] = useState(false);
   const [contactType, setContactType] = useState<"emergency" | "stream" | "both">("emergency");
+  const [addStudentGender, setAddStudentGender] = useState("");
 
   const emergencyContacts = contacts.filter(
     (c) => c.contact_type === "emergency" || c.contact_type === "both"
@@ -312,15 +314,17 @@ export function FamilyForm({
                     required
                     className="h-9 rounded-lg border border-silver bg-white px-3 text-sm"
                   />
-                  <select
-                    name="gender"
-                    className="h-9 rounded-lg border border-silver bg-white px-3 text-sm"
-                  >
-                    <option value="">Gender (optional)</option>
-                    <option value="female">Female</option>
-                    <option value="male">Male</option>
-                    <option value="other">Other</option>
-                  </select>
+                  <input type="hidden" name="gender" value={addStudentGender} />
+                  <SimpleSelect
+                    value={addStudentGender}
+                    onValueChange={setAddStudentGender}
+                    options={[
+                      { value: "female", label: "Female" },
+                      { value: "male", label: "Male" },
+                      { value: "other", label: "Other" },
+                    ]}
+                    placeholder="Gender (optional)"
+                  />
                 </div>
                 <textarea
                   name="medical_notes"

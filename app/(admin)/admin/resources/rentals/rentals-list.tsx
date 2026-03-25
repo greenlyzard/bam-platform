@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { SimpleSelect } from "@/components/ui/select";
 
 interface Rental {
   id: string;
@@ -43,6 +44,8 @@ export function RentalsList({
   const [filter, setFilter] = useState<string>("all");
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [formRoomId, setFormRoomId] = useState("");
+  const [formRenterType, setFormRenterType] = useState("");
 
   const filtered =
     filter === "all" ? rentals : rentals.filter((r) => r.status === filter);
@@ -132,35 +135,34 @@ export function RentalsList({
               <label className="block text-xs font-medium text-slate mb-1">
                 Room
               </label>
-              <select
-                name="room_id"
-                required
-                className="w-full rounded-lg border border-silver px-3 py-2 text-sm"
-              >
-                <option value="">Select room...</option>
-                {rooms.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
-                ))}
-              </select>
+              <input type="hidden" name="room_id" value={formRoomId} />
+              <SimpleSelect
+                value={formRoomId}
+                onValueChange={setFormRoomId}
+                options={rooms.map((r) => ({ value: r.id, label: r.name }))}
+                placeholder="Select room..."
+                className="w-full"
+              />
             </div>
             <div>
               <label className="block text-xs font-medium text-slate mb-1">
                 Renter Type
               </label>
-              <select
-                name="renter_type"
-                className="w-full rounded-lg border border-silver px-3 py-2 text-sm"
-              >
-                <option value="">Select type...</option>
-                <option value="yoga">Yoga</option>
-                <option value="pilates">Pilates</option>
-                <option value="fitness">Fitness</option>
-                <option value="dance">Dance</option>
-                <option value="therapy">Therapy</option>
-                <option value="other">Other</option>
-              </select>
+              <input type="hidden" name="renter_type" value={formRenterType} />
+              <SimpleSelect
+                value={formRenterType}
+                onValueChange={setFormRenterType}
+                options={[
+                  { value: "yoga", label: "Yoga" },
+                  { value: "pilates", label: "Pilates" },
+                  { value: "fitness", label: "Fitness" },
+                  { value: "dance", label: "Dance" },
+                  { value: "therapy", label: "Therapy" },
+                  { value: "other", label: "Other" },
+                ]}
+                placeholder="Select type..."
+                className="w-full"
+              />
             </div>
             <div>
               <label className="block text-xs font-medium text-slate mb-1">

@@ -6,6 +6,7 @@ import {
   TASK_TYPE_LABELS,
 } from "@/lib/schedule/queries";
 import { TaskActions } from "./task-actions";
+import { TaskFilters } from "./task-filters";
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return "—";
@@ -51,62 +52,12 @@ export default async function AdminTasksPage({
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
-        <form className="flex flex-wrap items-center gap-3">
-          <select
-            name="taskType"
-            defaultValue={params.taskType ?? ""}
-            className="h-9 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:outline-none focus:border-lavender"
-          >
-            <option value="">All Types</option>
-            <option value="makeup_needed">Makeup Needed</option>
-            <option value="class_at_risk">Class At Risk</option>
-            <option value="coverage_needed">Coverage Needed</option>
-            <option value="cancellation_pay_decision">Pay Decision</option>
-            <option value="timesheet_review">Timesheet Review</option>
-            <option value="other">Other</option>
-          </select>
-
-          <select
-            name="priority"
-            defaultValue={params.priority ?? ""}
-            className="h-9 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:outline-none focus:border-lavender"
-          >
-            <option value="">All Priorities</option>
-            <option value="urgent">Urgent</option>
-            <option value="normal">Normal</option>
-            <option value="low">Low</option>
-          </select>
-
-          <select
-            name="status"
-            defaultValue={params.status ?? ""}
-            className="h-9 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:outline-none focus:border-lavender"
-          >
-            <option value="">Open / In Progress</option>
-            <option value="open">Open</option>
-            <option value="in_progress">In Progress</option>
-            <option value="resolved">Resolved</option>
-            <option value="dismissed">Dismissed</option>
-          </select>
-
-          <button
-            type="submit"
-            className="h-9 rounded-lg bg-lavender px-4 text-sm font-semibold text-white hover:bg-lavender-dark transition-colors"
-          >
-            Filter
-          </button>
-
-          {(params.taskType || params.priority || params.status) && (
-            <a
-              href="/admin/tasks"
-              className="h-9 inline-flex items-center rounded-lg px-3 text-sm font-medium text-slate hover:text-charcoal transition-colors"
-            >
-              Clear
-            </a>
-          )}
-        </form>
-      </div>
+      <TaskFilters
+        taskType={params.taskType ?? ""}
+        priority={params.priority ?? ""}
+        status={params.status ?? ""}
+        hasFilters={!!(params.taskType || params.priority || params.status)}
+      />
 
       {/* Tasks table */}
       {tasks.length === 0 ? (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { SimpleSelect } from "@/components/ui/select";
 import { adminAddEntry, adminUpdateEntry, adminDeleteEntry, submitTimesheetEntry, approveTimesheetEntry } from "./actions";
 
 interface Teacher {
@@ -234,18 +235,13 @@ export function QuickEntryBar({
             <label className="text-sm font-medium text-charcoal whitespace-nowrap">
               Entry for:
             </label>
-            <select
+            <SimpleSelect
               value={stickyTeacher}
-              onChange={(e) => setStickyTeacher(e.target.value)}
-              className="h-9 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:outline-none min-w-[180px]"
-            >
-              <option value="">Select teacher...</option>
-              {teachers.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
+              onValueChange={(val) => setStickyTeacher(val)}
+              options={teachers.map((t) => ({ value: t.id, label: t.name }))}
+              placeholder="Select teacher..."
+              className="min-w-[180px]"
+            />
           </div>
 
           <div className="ml-auto text-sm text-slate">
@@ -627,20 +623,14 @@ function EntryDrawer({
               <label className="block text-sm font-medium text-charcoal mb-1.5">
                 Teacher *
               </label>
-              <select
-                name="teacherProfileId"
-                required
+              <input type="hidden" name="teacherProfileId" value={selectedTeacher} />
+              <SimpleSelect
                 value={selectedTeacher}
-                onChange={(e) => setSelectedTeacher(e.target.value)}
-                className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
-              >
-                <option value="">Select teacher...</option>
-                {teachers.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
+                onValueChange={(val) => setSelectedTeacher(val)}
+                options={teachers.map((t) => ({ value: t.id, label: t.name }))}
+                placeholder="Select teacher..."
+                className="w-full"
+              />
             </div>
           )}
 
@@ -663,26 +653,21 @@ function EntryDrawer({
             <label className="block text-sm font-medium text-charcoal mb-1.5">
               Category *
             </label>
-            <select
-              name="category"
-              required
+            <input type="hidden" name="category" value={category} />
+            <SimpleSelect
               value={category}
-              onChange={(e) => {
-                setCategory(e.target.value);
+              onValueChange={(val) => {
+                setCategory(val);
                 setSelectedInstance("");
                 setSelectedClassId("");
                 setCustomMode(false);
                 setSubForTeacher("");
                 setSelectedStudentIds([]);
               }}
-              className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
-            >
-              {CATEGORIES.map((c) => (
-                <option key={c.value} value={c.value}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
+              options={CATEGORIES}
+              placeholder="Select category..."
+              className="w-full"
+            />
           </div>
 
           {/* Class / Session Selector — three-tier: schedule instances → all classes → custom */}
@@ -715,18 +700,18 @@ function EntryDrawer({
                   />
                 </>
               ) : SHOW_SCHEDULE_CLASSES.has(category) && scheduleInstances.length > 0 ? (
-                <select
+                <SimpleSelect
                   value={selectedInstance}
-                  onChange={(e) => {
-                    if (e.target.value === "__custom__") {
+                  onValueChange={(val) => {
+                    if (val === "__custom__") {
                       setCustomMode(true);
                       setSelectedInstance("");
                       setSelectedClassId("");
                       setDescription("");
                       return;
                     }
-                    const inst = scheduleInstances.find((i) => i.id === e.target.value);
-                    setSelectedInstance(e.target.value);
+                    const inst = scheduleInstances.find((i) => i.id === val);
+                    setSelectedInstance(val);
                     setSelectedClassId("");
                     if (inst) {
                       if (inst.class_name) setDescription(inst.class_name);
@@ -739,49 +724,45 @@ function EntryDrawer({
                       }
                     }
                   }}
-                  className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
-                >
-                  <option value="">Select a session...</option>
-                  {scheduleInstances.map((inst) => (
-                    <option key={inst.id} value={inst.id}>
-                      {inst.class_name ?? inst.event_type}
-                      {inst.start_time ? ` ${formatTime12h(inst.start_time)}` : ""}
-                      {inst.end_time ? `\u2013${formatTime12h(inst.end_time)}` : ""}
-                    </option>
-                  ))}
-                  <option value="__custom__">+ Other / Custom</option>
-                </select>
+                  options={[
+                    ...scheduleInstances.map((inst) => ({
+                      value: inst.id,
+                      label: `${inst.class_name ?? inst.event_type}${inst.start_time ? ` ${formatTime12h(inst.start_time)}` : ""}${inst.end_time ? `\u2013${formatTime12h(inst.end_time)}` : ""}`,
+                    })),
+                    { value: "__custom__", label: "+ Other / Custom" },
+                  ]}
+                  placeholder="Select a session..."
+                  className="w-full"
+                />
               ) : allClasses.length > 0 ? (
-                <select
+                <SimpleSelect
                   value={selectedClassId}
-                  onChange={(e) => {
-                    if (e.target.value === "__custom__") {
+                  onValueChange={(val) => {
+                    if (val === "__custom__") {
                       setCustomMode(true);
                       setSelectedClassId("");
                       setDescription("");
                       return;
                     }
-                    setSelectedClassId(e.target.value);
+                    setSelectedClassId(val);
                     setSelectedInstance("");
-                    const cls = allClasses.find((c) => c.id === e.target.value);
+                    const cls = allClasses.find((c) => c.id === val);
                     if (cls) {
                       setDescription(cls.name);
                       if (cls.start_time) setStartTime(cls.start_time.slice(0, 5));
                       if (cls.end_time) setEndTime(cls.end_time.slice(0, 5));
                     }
                   }}
-                  className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
-                >
-                  <option value="">Select a class...</option>
-                  {allClasses.map((cls) => (
-                    <option key={cls.id} value={cls.id}>
-                      {cls.name}
-                      {cls.start_time ? ` ${formatTime12h(cls.start_time)}` : ""}
-                      {cls.end_time ? `\u2013${formatTime12h(cls.end_time)}` : ""}
-                    </option>
-                  ))}
-                  <option value="__custom__">+ Other / Custom</option>
-                </select>
+                  options={[
+                    ...allClasses.map((cls) => ({
+                      value: cls.id,
+                      label: `${cls.name}${cls.start_time ? ` ${formatTime12h(cls.start_time)}` : ""}${cls.end_time ? `\u2013${formatTime12h(cls.end_time)}` : ""}`,
+                    })),
+                    { value: "__custom__", label: "+ Other / Custom" },
+                  ]}
+                  placeholder="Select a class..."
+                  className="w-full"
+                />
               ) : null}
 
               <input type="hidden" name="scheduleInstanceId" value={selectedInstance} />
@@ -923,19 +904,16 @@ function EntryDrawer({
               <label className="block text-sm font-medium text-charcoal mb-1.5">
                 Substitute for
               </label>
-              <select
-                name="subFor"
+              <input type="hidden" name="subFor" value={subForTeacher} />
+              <SimpleSelect
                 value={subForTeacher}
-                onChange={(e) => setSubForTeacher(e.target.value)}
-                className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
-              >
-                <option value="">Select teacher...</option>
-                {teachers
+                onValueChange={(val) => setSubForTeacher(val)}
+                options={teachers
                   .filter((t) => t.id !== selectedTeacher)
-                  .map((t) => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
-              </select>
+                  .map((t) => ({ value: t.id, label: t.name }))}
+                placeholder="Select teacher..."
+                className="w-full"
+              />
             </div>
           )}
 

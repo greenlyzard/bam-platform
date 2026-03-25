@@ -2,6 +2,7 @@
 
 import { Fragment, useState, useTransition } from "react";
 import Link from "next/link";
+import { SimpleSelect } from "@/components/ui/select";
 import { bulkApproveTimesheets } from "./actions";
 import {
   AdminAddEntryButton,
@@ -100,6 +101,32 @@ interface CsvRow {
   status: string;
 }
 
+interface PrivateBillingSplit {
+  id: string;
+  studentId: string;
+  studentName: string;
+  splitAmount: number;
+  billingStatus: "unbilled" | "pending" | "charged" | "waived" | "disputed";
+  dateCardCharged: string | null;
+  chargeReference: string | null;
+  waiverReason: string | null;
+  disputeNotes: string | null;
+}
+
+interface PrivateBillingRecord {
+  id: string;
+  timesheetEntryId: string;
+  teacherName: string;
+  date: string;
+  totalHours: number;
+  description: string | null;
+  teacherConfirmed: boolean;
+  adminConfirmed: boolean | null;
+  adminEnteredCalendar: boolean;
+  billingSplitConfirmed: boolean;
+  splits: PrivateBillingSplit[];
+}
+
 const STATUS_BADGES: Record<string, { bg: string; text: string; label: string }> = {
   draft: { bg: "bg-cloud", text: "text-slate", label: "Draft" },
   submitted: { bg: "bg-gold/10", text: "text-gold-dark", label: "Submitted" },
@@ -139,6 +166,32 @@ function buildUrl(params: Record<string, string>): string {
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
+/** Wraps SimpleSelect with a hidden input for native form submission */
+function FormSelect({
+  name,
+  defaultValue,
+  options,
+  placeholder,
+}: {
+  name: string;
+  defaultValue: string;
+  options: { value: string; label: string }[];
+  placeholder: string;
+}) {
+  const [value, setValue] = useState(defaultValue);
+  return (
+    <>
+      <input type="hidden" name={name} value={value} />
+      <SimpleSelect
+        value={value}
+        onValueChange={(val) => setValue(val === "__all__" ? "" : val)}
+        options={[{ value: "__all__", label: placeholder }, ...options]}
+        placeholder={placeholder}
+      />
+    </>
+  );
+}
+
 export function TimesheetsClient({
   view,
   filterStatus,
@@ -159,6 +212,7 @@ export function TimesheetsClient({
   entryTypeLabels,
   isTeacherOnly,
   isAdmin,
+  billingRecords,
 }: {
   view: string;
   filterStatus: string;
@@ -179,6 +233,7 @@ export function TimesheetsClient({
   entryTypeLabels: Record<string, string>;
   isTeacherOnly: boolean;
   isAdmin: boolean;
+  billingRecords?: PrivateBillingRecord[];
 }) {
   const [quickMode, setQuickMode] = useState(false);
   const [stickyTeacher, setStickyTeacher] = useState("");
@@ -226,6 +281,7 @@ export function TimesheetsClient({
   const viewTabs = [
     { key: "timesheets", label: "Timesheets" },
     { key: "entries", label: "All Entries" },
+    { key: "billing", label: "Private Billing" },
   ];
 
   const hasFilters = filterTeacher || filterEmpType || filterEntryType ||
@@ -279,6 +335,7 @@ export function TimesheetsClient({
               view: tab.key,
               ...(tab.key === "timesheets" ? { status: filterStatus } : {}),
               ...(tab.key === "entries" ? { from: dateFrom, to: dateTo, teacher: filterTeacher, empType: filterEmpType, entryType: filterEntryType } : {}),
+              ...(tab.key === "billing" ? { view: "billing" } : {}),
             })}
             className={`pb-2 text-sm font-medium border-b-2 transition-colors ${
               view === tab.key
@@ -318,24 +375,24 @@ export function TimesheetsClient({
           {payPeriods.length > 0 && (
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium text-charcoal">Pay Period:</label>
-              <select
+              <SimpleSelect
                 value={filterPayPeriod}
-                onChange={(e) => {
+                onValueChange={(val) => {
                   window.location.href = buildUrl({
                     view: "timesheets",
                     status: filterStatus,
-                    ...(e.target.value ? { payPeriod: e.target.value } : {}),
+                    ...(val && val !== "__all__" ? { payPeriod: val } : {}),
                   });
                 }}
-                className="h-9 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:outline-none"
-              >
-                <option value="">All Pay Periods</option>
-                {payPeriods.map((pp) => (
-                  <option key={pp.id} value={pp.id}>
-                    {MONTHS[pp.periodMonth - 1]} {pp.periodYear}
-                  </option>
-                ))}
-              </select>
+                options={[
+                  { value: "__all__", label: "All Pay Periods" },
+                  ...payPeriods.map((pp) => ({
+                    value: pp.id,
+                    label: `${MONTHS[pp.periodMonth - 1]} ${pp.periodYear}`,
+                  })),
+                ]}
+                placeholder="All Pay Periods"
+              />
             </div>
           )}
 
@@ -591,41 +648,33 @@ export function TimesheetsClient({
               </div>
               <div>
                 <label className="block text-xs font-medium text-charcoal mb-1">Teacher</label>
-                <select
+                <FormSelect
                   name="teacher"
                   defaultValue={filterTeacher}
-                  className="h-9 rounded-lg border border-silver bg-white px-3 text-sm focus:border-lavender focus:outline-none"
-                >
-                  <option value="">All Teachers</option>
-                  {teachers.map((t) => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
-                </select>
+                  options={teachers.map((t) => ({ value: t.id, label: t.name }))}
+                  placeholder="All Teachers"
+                />
               </div>
               <div>
                 <label className="block text-xs font-medium text-charcoal mb-1">Employment</label>
-                <select
+                <FormSelect
                   name="empType"
                   defaultValue={filterEmpType}
-                  className="h-9 rounded-lg border border-silver bg-white px-3 text-sm focus:border-lavender focus:outline-none"
-                >
-                  <option value="">All</option>
-                  <option value="w2">W-2</option>
-                  <option value="1099">1099</option>
-                </select>
+                  options={[
+                    { value: "w2", label: "W-2" },
+                    { value: "1099", label: "1099" },
+                  ]}
+                  placeholder="All"
+                />
               </div>
               <div>
                 <label className="block text-xs font-medium text-charcoal mb-1">Entry Type</label>
-                <select
+                <FormSelect
                   name="entryType"
                   defaultValue={filterEntryType}
-                  className="h-9 rounded-lg border border-silver bg-white px-3 text-sm focus:border-lavender focus:outline-none"
-                >
-                  <option value="">All</option>
-                  {ENTRY_TYPES_LIST.map((et) => (
-                    <option key={et.value} value={et.value}>{et.label}</option>
-                  ))}
-                </select>
+                  options={ENTRY_TYPES_LIST}
+                  placeholder="All"
+                />
               </div>
               <button
                 type="submit"
@@ -743,6 +792,99 @@ export function TimesheetsClient({
             </div>
           </div>
         </>
+      )}
+
+      {view === "billing" && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-charcoal">Private Billing Tracker</h2>
+            <span className="text-xs text-slate">Unresolved items block payroll export</span>
+          </div>
+          {!billingRecords || billingRecords.length === 0 ? (
+            <p className="text-sm text-slate py-8 text-center">No private billing records found for this period.</p>
+          ) : (
+            <div className="space-y-3">
+              {billingRecords.map((record) => {
+                const allCharged = record.splits.every((s) => s.billingStatus === "charged" || s.billingStatus === "waived");
+                const hasUnresolved = record.splits.some((s) => s.billingStatus === "unbilled" || s.billingStatus === "pending");
+                return (
+                  <div key={record.id} className={`border rounded-lg p-4 space-y-3 ${hasUnresolved ? "border-gold/50 bg-gold/5" : "border-silver bg-white"}`}>
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-charcoal">{record.teacherName}</span>
+                          <span className="text-xs text-slate">·</span>
+                          <span className="text-xs text-slate">{record.date}</span>
+                          <span className="text-xs text-slate">·</span>
+                          <span className="text-xs text-slate">{record.totalHours}h</span>
+                        </div>
+                        {record.description && <p className="text-xs text-slate">{record.description}</p>}
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {record.teacherConfirmed ? (
+                          <span className="text-xs bg-green/10 text-green-dark px-2 py-0.5 rounded-full">Teacher confirmed</span>
+                        ) : (
+                          <span className="text-xs bg-cloud text-slate px-2 py-0.5 rounded-full">Awaiting teacher</span>
+                        )}
+                        {allCharged ? (
+                          <span className="text-xs bg-green/10 text-green-dark px-2 py-0.5 rounded-full">Fully charged</span>
+                        ) : hasUnresolved ? (
+                          <span className="text-xs bg-gold/10 text-gold-dark px-2 py-0.5 rounded-full">Action needed</span>
+                        ) : (
+                          <span className="text-xs bg-cloud text-slate px-2 py-0.5 rounded-full">In progress</span>
+                        )}
+                      </div>
+                    </div>
+                    {record.splits.length > 0 && (
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="text-left text-slate border-b border-silver">
+                            <th className="pb-1 font-medium">Student</th>
+                            <th className="pb-1 font-medium">Amount</th>
+                            <th className="pb-1 font-medium">Status</th>
+                            <th className="pb-1 font-medium">Date Charged</th>
+                            <th className="pb-1 font-medium">Reference</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {record.splits.map((split) => (
+                            <tr key={split.id} className="border-b border-silver/50 last:border-0">
+                              <td className="py-1.5 text-charcoal">{split.studentName}</td>
+                              <td className="py-1.5 text-charcoal">${split.splitAmount.toFixed(2)}</td>
+                              <td className="py-1.5">
+                                <span className={`px-1.5 py-0.5 rounded-full text-xs ${
+                                  split.billingStatus === "charged" ? "bg-green/10 text-green-dark" :
+                                  split.billingStatus === "waived" ? "bg-cloud text-slate" :
+                                  split.billingStatus === "disputed" ? "bg-red/10 text-red-dark" :
+                                  split.billingStatus === "pending" ? "bg-lavender/10 text-lavender-dark" :
+                                  "bg-gold/10 text-gold-dark"
+                                }`}>
+                                  {split.billingStatus}
+                                </span>
+                              </td>
+                              <td className="py-1.5 text-slate">{split.dateCardCharged ?? "—"}</td>
+                              <td className="py-1.5 text-slate font-mono">{split.chargeReference ?? "—"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                    <div className="flex items-center gap-3 pt-1">
+                      <label className="flex items-center gap-1.5 text-xs text-slate cursor-pointer">
+                        <input type="checkbox" checked={record.adminEnteredCalendar} readOnly className="rounded" />
+                        Entered in calendar
+                      </label>
+                      <label className="flex items-center gap-1.5 text-xs text-slate cursor-pointer">
+                        <input type="checkbox" checked={record.billingSplitConfirmed} readOnly className="rounded" />
+                        Split confirmed
+                      </label>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

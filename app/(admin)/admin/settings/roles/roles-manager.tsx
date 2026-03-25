@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { SimpleSelect } from "@/components/ui/select";
 
 interface RoleAssignment {
   id: string;
@@ -331,35 +332,28 @@ function AssignRoleDialog({
           onChange={(e) => setSearch(e.target.value)}
           className="w-full h-9 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal placeholder:text-mist focus:border-lavender focus:outline-none mb-1"
         />
-        <select
+        <SimpleSelect
           value={userId}
-          onChange={(e) => setUserId(e.target.value)}
-          className="w-full h-9 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:outline-none"
-        >
-          <option value="">Select user...</option>
-          {filteredUsers.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.name} ({u.email})
-            </option>
-          ))}
-        </select>
+          onValueChange={setUserId}
+          options={filteredUsers.map((u) => ({
+            value: u.id,
+            label: `${u.name} (${u.email})`,
+          }))}
+          placeholder="Select user..."
+          className="w-full"
+        />
       </div>
 
       <div>
         <label className="block text-sm font-medium text-charcoal mb-1.5">
           Role
         </label>
-        <select
+        <SimpleSelect
           value={role}
-          onChange={(e) => setRole(e.target.value)}
-          className="w-full h-9 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:outline-none"
-        >
-          {availableRoles.map((r) => (
-            <option key={r.value} value={r.value}>
-              {r.label}
-            </option>
-          ))}
-        </select>
+          onValueChange={setRole}
+          options={availableRoles.map((r) => ({ value: r.value, label: r.label }))}
+          className="w-full"
+        />
       </div>
 
       <label className="flex items-center gap-2 text-sm text-charcoal cursor-pointer">

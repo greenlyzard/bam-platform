@@ -2,7 +2,34 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { SimpleSelect } from "@/components/ui/select";
 import { markEntriesAsPaid } from "../actions";
+
+/** Wraps SimpleSelect with a hidden input for native form submission */
+function FormSelect({
+  name,
+  defaultValue,
+  options,
+  placeholder,
+}: {
+  name: string;
+  defaultValue: string;
+  options: { value: string; label: string }[];
+  placeholder: string;
+}) {
+  const [value, setValue] = useState(defaultValue);
+  return (
+    <>
+      <input type="hidden" name={name} value={value} />
+      <SimpleSelect
+        value={value}
+        onValueChange={(val) => setValue(val === "__all__" ? "" : val)}
+        options={[{ value: "__all__", label: placeholder }, ...options]}
+        placeholder={placeholder}
+      />
+    </>
+  );
+}
 
 interface TeacherPayroll {
   id: string;
@@ -285,63 +312,51 @@ export function PayrollReport({
             <label className="block text-xs font-medium text-charcoal mb-1">
               Teacher
             </label>
-            <select
+            <FormSelect
               name="teacher"
               defaultValue={filterTeacher}
-              className="h-9 rounded-lg border border-silver bg-white px-3 text-sm focus:border-lavender focus:outline-none"
-            >
-              <option value="">All Teachers</option>
-              {teacherList.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
+              options={teacherList.map((t) => ({ value: t.id, label: t.name }))}
+              placeholder="All Teachers"
+            />
           </div>
           <div>
             <label className="block text-xs font-medium text-charcoal mb-1">
               Production
             </label>
-            <select
+            <FormSelect
               name="production"
               defaultValue={filterProduction}
-              className="h-9 rounded-lg border border-silver bg-white px-3 text-sm focus:border-lavender focus:outline-none"
-            >
-              <option value="">All</option>
-              {productions.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+              options={productions.map((p) => ({ value: p.id, label: p.name }))}
+              placeholder="All"
+            />
           </div>
           <div>
             <label className="block text-xs font-medium text-charcoal mb-1">
               Employment Type
             </label>
-            <select
+            <FormSelect
               name="empType"
               defaultValue={filterEmpType}
-              className="h-9 rounded-lg border border-silver bg-white px-3 text-sm focus:border-lavender focus:outline-none"
-            >
-              <option value="">All</option>
-              <option value="w2">W-2 Employees</option>
-              <option value="1099">1099 Contractors</option>
-            </select>
+              options={[
+                { value: "w2", label: "W-2 Employees" },
+                { value: "1099", label: "1099 Contractors" },
+              ]}
+              placeholder="All"
+            />
           </div>
           <div>
             <label className="block text-xs font-medium text-charcoal mb-1">
               Status
             </label>
-            <select
+            <FormSelect
               name="status"
               defaultValue={filterStatus}
-              className="h-9 rounded-lg border border-silver bg-white px-3 text-sm focus:border-lavender focus:outline-none"
-            >
-              <option value="">All</option>
-              <option value="approved">Approved Only</option>
-              <option value="pending">Pending</option>
-            </select>
+              options={[
+                { value: "approved", label: "Approved Only" },
+                { value: "pending", label: "Pending" },
+              ]}
+              placeholder="All"
+            />
           </div>
           <button
             type="submit"

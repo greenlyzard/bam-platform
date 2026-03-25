@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { SimpleSelect } from "@/components/ui/select";
 import { createProduction, updateProduction } from "./actions";
 
 interface ProductionData {
@@ -25,6 +26,9 @@ export function ProductionForm({ production }: { production?: ProductionData }) 
   const router = useRouter();
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [productionType, setProductionType] = useState(
+    production?.production_type ?? "recital"
+  );
   const [showCompetition, setShowCompetition] = useState(
     production?.production_type === "competition" || production?.production_type === "mixed"
   );
@@ -53,8 +57,9 @@ export function ProductionForm({ production }: { production?: ProductionData }) 
     }
   }
 
-  function handleTypeChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    setShowCompetition(e.target.value === "competition" || e.target.value === "mixed");
+  function handleTypeChange(val: string) {
+    setProductionType(val);
+    setShowCompetition(val === "competition" || val === "mixed");
   }
 
   return (
@@ -84,18 +89,18 @@ export function ProductionForm({ production }: { production?: ProductionData }) 
           <label className="block text-xs font-semibold text-charcoal mb-1.5">
             Type *
           </label>
-          <select
-            name="production_type"
-            required
-            defaultValue={production?.production_type ?? "recital"}
-            onChange={handleTypeChange}
-            className="w-full h-10 rounded-lg border border-silver px-3 text-sm focus:border-lavender focus:ring-1 focus:ring-lavender outline-none bg-white"
-          >
-            <option value="recital">Recital</option>
-            <option value="showcase">Showcase</option>
-            <option value="competition">Competition</option>
-            <option value="mixed">Mixed (Recital + Competition)</option>
-          </select>
+          <input type="hidden" name="production_type" value={productionType} />
+          <SimpleSelect
+            value={productionType}
+            onValueChange={handleTypeChange}
+            options={[
+              { value: "recital", label: "Recital" },
+              { value: "showcase", label: "Showcase" },
+              { value: "competition", label: "Competition" },
+              { value: "mixed", label: "Mixed (Recital + Competition)" },
+            ]}
+            className="w-full"
+          />
         </div>
 
         <div>

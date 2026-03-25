@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { SimpleSelect } from "@/components/ui/select";
 import {
   updateFamily,
   addStudentToFamily,
@@ -176,6 +177,7 @@ export function FamilyDetail({
   const [showAddStudent, setShowAddStudent] = useState(false);
   const [showAddGuardian, setShowAddGuardian] = useState(false);
   const [showAddExtended, setShowAddExtended] = useState(false);
+  const [addStudentGender, setAddStudentGender] = useState("");
   const [childFilter, setChildFilter] = useState("__all__");
 
   // Guardian add
@@ -363,12 +365,17 @@ export function FamilyDetail({
               <input name="first_name" required placeholder="First name *" className="h-9 rounded-lg border border-silver bg-white px-3 text-sm" />
               <input name="last_name" required placeholder="Last name *" className="h-9 rounded-lg border border-silver bg-white px-3 text-sm" />
               <input name="date_of_birth" type="date" required className="h-9 rounded-lg border border-silver bg-white px-3 text-sm" />
-              <select name="gender" className="h-9 rounded-lg border border-silver bg-white px-3 text-sm">
-                <option value="">Gender</option>
-                <option value="female">Female</option>
-                <option value="male">Male</option>
-                <option value="other">Other</option>
-              </select>
+              <input type="hidden" name="gender" value={addStudentGender} />
+              <SimpleSelect
+                value={addStudentGender}
+                onValueChange={setAddStudentGender}
+                options={[
+                  { value: "female", label: "Female" },
+                  { value: "male", label: "Male" },
+                  { value: "other", label: "Other" },
+                ]}
+                placeholder="Gender"
+              />
             </div>
             <button type="submit" disabled={saving} className="h-9 rounded-lg bg-lavender hover:bg-lavender-dark text-white text-sm font-semibold px-4 disabled:opacity-50">Add Student</button>
           </form>

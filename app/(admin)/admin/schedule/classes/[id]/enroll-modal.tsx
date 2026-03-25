@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { SimpleSelect } from "@/components/ui/select";
 import { adminEnrollStudent } from "@/app/(admin)/admin/families/actions";
 
 interface FamilyResult {
@@ -215,20 +216,22 @@ export function EnrollModal({ classId, onClose, onSuccess }: EnrollModalProps) {
                   <label className="block text-xs font-medium text-slate mb-1">
                     Enrollment Type
                   </label>
-                  <select
+                  <SimpleSelect
                     value={enrollmentType}
-                    onChange={(e) =>
+                    onValueChange={(val) =>
                       setEnrollmentType(
-                        e.target.value as "full" | "trial" | "audit" | "comp"
+                        val as "full" | "trial" | "audit" | "comp"
                       )
                     }
-                    className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm"
-                  >
-                    <option value="full">Full Enrollment</option>
-                    <option value="trial">Trial</option>
-                    <option value="audit">Audit (Observe Only)</option>
-                    <option value="comp">Comp (Complimentary)</option>
-                  </select>
+                    options={[
+                      { value: "full", label: "Full Enrollment" },
+                      { value: "trial", label: "Trial" },
+                      { value: "audit", label: "Audit (Observe Only)" },
+                      { value: "comp", label: "Comp (Complimentary)" },
+                    ]}
+                    placeholder="Select type..."
+                    className="w-full"
+                  />
                   {enrollmentType === "trial" && selectedStudent.trialUsed && (
                     <p className="mt-1 text-xs text-[#D4A843]">
                       This student has already used their free trial. A second
@@ -241,16 +244,18 @@ export function EnrollModal({ classId, onClose, onSuccess }: EnrollModalProps) {
                   <label className="block text-xs font-medium text-slate mb-1">
                     Proration Method
                   </label>
-                  <select
+                  <SimpleSelect
                     value={prorationMethod}
-                    onChange={(e) => setProrationMethod(e.target.value)}
-                    className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm"
-                  >
-                    <option value="per_class">Per-Class Rate</option>
-                    <option value="daily">Daily Rate</option>
-                    <option value="split">Split (before/after 15th)</option>
-                    <option value="none">No Proration</option>
-                  </select>
+                    onValueChange={(val) => setProrationMethod(val)}
+                    options={[
+                      { value: "per_class", label: "Per-Class Rate" },
+                      { value: "daily", label: "Daily Rate" },
+                      { value: "split", label: "Split (before/after 15th)" },
+                      { value: "none", label: "No Proration" },
+                    ]}
+                    placeholder="Select method..."
+                    className="w-full"
+                  />
                 </div>
 
                 <div>

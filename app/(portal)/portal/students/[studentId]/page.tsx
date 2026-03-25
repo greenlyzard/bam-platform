@@ -1,5 +1,6 @@
 import { requireParent } from "@/lib/auth/guards";
 import { notFound } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
 import {
   getStudentDetail,
   getStudentAttendanceSummary,
@@ -19,21 +20,49 @@ function formatTime(t: string | null) {
   return `${h12}:${m} ${ampm}`;
 }
 
+function formatDate(d: string | null) {
+  if (!d) return "";
+  return new Date(d + "T12:00:00").toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 const STATUS_COLORS: Record<string, string> = {
-  active: "bg-[#5A9E6F]/10 text-[#5A9E6F]",
+  active: "bg-success/10 text-success",
   trial: "bg-lavender/10 text-lavender-dark",
-  waitlist: "bg-[#D4A843]/10 text-[#D4A843]",
-  pending_payment: "bg-[#D4A843]/10 text-[#D4A843]",
+  waitlist: "bg-gold/10 text-gold-dark",
+  pending_payment: "bg-gold/10 text-gold-dark",
 };
 
-export default async function StudentDetailPage({
+const TIER_COLORS: Record<string, string> = {
+  bronze: "bg-[#CD7F32]/10 text-[#CD7F32]",
+  silver: "bg-silver/30 text-slate",
+  gold: "bg-gold/10 text-gold-dark",
+  platinum: "bg-lavender/10 text-lavender-dark",
+};
+
+const CATEGORY_ICONS: Record<string, string> = {
+  attendance: "📅",
+  performance: "🎭",
+  competition: "🏆",
+  skill: "⭐",
+  milestone: "🎯",
+  leadership: "👑",
+  special: "✨",
+};
+
+export default async function StudentProfilePage({
   params,
 }: {
   params: Promise<{ studentId: string }>;
 }) {
   await requireParent();
   const { studentId } = await params;
+  const supabase = await createClient();
 
+  // Parallel fetch all data
   const [student, attendance, contacts] = await Promise.all([
     getStudentDetail(studentId),
     getStudentAttendanceSummary(studentId),
@@ -42,8 +71,37 @@ export default async function StudentDetailPage({
 
   if (!student) notFound();
 
+  // Fetch badges, evaluations, photo albums
+  const [badgesResult, evalsResult, albumsResult] = await Promise.all([
+    supabase
+      .from("student_badges")
+      .select("id, awarded_at, notes, badge_id, badges(name, description, category, tier, icon_url)")
+      .eq("student_id", studentId)
+      .order("awarded_at", { ascending: false }),
+    supabase
+      .from("student_evaluations")
+      .select("id, evaluation_type, title, body, attributed_to_name, is_private, created_at")
+      .eq("student_id", studentId)
+      .eq("is_private", false)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("student_google_photo_albums")
+      .select("id, label, album_url, is_active")
+      .eq("student_id", studentId)
+      .eq("is_active", true)
+      .order("sort_order"),
+  ]);
+
+  const badges = badgesResult.data ?? [];
+  const evaluations = evalsResult.data ?? [];
+  const albums = albumsResult.data ?? [];
+
   const age = calculateAge(student.date_of_birth);
   const initials = `${student.first_name[0]}${student.last_name[0]}`;
+  const displayName = student.preferred_name || student.first_name;
+  const yearsAtStudio = student.created_at
+    ? Math.floor((Date.now() - new Date(student.created_at).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
+    : null;
 
   return (
     <div className="space-y-6">
@@ -56,35 +114,90 @@ export default async function StudentDetailPage({
         </Link>
       </div>
 
-      {/* Profile Header */}
-      <div className="rounded-xl border border-silver bg-white p-5">
-        <div className="flex items-start gap-4">
-          <div className="h-16 w-16 rounded-full bg-lavender-light flex items-center justify-center text-lg font-bold text-lavender-dark shrink-0">
-            {initials}
-          </div>
-          <div>
-            <h1 className="text-2xl font-heading font-semibold text-charcoal">
-              {student.first_name} {student.last_name}
-            </h1>
-            <p className="text-sm text-slate mt-1">
-              Age {age}
-              {student.current_level ? ` · ${student.current_level}` : ""}
-            </p>
-            {student.medical_notes && (
-              <p className="text-xs text-mist mt-2">
-                Medical: {student.medical_notes}
-              </p>
+      {/* ── Hero / Profile Header ──────────────────────────── */}
+      <div className="rounded-xl border border-silver bg-white overflow-hidden">
+        {/* Gradient banner */}
+        <div className="h-24 bg-gradient-to-r from-lavender via-lavender-light to-gold-light" />
+        <div className="px-5 pb-5 -mt-10">
+          <div className="flex items-end gap-4">
+            {student.avatar_url ? (
+              <img
+                src={student.avatar_url}
+                alt={displayName}
+                className="h-20 w-20 rounded-full border-4 border-white object-cover shadow-md"
+              />
+            ) : (
+              <div className="h-20 w-20 rounded-full border-4 border-white bg-lavender-light flex items-center justify-center text-xl font-bold text-lavender-dark shadow-md">
+                {initials}
+              </div>
             )}
-            {student.allergy_notes && (
-              <p className="text-xs text-[#D4A843] mt-1">
-                Allergies: {student.allergy_notes}
-              </p>
-            )}
+            <div className="pb-1">
+              <h1 className="text-2xl font-heading font-semibold text-charcoal">
+                {displayName} {student.last_name}
+              </h1>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <span className="text-sm text-slate">Age {age}</span>
+                {student.current_level && (
+                  <span className="inline-block rounded-full bg-lavender/10 text-lavender-dark px-2.5 py-0.5 text-xs font-medium">
+                    {student.current_level}
+                  </span>
+                )}
+                {yearsAtStudio !== null && yearsAtStudio >= 1 && (
+                  <span className="text-xs text-mist">
+                    · Dancer since {new Date(student.created_at).getFullYear()}
+                  </span>
+                )}
+              </div>
+              {badges.length > 0 && (
+                <p className="text-xs text-mist mt-1">{badges.length} badge{badges.length !== 1 ? "s" : ""} earned</p>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Attendance Summary */}
+      {/* ── Badges & Achievements ──────────────────────────── */}
+      {badges.length > 0 && (
+        <div className="rounded-xl border border-silver bg-white p-5 space-y-3">
+          <h2 className="text-lg font-heading font-semibold text-charcoal">
+            Badges & Achievements
+          </h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {badges.map((sb) => {
+              const badge = sb.badges as unknown as {
+                name: string;
+                description: string | null;
+                category: string;
+                tier: string;
+                icon_url: string | null;
+              } | null;
+              if (!badge) return null;
+              const tierClass = TIER_COLORS[badge.tier] ?? TIER_COLORS.bronze;
+              const icon = CATEGORY_ICONS[badge.category] ?? "🏅";
+              return (
+                <div
+                  key={sb.id}
+                  className="rounded-xl border border-silver/50 p-3 text-center hover:shadow-sm transition-shadow"
+                >
+                  <div className="text-2xl mb-1.5">{icon}</div>
+                  <p className="text-sm font-medium text-charcoal leading-tight">{badge.name}</p>
+                  <span className={`inline-block mt-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${tierClass}`}>
+                    {badge.tier}
+                  </span>
+                  {badge.description && (
+                    <p className="text-[10px] text-mist mt-1 leading-tight">{badge.description}</p>
+                  )}
+                  <p className="text-[10px] text-mist mt-1">
+                    {formatDate(sb.awarded_at)}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Attendance Summary ─────────────────────────────── */}
       <div className="rounded-xl border border-silver bg-white p-5 space-y-3">
         <h2 className="text-lg font-heading font-semibold text-charcoal">
           This Month&apos;s Attendance
@@ -93,15 +206,15 @@ export default async function StudentDetailPage({
           <p className="text-sm text-mist">No attendance records this month.</p>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <AttendanceStat label="Present" count={attendance.present} color="text-[#5A9E6F]" />
-            <AttendanceStat label="Absent" count={attendance.absent} color="text-[#C45B5B]" />
-            <AttendanceStat label="Late" count={attendance.late} color="text-[#D4A843]" />
+            <AttendanceStat label="Present" count={attendance.present} color="text-success" />
+            <AttendanceStat label="Absent" count={attendance.absent} color="text-error" />
+            <AttendanceStat label="Late" count={attendance.late} color="text-gold-dark" />
             <AttendanceStat label="Excused" count={attendance.excused} color="text-slate" />
           </div>
         )}
       </div>
 
-      {/* Enrolled Classes */}
+      {/* ── Enrolled Classes ──────────────────────────────── */}
       <div className="rounded-xl border border-silver bg-white p-5 space-y-3">
         <h2 className="text-lg font-heading font-semibold text-charcoal">
           Enrolled Classes
@@ -133,9 +246,7 @@ export default async function StudentDetailPage({
                 end_time: string | null;
                 room: string | null;
               } | null;
-
               if (!cls) return null;
-
               return (
                 <div key={e.id} className="py-3 flex items-center justify-between">
                   <div>
@@ -163,7 +274,59 @@ export default async function StudentDetailPage({
         )}
       </div>
 
-      {/* Contacts */}
+      {/* ── Evaluations ───────────────────────────────────── */}
+      {evaluations.length > 0 && (
+        <div className="rounded-xl border border-silver bg-white p-5 space-y-3">
+          <h2 className="text-lg font-heading font-semibold text-charcoal">
+            Evaluations
+          </h2>
+          <div className="space-y-4">
+            {evaluations.map((ev) => (
+              <div key={ev.id} className="border-l-2 border-lavender pl-4">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-sm font-medium text-charcoal">{ev.title ?? "Note"}</p>
+                  <span className="rounded-full bg-cloud px-2 py-0.5 text-[10px] font-medium text-slate capitalize">
+                    {ev.evaluation_type.replace("_", " ")}
+                  </span>
+                </div>
+                <p className="text-sm text-slate mt-1 leading-relaxed">{ev.body}</p>
+                <p className="text-xs text-mist mt-1.5">
+                  {formatDate(ev.created_at)}
+                  {ev.attributed_to_name ? ` · ${ev.attributed_to_name}` : ""}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Photo Gallery ─────────────────────────────────── */}
+      {albums.length > 0 && (
+        <div className="rounded-xl border border-silver bg-white p-5 space-y-3">
+          <h2 className="text-lg font-heading font-semibold text-charcoal">
+            Photo Gallery
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {albums.map((album) => (
+              <a
+                key={album.id}
+                href={album.album_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 rounded-lg border border-silver/50 p-3 hover:bg-cloud/30 transition-colors"
+              >
+                <span className="text-2xl">📸</span>
+                <div>
+                  <p className="text-sm font-medium text-charcoal">{album.label}</p>
+                  <p className="text-xs text-lavender">View album →</p>
+                </div>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Family Contacts ───────────────────────────────── */}
       {contacts.length > 0 && (
         <div className="rounded-xl border border-silver bg-white p-5 space-y-3">
           <h2 className="text-lg font-heading font-semibold text-charcoal">

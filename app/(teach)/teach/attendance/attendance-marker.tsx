@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { markAttendance, logHoursFromAttendance } from "./actions";
 import type { AttendanceResult } from "./actions";
+import { SimpleSelect } from "@/components/ui/select";
 
 interface ClassOption {
   id: string;
@@ -190,19 +191,13 @@ export function AttendanceMarker({ classes }: { classes: ClassOption[] }) {
           >
             Class
           </label>
-          <select
-            id="classSelect"
+          <SimpleSelect
             value={selectedClassId}
-            onChange={(e) => setSelectedClassId(e.target.value)}
-            className="w-full h-11 rounded-lg border border-silver bg-white px-4 text-base text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
-          >
-            <option value="">Select a class...</option>
-            {classes.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+            onValueChange={setSelectedClassId}
+            options={classes.map((c) => ({ value: c.id, label: c.name }))}
+            placeholder="Select a class..."
+            className="w-full"
+          />
         </div>
         <div>
           <label

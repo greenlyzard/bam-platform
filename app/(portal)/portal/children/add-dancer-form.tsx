@@ -1,12 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { SimpleSelect } from "@/components/ui/select";
 import { addStudent } from "./actions";
 
 export function AddDancerForm() {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [gender, setGender] = useState("");
+  const [currentLevel, setCurrentLevel] = useState("");
 
   async function handleSubmit(formData: FormData) {
     setLoading(true);
@@ -106,16 +109,18 @@ export function AddDancerForm() {
               Gender{" "}
               <span className="text-mist font-normal">(optional)</span>
             </label>
-            <select
-              id="gender"
-              name="gender"
-              className="w-full h-11 rounded-lg border border-silver bg-white px-4 text-base text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
-            >
-              <option value="">Prefer not to say</option>
-              <option value="female">Female</option>
-              <option value="male">Male</option>
-              <option value="other">Other</option>
-            </select>
+            <input type="hidden" name="gender" value={gender} />
+            <SimpleSelect
+              value={gender}
+              onValueChange={setGender}
+              options={[
+                { value: "female", label: "Female" },
+                { value: "male", label: "Male" },
+                { value: "other", label: "Other" },
+              ]}
+              placeholder="Prefer not to say"
+              className="w-full"
+            />
           </div>
         </div>
 
@@ -126,17 +131,19 @@ export function AddDancerForm() {
           >
             Experience level
           </label>
-          <select
-            id="currentLevel"
-            name="currentLevel"
-            className="w-full h-11 rounded-lg border border-silver bg-white px-4 text-base text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
-          >
-            <option value="">Not sure yet</option>
-            <option value="pre_ballet">New to ballet</option>
-            <option value="level_1">Beginner (some experience)</option>
-            <option value="level_2">Intermediate</option>
-            <option value="level_3">Advanced</option>
-          </select>
+          <input type="hidden" name="currentLevel" value={currentLevel} />
+          <SimpleSelect
+            value={currentLevel}
+            onValueChange={setCurrentLevel}
+            options={[
+              { value: "pre_ballet", label: "New to ballet" },
+              { value: "level_1", label: "Beginner (some experience)" },
+              { value: "level_2", label: "Intermediate" },
+              { value: "level_3", label: "Advanced" },
+            ]}
+            placeholder="Not sure yet"
+            className="w-full"
+          />
         </div>
 
         <div>

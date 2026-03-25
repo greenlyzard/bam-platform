@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { SimpleSelect } from "@/components/ui/select";
 import { requestEnrollment } from "./actions";
 
 interface ClassInfo {
@@ -146,21 +147,18 @@ export function ClassBrowser({
             <label className="block text-xs font-medium text-slate mb-1">
               Enrolling for
             </label>
-            <select
+            <SimpleSelect
               value={selectedStudent}
-              onChange={(e) => {
-                setSelectedStudent(e.target.value);
+              onValueChange={(val) => {
+                setSelectedStudent(val);
                 setMessage(null);
               }}
-              className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm focus:border-lavender focus:ring-1 focus:ring-lavender outline-none"
-            >
-              {students.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.first_name} {s.last_name} (age{" "}
-                  {calculateAge(s.date_of_birth)})
-                </option>
-              ))}
-            </select>
+              options={students.map((s) => ({
+                value: s.id,
+                label: `${s.first_name} ${s.last_name} (age ${calculateAge(s.date_of_birth)})`,
+              }))}
+              className="w-full"
+            />
           </div>
         )}
 
@@ -182,35 +180,31 @@ export function ClassBrowser({
             <label className="block text-xs font-medium text-slate mb-1">
               Style
             </label>
-            <select
+            <SimpleSelect
               value={styleFilter}
-              onChange={(e) => setStyleFilter(e.target.value)}
-              className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm focus:border-lavender focus:ring-1 focus:ring-lavender outline-none"
-            >
-              <option value="">All styles</option>
-              {availableStyles.map((s) => (
-                <option key={s} value={s}>
-                  {STYLE_LABELS[s] ?? s}
-                </option>
-              ))}
-            </select>
+              onValueChange={setStyleFilter}
+              options={availableStyles.map((s) => ({
+                value: s,
+                label: STYLE_LABELS[s] ?? s,
+              }))}
+              placeholder="All styles"
+              className="w-full"
+            />
           </div>
           <div>
             <label className="block text-xs font-medium text-slate mb-1">
               Day
             </label>
-            <select
+            <SimpleSelect
               value={dayFilter}
-              onChange={(e) => setDayFilter(e.target.value)}
-              className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm focus:border-lavender focus:ring-1 focus:ring-lavender outline-none"
-            >
-              <option value="">All days</option>
-              {DAYS.map((d, i) => (
-                <option key={i} value={i}>
-                  {d}
-                </option>
-              ))}
-            </select>
+              onValueChange={setDayFilter}
+              options={DAYS.map((d, i) => ({
+                value: String(i),
+                label: d,
+              }))}
+              placeholder="All days"
+              className="w-full"
+            />
           </div>
         </div>
       </div>

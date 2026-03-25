@@ -365,3 +365,21 @@ Each timesheet displays a summary table:
 - [ ] Is the Stripe account for private billing the same account used for tuition, or separate?
 - [ ] Should Finance Admin receive a configurable alert when uncharged privates exceed X days pending?
 - [ ] For competition entries: is the rate the same as performance rate, or a distinct rate?
+
+---
+
+## Decisions Log
+
+| # | Question | Decision |
+|---|---|---|
+| 1 | Payroll processor | Square Payroll — CSV export columns will match Square Payroll import format |
+| 2 | Teacher edit cutoff | Default = last day of the month; Finance Admin and above can override per pay period in tenant settings; supported cadences: weekly, bi-weekly, bi-monthly, monthly, custom date |
+| 3 | Retroactive entry after cutoff | Requires Finance Admin approval; teacher submits request with reason |
+| 4 | Waived private — teacher pay | Finance Admin decides per case; Finance Admin toggles "pay teacher" per waived entry |
+| 5 | Stripe account | Same Stripe account as tuition; private billing charges go through the same pipeline |
+| 6 | Uncharged private alert | Yes — configurable threshold in days; Finance Admin sets in tenant settings |
+| 7 | Competition rate | Finance Admin sets rate per competition event; not tied to a global performance rate |
+
+## Open Questions
+- [ ] Should weekly/bi-weekly pay cadences generate automatic pay period records, or does Finance Admin create them manually?
+- [ ] For retroactive entry requests, does the teacher see a status tracker, or is it handled entirely by Finance Admin off-platform?

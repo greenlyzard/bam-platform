@@ -6,6 +6,7 @@ import type {
   ScheduleInstanceWithDetails,
   Season,
 } from "@/lib/calendar/types";
+import { SimpleSelect } from "@/components/ui/select";
 import styles from "./widget.module.css";
 
 // ── Helpers ─────────────────────────────────────────────────
@@ -132,6 +133,7 @@ export function ScheduleWidget({
   const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set());
   const [showTrialsOnly, setShowTrialsOnly] = useState(false);
   const [showRehearsals, setShowRehearsals] = useState(embedConfig.show_rehearsals);
+  const [selectedSeasonId, setSelectedSeasonId] = useState("");
 
   const fetchData = useCallback(async (weekMonday: Date) => {
     setLoading(true);
@@ -418,13 +420,12 @@ export function ScheduleWidget({
         {embedConfig.allow_filter_season && seasons.length > 1 && (
           <div className={styles.filterGroup}>
             <span className={styles.filterLabel}>Season</span>
-            <select className={styles.filterSelect}>
-              {seasons.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
+            <SimpleSelect
+              value={selectedSeasonId}
+              onValueChange={setSelectedSeasonId}
+              options={seasons.map((s) => ({ value: s.id, label: s.name }))}
+              className={styles.filterSelect}
+            />
           </div>
         )}
       </div>

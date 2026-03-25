@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { SimpleSelect } from "@/components/ui/select";
 
 interface Article {
   id: string;
@@ -198,17 +199,12 @@ export function KnowledgeBaseDashboard() {
             <label className="mb-1 block text-sm font-medium text-charcoal">
               Category
             </label>
-            <select
+            <SimpleSelect
               value={formCategory}
-              onChange={(e) => setFormCategory(e.target.value)}
-              className="w-full rounded-lg border border-silver px-3 py-2 text-sm text-charcoal focus:border-lavender focus:outline-none focus:ring-1 focus:ring-lavender"
-            >
-              {CATEGORIES.map((c) => (
-                <option key={c.value} value={c.value}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
+              onValueChange={setFormCategory}
+              options={CATEGORIES}
+              className="w-full"
+            />
           </div>
 
           {/* Audience */}
@@ -291,18 +287,12 @@ export function KnowledgeBaseDashboard() {
         >
           + New Article
         </button>
-        <select
+        <SimpleSelect
           value={filterCategory}
-          onChange={(e) => setFilterCategory(e.target.value)}
-          className="rounded-lg border border-silver px-3 py-2 text-sm text-charcoal focus:border-lavender focus:outline-none"
-        >
-          <option value="">All Categories</option>
-          {CATEGORIES.map((c) => (
-            <option key={c.value} value={c.value}>
-              {c.label}
-            </option>
-          ))}
-        </select>
+          onValueChange={setFilterCategory}
+          options={CATEGORIES}
+          placeholder="All Categories"
+        />
         <span className="text-xs text-mist">
           {filtered.length} article{filtered.length !== 1 ? "s" : ""}
         </span>

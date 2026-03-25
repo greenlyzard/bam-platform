@@ -94,6 +94,50 @@ export default async function AdminTimesheetsPage({
     status: pp.status,
   }));
 
+  // Fetch private billing records with splits and student names
+  const { data: billingRows } = await supabase
+    .from("private_billing_records")
+    .select(
+      `id, timesheet_entry_id, teacher_confirmed, admin_confirmed, admin_entered_calendar, billing_split_confirmed,
+      timesheet_entries!inner(date, total_hours, description, timesheet_id,
+        timesheets!inner(teacher_id, profiles!teacher_id(first_name, last_name))),
+      private_billing_splits(id, student_id, split_amount, billing_status, date_card_charged, charge_reference, waiver_reason, dispute_notes,
+        profiles!student_id(first_name, last_name))`
+    )
+    .order("created_at", { ascending: false });
+
+  const billingRecords = (billingRows ?? []).map((row) => {
+    const entry = row.timesheet_entries as any;
+    const ts = entry?.timesheets as any;
+    const prof = ts?.profiles as any;
+    return {
+      id: row.id,
+      timesheetEntryId: row.timesheet_entry_id,
+      teacherName: prof ? [prof.first_name, prof.last_name].filter(Boolean).join(" ") : "Unknown",
+      date: entry?.date ?? "",
+      totalHours: entry?.total_hours ?? 0,
+      description: entry?.description ?? null,
+      teacherConfirmed: row.teacher_confirmed,
+      adminConfirmed: row.admin_confirmed,
+      adminEnteredCalendar: row.admin_entered_calendar,
+      billingSplitConfirmed: row.billing_split_confirmed,
+      splits: ((row.private_billing_splits as any[]) ?? []).map((s: any) => {
+        const sp = s.profiles as any;
+        return {
+          id: s.id,
+          studentId: s.student_id,
+          studentName: sp ? [sp.first_name, sp.last_name].filter(Boolean).join(" ") : "Unknown",
+          splitAmount: s.split_amount,
+          billingStatus: s.billing_status,
+          dateCardCharged: s.date_card_charged ?? null,
+          chargeReference: s.charge_reference ?? null,
+          waiverReason: s.waiver_reason ?? null,
+          disputeNotes: s.dispute_notes ?? null,
+        };
+      }),
+    };
+  });
+
   // Fetch timesheets with teacher info
   let tsQuery = supabase
     .from("timesheets")
@@ -275,6 +319,7 @@ export default async function AdminTimesheetsPage({
       entryTypeLabels={ENTRY_TYPE_LABELS}
       isTeacherOnly={isTeacherOnly}
       isAdmin={currentUser.roles.some((r) => ["finance_admin", "admin", "super_admin"].includes(r))}
+      billingRecords={billingRecords}
     />
   );
 }
