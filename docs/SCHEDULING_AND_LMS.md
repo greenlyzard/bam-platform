@@ -133,6 +133,7 @@ classes (
                       )),
   is_published        boolean default false,   -- visible on parent portal
   is_open_enrollment  boolean default true,    -- accepting new students
+  point_cost          integer NOT NULL DEFAULT 1,
 
   -- Display
   color_code          text,               -- hex color for calendar display
@@ -253,6 +254,8 @@ PERFORMANCE_COMPETITION_COSTS.md).
 - Created by Admin directly
 Private sessions generate timesheet entries at private lesson rate and
 trigger billing events for the student's family account.
+
+Private lessons have a configurable point_cost on the class record. Standard privates default to 2 points; senior teacher privates to 3. See BILLING_AND_CREDITS.md Section 2.1.
 
 ### 4.6 Workshop / Intensive
 One-time or short-run event with separate enrollment from regular classes.
@@ -639,6 +642,8 @@ trial_notes             text,                    -- internal note (e.g., "OK for
 - When a promotion enables trials for Pilates/Gyrotonic, the class
   `trial_eligible` flag is toggled for the promotion period and
   automatically reverts when the promotion expires
+
+Cross-reference: REGISTRATION_AND_ONBOARDING.md Section 4 for the full trial system spec including trial abuse detection, front-desk enrollment suppression, outcome tracking, Super Admin override, and Angelina post-trial follow-up sequence.
 
 ### 13.3 Trial Class Flow
 1. Parent selects a trial-eligible class during onboarding or from website
