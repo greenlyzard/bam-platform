@@ -17,6 +17,7 @@ import {
   updateRelativeActive,
   updateSharePermission,
 } from "./actions";
+import { AddToClassModal } from "./add-to-class-modal";
 
 // ---------------------------------------------------------------------------
 // Interfaces
@@ -179,6 +180,7 @@ export function AdminStudentProfile({
   const [permissions, setPermissions] = useState(initialPerms);
   const [isPending, startTransition] = useTransition();
   const [toast, setToast] = useState("");
+  const [addToClassOpen, setAddToClassOpen] = useState(false);
 
   // Section form toggles
   const [editingInfo, setEditingInfo] = useState(false);
@@ -541,9 +543,17 @@ export function AdminStudentProfile({
 
         {/* Edit form */}
         {!editingInfo ? (
-          <button onClick={() => { setInfoForm({ first_name: student.first_name, last_name: student.last_name, preferred_name: student.preferred_name ?? "", date_of_birth: student.date_of_birth ?? "", medical_notes: student.medical_notes ?? "", allergy_notes: student.allergy_notes ?? "" }); setEditingInfo(true); }} className="text-xs text-lavender hover:text-lavender-dark">
-            Edit Info
-          </button>
+          <div className="flex items-center gap-3 pt-2">
+            <button onClick={() => { setInfoForm({ first_name: student.first_name, last_name: student.last_name, preferred_name: student.preferred_name ?? "", date_of_birth: student.date_of_birth ?? "", medical_notes: student.medical_notes ?? "", allergy_notes: student.allergy_notes ?? "" }); setEditingInfo(true); }} className="text-xs text-lavender hover:text-lavender-dark">
+              Edit Info
+            </button>
+            <button
+              onClick={() => setAddToClassOpen(true)}
+              className="h-8 rounded-lg bg-lavender hover:bg-lavender-dark text-white font-semibold text-xs px-4 transition-colors"
+            >
+              + Add to Class
+            </button>
+          </div>
         ) : (
           <div className="grid grid-cols-2 gap-3 pt-2 border-t border-silver">
             <input className={inputCls} placeholder="First name" value={infoForm.first_name} onChange={(e) => setInfoForm((f) => ({ ...f, first_name: e.target.value }))} />
@@ -810,6 +820,19 @@ export function AdminStudentProfile({
           </div>
         )}
       </div>
+
+      {/* Add to Class Modal */}
+      {addToClassOpen && (
+        <AddToClassModal
+          student={student}
+          tenantId={tenantId}
+          onClose={() => setAddToClassOpen(false)}
+          onEnrolled={() => {
+            flash("Enrolled in class");
+            setAddToClassOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 }

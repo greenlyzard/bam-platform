@@ -349,3 +349,151 @@ export async function updateSharePermission(formData: FormData) {
   revalidatePath("/admin/students");
   return {};
 }
+
+// ---------------------------------------------------------------------------
+// 14. Enroll student in class
+// ---------------------------------------------------------------------------
+export async function enrollStudentInClass(formData: FormData) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const tenantId = formData.get("tenantId") as string;
+  const studentId = formData.get("studentId") as string;
+  const classId = formData.get("classId") as string;
+  const familyId = (formData.get("familyId") as string) || null;
+  const enrollmentType = (formData.get("enrollmentType") as string) || "full";
+  const billingPlanType = (formData.get("billingPlanType") as string) || null;
+  const suppressOnboarding = formData.get("suppressOnboarding") === "true";
+  const pointCost = parseInt(formData.get("pointCost") as string) || 1;
+
+  if (!tenantId || !studentId || !classId) {
+    return { error: "Missing required fields" };
+  }
+
+  const { data: enrollment, error: enrollErr } = await supabase
+    .from("enrollments")
+    .insert({
+      tenant_id: tenantId,
+      student_id: studentId,
+      class_id: classId,
+      family_id: familyId,
+      status: "active",
+      enrollment_type: enrollmentType,
+      enrolled_by: user.id,
+      billing_plan_type: billingPlanType,
+      suppress_onboarding: suppressOnboarding,
+      enrolled_at: new Date().toISOString(),
+    })
+    .select("id")
+    .single();
+
+  if (enrollErr) {
+    console.error("[enroll:insert]", enrollErr);
+    return { error: enrollErr.message };
+  }
+
+  // If bundle: deduct credits
+  if (billingPlanType === "bundle" && pointCost > 0) {
+    try {
+      let { data: account } = await supabase
+        .from("credit_accounts")
+        .select("id, balance, lifetime_spent")
+        .eq("tenant_id", tenantId)
+        .eq("student_id", studentId)
+        .single();
+
+      if (!account) {
+        const { data: newAcct } = await supabase
+          .from("credit_accounts")
+          .insert({ tenant_id: tenantId, student_id: studentId, family_id: familyId, balance: 0 })
+          .select("id, balance, lifetime_spent")
+          .single();
+        account = newAcct;
+      }
+
+      if (account) {
+        const newBalance = account.balance - pointCost;
+        await supabase
+          .from("credit_accounts")
+          .update({ balance: newBalance, lifetime_spent: (account.lifetime_spent ?? 0) + pointCost, updated_at: new Date().toISOString() })
+          .eq("id", account.id);
+
+        const { data: cls } = await supabase.from("classes").select("name").eq("id", classId).single();
+
+        await supabase.from("credit_transactions").insert({
+          tenant_id: tenantId, account_id: account.id, type: "charge",
+          amount: -pointCost, balance_after: newBalance,
+          description: `Class enrollment: ${cls?.name ?? classId}`,
+          reference_id: enrollment.id, created_by: user.id,
+        });
+      }
+    } catch (e) {
+      console.warn("[enroll:credits] Credit deduction failed", e);
+    }
+  }
+
+  // If trial: insert trial_history
+  if (enrollmentType === "trial") {
+    try {
+      await supabase.from("trial_history").insert({
+        tenant_id: tenantId, student_id: studentId, class_id: classId,
+        enrollment_id: enrollment.id,
+        trial_date: new Date().toISOString().split("T")[0],
+        outcome: "pending_conversion",
+      });
+    } catch (e) {
+      console.warn("[enroll:trial] trial_history insert failed", e);
+    }
+  }
+
+  revalidatePath("/admin/students");
+  return { id: enrollment.id };
+}
+
+// ---------------------------------------------------------------------------
+// 15. Check billing plan for enrollment
+// ---------------------------------------------------------------------------
+export async function checkBillingPlan(formData: FormData) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const tenantId = formData.get("tenantId") as string;
+  const studentId = formData.get("studentId") as string;
+  const pointCost = parseInt(formData.get("pointCost") as string) || 1;
+
+  // 1. Check unlimited plans
+  try {
+    const { data: plans } = await supabase
+      .from("unlimited_plans")
+      .select("id, plan_name")
+      .eq("tenant_id", tenantId)
+      .eq("student_id", studentId)
+      .eq("is_active", true)
+      .limit(1);
+    if (plans && plans.length > 0) {
+      return { planType: "unlimited" as const, message: "Covered by unlimited plan — no charge" };
+    }
+  } catch { /* table may not exist */ }
+
+  // 2. Check credit balance
+  try {
+    const { data: account } = await supabase
+      .from("credit_accounts")
+      .select("id, balance")
+      .eq("tenant_id", tenantId)
+      .eq("student_id", studentId)
+      .single();
+    if (account && account.balance >= pointCost) {
+      return {
+        planType: "bundle" as const,
+        message: `${account.balance} credits available — this class costs ${pointCost} point${pointCost !== 1 ? "s" : ""}. ${account.balance - pointCost} remaining after enrollment.`,
+        balance: account.balance,
+      };
+    }
+  } catch { /* table may not exist or no row */ }
+
+  // 3. Fallback
+  return { planType: "per_class" as const, message: "No plan or credits. Standard rate applies." };
+}
