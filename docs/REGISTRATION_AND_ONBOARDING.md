@@ -1,7 +1,8 @@
 # REGISTRATION_AND_ONBOARDING.md
 # Ballet Academy and Movement — Registration & Onboarding Spec
-# Version: 2.0 | Status: Authoritative | Owner: Derek Shaw (Green Lyzard)
-# Updated: March 2026
+# Version: 3.0 | Status: Authoritative | Owner: Derek Shaw (Green Lyzard)
+# Updated: March 2026 — added trial abuse detection, front-desk suppression,
+# Angelina-personalized onboarding, and cross-references to BILLING_AND_CREDITS.md
 
 ---
 
@@ -14,11 +15,11 @@ while preserving Amanda's ability to control placement, quality, and
 culture.
 
 Cross-references:
-- BILLING.md — fees, tuition, proration, payment processing
-- SCHEDULING_AND_LMS.md — class records, enrollment counts, trial eligibility
+- BILLING_AND_CREDITS.md — fees, tuition, credit/bundle system, proration
+- SCHEDULING_AND_LMS.md — class records, point_cost, trial eligibility
 - COMMUNICATIONS.md — welcome sequences, Angelina follow-up
 - CHATBOT_AND_LEAD_CAPTURE.md — Angelina conversation flows
-- MARKETING_INTEGRATIONS.md — audience sync on registration events
+- STUDENT_EVALUATIONS.md — annual evaluation driving re-enrollment placement
 
 ---
 
@@ -31,438 +32,538 @@ Cross-references:
 | Existing family re-enrolling | Portal → Review placement → Confirm → Pay | Previous level + annual eval drives placement |
 | Admin enrolling a student | Admin → Select student → Select class → Enroll | Direct enrollment, no wizard |
 | Walk-in / phone inquiry | Angelina or Admin creates lead record | Captured, nurtured into registration |
+| Advanced dancer / transfer | Assessment flow → Amanda approval | Level placement requires Amanda review |
 
 ---
 
 ## 3. New Family — Primary Flow
 
 ### 3.1 Entry Points
-New families can enter registration from multiple places:
 - Website chatbot (Angelina)
 - Website "Enroll Now" button
 - Direct URL from ad campaign
 - QR code from in-studio or printed marketing
 
 ### 3.2 Path A — Angelina Chat-Guided (default for website visitors)
-1. Angelina greets visitor, asks about their child (age, experience,
-   goals, schedule)
+1. Angelina greets visitor, asks about their child (age, experience, goals, schedule)
 2. Based on responses, Angelina recommends 1–3 classes
 3. For trial-eligible classes: "Would you like to book a free trial?"
-4. For non-level or beginner classes: "Ready to register now?" —
-   can bypass trial entirely
-5. Parent enters contact info → lead record created in CRM
+4. For non-level or beginner classes: "Ready to register now?" — can bypass trial
+5. Parent enters contact info → lead record created
 6. If trial: trial session booked, confirmation sent
 7. If direct registration: flows into enrollment wizard (Section 3.4)
 
 ### 3.3 Path B — Intake Survey → AI Recommendation → Trial/Register
-For parents who prefer self-service over chat:
-1. Parent fills out intake survey:
-   - Child's name and date of birth
-   - Prior dance experience (none / some / trained)
-   - Goals (fun & confidence / serious training / both)
-   - Schedule availability (days/times)
-   - How they heard about BAM
-2. AI (Angelina API) processes survey + compares to available classes
-3. AI returns 1–3 recommended classes with reasoning
-   ("Based on Maya's age and no prior experience, we recommend...")
-4. Parent sees recommendation card per class:
-   - Simple name, days/times, teacher, room
-   - Trial available badge (if eligible)
-   - "Book Trial" or "Register Now" CTA
-5. Parent selects their path
+1. Parent fills intake survey: child name/DOB, prior dance experience, goals, schedule availability, referral source
+2. Angelina processes survey → recommends 1–3 classes with reasoning
+3. Parent sees recommendation card per class: name, days/times, teacher, trial badge if eligible
+4. Parent selects their path (trial or register now)
 
-### 3.4 Path C — Straight Registration (beginner / non-level classes)
-For classes where trial is not required or where parent already knows
-what they want:
-1. Parent browses available classes filtered by:
-   - Age of child
-   - Day/time preference
-   - Class type
+### 3.4 Path C — Straight Registration
+1. Parent browses classes filtered by age / day / type
 2. Selects class → enrollment wizard:
-   - Step 1: Student info (name, DOB, any health/allergy notes)
+   - Step 1: Student info (name, DOB, health/allergy notes)
    - Step 2: Parent/guardian info
-   - Step 3: Emergency contacts + approved stream contacts
+   - Step 3: Emergency contacts + stream contacts
    - Step 4: Registration fee payment (unless waived)
    - Step 5: Confirm enrollment
-3. Confirmation email + welcome sequence triggers in Klaviyo
+3. Confirmation email + onboarding sequence triggers
 
-### 3.5 Trial Class Rules
-- One free trial per student — enforced by system (checks student email/DOB)
-- Second trial requires Super Admin approval (Amanda)
-- Trial student appears on session roster tagged [TRIAL]
-- Trial session is not charged
-- Trial does NOT require registration fee — fee is due only on full enrollment
-- After trial: Angelina sends follow-up sequence (see Section 3.6)
-- If `trial_requires_approval = true` on the class: Admin reviews and
-  confirms the trial booking before parent receives confirmation
+### 3.5 Advanced Dancer / Transfer Student Path
+Students arriving with prior training at another studio may not fit the
+standard beginner flow. The system must accommodate this:
 
-### 3.6 Post-Trial Follow-Up (Angelina Sequence)
-Triggered automatically after trial session attendance is confirmed:
+1. During intake survey or Angelina chat, if experience = "trained at another studio"
+   or "serious training background":
+   - System flags as `placement_review_required = true`
+   - Angelina: "Because of your prior training, we'd like Amanda to personally
+     review your placement. Would you like to schedule a brief assessment class?"
+2. Admin task created: "Advanced dancer inquiry — [student name], age [X],
+   prior experience: [description]. Review and recommend class."
+3. Amanda (or designated teacher) reviews and sets recommended class
+4. Parent notified via portal + email: "We've reviewed [student]'s background
+   and recommend [class name]. Here's how to register."
+5. System bypasses standard age-gating for this student; placement overrides
+   the default recommendation
 
-| Timing | Action |
-|---|---|
-| Same day (after class) | Angelina sends warm follow-up: "How did Maya enjoy her class today?" |
-| Day 2 | Email: what to expect in the full program, Amanda's philosophy |
-| Day 4 | SMS or in-app: "Ready to save Maya's spot? Registration is open." |
-| Day 7 | Final follow-up: limited spots note if class is near capacity |
-| Day 14 | Admin task created: "Trial student [name] has not registered — follow up" |
+```sql
+-- Additional fields on students table:
+placement_review_required   BOOLEAN DEFAULT false,
+placement_reviewed_by       UUID REFERENCES profiles(id),
+placement_reviewed_at       TIMESTAMPTZ,
+placement_review_notes      TEXT,
+prior_studio                TEXT,
+prior_training_years        INTEGER,
+```
 
 ---
 
-## 4. Existing Student Re-Enrollment
+## 4. Trial Class System
 
-### 4.1 Placement Logic
-Existing students are NOT placed manually by Amanda for every student
-every year. The system uses a structured progression:
-
-1. **Previous level** is the baseline — a student in Ballet II is
-   assumed to continue in Ballet II unless changed
-2. **Annual evaluation** (conducted by teacher near year end) can
-   recommend advancement, hold, or level change
-3. **AI recommendation** — Amanda can prompt Angelina in bulk:
-   "Based on this year's evaluations and attendance, recommend
-   class placements for all returning students for Fall 2026"
-4. Angelina outputs a draft placement list showing:
-   - Student name
-   - Current class / level
-   - Recommended class / level for next year
-   - Reasoning (evaluation score, attendance rate, teacher note)
-   - Confidence level (high / medium / needs review)
-5. Amanda reviews the draft list, adjusts individual placements,
-   and approves in bulk or one by one
-6. Once Amanda approves: parent receives placement notification
-   in portal and via email
-7. Parent confirms enrollment and pays registration fee
-
-### 4.2 Annual Evaluation
-Teachers complete evaluations per student near year end:
+### 4.1 Trial Eligibility (Per Class)
+Trial class eligibility is explicitly configured per class by Admin.
+No class is trial-eligible by default.
 
 ```sql
-student_evaluations (
-  id                uuid PK,
-  tenant_id         uuid FK tenants,
-  student_id        uuid FK users,
-  class_id          uuid FK classes,
-  evaluator_id      uuid FK users,        -- teacher
-  school_year       text,                 -- "2025-2026"
-  technical_score   integer,              -- 1-5
-  musicality_score  integer,
-  performance_score integer,
-  attendance_rate   numeric,              -- computed from session_attendance
-  teacher_notes     text,
-  recommended_level text,                 -- from BALLET_DOMAIN.md taxonomy
-  recommended_class_ids uuid[],          -- specific classes for next year
-  approved_by       uuid FK users,        -- Amanda
-  approved_at       timestamptz,
-  created_at        timestamptz default now()
-)
+-- On the classes table:
+trial_eligible          BOOLEAN DEFAULT false,
+trial_requires_approval BOOLEAN DEFAULT false,
+trial_max_per_session   INTEGER DEFAULT 2,
+trial_notes             TEXT,
 ```
 
-### 4.3 Angelina Bulk Placement
+### 4.2 Trial Rules
+- **One free trial per student per class** — enforced system-wide
+- System checks `trial_history` table across all seasons, not just current
+- A second trial for the same class requires Super Admin (Amanda) approval
+- Trial does NOT require registration fee — fee due only on full enrollment
+- Trial student appears on session roster tagged as [TRIAL]
+- Trial `point_cost` = 0 (free, does not deduct credits)
+
+### 4.3 Trial Abuse Detection
+
+**What counts as abuse:**
+- Same student attempting to trial the same class a second time (any season)
+- Same family attempting to trial the same class for multiple children
+  sequentially without enrolling any of them
+- Email/phone/DOB pattern matching across multiple "new" accounts
+
+**Detection logic:**
+```sql
+CREATE TABLE trial_history (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id       UUID NOT NULL REFERENCES tenants(id),
+  student_id      UUID NOT NULL REFERENCES students(id),
+  class_id        UUID NOT NULL REFERENCES classes(id),
+  session_id      UUID REFERENCES class_sessions(id),
+  trial_date      DATE NOT NULL,
+  outcome         TEXT NOT NULL CHECK (outcome IN (
+                    'pending_conversion', -- trial attended, no action yet
+                    'converted',          -- enrolled after trial
+                    'declined',           -- parent declined to enroll
+                    'no_show',            -- booked but did not attend
+                    'enrolled_front_desk' -- enrolled in person; suppress emails
+                  )),
+  outcome_set_by  UUID REFERENCES profiles(id),
+  outcome_set_at  TIMESTAMPTZ,
+  abuse_flag      BOOLEAN DEFAULT false,
+  abuse_reason    TEXT,
+  override_approved_by UUID REFERENCES profiles(id), -- Super Admin override
+  override_reason TEXT,
+  notes           TEXT,
+  created_at      TIMESTAMPTZ DEFAULT now()
+);
+```
+
+**At trial booking:**
+1. System checks `trial_history` for `student_id + class_id` regardless of season
+2. If prior trial exists and outcome ≠ `converted`:
+   - If `outcome = 'enrolled_front_desk'`: allow, no flag (they did enroll)
+   - Otherwise: block with message to admin: "This student has already trialed
+     this class on [date]. A second trial requires Amanda's approval."
+3. Admin can submit Super Admin approval request with reason
+4. Super Admin (Amanda) approves or denies from Admin → Trials → Pending Approvals
+5. If approved: `override_approved_by` set, trial booked, abuse_flag = true logged
+
+**Family pattern detection:**
+If 3+ students from the same family_id have trialed the same class without
+any converting to enrolled, system creates an Admin task:
+"⚠️ Multiple trial attempts from [Family Name] without enrollment.
+Review before approving additional trials."
+
+### 4.4 Front-Desk Enrollment Suppression
+When a student enrolls at the front desk after a trial (in person or
+by phone), the admin or front desk must mark the trial outcome to prevent
+duplicate follow-up emails.
+
+**How to mark:**
+- Admin opens Admin → Trials → [Student Name]
+- Sets `outcome = 'enrolled_front_desk'`
+- Optionally notes which class they enrolled in
+
+**Effect:**
+- All pending trial follow-up emails and Klaviyo sequences are suppressed
+- Angelina follow-up sequence is cancelled
+- No "Ready to save your spot?" SMS sent
+- Admin task for unconverted trial is closed automatically
+
+**Angelina also checks before sending:**
+Before each step in the trial follow-up sequence, Angelina checks
+`trial_history.outcome` for that student:
+- If `outcome = 'enrolled_front_desk'` or `'converted'`: skip/cancel remaining sequence
+- If `outcome = 'no_show'`: send modified message acknowledging they missed the trial
+
+### 4.5 Post-Trial Follow-Up Sequence (Angelina)
+
+Triggered after trial session attendance is confirmed as `present`:
+
+| Timing | Action | Suppressed if |
+|---|---|---|
+| Same day (after class) | Angelina sends warm follow-up in chat | outcome = enrolled_front_desk or converted |
+| Day 2 | Email: what to expect in full program, Amanda's philosophy | Same |
+| Day 4 | SMS or in-app: "Ready to save [name]'s spot?" | Same |
+| Day 7 | Final follow-up: limited spots note if class near capacity | Same |
+| Day 14 | Admin task: "Trial student [name] unconverted — follow up" | Outcome set to any |
+
+If trial was `no_show`:
+- Day 1: Email: "We missed you! Would you like to reschedule your trial?"
+- Day 5: Final reschedule offer
+- Day 10: Admin task: "Trial no-show [name] — follow up or close"
+
+---
+
+## 5. Angelina-Personalized Onboarding
+
+### 5.1 Overview
+When a student enrolls for the first time (not trial), Angelina generates
+a personalized onboarding email sequence based on the student's profile.
+This replaces generic template emails.
+
+### 5.2 Personalization Inputs
+
+| Input | Source | Example Use |
+|---|---|---|
+| Student first name | students.first_name | "Welcome, Lily!" |
+| Student age | students.date_of_birth | "Ages 6–8 in Level 1..." |
+| Dance level / program | enrollments → classes.levels | "Your first class is Level 1 Ballet..." |
+| Class name | classes.simple_name | "Ballet for Ages 6–9" |
+| Teacher name | class_teachers → profiles | "Your teacher is Miss Amanda" |
+| Season name | seasons.name | "Spring 2026 season" |
+| Key season dates | seasons.start_date, end_date, performance_dates | "The spring recital is June 14" |
+| Disciplines enrolled | classes.discipline_tag | Ballet-specific vs jazz-specific content |
+| Is new student | trial_history.outcome OR first_enrollment | Welcome vs returning language |
+| Prior studio | students.prior_studio | "Transferring from another studio?" section |
+
+### 5.3 Email Sequence
+
+All emails are Angelina-generated and reviewed by admin before send.
+Admin can edit any generated email before approving or can approve as-is.
+
+**Email 1 — Welcome (Day 0, sent at enrollment confirmation)**
+
+Subject: "Welcome to Ballet Academy and Movement, [first name]!"
+
+Content generated by Angelina includes:
+- Personalized welcome referencing class name and teacher
+- "What to expect at your first class" — age-appropriate language
+  - Ages 3–5: playful, reassuring ("You'll dance, sing, and make new friends!")
+  - Ages 6–10: encouraging ("Here's what your Level 1 class looks like...")
+  - Ages 11+: informative, slightly more technical ("Level 3B focuses on...")
+  - Adults: professional, peer tone
+- Studio address and parking
+- What to wear (dress code specific to class type)
+- What to bring
+
+**Email 2 — Studio Policies (Day 1)**
+
+Subject: "Everything you need to know before your first class"
+
+Content:
+- Tardiness and absence policy
+- Dress code with links to approved vendors
+- Photo/video policy
+- Studio entry procedures
+- Contact info for questions
+
+**Email 3 — Season Overview (Day 3)**
+
+Subject: "What's coming up this season at the studio"
+
+Content (Angelina pulls from current season record):
+- Season dates (start, end)
+- Performance dates (Nutcracker dates, spring recital, etc.)
+- Any upcoming events relevant to this student's program
+- Link to parent portal to view full schedule
+
+**Email 4 — Parent Portal Walkthrough (Day 5)**
+
+Subject: "Your parent portal is ready — here's how to use it"
+
+Content:
+- Link to portal
+- Key features: schedule, attendance, communications, billing
+- How to contact teacher via the portal
+
+**Email 5 — 30-Day Check-In (Day 30)**
+
+Subject: "How are things going for [student name]?"
+
+Content generated by Angelina:
+- Check-in on how the first month went
+- Any evaluations or notes available (if teacher has added any)
+- Upsell: relevant additional classes if student is enrolled in only one
+  (e.g., if enrolled in ballet only, suggest jazz or conditioning)
+- Link to book a private lesson if interested
+
+### 5.4 Suppression Rules
+
+| Condition | Action |
+|---|---|
+| Student already received onboarding this season | Skip all emails |
+| Trial outcome = `enrolled_front_desk` | Skip emails 1–2; send email 3+ with modified tone |
+| Re-enrolling returning student (was enrolled prior season) | Skip emails 1–2; send email 3 (season overview) only |
+| Student unenrolls within 3 days of enrollment | Cancel remaining sequence |
+| Admin marks `suppress_onboarding = true` on enrollment | Cancel all emails |
+
+```sql
+-- Additional field on enrollments table:
+suppress_onboarding     BOOLEAN DEFAULT false,
+onboarding_sequence_id  TEXT,    -- Klaviyo sequence ID for cancellation
+onboarding_sent_at      TIMESTAMPTZ,
+```
+
+### 5.5 Admin Review Interface
+Before any Angelina-generated onboarding email sends:
+- Admin sees a preview in Admin → Enrollment → Onboarding Queue
+- Each pending email shows: student name, email number, generated content, send time
+- Admin can: Approve as-is | Edit and approve | Skip this email | Cancel all
+- If not reviewed within 2 hours: email sends automatically (configurable)
+- Amanda can configure auto-approve = true per email number in settings
+
+---
+
+## 6. Existing Student Re-Enrollment
+
+### 6.1 Placement Logic
+1. Previous level is the baseline
+2. Annual evaluation (teacher-completed near year end) recommends next level
+3. AI bulk placement: Amanda prompts Angelina to draft placements for all returning students
+4. Amanda reviews draft list, adjusts, approves
+5. Parent receives placement notification; confirms and pays registration fee
+
+### 6.2 Annual Evaluation
+See `docs/STUDENT_EVALUATIONS.md` for the full evaluation system spec.
+The evaluation produces a `placement_next_season` recommendation used here.
+
+### 6.3 Angelina Bulk Placement Prompt
 Amanda opens Admin → Enrollment → Class Placement and types:
-"Place all returning students for Fall 2026 based on this year's
-evaluations. Prioritize retention. Flag anyone who needs a level
-change discussion."
+"Place all returning students for Fall 2026 based on this year's evaluations.
+Prioritize retention. Flag anyone who needs a level change discussion."
 
-Angelina:
-- Reads all evaluations for the current school year
-- Reads each student's attendance record
-- Reads current class schedules for next year
-- Outputs a draft placement table (list + calendar view)
-- Flags students needing discussion with reason
-- Outputs room utilization model (is Studio A overbooked on Mondays?)
+Angelina reads evaluations, attendance records, and class schedules,
+then outputs a draft placement table with confidence levels and flags.
 
-Amanda reviews, adjusts, approves. System sends notifications.
-
-### 4.4 Early Access Window
-Returning families get a registration window before the public:
-- Admin sets: early access open date, early access close date,
-  public open date
-- Early access families may also receive earlybird pricing
-  (discounted registration fee or tuition — Admin configures)
-- System enforces: returning families can only enroll during their
-  window; new families cannot register until public open date
+### 6.4 Early Access Window
 
 ```sql
-enrollment_windows (
-  id                    uuid PK,
-  tenant_id             uuid FK tenants,
-  school_year           text,
-  returning_open_at     timestamptz,
-  returning_close_at    timestamptz,
-  public_open_at        timestamptz,
-  public_close_at       timestamptz nullable,
-  earlybird_discount_type text,           -- 'percent' or 'amount'
-  earlybird_discount_value numeric(10,2),
-  earlybird_applies_to  text,             -- 'registration_fee' or 'first_month'
-  created_by            uuid FK users,
-  created_at            timestamptz default now()
-)
+CREATE TABLE enrollment_windows (
+  id                        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id                 UUID NOT NULL REFERENCES tenants(id),
+  school_year               TEXT NOT NULL,
+  returning_open_at         TIMESTAMPTZ NOT NULL,
+  returning_close_at        TIMESTAMPTZ NOT NULL,
+  public_open_at            TIMESTAMPTZ NOT NULL,
+  public_close_at           TIMESTAMPTZ,
+  earlybird_discount_type   TEXT CHECK (earlybird_discount_type IN ('percent', 'amount')),
+  earlybird_discount_value  NUMERIC(10,2),
+  earlybird_applies_to      TEXT CHECK (earlybird_applies_to IN (
+                              'registration_fee', 'first_month'
+                            )),
+  created_by                UUID REFERENCES profiles(id),
+  created_at                TIMESTAMPTZ DEFAULT now()
+);
 ```
 
 ---
 
-## 5. Adult Student Self-Registration
+## 7. Adult Student Self-Registration
 
-Adult students (18+) enrolling themselves:
-1. Light intake: name, goals, schedule preference, any injuries/limitations
-2. AI recommends classes appropriate for adults
-3. Can go straight to registration — no trial required (but trial available
-   if the class is trial-eligible)
+Adults (18+) enrolling themselves:
+1. Light intake: name, goals, schedule, injuries/limitations
+2. AI recommends adult-appropriate classes
+3. Can go straight to registration — trial available if class is trial-eligible
 4. Billing is under their own account (not a family/parent account)
-5. Same enrollment wizard as Path C (Section 3.4)
+5. Same enrollment wizard as Path C
 
 ---
 
-## 6. Admin Direct Enrollment
+## 8. Admin Direct Enrollment
 
-Admin can enroll any student in any class directly:
-- Admin → Schedule → Classes → [Class] → Enrolled Students → Add Student
-- Search existing students or create new student record
-- Select enrollment type: Full / Trial / Audit (observe only)
-- Set billing override if needed (scholarship, comp, custom rate)
-- Enrollment is immediate — no payment wizard required
-- System still generates billing record; Finance Admin processes payment
+Admin can enroll any student directly from:
+- Admin → Students → [Student] → Profile → Add to Class
+- Admin → Classes → [Class] → Enrolled Students → Add Student
+
+At enrollment, system:
+1. Shows billing plan check (unlimited? credits? per-class?)
+2. Admin selects enrollment_type: paid / trial / comp / staff / bundle
+3. Admin can override billing plan
+4. Enrollment is immediate — payment handled separately
+5. System generates billing record; Finance Admin processes payment
+6. Onboarding sequence can be suppressed via checkbox: "Student already onboarded"
 
 ---
 
-## 7. Family Account Structure
+## 9. "Add to Class" Modal (Admin-Side)
 
-One family account can hold multiple student profiles.
-Billing is consolidated under the family account.
+When admin adds a student to a class from the student profile:
+
+**Step 1 — Class selection:**
+- Search/filter classes
+- Shows: class name, day/time, capacity remaining, trial eligibility
+
+**Step 2 — Billing plan check (automatic):**
+System shows one of:
+- ✅ "Covered by unlimited plan — no charge"
+- 🎟 "Student has [N] credits — this class costs [X] points. [N–X] remaining."
+- 💳 "No plan or credits. Charge: $[X]. Select payment method."
+
+**Step 3 — Enrollment type selection:**
+- Full enrollment
+- Trial (if class is trial-eligible and student has not trialed before)
+- Comp (Finance Admin+ only)
+- Staff (Finance Admin+ only)
+
+**Step 4 — Confirm:**
+- Summary: student name, class, billing impact, type
+- "Suppress onboarding emails" checkbox
+- Confirm button
+
+---
+
+## 10. Family Account Structure
 
 ```sql
-families (
-  id              uuid PK,
-  tenant_id       uuid FK tenants,
-  primary_contact_id uuid FK users,     -- parent/guardian account
-  family_name     text,                 -- "The Johnson Family"
-  billing_email   text,
-  billing_phone   text,
-  stripe_customer_id text,              -- or adapter equivalent
-  account_credit  numeric(10,2) default 0, -- studio credit balance
-  notes           text,                 -- internal Admin notes
-  created_at      timestamptz default now()
-)
+CREATE TABLE families (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id           UUID NOT NULL REFERENCES tenants(id),
+  primary_contact_id  UUID REFERENCES profiles(id),
+  family_name         TEXT,
+  billing_email       TEXT,
+  billing_phone       TEXT,
+  stripe_customer_id  TEXT,
+  account_credit      NUMERIC(10,2) DEFAULT 0,
+  notes               TEXT,
+  created_at          TIMESTAMPTZ DEFAULT now()
+);
 
-students (
-  id              uuid PK,
-  tenant_id       uuid FK tenants,
-  family_id       uuid FK families,
-  user_id         uuid FK users nullable, -- if student has portal login
-  first_name      text NOT NULL,
-  last_name       text NOT NULL,
-  date_of_birth   date NOT NULL,
-  gender          text,
-  medical_notes   text,
-  allergy_notes   text,
-  photo_consent   boolean default false,
-  stream_consent  boolean default false,
-  approved_stream_contacts jsonb,       -- [{name, relationship, phone, email}]
-  current_level   text,                 -- from BALLET_DOMAIN.md taxonomy
-  trial_used      boolean default false,
-  trial_approved_override boolean default false, -- Amanda approved 2nd trial
-  created_at      timestamptz default now(),
-  updated_at      timestamptz default now()
-)
-
-enrollments (
-  id              uuid PK,
-  tenant_id       uuid FK tenants,
-  student_id      uuid FK students,
-  family_id       uuid FK families,
-  class_id        uuid FK classes,
-  enrollment_type text CHECK IN ('full','trial','audit','comp'),
-  status          text CHECK IN ('active','dropped','completed',
-                    'suspended','pending_payment'),
-  enrolled_at     timestamptz,
-  enrolled_by     uuid FK users,
-  drop_date       date nullable,
-  drop_reason     text nullable,
-  drop_approved_by uuid FK users nullable,
-  cancellation_notice_date date nullable, -- 30-day notice start
-  billing_override boolean default false,
-  override_amount numeric(10,2) nullable,
-  override_reason text nullable,
-  override_by     uuid FK users nullable,
-  created_at      timestamptz default now(),
-  updated_at      timestamptz default now()
-)
+CREATE TABLE students (
+  id                            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id                     UUID NOT NULL REFERENCES tenants(id),
+  family_id                     UUID NOT NULL REFERENCES families(id),
+  user_id                       UUID REFERENCES profiles(id),
+  first_name                    TEXT NOT NULL,
+  last_name                     TEXT NOT NULL,
+  date_of_birth                 DATE NOT NULL,
+  gender                        TEXT,
+  medical_notes                 TEXT,
+  allergy_notes                 TEXT,
+  photo_consent                 BOOLEAN DEFAULT false,
+  stream_consent                BOOLEAN DEFAULT false,
+  approved_stream_contacts      JSONB,
+  current_level                 TEXT,
+  prior_studio                  TEXT,
+  prior_training_years          INTEGER,
+  placement_review_required     BOOLEAN DEFAULT false,
+  placement_reviewed_by         UUID REFERENCES profiles(id),
+  placement_reviewed_at         TIMESTAMPTZ,
+  placement_review_notes        TEXT,
+  trial_used                    BOOLEAN DEFAULT false,       -- legacy field, use trial_history
+  trial_approved_override       BOOLEAN DEFAULT false,
+  portal_access_enabled         BOOLEAN DEFAULT false,
+  portal_access_approved_by     UUID REFERENCES profiles(id),
+  portal_access_approved_at     TIMESTAMPTZ,
+  portal_access_level           TEXT DEFAULT 'view_only' CHECK (portal_access_level IN (
+                                  'view_only', 'standard', 'full'
+                                )),
+  created_at                    TIMESTAMPTZ DEFAULT now(),
+  updated_at                    TIMESTAMPTZ DEFAULT now()
+);
 ```
 
 ---
 
-## 8. Cancellation & Drop Policy
+## 11. Cancellation & Drop Policy
 
-- **30-day written notice required** to cancel enrollment
-- No mid-month refund unless overridden by Finance Admin or above
-- Future credit (applied to family account balance) is available
-  at Admin discretion
-- Cancellation notice date is logged; system calculates final billing date
-- Override (waive notice period) requires Finance Admin or above
-- When a student is dropped:
+- **30-day written notice required**
+- No mid-month refund unless overridden by Finance Admin+
+- Future credit (to family account) at Admin discretion
+- When dropped:
   1. `enrollments.status` → 'dropped'
-  2. `enrollments.drop_date` logged
-  3. Future tuition charges cancelled in billing system
-  4. If mid-month: no refund generated unless override applied
-  5. Admin task created: "Student [name] dropped [class] — confirm
-     final billing and any credit to apply"
+  2. Future tuition charges cancelled
+  3. Admin task created: "Student [name] dropped [class] — confirm final billing"
 
 ---
 
-## 9. AI Learning from Enrollment History
+## 12. Enrollments Table (Authoritative Schema)
 
-The system accumulates enrollment, attendance, advancement, and
-retention data year over year. Angelina uses this to:
-
-### 9.1 Placement Intelligence
-- Which students advanced? What were their attendance rates?
-- Which level transitions had the highest retention?
-- Which class combinations correlate with long-term retention?
-
-### 9.2 Schedule Optimization
-When Amanda asks Angelina to model next year's schedule:
-- "Which classes are consistently underenrolled? Should we consolidate?"
-- "Studio A is booked 6 days a week — what can move to Studio B?"
-- "If we add a Wednesday Petites class, how many students might fill it
-  based on inquiry patterns?"
-
-### 9.3 AI Data Inputs for Recommendations
-| Signal | Weight |
-|---|---|
-| Student's current level | High |
-| Annual evaluation scores | High |
-| Attendance rate this year | High |
-| Teacher recommendation | High |
-| Number of years enrolled | Medium |
-| Classes dropped in prior years | Medium |
-| Trial → enrollment conversion pattern | Medium |
-| Parent-stated goals (from intake survey) | Medium |
-
-### 9.4 Output Formats
-Angelina outputs placement and schedule recommendations in:
-- **List view** — table of students, current class, recommended class
-- **Calendar/grid view** — draft schedule by day/time/room
-- **Flagged list** — students needing Admin discussion
-- **Room utilization model** — occupancy % per room per time slot
+```sql
+CREATE TABLE enrollments (
+  id                        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id                 UUID NOT NULL REFERENCES tenants(id),
+  student_id                UUID NOT NULL REFERENCES students(id),
+  family_id                 UUID NOT NULL REFERENCES families(id),
+  class_id                  UUID NOT NULL REFERENCES classes(id),
+  enrollment_type           TEXT NOT NULL DEFAULT 'full' CHECK (enrollment_type IN (
+                              'full', 'trial', 'audit', 'comp', 'staff'
+                            )),
+  status                    TEXT NOT NULL DEFAULT 'active' CHECK (status IN (
+                              'active', 'dropped', 'completed',
+                              'suspended', 'pending_payment', 'waitlisted'
+                            )),
+  billing_plan_type         TEXT CHECK (billing_plan_type IN (
+                              'per_class', 'bundle', 'unlimited', 'comp', 'staff'
+                            )),
+  enrolled_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
+  enrolled_by               UUID REFERENCES profiles(id),
+  drop_date                 DATE,
+  drop_reason               TEXT,
+  drop_approved_by          UUID REFERENCES profiles(id),
+  cancellation_notice_date  DATE,
+  billing_override          BOOLEAN DEFAULT false,
+  override_amount           NUMERIC(10,2),
+  override_reason           TEXT,
+  override_by               UUID REFERENCES profiles(id),
+  suppress_onboarding       BOOLEAN DEFAULT false,
+  onboarding_sequence_id    TEXT,
+  onboarding_sent_at        TIMESTAMPTZ,
+  proration_method          TEXT CHECK (proration_method IN (
+                              'per_class', 'daily', 'split', 'custom', 'none'
+                            )),
+  prorated_amount           NUMERIC(10,2),
+  proration_override        BOOLEAN DEFAULT false,
+  proration_override_by     UUID REFERENCES profiles(id),
+  proration_override_reason TEXT,
+  stripe_payment_intent_id  TEXT,
+  amount_paid_cents         INTEGER,
+  created_at                TIMESTAMPTZ DEFAULT now(),
+  updated_at                TIMESTAMPTZ DEFAULT now()
+);
+```
 
 ---
 
-## 10. Phase Implementation Order
+## 13. Phase Implementation Order
 
 ### Phase 1 — Core Registration
 - [ ] Family + student + enrollment tables
 - [ ] Enrollment wizard (Path C — straight registration)
-- [ ] Admin direct enrollment
-- [ ] Trial class booking with [TRIAL] roster tag
-- [ ] Registration fee payment integration (BILLING.md)
+- [ ] Admin direct enrollment with billing plan check modal
+- [ ] Trial class booking with roster tag + trial_history table
+- [ ] Registration fee payment (BILLING_AND_CREDITS.md Phase 1)
 - [ ] Welcome email trigger on enrollment confirm
 
-### Phase 2 — New Family Flow
-- [ ] Intake survey → AI class recommendation
-- [ ] Angelina post-trial follow-up sequence
-- [ ] Lead record creation for unconverted inquiries
-- [ ] Enrollment windows (early access + earlybird pricing)
+### Phase 2 — Trial System & Abuse Detection
+- [ ] trial_history table
+- [ ] Trial abuse detection logic
+- [ ] Front-desk enrollment suppression (outcome = enrolled_front_desk)
+- [ ] Post-trial follow-up sequence (Angelina) with suppression checks
+- [ ] Super Admin approval for second trials
+- [ ] Family pattern detection (3+ unconverted trials)
 
-### Phase 3 — Re-Enrollment & AI Placement
-- [ ] Annual evaluation form for teachers
+### Phase 3 — Angelina-Personalized Onboarding
+- [ ] Onboarding email generation via Angelina API
+- [ ] Admin review queue for generated emails
+- [ ] Suppression rules engine
+- [ ] Advanced dancer / transfer student path
+- [ ] 30-day check-in + upsell email
+
+### Phase 4 — Re-Enrollment & AI Placement
+- [ ] Annual evaluation → placement pipeline (see STUDENT_EVALUATIONS.md)
 - [ ] Angelina bulk placement prompt + draft output
-- [ ] List view + calendar view for placement draft
 - [ ] Amanda approval flow → parent notification
-- [ ] AI learning model (enrollment history analysis)
+- [ ] Enrollment windows with early access + earlybird pricing
 
-### Phase 4 — Advanced
+### Phase 5 — Advanced
 - [ ] Schedule optimization modeling
-- [ ] Room utilization dashboard
 - [ ] Retention prediction per student
-- [ ] Marketing audience sync on enrollment events (MARKETING_INTEGRATIONS.md)
-
----
-
-## 11. Policy Decisions (Resolved)
-
-### Student Portal Access — Any Age, Admin-Approved
-- Students of any age can have their own portal login
-- Access requires explicit Admin approval (not automatic)
-- A parent submits the request or Admin creates it directly
-- Student portal is a restricted view — content is age/role appropriate:
-  - Young students (e.g., under 10): view their dances, performance
-    videos, badges earned. Read-only. No messaging.
-  - Older students (10–17): schedule view, class videos, badges,
-    limited communications (class channels only, no DMs with teachers)
-  - Adult students (18+): full student portal equivalent to parent view
-    for their own account
-- Parent account retains full visibility into their child's portal
-  activity at all times
-- Admin can revoke student portal access at any time
-- Student login is separate credentials from parent login
-- On a shared family device: student can log into their own account
-  without accessing parent's account or billing information
-
-```sql
--- Additional fields on students table:
-portal_access_enabled     boolean default false,
-portal_access_approved_by uuid FK users nullable,
-portal_access_approved_at timestamptz nullable,
-portal_access_level       text CHECK IN (
-                            'view_only',      -- dances, videos, badges
-                            'standard',       -- + schedule, class channels
-                            'full'            -- adult students
-                          ) default 'view_only',
-```
-
-### Emergency Contacts vs. Approved Stream Contacts
-Both contact lists are tied to the **family record** (not individual
-students). This means one family maintains one set of contacts shared
-across all their enrolled students.
-
-However, **stream contact authorization is scoped per student** —
-Grandma can be approved to receive stream alerts for Maya's Nutcracker
-performance but not for her younger sibling who isn't performing yet.
-
-**Emergency Contacts (family-level)**
-- People to call if a student is injured, ill, or needs to be picked up
-- Not notified about livestreams
-- Visible to teachers and Admin during class sessions
-- Required minimum: 1 emergency contact beyond primary parent
-
-**Approved Stream Contacts (family-level list, student-level authorization)**
-- People authorized to receive livestream alert notifications
-- Separate from emergency contacts entirely
-- Primary parent is included by default (can be removed)
-- Additional contacts added by primary parent or Admin
-- Each contact specifies which students they're authorized for
-- Notification channels per contact: in-app, SMS, email (their preference)
-
-```sql
-family_contacts (
-  id                  uuid PK,
-  tenant_id           uuid FK tenants,
-  family_id           uuid FK families,
-  contact_type        text CHECK IN ('emergency','stream','both'),
-  first_name          text NOT NULL,
-  last_name           text NOT NULL,
-  relationship        text,               -- "Grandmother", "Aunt", etc.
-  phone               text,
-  email               text,
-  has_portal_account  boolean default false,
-  user_id             uuid FK users nullable, -- if they have a portal login
-  notify_via_sms      boolean default true,
-  notify_via_email    boolean default true,
-  notify_via_app      boolean default false,
-  is_primary          boolean default false,
-  -- Stream authorization is per-student (stored as array of student IDs)
-  stream_authorized_student_ids uuid[],   -- which students they get alerts for
-  created_by          uuid FK users,
-  created_at          timestamptz default now(),
-  updated_at          timestamptz default now()
-)
-```
-
-**Rules:**
-- Emergency contacts: visible to teachers during check-in
-- Stream contacts: only used by the livestream alert system
-- Admin can view and edit both lists
-- Primary parent can add/edit stream contacts for their own family
-- Teachers cannot see stream contact lists
-- A contact with `contact_type = 'both'` appears on both lists
+- [ ] Marketing audience sync on enrollment events

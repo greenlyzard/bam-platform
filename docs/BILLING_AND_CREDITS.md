@@ -1,385 +1,584 @@
 # BILLING_AND_CREDITS.md
-# Ballet Academy and Movement — Billing & Credits Spec
-# Status: Ready to build
-# Related: RBAC_AND_PERMISSIONS.md, DATA_MIGRATION.md
+# Ballet Academy and Movement — Billing Engine & Credits Spec
+# Version: 2.0 | Status: Authoritative | Owner: Derek Shaw (Green Lyzard)
+# Updated: March 2026 — merged BILLING.md + BILLING_AND_CREDITS.md
 
 ---
 
 ## 1. Overview
 
-The BAM Platform uses a unified credit-based billing system. Credits are the
-universal currency for all class types — seasonal, ongoing, private, and group.
-The studio sets a base credit rate (default $1 = 1 credit = 1 minute) which can
-be overridden at the session, class, or student level.
+Billing at BAM operates in two complementary layers:
 
-Billing supports four models:
-1. Credit-based (time × rate ÷ students)
-2. Flat fee per student
-3. Flat fee per session
-4. Credit package purchases (prepaid, discountable)
+**Layer 1 — Credit/Point System**
+Handles per-class, drop-in, bundle, private, and Pilates billing. Credits
+are the universal currency. Each class has a configurable point cost.
+Bundles are punch cards denominated in points. Monthly subscriptions
+(unlimited plans) are also tracked here.
+
+**Layer 2 — Billing Charges Master Table**
+Handles tuition (monthly recurring), registration fees, competition
+charges, and costume charges. These are dollar-denominated charges
+that flow through Stripe (or the configured payment adapter).
+
+Both layers coexist. A student can simultaneously have:
+- A bundle credit balance (Layer 1) for Pilates/privates
+- A monthly tuition charge (Layer 2) for a seasonal class
+- A competition charge pending (Layer 2)
+
+All payment processing routes through the pluggable payment adapter
+(`src/lib/payments/adapter.ts`). No direct Stripe calls anywhere.
+
+Cross-references:
+- INTEGRATIONS.md — Stripe/PayPal/Authorize.net adapter
+- REGISTRATION_AND_ONBOARDING.md — registration fee, enrollment events
+- SCHEDULING_AND_LMS.md — class point_cost, trial eligibility, bundles
+- SAAS.md — multi-tenant payment config
 
 ---
 
-## 2. Credit System
+## 2. Layer 1 — Credit / Point System
 
 ### 2.1 Credit Definition
-- 1 credit = 1 minute at the studio's base rate
-- Base rate is studio-configurable (default: $1.00 per credit)
-- Billing minimum: 15-minute increments (15 credits at base rate)
+- 1 credit = 1 point at the studio's base rate (default $1.00 per credit)
+- Base rate is studio-configurable in Admin Settings → Billing
+- Each class has a `point_cost` field (default: 1)
+  - Standard group class: 1 point
+  - Pilates: 2 points (configurable)
+  - Private with standard teacher: 2 points (configurable)
+  - Private with senior/specialist teacher: 3 points (configurable)
+- Billing minimum: 15-minute increments for private/time-based billing
 - Credits are tenant-scoped — credits at one studio cannot be used at another
 
-### 2.2 Credit Accounts
-Every student has a credit account (credit_accounts table):
-- Balance in credits (not dollars)
-- Optional expiry date (null = indefinite)
-- Linked to tenant + student
+### 2.2 Billing Plan Types
 
-### 2.3 Credit Transactions
-Every credit movement is logged:
-- purchase (parent buys credits)
-- charge (session deducted)
-- refund (credits returned)
-- adjustment (admin manual correction)
-- expiry (credits expired)
-- bonus (promotional credits added)
+| Plan Type | Description | Upgrade Path |
+|---|---|---|
+| `per_class` | Drop-in; charged per enrollment at class point_cost | Can upgrade to bundle or unlimited |
+| `bundle` | Pre-purchased point pack (punch card); deducts points per enrollment | Can upgrade to unlimited |
+| `unlimited` | Monthly subscription; covers unlimited classes in scope | — |
+| `comp` | No charge; admin-granted | — |
+| `staff` | No charge; teacher/staff enrollment | — |
 
-### 2.4 Credit Expiry
-- Default: no expiry
-- Studio can set global expiry policy (e.g. credits expire 12 months after purchase)
-- Can be overridden per credit package or per student
-- Expiry runs via nightly cron job
-- Parents notified 30 days before expiry via Klaviyo
+**Upgrade path:** A student can start per_class, purchase a bundle,
+and later upgrade to unlimited — all mid-season. The system tracks
+which plan covers each enrollment. Admin manages upgrades.
 
----
+### 2.3 Unlimited Plan Scope
+The unlimited plan covers classes within a configurable scope:
+- `all` — all classes at the studio
+- `discipline` — e.g., all ballet classes only
+- `level_range` — e.g., Level 2A through Level 4C
 
-## 3. Database Schema
+Scope is set per plan when Admin assigns it to a student.
+A student on unlimited for ballet still pays per_class for Pilates
+unless their plan scope includes Pilates.
 
-### 3.1 credit_accounts
+### 2.4 Credit Accounts
+Every student has a credit account:
+
 ```sql
 CREATE TABLE credit_accounts (
-  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id       uuid NOT NULL REFERENCES tenants(id),
-  student_id      uuid NOT NULL REFERENCES students(id) ON DELETE CASCADE,
-  balance         numeric(10,2) NOT NULL DEFAULT 0,
-  lifetime_earned numeric(10,2) NOT NULL DEFAULT 0,
-  lifetime_spent  numeric(10,2) NOT NULL DEFAULT 0,
-  created_at      timestamptz DEFAULT now(),
-  updated_at      timestamptz DEFAULT now(),
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id       UUID NOT NULL REFERENCES tenants(id),
+  student_id      UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  balance         NUMERIC(10,2) NOT NULL DEFAULT 0,
+  lifetime_earned NUMERIC(10,2) NOT NULL DEFAULT 0,
+  lifetime_spent  NUMERIC(10,2) NOT NULL DEFAULT 0,
+  created_at      TIMESTAMPTZ DEFAULT now(),
+  updated_at      TIMESTAMPTZ DEFAULT now(),
   UNIQUE(tenant_id, student_id)
 );
 ```
 
-### 3.2 credit_transactions
+### 2.5 Credit Transactions
+Every credit movement is logged with full audit trail:
+
 ```sql
 CREATE TABLE credit_transactions (
-  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id       uuid NOT NULL REFERENCES tenants(id),
-  student_id      uuid NOT NULL REFERENCES students(id),
-  type            text NOT NULL CHECK (type IN (
-                    'purchase', 'charge', 'refund', 
-                    'adjustment', 'expiry', 'bonus'
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id       UUID NOT NULL REFERENCES tenants(id),
+  student_id      UUID NOT NULL REFERENCES students(id),
+  type            TEXT NOT NULL CHECK (type IN (
+                    'purchase',     -- parent buys a bundle/pack
+                    'charge',       -- enrollment deducts points
+                    'refund',       -- points returned on drop/cancel
+                    'adjustment',   -- admin manual correction
+                    'expiry',       -- points expired by cron
+                    'bonus'         -- promotional points added
                   )),
-  credits         numeric(10,2) NOT NULL, -- positive = added, negative = deducted
-  balance_after   numeric(10,2) NOT NULL,
-  description     text,
-  session_id      uuid REFERENCES sessions(id),
-  package_id      uuid REFERENCES credit_packages(id),
-  invoice_id      uuid REFERENCES invoices(id),
-  expires_at      timestamptz,
-  created_by      uuid REFERENCES profiles(id),
-  created_at      timestamptz DEFAULT now()
+  credits         NUMERIC(10,2) NOT NULL, -- positive = added, negative = deducted
+  balance_after   NUMERIC(10,2) NOT NULL,
+  description     TEXT,
+  enrollment_id   UUID REFERENCES enrollments(id),
+  package_id      UUID REFERENCES credit_packages(id),
+  invoice_id      UUID REFERENCES invoices(id),
+  expires_at      TIMESTAMPTZ,
+  created_by      UUID REFERENCES profiles(id),
+  created_at      TIMESTAMPTZ DEFAULT now()
 );
 ```
 
-### 3.3 credit_packages
+### 2.6 Credit Packages (Bundles / Punch Cards)
+Admin creates packages with a point balance and a price:
+
 ```sql
 CREATE TABLE credit_packages (
-  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id       uuid NOT NULL REFERENCES tenants(id),
-  name            text NOT NULL,           -- e.g. "10-Hour Bundle"
-  credits         numeric(10,2) NOT NULL,  -- credits included
-  price           numeric(10,2) NOT NULL,  -- dollars charged
-  discount_pct    numeric(5,2),            -- e.g. 10.00 = 10% off
-  is_active       boolean DEFAULT true,
-  is_promotion    boolean DEFAULT false,
-  promotion_start timestamptz,
-  promotion_end   timestamptz,
-  expires_after_days integer,              -- null = no expiry
-  max_purchases   integer,                 -- null = unlimited
-  created_at      timestamptz DEFAULT now()
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id           UUID NOT NULL REFERENCES tenants(id),
+  name                TEXT NOT NULL,           -- e.g. "10-Class Pilates Pack"
+  credits             NUMERIC(10,2) NOT NULL,  -- points included
+  price               NUMERIC(10,2) NOT NULL,  -- dollars charged
+  discount_pct        NUMERIC(5,2),            -- e.g. 10.00 = 10% off
+  applicable_to       TEXT DEFAULT 'all' CHECK (applicable_to IN (
+                        'all', 'pilates', 'privates', 'specific_classes'
+                      )),
+  applicable_class_ids UUID[],                 -- if applicable_to = specific_classes
+  is_active           BOOLEAN DEFAULT true,
+  is_promotion        BOOLEAN DEFAULT false,
+  promotion_start     TIMESTAMPTZ,
+  promotion_end       TIMESTAMPTZ,
+  expires_after_days  INTEGER,                 -- null = no expiry
+  max_purchases       INTEGER,                 -- null = unlimited
+  created_at          TIMESTAMPTZ DEFAULT now()
 );
 ```
 
-### 3.4 sessions
-Sessions are the billable unit — one session = one class occurrence or private booking.
+**Example packages:**
+| Name | Points | Price | Point Cost Per Use |
+|---|---|---|---|
+| Pilates 5-Pack | 10 | $95 | 2 pts per Pilates session |
+| Pilates 10-Pack | 20 | $180 | 2 pts per Pilates session |
+| Private 5-Pack | 10 | $250 | 2 pts standard / 3 pts senior |
+| Sampler Bundle | 6 | $60 | 1 pt per class |
+
+### 2.7 Unlimited Plans (Subscription)
 
 ```sql
-CREATE TABLE sessions (
-  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id       uuid NOT NULL REFERENCES tenants(id),
-  class_id        uuid REFERENCES classes(id),
-  session_date    date NOT NULL,
-  start_time      time NOT NULL,
-  end_time        time NOT NULL,
-  duration_minutes integer GENERATED ALWAYS AS (
-                    EXTRACT(EPOCH FROM (end_time - start_time)) / 60
-                  ) STORED,
-  location        text,
-  billing_model   text NOT NULL CHECK (billing_model IN (
-                    'credit', 'flat_per_student', 'flat_per_session', 'free'
+CREATE TABLE unlimited_plans (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id       UUID NOT NULL REFERENCES tenants(id),
+  student_id      UUID NOT NULL REFERENCES students(id),
+  plan_name       TEXT NOT NULL,               -- "Unlimited Ballet Monthly"
+  scope           TEXT NOT NULL DEFAULT 'all' CHECK (scope IN (
+                    'all', 'discipline', 'level_range'
                   )),
-  -- Credit billing fields
-  hourly_rate     numeric(10,2),           -- studio rate for this session
-  credit_rate     numeric(10,2),           -- override credit value (null = use tenant default)
-  -- Flat fee fields
-  flat_fee        numeric(10,2),           -- used when billing_model = flat_per_student/session
-  -- Calculated fields
-  num_students    integer,                 -- populated after attendance
-  cost_per_student numeric(10,2),          -- calculated
-  credits_per_student numeric(10,2),       -- calculated
-  notes           text,
-  status          text DEFAULT 'scheduled' CHECK (status IN (
-                    'scheduled', 'in_progress', 'completed', 'cancelled'
+  scope_discipline TEXT,                        -- if scope = discipline
+  scope_level_min  TEXT,                        -- if scope = level_range
+  scope_level_max  TEXT,                        -- if scope = level_range
+  monthly_price   NUMERIC(10,2) NOT NULL,
+  billing_day     INTEGER DEFAULT 15,           -- day of month to charge
+  status          TEXT NOT NULL DEFAULT 'active' CHECK (status IN (
+                    'active', 'paused', 'cancelled'
                   )),
-  created_at      timestamptz DEFAULT now(),
-  updated_at      timestamptz DEFAULT now()
+  started_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  cancelled_at    TIMESTAMPTZ,
+  cancel_reason   TEXT,
+  created_by      UUID REFERENCES profiles(id),
+  created_at      TIMESTAMPTZ DEFAULT now()
 );
 ```
 
-### 3.5 session_teachers
-Links teachers (including 1099s) to sessions with their rate.
+### 2.8 Billing Plan Check (Enrollment Flow)
+When enrolling a student (admin or parent portal), the system checks in order:
+
+1. Does student have an active `unlimited_plan` that covers this class? → Enroll, no charge
+2. Does student have a `credit_account` balance ≥ class `point_cost`? → Deduct credits, enroll
+3. Otherwise → require payment (Stripe checkout or admin override)
+
+### 2.9 Insufficient Credits Flow
+1. Student has 1 credit, class costs 2 credits
+2. System shows: "Insufficient credits. Purchase a pack or pay per class."
+3. Options shown: buy a bundle pack | pay per-class rate | admin override (admin only)
+4. If admin overrides: enrollment created, invoice generated for difference
+5. Parent notified via email + Angelina
+
+### 2.10 Credit Expiry
+- Default: no expiry
+- Studio can set global expiry policy (e.g. expire 12 months after purchase)
+- Override per package or per student
+- Expiry runs via nightly cron
+- Parents notified 30 days before expiry via Klaviyo
+
+---
+
+## 3. Layer 2 — Billing Charges Master Table
+
+All dollar-denominated charges (tuition, registration, competition, costume)
+flow into a single master charges table for consolidated family account views
+and Finance reporting.
+
+### 3.1 Charge Types
+
+| Charge Type | Trigger | Who Approves | Timing |
+|---|---|---|---|
+| Registration fee | Enrollment confirmation | Auto (or waived by Admin+) | At enrollment |
+| Monthly tuition | Active enrollment | Auto | 15th of each month |
+| Prorated tuition | Mid-month enrollment | Auto (method configurable) | At enrollment |
+| Unlimited plan | Active subscription | Auto | 15th of each month |
+| Competition fee | Amanda confirms student | Finance Admin queues | On Finance Admin trigger |
+| Costume charge | Admin creates charge | Finance Admin queues | On Finance Admin trigger |
+| Private lesson (flat) | Teacher confirms session | Finance Admin reviews | Batched monthly |
+| Credit adjustment | Admin applies credit | Finance Admin or above | Immediate |
+| Cash payment record | Admin marks paid | Any Admin | Manual, immediate |
+
+### 3.2 Master Charges Table
 
 ```sql
-CREATE TABLE session_teachers (
-  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  session_id      uuid NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-  teacher_id      uuid NOT NULL REFERENCES profiles(id),
-  role            text DEFAULT 'primary' CHECK (role IN (
-                    'primary', 'assistant', 'guest'
-                  )),
-  teacher_type    text DEFAULT 'employee' CHECK (teacher_type IN (
-                    'employee', '1099'
-                  )),
-  hourly_rate     numeric(10,2),           -- their pay rate
-  billing_target  text DEFAULT 'studio' CHECK (billing_target IN (
-                    'studio',    -- studio absorbs cost
-                    'session'    -- cost rolled into session total
-                  )),
-  total_pay       numeric(10,2),           -- calculated at session close
-  created_at      timestamptz DEFAULT now()
+CREATE TABLE billing_charges (
+  id                        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id                 UUID NOT NULL REFERENCES tenants(id),
+  family_id                 UUID NOT NULL REFERENCES families(id),
+  student_id                UUID REFERENCES students(id),
+  charge_type               TEXT NOT NULL CHECK (charge_type IN (
+                              'registration_fee',
+                              'tuition',
+                              'tuition_prorated',
+                              'unlimited_plan',
+                              'competition_fee',
+                              'costume',
+                              'private_lesson',
+                              'drop_in',
+                              'credit_adjustment',
+                              'other'
+                            )),
+  description               TEXT NOT NULL,
+  amount                    NUMERIC(10,2) NOT NULL,
+  due_date                  DATE,
+  billing_period            TEXT,              -- "2026-01" for January tuition
+  status                    TEXT NOT NULL CHECK (status IN (
+                              'pending',
+                              'queued',
+                              'notification_sent',
+                              'charged',
+                              'failed',
+                              'paid_cash',
+                              'waived',
+                              'refunded',
+                              'written_off'
+                            )),
+  payment_method            TEXT CHECK (payment_method IN (
+                              'card', 'cash', 'credit', 'waived'
+                            )),
+  transaction_id            TEXT,
+  stripe_payment_intent_id  TEXT,
+  charged_at                TIMESTAMPTZ,
+  retry_count               INTEGER DEFAULT 0,
+  last_retry_at             TIMESTAMPTZ,
+  next_retry_at             TIMESTAMPTZ,
+  failure_reason            TEXT,
+  escalated_at              TIMESTAMPTZ,
+  resolved_at               TIMESTAMPTZ,
+  resolved_by               UUID REFERENCES profiles(id),
+  resolution_method         TEXT CHECK (resolution_method IN (
+                              'payment_succeeded', 'cash_paid', 'credit_applied',
+                              'written_off', 'enrollment_suspended'
+                            )),
+  waived_by                 UUID REFERENCES profiles(id),
+  waived_reason             TEXT,
+  marked_paid_by            UUID REFERENCES profiles(id),
+  marked_paid_at            TIMESTAMPTZ,
+  created_by                UUID REFERENCES profiles(id),
+  created_at                TIMESTAMPTZ DEFAULT now(),
+  updated_at                TIMESTAMPTZ DEFAULT now()
 );
 ```
 
-### 3.6 session_enrollments
-Students attending a session.
+---
+
+## 4. Registration Fee
+
+- Due at enrollment confirmation
+- Amount configured per class or globally in Admin Settings → Billing
+- **Waiver:** Any Admin role can waive with a required reason (logged)
+- **Earlybird discount:** applied automatically if within earlybird window
+- Registration fee is non-refundable unless overridden by Finance Admin+
 
 ```sql
-CREATE TABLE session_enrollments (
-  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  session_id      uuid NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-  student_id      uuid NOT NULL REFERENCES students(id),
-  attendance      text DEFAULT 'enrolled' CHECK (attendance IN (
-                    'enrolled', 'present', 'absent', 'late', 'excused'
-                  )),
-  credits_charged numeric(10,2),
-  charged_at      timestamptz,
-  override_rate   numeric(10,2),           -- per-student rate override
-  override_reason text,
-  created_at      timestamptz DEFAULT now(),
-  UNIQUE(session_id, student_id)
+CREATE TABLE registration_fees (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id   UUID NOT NULL REFERENCES tenants(id),
+  class_id    UUID REFERENCES classes(id),   -- null = global default
+  amount      NUMERIC(10,2) NOT NULL,
+  is_active   BOOLEAN DEFAULT true,
+  created_at  TIMESTAMPTZ DEFAULT now()
 );
 ```
 
-### 3.7 invoices
+---
+
+## 5. Monthly Tuition
+
+### 5.1 Billing Cycle
+- Runs on the **15th of each month**
+- Applies to all students with `enrollments.status = 'active'`
+- One charge per class per student
+- Family account receives one consolidated invoice
+
+### 5.2 Proration Methods
+
+| Method | Description |
+|---|---|
+| `per_class` (default) | Remaining sessions ÷ total sessions × monthly tuition |
+| `daily` | Remaining days ÷ 30 × monthly tuition |
+| `split` | Before 15th = full month; on/after 15th = half month |
+| `custom` | Finance Admin enters amount manually with reason |
+| `none` | No proration — full month charged regardless |
+
+Finance Admin and above can manually override prorated amount with reason logged.
+
+```sql
+-- Additional columns on enrollments table:
+proration_method      TEXT CHECK (proration_method IN (
+                        'per_class', 'daily', 'split', 'custom', 'none'
+                      )),
+prorated_amount       NUMERIC(10,2),
+proration_override    BOOLEAN DEFAULT false,
+proration_override_by UUID REFERENCES profiles(id),
+proration_override_reason TEXT,
+```
+
+### 5.3 Tuition Rates
+
+```sql
+CREATE TABLE tuition_rates (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id   UUID NOT NULL REFERENCES tenants(id),
+  class_id    UUID REFERENCES classes(id),   -- null = applies to all
+  rate_type   TEXT NOT NULL CHECK (rate_type IN (
+                'per_class_monthly',
+                'unlimited_season',
+                'drop_in',
+                'custom'
+              )),
+  amount      NUMERIC(10,2) NOT NULL,
+  season      TEXT,                           -- "Fall 2025", "Spring 2026"
+  is_active   BOOLEAN DEFAULT true,
+  created_at  TIMESTAMPTZ DEFAULT now()
+);
+```
+
+---
+
+## 6. Competition Charges
+
+### 6.1 Workflow
+1. Amanda confirms a student for a competition entry
+2. Charge created with `status = 'pending_finance_review'`
+3. Finance Admin reviews in Admin → Billing → Competition Charges
+4. Finance Admin approves and sends batch notification to families
+5. **24-hour window:** parent can respond "Do not charge"
+6. If no response: charge fires automatically after 24 hours
+7. Dispute → conversation queued in Admin inbox tagged `competition_charge_dispute`
+8. Admin resolves: approve / adjust / remove student / switch payment / cash / credit
+
+### 6.2 Competition Charge Schema
+
+```sql
+CREATE TABLE competition_charges (
+  id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id               UUID NOT NULL REFERENCES tenants(id),
+  competition_entry_id    UUID REFERENCES competition_entries(id),
+  family_id               UUID NOT NULL REFERENCES families(id),
+  student_id              UUID NOT NULL REFERENCES students(id),
+  description             TEXT,
+  amount                  NUMERIC(10,2),
+  status                  TEXT NOT NULL CHECK (status IN (
+                            'pending_finance_review', 'approved',
+                            'notification_sent', 'charged',
+                            'disputed', 'waived', 'paid_cash'
+                          )),
+  payment_method          TEXT CHECK (payment_method IN (
+                            'card', 'cash', 'credit', 'waived'
+                          )),
+  notification_sent_at    TIMESTAMPTZ,
+  charge_after            TIMESTAMPTZ,   -- 24hrs after notification
+  charged_at              TIMESTAMPTZ,
+  transaction_id          TEXT,
+  dispute_conversation_id UUID,
+  marked_paid_by          UUID REFERENCES profiles(id),
+  marked_paid_at          TIMESTAMPTZ,
+  finance_approved_by     UUID REFERENCES profiles(id),
+  finance_approved_at     TIMESTAMPTZ,
+  notes                   TEXT,
+  created_by              UUID REFERENCES profiles(id),
+  created_at              TIMESTAMPTZ DEFAULT now()
+);
+```
+
+---
+
+## 7. Costume Charges
+
+### 7.1 Billing Modes (Per Production)
+- `per_costume` — individual charge per costume item per student
+- `flat_per_student` — one charge per student for the entire production
+
+### 7.2 Schema
+
+```sql
+CREATE TABLE costumes (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id       UUID NOT NULL REFERENCES tenants(id),
+  production_id   UUID NOT NULL REFERENCES productions(id),
+  dance_title     TEXT,
+  item_name       TEXT NOT NULL,
+  description     TEXT,
+  studio_cost     NUMERIC(10,2),    -- BAM's cost (for P&L, hidden from parents)
+  family_charge   NUMERIC(10,2),    -- amount billed to family
+  student_ids     UUID[],
+  notes           TEXT,
+  created_by      UUID REFERENCES profiles(id),
+  created_at      TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE costume_charges (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id           UUID NOT NULL REFERENCES tenants(id),
+  costume_id          UUID REFERENCES costumes(id),
+  production_id       UUID NOT NULL REFERENCES productions(id),
+  family_id           UUID NOT NULL REFERENCES families(id),
+  student_id          UUID NOT NULL REFERENCES students(id),
+  description         TEXT,
+  amount              NUMERIC(10,2),
+  amount_override     BOOLEAN DEFAULT false,
+  override_reason     TEXT,
+  override_by         UUID REFERENCES profiles(id),
+  status              TEXT NOT NULL CHECK (status IN (
+                        'pending_finance_review', 'queued',
+                        'notification_sent', 'charged', 'waived', 'paid_cash'
+                      )),
+  payment_method      TEXT CHECK (payment_method IN (
+                        'card', 'cash', 'credit', 'waived'
+                      )),
+  notification_sent_at TIMESTAMPTZ,
+  charged_at          TIMESTAMPTZ,
+  transaction_id      TEXT,
+  marked_paid_by      UUID REFERENCES profiles(id),
+  marked_paid_at      TIMESTAMPTZ,
+  notes               TEXT,
+  created_by          UUID REFERENCES profiles(id),
+  created_at          TIMESTAMPTZ DEFAULT now()
+);
+```
+
+### 7.3 P&L Data
+Finance Admin and above can see `studio_cost` vs `family_charge` per costume.
+Parents and teachers cannot see `studio_cost`.
+
+---
+
+## 8. Failed Payment Handling
+
+### 8.1 Retry Logic (Tuition — 15th of month)
+
+| Day | Action |
+|---|---|
+| Day 0 (15th) | Initial charge attempt |
+| Day 0 fail | Internal flag to Finance Admin task queue |
+| Day 3 | Auto-retry charge |
+| Day 3 fail | Email + SMS to parent; task stays open |
+| Day 10 | Escalation to Studio Admin + Super Admin |
+
+Task stays open until: payment succeeds / cash marked / credit applied / enrollment suspended / written off.
+
+### 8.2 Admin Resolution Options
+- Payment succeeded (auto or manual retry)
+- Mark as paid (cash)
+- Apply account credit
+- Suspend enrollment pending payment
+- Write off (with required reason)
+
+---
+
+## 9. Account Credit
+
+```sql
+CREATE TABLE account_credits (
+  id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id             UUID NOT NULL REFERENCES tenants(id),
+  family_id             UUID NOT NULL REFERENCES families(id),
+  amount                NUMERIC(10,2) NOT NULL,
+  reason                TEXT,
+  applied_to_charge_id  UUID REFERENCES billing_charges(id),
+  created_by            UUID REFERENCES profiles(id),
+  created_at            TIMESTAMPTZ DEFAULT now()
+);
+```
+
+Sources: Finance Admin manual credit, prorated refund (Finance Admin approved), promotional credits.
+
+---
+
+## 10. Cash Payment Recording
+
+Any charge can be marked as paid by cash:
+- **Who:** Any Admin role
+- **Fields:** `payment_method = 'cash'`, `marked_paid_by`, `marked_paid_at`
+- **Effect:** Charge status → `paid_cash`; removed from outstanding balance
+- Parent portal shows "Paid — Cash"
+- Finance Admin sees cash payments separately in billing reports
+
+---
+
+## 11. Invoices
+
 ```sql
 CREATE TABLE invoices (
-  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id       uuid NOT NULL REFERENCES tenants(id),
-  student_id      uuid NOT NULL REFERENCES students(id),
-  parent_id       uuid NOT NULL REFERENCES profiles(id),
-  amount          numeric(10,2) NOT NULL,
-  credits_used    numeric(10,2) DEFAULT 0,
-  status          text DEFAULT 'draft' CHECK (status IN (
-                    'draft', 'sent', 'paid', 'overdue', 'void', 'refunded'
-                  )),
-  due_date        date,
-  paid_at         timestamptz,
-  stripe_invoice_id text,
-  line_items      jsonb,                   -- array of {description, credits, amount}
-  notes           text,
-  created_at      timestamptz DEFAULT now(),
-  updated_at      timestamptz DEFAULT now()
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id         UUID NOT NULL REFERENCES tenants(id),
+  student_id        UUID NOT NULL REFERENCES students(id),
+  family_id         UUID NOT NULL REFERENCES families(id),
+  amount            NUMERIC(10,2) NOT NULL,
+  credits_used      NUMERIC(10,2) DEFAULT 0,
+  status            TEXT DEFAULT 'draft' CHECK (status IN (
+                      'draft', 'sent', 'paid', 'overdue', 'void', 'refunded'
+                    )),
+  due_date          DATE,
+  paid_at           TIMESTAMPTZ,
+  stripe_invoice_id TEXT,
+  line_items        JSONB,   -- [{description, credits, amount}]
+  notes             TEXT,
+  created_at        TIMESTAMPTZ DEFAULT now(),
+  updated_at        TIMESTAMPTZ DEFAULT now()
 );
 ```
 
-### 3.8 tenant_billing_settings
-Studio-wide billing configuration.
+---
+
+## 12. Tenant Billing Settings
 
 ```sql
 CREATE TABLE tenant_billing_settings (
-  id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id             uuid NOT NULL REFERENCES tenants(id) UNIQUE,
-  credit_rate           numeric(10,2) NOT NULL DEFAULT 1.00, -- $ per credit
-  billing_increment_min integer NOT NULL DEFAULT 15,          -- min billable increment
-  default_expiry_days   integer,                              -- null = no expiry
-  auto_charge           boolean DEFAULT false,                -- charge on session close
-  grace_period_days     integer DEFAULT 3,                    -- days before overdue
-  late_fee_pct          numeric(5,2),                         -- % late fee
-  stripe_account_id     text,
-  payment_processor     text DEFAULT 'stripe' CHECK (payment_processor IN (
+  id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id             UUID NOT NULL REFERENCES tenants(id) UNIQUE,
+  credit_rate           NUMERIC(10,2) NOT NULL DEFAULT 1.00,
+  billing_increment_min INTEGER NOT NULL DEFAULT 15,
+  default_expiry_days   INTEGER,              -- null = no expiry
+  auto_charge           BOOLEAN DEFAULT false,
+  grace_period_days     INTEGER DEFAULT 3,
+  late_fee_pct          NUMERIC(5,2),
+  stripe_account_id     TEXT,
+  payment_processor     TEXT DEFAULT 'stripe' CHECK (payment_processor IN (
                           'stripe', 'authorize_net', 'square', 'paypal'
                         )),
-  created_at            timestamptz DEFAULT now(),
-  updated_at            timestamptz DEFAULT now()
+  created_at            TIMESTAMPTZ DEFAULT now(),
+  updated_at            TIMESTAMPTZ DEFAULT now()
 );
 ```
 
 ---
 
-## 4. Billing Models
+## 13. Rate Override Hierarchy (Credit Billing)
 
-### 4.1 Credit Billing (time-based)
+Rates are resolved in this priority order (highest wins):
 
-**Formula:**
-```
-session_cost = (hourly_rate × duration_minutes / 60)
-               + sum(teacher_costs where billing_target = 'session')
-
-cost_per_student = session_cost / num_attending_students
-
-credits_charged = CEIL(cost_per_student / credit_rate / 15) × 15
-                  -- rounds UP to nearest 15-minute increment
-```
-
-**Example — private with guest teacher:**
-```
-Duration: 60 min
-Hourly rate: $250
-Guest teacher cost billed to session: $0 (billed to studio in this case)
-Students: 4
-credit_rate: $1.00
-
-cost_per_student = $250 / 4 = $62.50
-credits_charged = CEIL(62.50 / 1.00 / 15) × 15 = CEIL(4.167) × 15 = 75 credits
-```
-
-**Example — group class:**
-```
-Duration: 45 min
-Hourly rate: $30/student
-Students: 8
-credit_rate: $1.00
-
-cost_per_student = $30 × (45/60) = $22.50
-credits_charged = CEIL(22.50 / 1.00 / 15) × 15 = CEIL(1.5) × 15 = 30 credits
-```
-
-### 4.2 Flat Fee Per Student
-- Fixed dollar amount per student per session
-- Converted to credits at the credit_rate
-- Example: $25 flat → 25 credits at $1/credit
-
-### 4.3 Flat Fee Per Session
-- Fixed dollar amount for the entire session
-- Divided equally by num_students
-- Remainder credits distributed to first student or absorbed by studio
-
-### 4.4 Free
-- No credits charged
-- Used for trial classes, make-up sessions, comped classes
+1. Per-student per-session override (admin manual)
+2. Per-class `point_cost` override (admin per-class setting)
+3. Tenant default `credit_rate` (studio-wide)
 
 ---
 
-## 5. Class Types & Billing Defaults
-
-| Class Type | Default Billing | Season | Notes |
-|------------|----------------|--------|-------|
-| Seasonal group | credit or flat_per_student | required | Fall, Spring, Summer |
-| Ongoing group | credit or flat_per_student | null | Ballet technique, pointe |
-| Private | credit | null | One student, ad hoc |
-| Semi-private | credit | null | 2–6 students |
-| Pilates | credit or flat | null | Ongoing |
-| Gyrotonic | credit or flat | null | Ongoing |
-| Personal Training | credit or flat | null | Ongoing |
-| Trial class | free | null | First visit |
-| Make-up | free | null | Missed class |
-
-Ongoing classes (season_id = null) bill month-to-month or per-session
-depending on the billing_model set on the class.
-
----
-
-## 6. 1099 Teacher Billing
-
-Guest/1099 teachers have two billing targets:
-
-**billing_target = 'studio'**
-- Their cost is absorbed by the studio
-- Does not affect what students are charged
-- Tracked for studio payroll/accounting purposes
-
-**billing_target = 'session'**
-- Their hourly rate is added to the session total
-- Increases cost_per_student proportionally
-- Used when client is paying for specialist directly
-
-Studio sets default billing_target per teacher in teacher settings.
-Can be overridden per session.
-
----
-
-## 7. Credit Packages & Promotions
-
-### Package Purchase Flow
-1. Parent sees available packages on /portal/billing
-2. Selects package → Stripe checkout
-3. On payment success: credit_transactions row inserted (type='purchase')
-4. credit_accounts balance updated
-5. Confirmation email via Resend
-6. Klaviyo event fired for purchase tracking
-
-### Promotion Rules
-- Promotions have start/end dates
-- Can set max_purchases limit (e.g. "first 20 buyers")
-- Discount shown clearly: "Save 15% — Limited Time"
-- Expired promotions auto-hide from portal
-
-### Example Packages
-| Name | Credits | Price | Discount |
-|------|---------|-------|----------|
-| Starter Pack | 300 | $285 | 5% |
-| 10-Hour Bundle | 600 | $540 | 10% |
-| 20-Hour Bundle | 1200 | $1,020 | 15% |
-| Unlimited Month | 2000 | $199 | — |
-
----
-
-## 8. Billing Workflow
-
-### Session Billing Flow
-1. Session is scheduled (status = 'scheduled')
-2. Students enrolled via session_enrollments
-3. Session occurs — attendance marked
-4. Admin closes session (status = 'completed')
-5. System calculates cost_per_student based on billing_model
-6. For each present/late student:
-   - Check credit_accounts balance
-   - If sufficient: deduct credits, log transaction
-   - If insufficient: create invoice for difference, notify parent
-7. Session summary sent to admin
-8. Optional: auto-charge if tenant setting auto_charge = true
-
-### Insufficient Credits Flow
-1. Student has 20 credits, session costs 30 credits
-2. System deducts 20 (balance → 0)
-3. Creates invoice for 10 credits ($10 at base rate)
-4. Parent notified via email + Angelina chat
-5. Invoice due in grace_period_days
-6. If unpaid: status → 'overdue', optional late_fee applied
-
----
-
-## 9. Admin Billing UI
+## 14. Admin Billing UI
 
 ### /admin/billing
 - Overview: total outstanding, overdue count, credits sold this month
@@ -389,56 +588,88 @@ Can be overridden per session.
 ### /admin/billing/packages
 - Manage credit packages
 - Create/edit/deactivate packages
-- Run promotions with date range
+- Run promotions with date range and max redemptions
 
-### /admin/billing/sessions/[id]
-- Session billing detail
-- Override individual student rates
-- Apply comps or adjustments
-- Close session and trigger billing
+### /admin/billing/unlimited
+- Manage unlimited plan subscriptions per student
+- Assign, pause, cancel plans
+- View scope per plan
+
+### /admin/billing/competition-charges
+- Review queue of pending competition charges
+- Batch approve and send notifications
+- Dispute resolution queue
+
+### /admin/billing/costume-charges
+- Costume charge management per production
+- P&L view (studio cost vs family charge) — Finance Admin only
 
 ### /admin/billing/reports
-- Revenue by month
+- Monthly revenue by charge type
 - Credits sold vs redeemed
-- Outstanding by parent
-- 1099 teacher cost report
+- Outstanding balances by family
+- Cash payment audit log
+- Written-off charges with reasons and approver
 - Export to CSV
 
 ---
 
-## 10. Parent Billing Portal
+## 15. Parent Billing Portal
 
 ### /portal/billing
-- Credit balance (prominent display)
-- Buy credits → package selector → Stripe checkout
-- Transaction history
+- Credit balance (prominent)
+- Available bundle packages → Stripe checkout
+- Transaction history (credits and dollar charges)
 - Outstanding invoices
-- Upcoming session costs (estimated)
-- Auto-pay toggle (charges saved card when balance runs low)
+- Auto-pay toggle
+- Unlimited plan status (if active)
 
 ---
 
-## 11. Rate Override Hierarchy
+## 16. Finance Views (P&L Foundation)
 
-Rates are resolved in this priority order (highest wins):
-
-1. session_enrollments.override_rate (per student per session)
-2. sessions.credit_rate (per session override)
-3. classes.default_credit_rate (per class default)
-4. tenant_billing_settings.credit_rate (studio default)
+Finance Admin and above only:
+- Monthly revenue: charged vs collected by charge type
+- Outstanding balances: per family, per class, studio-wide
+- Competition P&L: fees charged vs collected per competition
+- Costume P&L: studio cost vs family charge per production
+- Registration fee revenue: per school year
+- Cash payment log by date
+- Written-off charges with reasons
 
 ---
 
-## 12. Acceptance Criteria
+## 17. Phase Implementation Order
 
-1. Studio can set base credit rate and billing increment in settings
-2. Session cost calculates correctly for all four billing models
-3. 1099 teacher cost routes correctly to studio or session
-4. Credits deduct from student account on session close
-5. Insufficient balance creates invoice automatically
-6. Parent can purchase credit package via Stripe
-7. Promotions activate/deactivate by date automatically
-8. Credit expiry cron runs nightly and notifies parents 30 days prior
-9. Admin can override rate per student per session with reason
-10. All transactions are logged with balance_after for audit trail
-11. Multi-tenant: rates, packages, and settings are fully tenant-scoped
+### Phase 1 — Core Billing (Build now)
+- [ ] billing_charges master table
+- [ ] credit_accounts and credit_transactions tables
+- [ ] credit_packages table
+- [ ] Registration fee charge on enrollment
+- [ ] Admin "Add to Class" flow with billing plan check
+- [ ] Cash payment marking
+- [ ] Family account view: charges, credits, balance
+
+### Phase 2 — Bundles & Unlimited
+- [ ] unlimited_plans table and assignment UI
+- [ ] Billing plan check at enrollment (Layer 1 priority)
+- [ ] Bundle purchase flow via Stripe
+- [ ] Auto-deduct credits on enrollment
+- [ ] Insufficient credits flow → invoice
+
+### Phase 3 — Tuition & Proration
+- [ ] Monthly tuition charge generation on 15th (manual first, then cron)
+- [ ] Proration calculation (default: per-class rate)
+- [ ] Failed payment retry logic + admin task queue
+
+### Phase 4 — Competition & Costume
+- [ ] Competition charge workflow + 24hr notification
+- [ ] Costume charge creation (per-costume and flat modes)
+- [ ] Batch notification system
+- [ ] Dispute → admin inbox queue
+
+### Phase 5 — Finance Reporting
+- [ ] P&L dashboard
+- [ ] Outstanding balances view
+- [ ] Costume P&L per production
+- [ ] Cash and write-off audit logs
