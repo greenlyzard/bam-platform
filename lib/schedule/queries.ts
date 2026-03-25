@@ -475,6 +475,153 @@ export async function getScheduleInstances(filters: {
   return enriched;
 }
 
+// ── Map recurring classes to ScheduleInstance[] for a given week ──
+// Used as fallback when schedule_instances table has no generated data.
+export async function getClassesAsScheduleInstances(filters: {
+  startDate: string;
+  endDate: string;
+  teacherId?: string;
+  level?: string;
+  roomId?: string;
+  dayOfWeek?: string;
+  tenantId?: string;
+}): Promise<ScheduleInstance[]> {
+  const supabase = await createClient();
+
+  let query = supabase
+    .from("classes")
+    .select(
+      "id, name, short_name, simple_name, day_of_week, days_of_week, start_time, end_time, room, levels, max_enrollment, max_students, is_active, status, color_code, tenant_id"
+    )
+    .or("is_active.eq.true,status.eq.active");
+
+  if (filters.tenantId) query = query.eq("tenant_id", filters.tenantId);
+
+  const { data: classes, error } = await query.order("day_of_week").order("start_time");
+  if (error || !classes) {
+    console.error("[schedule:classesAsInstances]", error);
+    return [];
+  }
+
+  // Get enrollment counts
+  const classIds = classes.map((c) => c.id);
+  const enrollMap: Record<string, number> = {};
+  if (classIds.length > 0) {
+    const { data: enrollments } = await supabase
+      .from("enrollments")
+      .select("class_id")
+      .in("class_id", classIds)
+      .in("status", ["active", "trial"]);
+    for (const e of enrollments ?? []) {
+      enrollMap[e.class_id] = (enrollMap[e.class_id] ?? 0) + 1;
+    }
+  }
+
+  // Get teacher names via class_teachers
+  const { data: classTeachers } = await supabase
+    .from("class_teachers")
+    .select("class_id, teacher_id, is_primary")
+    .in("class_id", classIds);
+
+  const teacherIdSet = new Set<string>();
+  const classTeacherMap: Record<string, string> = {};
+  for (const ct of classTeachers ?? []) {
+    teacherIdSet.add(ct.teacher_id);
+    if (ct.is_primary || !classTeacherMap[ct.class_id]) {
+      classTeacherMap[ct.class_id] = ct.teacher_id;
+    }
+  }
+
+  const teacherNameMap: Record<string, { name: string; initials: string }> = {};
+  if (teacherIdSet.size > 0) {
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, first_name, last_name")
+      .in("id", [...teacherIdSet]);
+    for (const p of profiles ?? []) {
+      const name = [p.first_name, p.last_name].filter(Boolean).join(" ");
+      const initials = [p.first_name?.[0], p.last_name?.[0]].filter(Boolean).join("");
+      teacherNameMap[p.id] = { name, initials };
+    }
+  }
+
+  // Build week dates map: day_of_week → date string
+  const weekDates: Record<number, string> = {};
+  const monday = new Date(filters.startDate + "T00:00:00");
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    const dow = d.getDay(); // 0=Sun, 1=Mon, ...
+    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    weekDates[dow] = dateStr;
+  }
+
+  // Map classes to ScheduleInstance[]
+  let instances: ScheduleInstance[] = [];
+  for (const c of classes) {
+    if (!c.start_time || !c.end_time) continue;
+
+    const daysToMap = c.days_of_week?.length ? c.days_of_week : (c.day_of_week != null ? [c.day_of_week] : []);
+    const teacherId = classTeacherMap[c.id] ?? null;
+    const teacher = teacherId ? teacherNameMap[teacherId] : null;
+    const level = c.levels?.length ? c.levels[0] : null;
+    const displayName = c.short_name || c.simple_name || c.name;
+
+    for (const dow of daysToMap) {
+      const eventDate = weekDates[dow];
+      if (!eventDate) continue;
+
+      instances.push({
+        id: `${c.id}-${dow}`,
+        tenant_id: c.tenant_id,
+        class_id: c.id,
+        teacher_id: teacherId,
+        room_id: null,
+        event_type: "class",
+        event_date: eventDate,
+        start_time: c.start_time,
+        end_time: c.end_time,
+        status: "scheduled",
+        cancellation_reason: null,
+        substitute_teacher_id: null,
+        notes: null,
+        is_trial_eligible: false,
+        production_id: null,
+        className: displayName,
+        classLevel: level,
+        classStyle: null,
+        teacherName: teacher?.name ?? null,
+        teacherInitials: teacher?.initials ?? null,
+        subTeacherName: null,
+        roomName: c.room ?? null,
+        enrolledCount: enrollMap[c.id] ?? 0,
+        maxStudents: c.max_enrollment ?? c.max_students ?? null,
+      });
+    }
+  }
+
+  // Apply filters
+  if (filters.teacherId) {
+    instances = instances.filter((i) => i.teacher_id === filters.teacherId);
+  }
+  if (filters.level) {
+    const lvl = filters.level.toLowerCase();
+    instances = instances.filter((i) => i.classLevel?.toLowerCase().includes(lvl));
+  }
+  if (filters.roomId) {
+    instances = instances.filter((i) => i.roomName === filters.roomId);
+  }
+  if (filters.dayOfWeek) {
+    const dow = parseInt(filters.dayOfWeek, 10);
+    instances = instances.filter((i) => {
+      const d = new Date(i.event_date + "T00:00:00");
+      return d.getDay() === dow;
+    });
+  }
+
+  return instances;
+}
+
 export async function getDistinctLevels(): Promise<string[]> {
   const supabase = await createClient();
   const { data } = await supabase

@@ -100,6 +100,7 @@ interface ScheduleCalendarProps {
   rooms: Array<{ id: string; name: string }>;
   levels: string[];
   weekStart: string;
+  isRecurring?: boolean;
   initialFilters: {
     teacher: string;
     level: string;
@@ -305,6 +306,7 @@ export function ScheduleCalendar({
   rooms,
   levels,
   weekStart,
+  isRecurring,
   initialFilters,
 }: ScheduleCalendarProps) {
   const router = useRouter();
@@ -433,7 +435,7 @@ export function ScheduleCalendar({
       <div className="space-y-4">
         {sortedDates.length === 0 ? (
           <div className="rounded-xl border border-dashed border-silver bg-white p-8 text-center text-sm text-mist">
-            No sessions this week.
+            No classes scheduled this week.
           </div>
         ) : (
           sortedDates.map((date) => (
@@ -535,7 +537,7 @@ export function ScheduleCalendar({
         ))}
         {roomNames.length === 0 && (
           <div className="col-span-full rounded-xl border border-dashed border-silver bg-white p-8 text-center text-sm text-mist">
-            No sessions this week.
+            No classes scheduled this week.
           </div>
         )}
       </div>
@@ -560,7 +562,10 @@ export function ScheduleCalendar({
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between print:hidden">
         <div>
           <h1 className="font-heading text-2xl font-semibold text-charcoal">Schedule</h1>
-          <p className="mt-1 text-sm text-slate">{getWeekLabel(weekStart)}</p>
+          <p className="mt-1 text-sm text-slate">
+            {getWeekLabel(weekStart)}
+            {isRecurring && <span className="ml-2 text-xs text-mist italic">· Showing recurring weekly schedule</span>}
+          </p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">

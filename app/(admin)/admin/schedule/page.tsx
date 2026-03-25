@@ -1,5 +1,5 @@
 import { requireAdmin } from "@/lib/auth/guards";
-import { getScheduleInstances, getApprovedTeachers, getRooms, getDistinctLevels } from "@/lib/schedule/queries";
+import { getScheduleInstances, getClassesAsScheduleInstances, getApprovedTeachers, getRooms, getDistinctLevels } from "@/lib/schedule/queries";
 import { ScheduleCalendar } from "./schedule-calendar";
 
 function getWeekRange(weekParam?: string): { startDate: string; endDate: string; weekStart: string } {
@@ -47,20 +47,27 @@ export default async function AdminSchedulePage({
   const params = await searchParams;
   const { startDate, endDate, weekStart } = getWeekRange(params.week);
 
-  const [instances, teachers, rooms, levels] = await Promise.all([
-    getScheduleInstances({
-      startDate,
-      endDate,
-      teacherId: params.teacher,
-      level: params.level,
-      roomId: params.room,
-      dayOfWeek: params.day,
-      tenantId: user.tenantId ?? undefined,
-    }),
+  const filterParams = {
+    startDate,
+    endDate,
+    teacherId: params.teacher,
+    level: params.level,
+    roomId: params.room,
+    dayOfWeek: params.day,
+    tenantId: user.tenantId ?? undefined,
+  };
+
+  const [sessionInstances, classInstances, teachers, rooms, levels] = await Promise.all([
+    getScheduleInstances(filterParams),
+    getClassesAsScheduleInstances(filterParams),
     getApprovedTeachers(),
     getRooms(),
     getDistinctLevels(),
   ]);
+
+  // Use session instances if available, otherwise fall back to recurring classes
+  const instances = sessionInstances.length > 0 ? sessionInstances : classInstances;
+  const isRecurring = sessionInstances.length === 0;
 
   return (
     <div className="min-h-screen bg-cream">
@@ -71,6 +78,7 @@ export default async function AdminSchedulePage({
           rooms={rooms}
           levels={levels}
           weekStart={weekStart}
+          isRecurring={isRecurring}
           initialFilters={{
             teacher: params.teacher || "",
             level: params.level || "",
