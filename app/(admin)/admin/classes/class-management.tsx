@@ -3,6 +3,23 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SimpleSelect } from "@/components/ui/select";
 import { createClient } from "@/lib/supabase/client";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { ClassEditDrawer } from "./class-edit-drawer";
 
 // ── Types ────────────────────────────────────────────────
@@ -157,7 +174,15 @@ const DEFAULT_COLUMNS: ColumnConfig[] = [
   { key: "enrolled", label: "Enrolled", visible: true },
   { key: "status", label: "Status", visible: true },
   { key: "onlinereg", label: "Online Reg", visible: true },
+  { key: "capacity", label: "Capacity", visible: false },
+  { key: "type", label: "Type", visible: false },
+  { key: "startdate", label: "Start Date", visible: false },
+  { key: "enddate", label: "End Date", visible: false },
+  { key: "room", label: "Room/Location", visible: false },
 ];
+
+// Name column cannot be hidden
+const LOCKED_COLUMNS = new Set(["name"]);
 
 const COLUMNS_STORAGE_KEY = "bam-classes-columns";
 
@@ -262,6 +287,7 @@ export function ClassManagement({
   }
 
   function toggleColumnVisible(key: string) {
+    if (LOCKED_COLUMNS.has(key)) return;
     const newCols = columns.map((c) =>
       c.key === key ? { ...c, visible: !c.visible } : c
     );
@@ -272,31 +298,18 @@ export function ClassManagement({
     updateColumns(DEFAULT_COLUMNS);
   }
 
-  const colDragRef = useRef<string | null>(null);
-  const colDragOverRef = useRef<string | null>(null);
+  const colSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
-  function handleColDragStart(key: string) {
-    colDragRef.current = key;
-  }
-
-  function handleColDragOver(e: React.DragEvent, key: string) {
-    e.preventDefault();
-    colDragOverRef.current = key;
-  }
-
-  function handleColDrop() {
-    const dragKey = colDragRef.current;
-    const dropKey = colDragOverRef.current;
-    if (!dragKey || !dropKey || dragKey === dropKey) return;
-    const newCols = [...columns];
-    const dragIdx = newCols.findIndex((c) => c.key === dragKey);
-    const dropIdx = newCols.findIndex((c) => c.key === dropKey);
-    if (dragIdx === -1 || dropIdx === -1) return;
-    const [moved] = newCols.splice(dragIdx, 1);
-    newCols.splice(dropIdx, 0, moved);
-    updateColumns(newCols);
-    colDragRef.current = null;
-    colDragOverRef.current = null;
+  function handleColDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIdx = columns.findIndex((c) => c.key === active.id);
+    const newIdx = columns.findIndex((c) => c.key === over.id);
+    if (oldIdx === -1 || newIdx === -1) return;
+    updateColumns(arrayMove(columns, oldIdx, newIdx));
   }
 
   const supabase = createClient();
@@ -844,37 +857,31 @@ ${(byDay[d] ?? [])
           <div ref={columnsPopoverRef} className="relative">
             <button
               onClick={() => setColumnsPopoverOpen(!columnsPopoverOpen)}
-              className="h-8 rounded-lg border border-silver bg-white hover:bg-cloud text-xs font-medium text-slate px-3 transition-colors"
+              className="h-8 rounded-lg border border-silver bg-white hover:bg-cloud text-xs font-medium text-slate px-3 transition-colors inline-flex items-center gap-1.5"
             >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-mist">
+                <path d="M2 3.5h10M2 7h10M2 10.5h10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+              </svg>
               Columns
             </button>
             {columnsPopoverOpen && (
-              <div className="absolute right-0 top-full mt-1 w-56 rounded-xl border border-silver bg-white shadow-lg z-30 py-1">
+              <div className="absolute right-0 top-full mt-1 w-60 rounded-xl border border-silver bg-white shadow-lg z-30 py-1">
                 <div className="px-3 py-2 border-b border-silver">
                   <p className="text-xs font-semibold text-charcoal">Show / reorder columns</p>
                 </div>
-                <div className="max-h-64 overflow-y-auto py-1">
-                  {columns.map((col) => (
-                    <div
-                      key={col.key}
-                      draggable
-                      onDragStart={() => handleColDragStart(col.key)}
-                      onDragOver={(e) => handleColDragOver(e, col.key)}
-                      onDrop={handleColDrop}
-                      className="flex items-center gap-2 px-3 py-1.5 hover:bg-cloud/50"
-                    >
-                      <span className="text-mist hover:text-slate cursor-grab active:cursor-grabbing text-sm select-none">⠿</span>
-                      <label className="flex items-center gap-2 flex-1 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={col.visible}
-                          onChange={() => toggleColumnVisible(col.key)}
-                          className="h-3.5 w-3.5 rounded border-silver text-lavender focus:ring-lavender/20"
+                <div className="max-h-72 overflow-y-auto py-1">
+                  <DndContext sensors={colSensors} collisionDetection={closestCenter} onDragEnd={handleColDragEnd}>
+                    <SortableContext items={columns.map((c) => c.key)} strategy={verticalListSortingStrategy}>
+                      {columns.map((col) => (
+                        <SortableColumnRow
+                          key={col.key}
+                          col={col}
+                          locked={LOCKED_COLUMNS.has(col.key)}
+                          onToggle={() => toggleColumnVisible(col.key)}
                         />
-                        <span className="text-xs text-charcoal">{col.label}</span>
-                      </label>
-                    </div>
-                  ))}
+                      ))}
+                    </SortableContext>
+                  </DndContext>
                 </div>
                 <div className="px-3 py-2 border-t border-silver">
                   <button
@@ -1003,6 +1010,20 @@ ${(byDay[d] ?? [])
                           </button>
                         </td>
                       );
+                    case "capacity":
+                      return <td key={col.key} className="px-3 py-2 text-center text-xs text-slate">{maxEnroll}</td>;
+                    case "type": {
+                      const types: string[] = [];
+                      if (c.is_rehearsal) types.push("Rehearsal");
+                      if (c.is_performance) types.push("Performance");
+                      return <td key={col.key} className="px-3 py-2 text-xs text-slate">{types.length > 0 ? types.join(", ") : "—"}</td>;
+                    }
+                    case "startdate":
+                      return <td key={col.key} className="px-3 py-2 text-xs text-slate whitespace-nowrap">{c.start_date ?? "—"}</td>;
+                    case "enddate":
+                      return <td key={col.key} className="px-3 py-2 text-xs text-slate whitespace-nowrap">{c.end_date ?? "—"}</td>;
+                    case "room":
+                      return <td key={col.key} className="px-3 py-2 text-xs text-slate">{c.room ?? "—"}</td>;
                     default:
                       return <td key={col.key} className="px-3 py-2" />;
                   }
@@ -1221,6 +1242,53 @@ function BulkActionPanel({
           Delete
         </button>
       </div>
+    </div>
+  );
+}
+
+// ── Sortable column row for the column picker ────────────
+function SortableColumnRow({
+  col,
+  locked,
+  onToggle,
+}: {
+  col: { key: string; label: string; visible: boolean };
+  locked: boolean;
+  onToggle: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: col.key });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-2 px-3 py-1.5 hover:bg-cloud/50"
+    >
+      <span
+        {...attributes}
+        {...listeners}
+        className="text-mist hover:text-slate cursor-grab active:cursor-grabbing text-sm select-none"
+      >
+        ⠿
+      </span>
+      <label className="flex items-center gap-2 flex-1 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={col.visible}
+          disabled={locked}
+          onChange={onToggle}
+          className="h-3.5 w-3.5 rounded border-silver text-lavender focus:ring-lavender/20 disabled:opacity-50"
+        />
+        <span className="text-xs text-charcoal">{col.label}</span>
+        {locked && <span className="text-[10px] text-mist">(always shown)</span>}
+      </label>
     </div>
   );
 }
