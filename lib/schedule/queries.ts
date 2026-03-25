@@ -488,16 +488,15 @@ export async function getClassesAsScheduleInstances(filters: {
 }): Promise<ScheduleInstance[]> {
   const supabase = await createClient();
 
-  let query = supabase
+  // classes table has no tenant_id — fetch all active classes
+  const { data: classes, error } = await supabase
     .from("classes")
     .select(
-      "id, name, short_name, simple_name, day_of_week, days_of_week, start_time, end_time, room, levels, max_enrollment, max_students, is_active, status, color_code, tenant_id"
+      "id, name, day_of_week, days_of_week, start_time, end_time, room, levels, max_enrollment, max_students, is_active, status"
     )
-    .or("is_active.eq.true,status.eq.active");
-
-  if (filters.tenantId) query = query.eq("tenant_id", filters.tenantId);
-
-  const { data: classes, error } = await query.order("day_of_week").order("start_time");
+    .eq("is_active", true)
+    .order("day_of_week")
+    .order("start_time");
   if (error || !classes) {
     console.error("[schedule:classesAsInstances]", error);
     return [];
@@ -561,11 +560,11 @@ export async function getClassesAsScheduleInstances(filters: {
   for (const c of classes) {
     if (!c.start_time || !c.end_time) continue;
 
-    const daysToMap = c.days_of_week?.length ? c.days_of_week : (c.day_of_week != null ? [c.day_of_week] : []);
+    const daysToMap: number[] = c.days_of_week?.length ? c.days_of_week : (c.day_of_week != null ? [c.day_of_week] : []);
     const teacherId = classTeacherMap[c.id] ?? null;
     const teacher = teacherId ? teacherNameMap[teacherId] : null;
     const level = c.levels?.length ? c.levels[0] : null;
-    const displayName = c.short_name || c.simple_name || c.name;
+    const displayName = c.name;
 
     for (const dow of daysToMap) {
       const eventDate = weekDates[dow];
@@ -573,7 +572,7 @@ export async function getClassesAsScheduleInstances(filters: {
 
       instances.push({
         id: `${c.id}-${dow}`,
-        tenant_id: c.tenant_id,
+        tenant_id: filters.tenantId ?? "",
         class_id: c.id,
         teacher_id: teacherId,
         room_id: null,
