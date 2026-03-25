@@ -263,6 +263,9 @@ export function ClassManagement({
   const [isNewClass, setIsNewClass] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+
+  const activeFilterCount = [filterSeason, filterTeacher, filterLevel, filterDiscipline, filterDay, filterType, filterStatus].filter(Boolean).length;
   const [columns, setColumns] = useState<ColumnConfig[]>(DEFAULT_COLUMNS);
   const [columnsPopoverOpen, setColumnsPopoverOpen] = useState(false);
   const columnsPopoverRef = useRef<HTMLDivElement>(null);
@@ -770,8 +773,9 @@ ${(byDay[d] ?? [])
 
       {/* Search + Filters */}
       <div className="rounded-xl border border-silver bg-white p-4 space-y-3">
-        <div className="flex flex-wrap gap-3 items-end">
-          <div className="flex-1 min-w-[200px]">
+        {/* Search row + mobile filter button */}
+        <div className="flex gap-3 items-center">
+          <div className="flex-1 min-w-0">
             <input
               type="text"
               placeholder="Search classes..."
@@ -780,77 +784,70 @@ ${(byDay[d] ?? [])
               className="w-full h-9 rounded-lg border border-silver px-3 text-sm text-charcoal focus:border-lavender focus:outline-none focus:ring-1 focus:ring-lavender"
             />
           </div>
-          <SimpleSelect
-            value={filterSeason}
-            onValueChange={(val) => setFilterSeason(val === "__all__" ? "" : val)}
-            options={[
-              { value: "__all__", label: "All Seasons" },
-              ...seasons.map((s) => ({ value: s.id, label: s.name })),
-            ]}
-            placeholder="All Seasons"
-          />
-          <SimpleSelect
-            value={filterTeacher}
-            onValueChange={(val) => setFilterTeacher(val === "__all__" ? "" : val)}
-            options={[
-              { value: "__all__", label: "All Teachers" },
-              ...teachers.map((t) => ({ value: t.id, label: t.name })),
-            ]}
-            placeholder="All Teachers"
-          />
-          <SimpleSelect
-            value={filterLevel}
-            onValueChange={(val) => setFilterLevel(val === "__all__" ? "" : val)}
-            options={[
-              { value: "__all__", label: "All Levels" },
-              ...LEVEL_OPTIONS.map((l) => ({ value: l, label: l })),
-            ]}
-            placeholder="All Levels"
-          />
-          <SimpleSelect
-            value={filterDiscipline}
-            onValueChange={(val) => setFilterDiscipline(val === "__all__" ? "" : val)}
-            options={[
-              { value: "__all__", label: "All Disciplines" },
-              ...disciplines.map((d) => ({ value: d.id, label: d.name })),
-            ]}
-            placeholder="All Disciplines"
-          />
-          <SimpleSelect
-            value={filterDay}
-            onValueChange={(val) => setFilterDay(val === "__all__" ? "" : val)}
-            options={[
-              { value: "__all__", label: "All Days" },
-              ...[1, 2, 3, 4, 5, 6, 0].map((d) => ({
-                value: String(d),
-                label: DAY_NAMES_FULL[d],
-              })),
-            ]}
-            placeholder="All Days"
-          />
-          <SimpleSelect
-            value={filterType}
-            onValueChange={(val) => setFilterType(val === "__all__" ? "" : val)}
-            options={[
-              { value: "__all__", label: "All Types" },
-              { value: "class", label: "Class" },
-              { value: "rehearsal", label: "Rehearsal" },
-              { value: "performance", label: "Performance" },
-            ]}
-            placeholder="All Types"
-          />
-          <SimpleSelect
-            value={filterStatus}
-            onValueChange={(val) => setFilterStatus(val === "__all__" ? "" : val)}
-            options={[
-              { value: "__all__", label: "All Status" },
-              { value: "active", label: "Active" },
-              { value: "hidden", label: "Hidden" },
-              { value: "inactive", label: "Inactive" },
-            ]}
-            placeholder="All Status"
+          {/* Mobile filter button — visible below md */}
+          <button
+            onClick={() => setMobileFilterOpen(true)}
+            className="md:hidden h-9 rounded-lg border border-silver bg-white hover:bg-cloud px-3 text-xs font-medium text-slate transition-colors inline-flex items-center gap-1.5 shrink-0"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-mist">
+              <path d="M1.75 3.5h10.5M3.5 7h7M5.25 10.5h3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+            </svg>
+            Filters
+            {activeFilterCount > 0 && (
+              <span className="inline-flex items-center justify-center h-4 min-w-[16px] rounded-full bg-lavender text-white text-[10px] font-semibold px-1">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* Desktop filters — hidden below md */}
+        <div className="hidden md:flex flex-wrap gap-2 items-center">
+          <FilterSelects
+            filterSeason={filterSeason} setFilterSeason={setFilterSeason}
+            filterTeacher={filterTeacher} setFilterTeacher={setFilterTeacher}
+            filterLevel={filterLevel} setFilterLevel={setFilterLevel}
+            filterDiscipline={filterDiscipline} setFilterDiscipline={setFilterDiscipline}
+            filterDay={filterDay} setFilterDay={setFilterDay}
+            filterType={filterType} setFilterType={setFilterType}
+            filterStatus={filterStatus} setFilterStatus={setFilterStatus}
+            seasons={seasons} teachers={teachers} disciplines={disciplines}
           />
         </div>
+
+        {/* Mobile filter drawer */}
+        {mobileFilterOpen && (
+          <div className="fixed inset-0 z-50 md:hidden">
+            <div className="absolute inset-0 bg-black/30" onClick={() => setMobileFilterOpen(false)} />
+            <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-xl max-h-[80vh] overflow-y-auto">
+              <div className="sticky top-0 bg-white border-b border-silver px-4 py-3 flex items-center justify-between z-10 rounded-t-2xl">
+                <h3 className="text-sm font-semibold text-charcoal">Filters</h3>
+                <button onClick={() => setMobileFilterOpen(false)} className="text-slate hover:text-charcoal text-lg">✕</button>
+              </div>
+              <div className="p-4 space-y-4">
+                <FilterSelects
+                  filterSeason={filterSeason} setFilterSeason={setFilterSeason}
+                  filterTeacher={filterTeacher} setFilterTeacher={setFilterTeacher}
+                  filterLevel={filterLevel} setFilterLevel={setFilterLevel}
+                  filterDiscipline={filterDiscipline} setFilterDiscipline={setFilterDiscipline}
+                  filterDay={filterDay} setFilterDay={setFilterDay}
+                  filterType={filterType} setFilterType={setFilterType}
+                  filterStatus={filterStatus} setFilterStatus={setFilterStatus}
+                  seasons={seasons} teachers={teachers} disciplines={disciplines}
+                  stacked
+                />
+              </div>
+              <div className="sticky bottom-0 bg-white border-t border-silver px-4 py-3">
+                <button
+                  onClick={() => setMobileFilterOpen(false)}
+                  className="w-full h-10 rounded-lg bg-lavender hover:bg-lavender-dark text-white font-semibold text-sm transition-colors"
+                >
+                  Apply Filters
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="flex items-center justify-between">
           <p className="text-xs text-mist">{filtered.length} classes shown</p>
           {/* Columns popover */}
@@ -1290,5 +1287,43 @@ function SortableColumnRow({
         {locked && <span className="text-[10px] text-mist">(always shown)</span>}
       </label>
     </div>
+  );
+}
+
+// ── Filter selects — shared between desktop inline and mobile drawer ──
+function FilterSelects({
+  filterSeason, setFilterSeason,
+  filterTeacher, setFilterTeacher,
+  filterLevel, setFilterLevel,
+  filterDiscipline, setFilterDiscipline,
+  filterDay, setFilterDay,
+  filterType, setFilterType,
+  filterStatus, setFilterStatus,
+  seasons, teachers, disciplines,
+  stacked,
+}: {
+  filterSeason: string; setFilterSeason: (v: string) => void;
+  filterTeacher: string; setFilterTeacher: (v: string) => void;
+  filterLevel: string; setFilterLevel: (v: string) => void;
+  filterDiscipline: string; setFilterDiscipline: (v: string) => void;
+  filterDay: string; setFilterDay: (v: string) => void;
+  filterType: string; setFilterType: (v: string) => void;
+  filterStatus: string; setFilterStatus: (v: string) => void;
+  seasons: { id: string; name: string }[];
+  teachers: { id: string; name: string }[];
+  disciplines: { id: string; name: string }[];
+  stacked?: boolean;
+}) {
+  const cls = stacked ? "w-full" : "w-[140px]";
+  return (
+    <>
+      <SimpleSelect value={filterSeason || "__all__"} onValueChange={(val) => setFilterSeason(val === "__all__" ? "" : val)} options={[{ value: "__all__", label: "All Seasons" }, ...seasons.map((s) => ({ value: s.id, label: s.name }))]} placeholder="All Seasons" className={cls} />
+      <SimpleSelect value={filterTeacher || "__all__"} onValueChange={(val) => setFilterTeacher(val === "__all__" ? "" : val)} options={[{ value: "__all__", label: "All Teachers" }, ...teachers.map((t) => ({ value: t.id, label: t.name }))]} placeholder="All Teachers" className={cls} />
+      <SimpleSelect value={filterLevel || "__all__"} onValueChange={(val) => setFilterLevel(val === "__all__" ? "" : val)} options={[{ value: "__all__", label: "All Levels" }, ...LEVEL_OPTIONS.map((l) => ({ value: l, label: l }))]} placeholder="All Levels" className={cls} />
+      <SimpleSelect value={filterDiscipline || "__all__"} onValueChange={(val) => setFilterDiscipline(val === "__all__" ? "" : val)} options={[{ value: "__all__", label: "All Disciplines" }, ...disciplines.map((d) => ({ value: d.id, label: d.name }))]} placeholder="All Disciplines" className={cls} />
+      <SimpleSelect value={filterDay || "__all__"} onValueChange={(val) => setFilterDay(val === "__all__" ? "" : val)} options={[{ value: "__all__", label: "All Days" }, ...[1, 2, 3, 4, 5, 6, 0].map((d) => ({ value: String(d), label: DAY_NAMES_FULL[d] }))]} placeholder="All Days" className={cls} />
+      <SimpleSelect value={filterType || "__all__"} onValueChange={(val) => setFilterType(val === "__all__" ? "" : val)} options={[{ value: "__all__", label: "All Types" }, { value: "class", label: "Class" }, { value: "rehearsal", label: "Rehearsal" }, { value: "performance", label: "Performance" }]} placeholder="All Types" className={cls} />
+      <SimpleSelect value={filterStatus || "__all__"} onValueChange={(val) => setFilterStatus(val === "__all__" ? "" : val)} options={[{ value: "__all__", label: "All Status" }, { value: "active", label: "Active" }, { value: "hidden", label: "Hidden" }, { value: "inactive", label: "Inactive" }]} placeholder="All Status" className={cls} />
+    </>
   );
 }
