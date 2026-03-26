@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getPrimaryChannel, checkOptIn } from "@/lib/contact-channels";
 
 interface SendNotificationParams {
   tenantId: string;
@@ -9,6 +10,7 @@ interface SendNotificationParams {
   icon?: string;
   data?: Record<string, unknown>;
   channels?: ("in_app" | "email" | "sms" | "push")[];
+  isTransactional?: boolean;
 }
 
 export async function sendNotification(params: SendNotificationParams) {
@@ -163,13 +165,39 @@ async function sendEmailNotif(
   supabase: Awaited<ReturnType<typeof createClient>>,
   params: SendNotificationParams
 ) {
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("email")
-    .eq("id", params.userId)
-    .single();
+  // Transactional emails bypass opt-in; marketing emails require opt-in
+  if (!params.isTransactional) {
+    const optedIn = await checkOptIn(params.userId, "email");
+    if (!optedIn) return;
+  }
 
-  if (!profile?.email) return;
+  const channel = await getPrimaryChannel(params.userId, "email");
+  const emailAddress = channel?.value;
+
+  if (!emailAddress) {
+    // Fallback to profile.email if no contact_channels entry
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("email")
+      .eq("id", params.userId)
+      .single();
+    if (!profile?.email) return;
+
+    const html = `
+      <div style="font-family: 'Montserrat', Arial, sans-serif; max-width: 560px; margin: 0 auto;">
+        <h2 style="color: #6B5A99;">${params.title}</h2>
+        <p style="color: #333; line-height: 1.6;">${params.body}</p>
+      </div>
+    `;
+
+    try {
+      const { sendEmail } = await import("@/lib/resend/emails");
+      await sendEmail({ to: profile.email, subject: params.title, html });
+    } catch (e) {
+      console.warn("[notifications:email] Could not send:", e);
+    }
+    return;
+  }
 
   const html = `
     <div style="font-family: 'Montserrat', Arial, sans-serif; max-width: 560px; margin: 0 auto;">
@@ -178,10 +206,9 @@ async function sendEmailNotif(
     </div>
   `;
 
-  // Try primary email module, fall back to resend
   try {
     const { sendEmail } = await import("@/lib/resend/emails");
-    await sendEmail({ to: profile.email, subject: params.title, html });
+    await sendEmail({ to: emailAddress, subject: params.title, html });
   } catch (e) {
     console.warn("[notifications:email] Could not send:", e);
   }
@@ -191,18 +218,19 @@ async function sendSMS(
   supabase: Awaited<ReturnType<typeof createClient>>,
   params: SendNotificationParams
 ) {
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("phone")
-    .eq("id", params.userId)
-    .single();
+  // Check SMS opt-in via contact_channels
+  const optedIn = await checkOptIn(params.userId, "sms");
+  if (!optedIn) return;
 
-  if (!profile?.phone) return;
+  const channel = await getPrimaryChannel(params.userId, "sms");
+  const phone = channel?.value;
+
+  if (!phone) return;
 
   try {
     const { getSMSAdapter } = await import("@/lib/sms/adapter");
     const adapter = await getSMSAdapter(params.tenantId);
-    await adapter.sendMessage(profile.phone, `${params.title}\n${params.body}`);
+    await adapter.sendMessage(phone, `${params.title}\n${params.body}`);
   } catch (e) {
     console.warn("[notifications:sms] Could not send:", e);
   }

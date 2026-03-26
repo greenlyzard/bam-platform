@@ -1,5 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import {
+  normalizePhone,
+  matchPhoneToProfile,
+  handleStop,
+  handleStart,
+} from "@/lib/contact-channels";
+import { getSMSAdapter } from "@/lib/sms/adapter";
+
+const DEFAULT_TENANT_ID =
+  process.env.BAM_TENANT_ID ?? "84d98f72-c82f-414f-8b17-172b802f6993";
+
+const STOP_KEYWORDS = new Set(["STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END"]);
+const START_KEYWORDS = new Set(["START", "UNSTOP", "SUBSCRIBE"]);
 
 export async function POST(req: NextRequest) {
   // Always return 200 — Quo retries on non-200
@@ -8,7 +21,6 @@ export async function POST(req: NextRequest) {
     const secret = process.env.QUO_WEBHOOK_SECRET;
     if (secret) {
       const sig = req.headers.get("x-openphone-signature");
-      // Basic signature check — production should use HMAC verification
       if (!sig) {
         console.warn("[quo:webhook] Missing signature");
         return NextResponse.json({ ok: true });
@@ -22,54 +34,126 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    const fromPhone = data?.from;
-    const messageBody = data?.body ?? data?.content ?? "";
+    const rawPhone = data?.from;
+    const messageBody: string = data?.body ?? data?.content ?? "";
     const timestamp = data?.createdAt ?? new Date().toISOString();
 
-    if (!fromPhone || !messageBody) {
+    if (!rawPhone || !messageBody) {
       return NextResponse.json({ ok: true });
     }
 
-    const supabase = await createClient();
+    const fromPhone = normalizePhone(rawPhone) ?? rawPhone;
+    const tenantId = DEFAULT_TENANT_ID;
 
-    // Look up sender by phone number
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("id, first_name, last_name")
-      .eq("phone", fromPhone)
-      .single();
+    // -----------------------------------------------------------------------
+    // 1. STOP / START detection — must run before any other logic
+    // -----------------------------------------------------------------------
+    const keyword = messageBody.trim().toUpperCase();
 
-    if (profile) {
-      // Create a DM or log the inbound message
-      // For now: insert into sms_threads or log
+    if (STOP_KEYWORDS.has(keyword)) {
+      await handleStop(fromPhone, tenantId);
       try {
-        await supabase.from("sms_threads").insert({
-          from_phone: fromPhone,
-          user_id: profile.id,
-          direction: "inbound",
-          body: messageBody,
-          received_at: timestamp,
-        });
-      } catch {
-        // sms_threads may not exist — log only
-        console.log(
-          `[quo:webhook] Inbound from ${profile.first_name}: ${messageBody}`
+        const adapter = await getSMSAdapter(tenantId);
+        await adapter.sendMessage(
+          fromPhone,
+          "You've been unsubscribed from SMS messages. Reply START to resubscribe."
         );
+      } catch (e) {
+        console.warn("[quo:webhook] Failed to send STOP auto-reply:", e);
       }
-    } else {
-      // Unmatched phone — log for admin review
-      console.warn(
-        `[quo:webhook] Unmatched phone ${fromPhone}: ${messageBody}`
-      );
+      return NextResponse.json({ ok: true });
+    }
+
+    if (START_KEYWORDS.has(keyword)) {
+      await handleStart(fromPhone, tenantId);
       try {
-        await supabase.from("sms_threads").insert({
-          from_phone: fromPhone,
+        const adapter = await getSMSAdapter(tenantId);
+        await adapter.sendMessage(
+          fromPhone,
+          "You've been resubscribed to SMS messages. Reply STOP to unsubscribe."
+        );
+      } catch (e) {
+        console.warn("[quo:webhook] Failed to send START auto-reply:", e);
+      }
+      return NextResponse.json({ ok: true });
+    }
+
+    // -----------------------------------------------------------------------
+    // 2. Match phone to profile via contact_channels
+    // -----------------------------------------------------------------------
+    const supabase = await createClient();
+    const profileId = await matchPhoneToProfile(fromPhone, tenantId);
+
+    // -----------------------------------------------------------------------
+    // 3. Upsert sms_threads and insert sms_messages
+    // -----------------------------------------------------------------------
+    try {
+      // Upsert thread by phone_number + tenant_id
+      const { data: existingThread } = await supabase
+        .from("sms_threads")
+        .select("id, unread_count")
+        .eq("phone_number", fromPhone)
+        .eq("tenant_id", tenantId)
+        .maybeSingle();
+
+      let threadId: string;
+
+      if (existingThread) {
+        threadId = existingThread.id;
+        await supabase
+          .from("sms_threads")
+          .update({
+            last_message_at: timestamp,
+            last_message_body: messageBody,
+            unread_count: (existingThread.unread_count ?? 0) + 1,
+            ...(profileId ? { profile_id: profileId } : {}),
+          })
+          .eq("id", threadId);
+      } else {
+        const { data: newThread } = await supabase
+          .from("sms_threads")
+          .insert({
+            phone_number: fromPhone,
+            tenant_id: tenantId,
+            last_message_at: timestamp,
+            last_message_body: messageBody,
+            unread_count: 1,
+            ...(profileId ? { profile_id: profileId } : {}),
+          })
+          .select("id")
+          .single();
+
+        threadId = newThread?.id;
+      }
+
+      // Insert sms_messages
+      if (threadId) {
+        await supabase.from("sms_messages").insert({
+          thread_id: threadId,
           direction: "inbound",
           body: messageBody,
+          sent_at: timestamp,
+          ...(profileId ? { profile_id: profileId } : {}),
+        });
+      }
+    } catch (e) {
+      console.error("[quo:webhook] Failed to upsert thread/message:", e);
+    }
+
+    // -----------------------------------------------------------------------
+    // 4. Unmatched numbers → insert into unmatched_sms
+    // -----------------------------------------------------------------------
+    if (!profileId) {
+      console.warn(`[quo:webhook] Unmatched phone ${fromPhone}: ${messageBody}`);
+      try {
+        await supabase.from("unmatched_sms").insert({
+          phone_number: fromPhone,
+          body: messageBody,
           received_at: timestamp,
+          tenant_id: tenantId,
         });
       } catch {
-        // Table may not exist
+        // Table may not exist yet
       }
     }
   } catch (e) {
