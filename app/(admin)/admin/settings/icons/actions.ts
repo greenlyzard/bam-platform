@@ -127,3 +127,67 @@ export async function toggleIconActive(formData: FormData) {
   revalidatePath("/admin/settings/icons");
   return {};
 }
+
+// ---------------------------------------------------------------------------
+// 4. Upload Icon to Storage
+// ---------------------------------------------------------------------------
+export async function uploadIconToStorage(formData: FormData) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const file = formData.get("file") as File;
+  if (!file) return { error: "No file" };
+  if (file.size > 512 * 1024) return { error: "File too large (max 512KB)" };
+
+  const ext = file.name.split(".").pop()?.toLowerCase() ?? "png";
+  if (!["png", "svg", "webp"].includes(ext)) return { error: "Only PNG, SVG, WebP allowed" };
+
+  const slug = file.name.replace(/\.[^.]+$/, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const path = `icons/${slug}.${ext}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from("avatars") // reuse avatars bucket since it's the only one that exists
+    .upload(path, file, { upsert: true, contentType: file.type });
+
+  if (uploadError) return { error: uploadError.message };
+
+  const { data: { publicUrl } } = supabase.storage.from("avatars").getPublicUrl(path);
+
+  return { url: publicUrl, slug };
+}
+
+// ---------------------------------------------------------------------------
+// 5. Save Icons to Library (batch)
+// ---------------------------------------------------------------------------
+export async function saveIconsToLibrary(formData: FormData) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const icons = JSON.parse(formData.get("icons") as string ?? "[]") as Array<{
+    name: string; slug: string; category: string; icon_url: string; website_url?: string;
+  }>;
+
+  if (icons.length === 0) return { error: "No icons to save" };
+
+  const tenantId = formData.get("tenantId") as string;
+
+  const rows = icons.map((icon, i) => ({
+    tenant_id: tenantId || null,
+    name: icon.name,
+    slug: icon.slug,
+    category: icon.category,
+    icon_url: icon.icon_url,
+    website_url: icon.website_url || null,
+    is_global: false,
+    is_active: true,
+    sort_order: 100 + i,
+  }));
+
+  const { error } = await supabase.from("icon_library").insert(rows);
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/settings/icons");
+  return { count: rows.length };
+}

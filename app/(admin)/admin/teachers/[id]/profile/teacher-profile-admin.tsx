@@ -16,6 +16,7 @@ import {
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { IconPicker } from "@/components/ui/icon-picker";
 
 // ---------------------------------------------------------------------------
 // Interfaces
@@ -634,7 +635,7 @@ export function TeacherProfileAdmin({
           <button className={btnSecondary} onClick={() => setAddDiscOpen(true)}>+ Add Discipline</button>
         ) : (
           <div className="flex flex-wrap gap-2 items-end">
-            <label className="text-xs text-slate">Icon<SimpleSelect value={newDiscIconId} onValueChange={setNewDiscIconId} options={iconLibrary.filter(i => i.category === "discipline" || i.category === "certification").map(i => ({ value: i.id, label: i.name }))} placeholder="Select icon" /></label>
+            <label className="text-xs text-slate">Icon<IconPicker onSelect={(icon) => setNewDiscIconId(icon.id)} selectedId={newDiscIconId} category={["discipline", "certification"]} triggerLabel="Choose icon" /></label>
             <input className={inputCls + " max-w-[200px]"} value={newDiscName} onChange={e => setNewDiscName(e.target.value)} placeholder="Discipline name" />
             <label className="flex items-center gap-1 text-xs text-charcoal"><input type="checkbox" checked={newDiscCertified} onChange={e => setNewDiscCertified(e.target.checked)} className="h-3.5 w-3.5 rounded border-silver text-lavender" />Certified</label>
             <button className={btnPrimary} onClick={handleAddDisc} disabled={isPending || !newDiscName.trim()}>Add</button>
@@ -671,7 +672,7 @@ export function TeacherProfileAdmin({
         ) : (
           <div className="space-y-2">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-              <label className="text-xs text-slate">Icon<SimpleSelect value={newAffil.icon_id} onValueChange={v => setNewAffil(f => ({ ...f, icon_id: v }))} options={iconLibrary.map(i => ({ value: i.id, label: i.name }))} placeholder="Select icon" /></label>
+              <label className="text-xs text-slate">Icon<IconPicker onSelect={(icon) => setNewAffil(f => ({ ...f, icon_id: icon.id }))} selectedId={newAffil.icon_id} triggerLabel="Choose icon" /></label>
               <label className="text-xs text-slate">Type<SimpleSelect value={newAffil.affiliation_type} onValueChange={v => setNewAffil(f => ({ ...f, affiliation_type: v }))} options={[{ value: "company", label: "Company" }, { value: "school", label: "School" }, { value: "intensive", label: "Intensive" }, { value: "certification", label: "Certification" }]} placeholder="Type" /></label>
               <label className="text-xs text-slate">Name<input className={inputCls} value={newAffil.name} onChange={e => setNewAffil(f => ({ ...f, name: e.target.value }))} placeholder="Organization name" /></label>
               <label className="text-xs text-slate">Role<input className={inputCls} value={newAffil.role} onChange={e => setNewAffil(f => ({ ...f, role: e.target.value }))} placeholder="e.g. Principal Dancer" /></label>
