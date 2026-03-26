@@ -7,6 +7,14 @@ import {
   updateTeacherBasics, toggleTeacherActive, addSpecialty, removeSpecialty,
   updateSpecialtyOrder, upsertRateCard, updateCompliance, updateSubEligibility,
 } from "./actions";
+import {
+  updateEnhancedBio, addDiscipline, removeDiscipline, reorderDisciplines,
+  addAffiliation, removeAffiliation, reorderAffiliations,
+  uploadTeacherPhoto, updatePhotoCaption, deletePhoto, reorderPhotos,
+} from "./enhanced-actions";
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 // ---------------------------------------------------------------------------
 // Interfaces
@@ -14,8 +22,15 @@ import {
 interface Teacher {
   id: string; first_name: string; last_name: string; email: string;
   phone: string | null; avatar_url: string | null; bio: string | null;
+  title?: string | null; bio_short?: string | null; bio_full?: string | null;
+  years_experience?: number | null; education?: string | null;
+  social_instagram?: string | null; social_linkedin?: string | null;
   isActive: boolean;
 }
+interface IconItem { id: string; name: string; image_url: string | null; category: string | null; sort_order: number }
+interface Discipline { id: string; teacher_id: string; icon_id: string | null; name: string; is_certified: boolean; sort_order: number; icon_library?: IconItem | null }
+interface Affiliation { id: string; teacher_id: string; icon_id: string | null; name: string; affiliation_type: string; role: string | null; years: string | null; location: string | null; sort_order: number; icon_library?: IconItem | null }
+interface TeacherPhoto { id: string; teacher_id: string; photo_url: string; caption: string | null; sort_order: number }
 interface Specialty { id: string; specialty: string; sort_order: number }
 interface RateCard {
   id: string; session_type: string;
@@ -96,10 +111,14 @@ export function TeacherProfileAdmin({
   teacher: init, specialties: initSpecs, rateCards: initRates,
   compliance: initComp, subEligibility: initSub, classes,
   availabilityCount, privateCount, tenantId,
+  disciplines: initDiscs = [], affiliations: initAffils = [],
+  photos: initPhotos = [], iconLibrary = [],
 }: {
   teacher: Teacher; specialties: Specialty[]; rateCards: RateCard[];
   compliance: Compliance | null; subEligibility: SubEligibility | null;
   classes: ClassAssignment[]; availabilityCount: number; privateCount: number; tenantId: string;
+  disciplines?: Discipline[]; affiliations?: Affiliation[];
+  photos?: TeacherPhoto[]; iconLibrary?: IconItem[];
 }) {
   const [teacher, setTeacher] = useState(init);
   const [specs, setSpecs] = useState(initSpecs);
@@ -108,6 +127,23 @@ export function TeacherProfileAdmin({
   const [sub, setSub] = useState<SubEligibility | null>(initSub);
   const [isPending, startTransition] = useTransition();
   const [toast, setToast] = useState("");
+
+  // Sections I-L state
+  const [discs, setDiscs] = useState<Discipline[]>(initDiscs);
+  const [affils, setAffils] = useState<Affiliation[]>(initAffils);
+  const [tPhotos, setTPhotos] = useState<TeacherPhoto[]>(initPhotos);
+  const [bioForm, setBioForm] = useState({
+    title: init.title ?? "", bio_short: init.bio_short ?? "", bio_full: init.bio_full ?? "",
+    years_experience: init.years_experience?.toString() ?? "", education: init.education ?? "",
+    social_instagram: init.social_instagram ?? "", social_linkedin: init.social_linkedin ?? "",
+  });
+  const [addDiscOpen, setAddDiscOpen] = useState(false);
+  const [newDiscName, setNewDiscName] = useState("");
+  const [newDiscIconId, setNewDiscIconId] = useState("");
+  const [newDiscCertified, setNewDiscCertified] = useState(false);
+  const [addAffilOpen, setAddAffilOpen] = useState(false);
+  const [newAffil, setNewAffil] = useState({ name: "", icon_id: "", affiliation_type: "company", role: "", years: "", location: "" });
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   // Edit states
   const [editingInfo, setEditingInfo] = useState(false);
@@ -241,6 +277,99 @@ export function TeacherProfileAdmin({
 
   function toggleArr(arr: string[], val: string) {
     return arr.includes(val) ? arr.filter(x => x !== val) : [...arr, val];
+  }
+
+  // ── I. Enhanced Bio save ──
+  function saveEnhancedBio() {
+    const fd = new FormData(); fd.set("teacherId", teacher.id);
+    Object.entries(bioForm).forEach(([k, v]) => fd.set(k, v));
+    startTransition(async () => {
+      const res = await updateEnhancedBio(fd);
+      if (res.error) return flash(res.error);
+      flash("Enhanced bio saved");
+    });
+  }
+
+  // ── J. Disciplines ──
+  function handleAddDisc() {
+    if (!newDiscName.trim()) return;
+    const fd = new FormData();
+    fd.set("tenantId", tenantId); fd.set("teacherId", teacher.id);
+    fd.set("name", newDiscName.trim()); fd.set("icon_id", newDiscIconId); fd.set("is_certified", String(newDiscCertified));
+    startTransition(async () => {
+      const res = await addDiscipline(fd);
+      if (res.error) return flash(res.error);
+      const icon = iconLibrary.find(i => i.id === newDiscIconId) ?? null;
+      setDiscs(d => [...d, { id: crypto.randomUUID(), teacher_id: teacher.id, icon_id: newDiscIconId || null, name: newDiscName.trim(), is_certified: newDiscCertified, sort_order: d.length, icon_library: icon }]);
+      setNewDiscName(""); setNewDiscIconId(""); setNewDiscCertified(false); setAddDiscOpen(false);
+      flash("Discipline added");
+    });
+  }
+  function handleRemoveDisc(id: string) {
+    const fd = new FormData(); fd.set("disciplineId", id);
+    startTransition(async () => { const res = await removeDiscipline(fd); if (res.error) return flash(res.error); setDiscs(d => d.filter(x => x.id !== id)); flash("Discipline removed"); });
+  }
+  function handleDiscDragEnd(e: DragEndEvent) {
+    const { active, over } = e; if (!over || active.id === over.id) return;
+    setDiscs(prev => { const oi = prev.findIndex(d => d.id === active.id); const ni = prev.findIndex(d => d.id === over.id); const next = arrayMove(prev, oi, ni);
+      const fd = new FormData(); fd.set("teacherId", teacher.id); fd.set("orderedIds", JSON.stringify(next.map(d => d.id)));
+      startTransition(async () => { await reorderDisciplines(fd); }); return next; });
+  }
+
+  // ── K. Affiliations ──
+  function handleAddAffil() {
+    if (!newAffil.name.trim() || !newAffil.affiliation_type) return;
+    const fd = new FormData();
+    fd.set("tenantId", tenantId); fd.set("teacherId", teacher.id);
+    fd.set("name", newAffil.name.trim()); fd.set("icon_id", newAffil.icon_id); fd.set("affiliation_type", newAffil.affiliation_type);
+    fd.set("role", newAffil.role); fd.set("years", newAffil.years); fd.set("location", newAffil.location);
+    startTransition(async () => {
+      const res = await addAffiliation(fd);
+      if (res.error) return flash(res.error);
+      const icon = iconLibrary.find(i => i.id === newAffil.icon_id) ?? null;
+      setAffils(a => [...a, { id: crypto.randomUUID(), teacher_id: teacher.id, icon_id: newAffil.icon_id || null, name: newAffil.name.trim(), affiliation_type: newAffil.affiliation_type, role: newAffil.role || null, years: newAffil.years || null, location: newAffil.location || null, sort_order: a.length, icon_library: icon }]);
+      setNewAffil({ name: "", icon_id: "", affiliation_type: "company", role: "", years: "", location: "" }); setAddAffilOpen(false);
+      flash("Affiliation added");
+    });
+  }
+  function handleRemoveAffil(id: string) {
+    const fd = new FormData(); fd.set("affiliationId", id);
+    startTransition(async () => { const res = await removeAffiliation(fd); if (res.error) return flash(res.error); setAffils(a => a.filter(x => x.id !== id)); flash("Affiliation removed"); });
+  }
+  function handleAffilDragEnd(e: DragEndEvent) {
+    const { active, over } = e; if (!over || active.id === over.id) return;
+    setAffils(prev => { const oi = prev.findIndex(a => a.id === active.id); const ni = prev.findIndex(a => a.id === over.id); const next = arrayMove(prev, oi, ni);
+      const fd = new FormData(); fd.set("teacherId", teacher.id); fd.set("orderedIds", JSON.stringify(next.map(a => a.id)));
+      startTransition(async () => { await reorderAffiliations(fd); }); return next; });
+  }
+
+  // ── L. Photos ──
+  function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]; if (!file) return;
+    const fd = new FormData(); fd.set("tenantId", tenantId); fd.set("teacherId", teacher.id); fd.set("file", file);
+    startTransition(async () => {
+      const res = await uploadTeacherPhoto(fd);
+      if (res.error) return flash(res.error);
+      setTPhotos(p => [...p, { id: res.id!, teacher_id: teacher.id, photo_url: res.url!, caption: null, sort_order: p.length }]);
+      flash("Photo uploaded");
+    });
+    e.target.value = "";
+  }
+  function handleCaptionSave(photoId: string, caption: string) {
+    const fd = new FormData(); fd.set("photoId", photoId); fd.set("caption", caption);
+    startTransition(async () => { const res = await updatePhotoCaption(fd); if (res.error) return flash(res.error);
+      setTPhotos(p => p.map(ph => ph.id === photoId ? { ...ph, caption } : ph)); flash("Caption updated"); });
+  }
+  function handleDeletePhoto(photoId: string) {
+    const fd = new FormData(); fd.set("photoId", photoId);
+    startTransition(async () => { const res = await deletePhoto(fd); if (res.error) return flash(res.error);
+      setTPhotos(p => p.filter(ph => ph.id !== photoId)); flash("Photo deleted"); });
+  }
+  function handlePhotoDragEnd(e: DragEndEvent) {
+    const { active, over } = e; if (!over || active.id === over.id) return;
+    setTPhotos(prev => { const oi = prev.findIndex(p => p.id === active.id); const ni = prev.findIndex(p => p.id === over.id); const next = arrayMove(prev, oi, ni);
+      const fd = new FormData(); fd.set("teacherId", teacher.id); fd.set("orderedIds", JSON.stringify(next.map(p => p.id)));
+      startTransition(async () => { await reorderPhotos(fd); }); return next; });
   }
 
   // ── Render ──
@@ -448,6 +577,118 @@ export function TeacherProfileAdmin({
           </ul>
         )}
       </div>
+
+      {/* I. Enhanced Bio */}
+      <div className={cardCls}>
+        <h2 className={headingCls}>Enhanced Bio</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <label className="text-xs text-slate">Title<input className={inputCls} value={bioForm.title} onChange={e => setBioForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Owner, Director" /></label>
+          <label className="text-xs text-slate">Years Experience<input type="number" className={inputCls} value={bioForm.years_experience} onChange={e => setBioForm(f => ({ ...f, years_experience: e.target.value }))} /></label>
+        </div>
+        <label className="text-xs text-slate">Short Bio<textarea className={textareaCls} rows={2} value={bioForm.bio_short} onChange={e => setBioForm(f => ({ ...f, bio_short: e.target.value }))} /></label>
+        <label className="text-xs text-slate">Full Bio<textarea className={textareaCls} rows={6} value={bioForm.bio_full} onChange={e => setBioForm(f => ({ ...f, bio_full: e.target.value }))} /></label>
+        <label className="text-xs text-slate">Education<input className={inputCls} value={bioForm.education} onChange={e => setBioForm(f => ({ ...f, education: e.target.value }))} /></label>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <label className="text-xs text-slate">Instagram URL<input className={inputCls} value={bioForm.social_instagram} onChange={e => setBioForm(f => ({ ...f, social_instagram: e.target.value }))} placeholder="https://instagram.com/..." /></label>
+          <label className="text-xs text-slate">LinkedIn URL<input className={inputCls} value={bioForm.social_linkedin} onChange={e => setBioForm(f => ({ ...f, social_linkedin: e.target.value }))} placeholder="https://linkedin.com/in/..." /></label>
+        </div>
+        <button className={btnPrimary} onClick={saveEnhancedBio} disabled={isPending}>Save Enhanced Bio</button>
+      </div>
+
+      {/* J. Disciplines */}
+      <div className={cardCls}>
+        <h2 className={headingCls}>Disciplines</h2>
+        {discs.length === 0 ? <p className="text-sm text-slate">No disciplines added</p> : (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDiscDragEnd}>
+            <SortableContext items={discs.map(d => d.id)} strategy={verticalListSortingStrategy}>
+              {[{ label: "Specialties", items: discs.filter(d => !d.is_certified) }, { label: "Certified Instructor", items: discs.filter(d => d.is_certified) }].map(group => group.items.length > 0 && (
+                <div key={group.label}>
+                  <p className="text-xs font-medium text-slate mb-1">{group.label}</p>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {group.items.map(d => (
+                      <SortableDiscCard key={d.id} disc={d} onRemove={() => handleRemoveDisc(d.id)} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </SortableContext>
+          </DndContext>
+        )}
+        {!addDiscOpen ? (
+          <button className={btnSecondary} onClick={() => setAddDiscOpen(true)}>+ Add Discipline</button>
+        ) : (
+          <div className="flex flex-wrap gap-2 items-end">
+            <label className="text-xs text-slate">Icon<SimpleSelect value={newDiscIconId} onValueChange={setNewDiscIconId} options={iconLibrary.filter(i => i.category === "discipline" || i.category === "certification").map(i => ({ value: i.id, label: i.name }))} placeholder="Select icon" /></label>
+            <input className={inputCls + " max-w-[200px]"} value={newDiscName} onChange={e => setNewDiscName(e.target.value)} placeholder="Discipline name" />
+            <label className="flex items-center gap-1 text-xs text-charcoal"><input type="checkbox" checked={newDiscCertified} onChange={e => setNewDiscCertified(e.target.checked)} className="h-3.5 w-3.5 rounded border-silver text-lavender" />Certified</label>
+            <button className={btnPrimary} onClick={handleAddDisc} disabled={isPending || !newDiscName.trim()}>Add</button>
+            <button className={btnSecondary} onClick={() => setAddDiscOpen(false)}>Cancel</button>
+          </div>
+        )}
+      </div>
+
+      {/* K. Affiliations */}
+      <div className={cardCls}>
+        <h2 className={headingCls}>Affiliations</h2>
+        {affils.length === 0 ? <p className="text-sm text-slate">No affiliations added</p> : (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleAffilDragEnd}>
+            <SortableContext items={affils.map(a => a.id)} strategy={verticalListSortingStrategy}>
+              {[{ label: "Professional Experience", type: "company" }, { label: "Training & Education", type: "school" }, { label: "Summer Intensives", type: "intensive" }, { label: "Certifications", type: "certification" }].map(group => {
+                const items = affils.filter(a => a.affiliation_type === group.type);
+                if (items.length === 0) return null;
+                return (
+                  <div key={group.type}>
+                    <p className="text-xs font-medium text-slate mb-1">{group.label}</p>
+                    <div className="space-y-1 mb-2">
+                      {items.map(a => (
+                        <SortableAffilCard key={a.id} affil={a} onRemove={() => handleRemoveAffil(a.id)} />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </SortableContext>
+          </DndContext>
+        )}
+        {!addAffilOpen ? (
+          <button className={btnSecondary} onClick={() => setAddAffilOpen(true)}>+ Add Affiliation</button>
+        ) : (
+          <div className="space-y-2">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              <label className="text-xs text-slate">Icon<SimpleSelect value={newAffil.icon_id} onValueChange={v => setNewAffil(f => ({ ...f, icon_id: v }))} options={iconLibrary.map(i => ({ value: i.id, label: i.name }))} placeholder="Select icon" /></label>
+              <label className="text-xs text-slate">Type<SimpleSelect value={newAffil.affiliation_type} onValueChange={v => setNewAffil(f => ({ ...f, affiliation_type: v }))} options={[{ value: "company", label: "Company" }, { value: "school", label: "School" }, { value: "intensive", label: "Intensive" }, { value: "certification", label: "Certification" }]} placeholder="Type" /></label>
+              <label className="text-xs text-slate">Name<input className={inputCls} value={newAffil.name} onChange={e => setNewAffil(f => ({ ...f, name: e.target.value }))} placeholder="Organization name" /></label>
+              <label className="text-xs text-slate">Role<input className={inputCls} value={newAffil.role} onChange={e => setNewAffil(f => ({ ...f, role: e.target.value }))} placeholder="e.g. Principal Dancer" /></label>
+              <label className="text-xs text-slate">Years<input className={inputCls} value={newAffil.years} onChange={e => setNewAffil(f => ({ ...f, years: e.target.value }))} placeholder="e.g. 2018-2022" /></label>
+              <label className="text-xs text-slate">Location<input className={inputCls} value={newAffil.location} onChange={e => setNewAffil(f => ({ ...f, location: e.target.value }))} placeholder="City, State" /></label>
+            </div>
+            <div className="flex gap-2">
+              <button className={btnPrimary} onClick={handleAddAffil} disabled={isPending || !newAffil.name.trim()}>Add</button>
+              <button className={btnSecondary} onClick={() => setAddAffilOpen(false)}>Cancel</button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* L. Photo Gallery */}
+      <div className={cardCls}>
+        <h2 className={headingCls}>Photo Gallery</h2>
+        {tPhotos.length === 0 ? <p className="text-sm text-slate">No photos uploaded</p> : (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handlePhotoDragEnd}>
+            <SortableContext items={tPhotos.map(p => p.id)} strategy={verticalListSortingStrategy}>
+              <div className="grid grid-cols-3 gap-3">
+                {tPhotos.map(p => (
+                  <SortablePhotoCard key={p.id} photo={p} onCaptionSave={handleCaptionSave} onDelete={handleDeletePhoto} />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+        )}
+        <label className={btnSecondary + " cursor-pointer"}>
+          + Upload Photo
+          <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+        </label>
+      </div>
     </div>
   );
 }
@@ -524,6 +765,72 @@ function ComplianceItem({ label, statusKey, dateKey, expiryKey, form, setForm }:
           </label>
         )}
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sortable sub-components for Sections J, K, L
+// ---------------------------------------------------------------------------
+function SortableDiscCard({ disc, onRemove }: { disc: Discipline; onRemove: () => void }) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: disc.id });
+  const style = { transform: CSS.Transform.toString(transform), transition };
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}
+      className="inline-flex items-center gap-2 rounded-lg border border-silver bg-white px-3 py-2 text-sm cursor-grab">
+      {disc.icon_library?.image_url ? (
+        <img src={disc.icon_library.image_url} alt="" className="h-6 w-6 rounded-full object-cover" />
+      ) : (
+        <span className="h-6 w-6 rounded-full bg-lavender/20 shrink-0" />
+      )}
+      <span className="text-charcoal font-medium">{disc.name}</span>
+      {disc.is_certified && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-success/10 text-success font-medium">Certified</span>}
+      <button onClick={onRemove} className="ml-1 text-slate hover:text-error text-xs">&times;</button>
+    </div>
+  );
+}
+
+function SortableAffilCard({ affil, onRemove }: { affil: Affiliation; onRemove: () => void }) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: affil.id });
+  const style = { transform: CSS.Transform.toString(transform), transition };
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}
+      className="flex items-center gap-2 rounded-lg border border-silver bg-white px-3 py-2 text-sm cursor-grab">
+      {affil.icon_library?.image_url ? (
+        <img src={affil.icon_library.image_url} alt="" className="h-6 w-6 rounded-full object-cover" />
+      ) : (
+        <span className="h-6 w-6 rounded-full bg-lavender/20 shrink-0" />
+      )}
+      <span className="text-charcoal font-medium">{affil.name}</span>
+      {affil.role && <span className="text-xs text-slate">{affil.role}</span>}
+      {affil.years && <span className="text-xs text-slate">{affil.years}</span>}
+      <button onClick={onRemove} className="ml-auto text-slate hover:text-error text-xs">&times;</button>
+    </div>
+  );
+}
+
+function SortablePhotoCard({ photo, onCaptionSave, onDelete }: {
+  photo: TeacherPhoto; onCaptionSave: (id: string, caption: string) => void; onDelete: (id: string) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: photo.id });
+  const style = { transform: CSS.Transform.toString(transform), transition };
+  const [editing, setEditing] = useState(false);
+  const [caption, setCaption] = useState(photo.caption ?? "");
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="relative group cursor-grab">
+      <img src={photo.photo_url} alt={photo.caption ?? ""} className="w-full aspect-square object-cover rounded-lg" />
+      <button onClick={() => onDelete(photo.id)}
+        className="absolute top-1 right-1 h-5 w-5 rounded-full bg-error/80 text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">&times;</button>
+      {!editing ? (
+        <p className="text-xs text-slate mt-1 truncate cursor-text" onClick={() => setEditing(true)}>
+          {photo.caption || "Add caption..."}
+        </p>
+      ) : (
+        <input className="w-full text-xs border border-silver rounded px-1 py-0.5 mt-1" autoFocus value={caption}
+          onChange={e => setCaption(e.target.value)}
+          onBlur={() => { onCaptionSave(photo.id, caption); setEditing(false); }}
+          onKeyDown={e => { if (e.key === "Enter") { onCaptionSave(photo.id, caption); setEditing(false); } }} />
+      )}
     </div>
   );
 }

@@ -16,7 +16,7 @@ export default async function AdminTeacherProfilePage({
   // Fetch teacher profile
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, first_name, last_name, email, phone, avatar_url, bio")
+    .select("id, first_name, last_name, email, phone, avatar_url, bio, title, bio_short, bio_full, years_experience, education, social_instagram, social_linkedin")
     .eq("id", teacherId)
     .single();
 
@@ -31,6 +31,26 @@ export default async function AdminTeacherProfilePage({
     .single();
 
   if (!role) notFound();
+
+  // Fetch disciplines, affiliations, photos, icon library
+  let disciplines: any[] = [];
+  let affiliations: any[] = [];
+  let photos: any[] = [];
+  let iconLibrary: any[] = [];
+  try {
+    const [disciplinesResult, affiliationsResult, photosResult, iconsResult] = await Promise.all([
+      supabase.from("teacher_disciplines").select("*, icon_library(*)").eq("teacher_id", teacherId).order("sort_order"),
+      supabase.from("teacher_affiliations").select("*, icon_library(*)").eq("teacher_id", teacherId).order("sort_order"),
+      supabase.from("teacher_photos").select("*").eq("teacher_id", teacherId).eq("is_active", true).order("sort_order"),
+      supabase.from("icon_library").select("*").eq("is_active", true).order("sort_order"),
+    ]);
+    disciplines = disciplinesResult.data ?? [];
+    affiliations = affiliationsResult.data ?? [];
+    photos = photosResult.data ?? [];
+    iconLibrary = iconsResult.data ?? [];
+  } catch {
+    // Tables may not exist yet — gracefully default to empty arrays
+  }
 
   // Parallel fetch all related data
   const [
@@ -137,6 +157,10 @@ export default async function AdminTeacherProfilePage({
         availabilityCount={availabilityCount.count ?? 0}
         privateCount={privateCount.count ?? 0}
         tenantId={user.tenantId!}
+        disciplines={disciplines}
+        affiliations={affiliations}
+        photos={photos}
+        iconLibrary={iconLibrary}
       />
     </div>
   );
