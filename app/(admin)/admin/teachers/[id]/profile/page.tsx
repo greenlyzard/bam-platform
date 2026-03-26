@@ -32,25 +32,16 @@ export default async function AdminTeacherProfilePage({
 
   if (!role) notFound();
 
-  // Fetch disciplines, affiliations, photos, icon library
-  let disciplines: any[] = [];
-  let affiliations: any[] = [];
-  let photos: any[] = [];
-  let iconLibrary: any[] = [];
-  try {
-    const [disciplinesResult, affiliationsResult, photosResult, iconsResult] = await Promise.all([
-      supabase.from("teacher_disciplines").select("*, icon_library(*)").eq("teacher_id", teacherId).order("sort_order"),
-      supabase.from("teacher_affiliations").select("*, icon_library(*)").eq("teacher_id", teacherId).order("sort_order"),
-      supabase.from("teacher_photos").select("*").eq("teacher_id", teacherId).eq("is_active", true).order("sort_order"),
-      supabase.from("icon_library").select("*").eq("is_active", true).order("sort_order"),
-    ]);
-    disciplines = disciplinesResult.data ?? [];
-    affiliations = affiliationsResult.data ?? [];
-    photos = photosResult.data ?? [];
-    iconLibrary = iconsResult.data ?? [];
-  } catch {
-    // Tables may not exist yet — gracefully default to empty arrays
+  // Fetch disciplines, affiliations, photos, icon library — each independently
+  async function safeFetch(query: PromiseLike<{ data: any[] | null }>): Promise<any[]> {
+    try { const r = await query; return r.data ?? []; } catch { return []; }
   }
+  const [disciplines, affiliations, photos, iconLibrary] = await Promise.all([
+    safeFetch(supabase.from("teacher_disciplines").select("*, icon_library(*)").eq("teacher_id", teacherId).order("sort_order")),
+    safeFetch(supabase.from("teacher_affiliations").select("*, icon_library(*)").eq("teacher_id", teacherId).order("sort_order")),
+    safeFetch(supabase.from("teacher_photos").select("*").eq("teacher_id", teacherId).eq("is_active", true).order("sort_order")),
+    safeFetch(supabase.from("icon_library").select("*").eq("is_active", true).order("sort_order")),
+  ]);
 
   // Parallel fetch all related data
   const [
