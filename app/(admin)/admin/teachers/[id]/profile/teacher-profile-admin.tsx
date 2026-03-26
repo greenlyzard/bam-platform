@@ -157,7 +157,7 @@ export function TeacherProfileAdmin({
   const [editingInfo, setEditingInfo] = useState(false);
   const [infoForm, setInfoForm] = useState({
     first_name: teacher.first_name, last_name: teacher.last_name,
-    email: teacher.email, phone: teacher.phone ?? "", bio: teacher.bio ?? "",
+    email: teacher.email, phone: teacher.phone ?? "",
   });
   const [newSpec, setNewSpec] = useState("");
 
@@ -200,11 +200,11 @@ export function TeacherProfileAdmin({
     const fd = new FormData();
     fd.set("teacherId", teacher.id);
     fd.set("first_name", infoForm.first_name); fd.set("last_name", infoForm.last_name);
-    fd.set("email", infoForm.email); fd.set("phone", infoForm.phone); fd.set("bio", infoForm.bio);
+    fd.set("email", infoForm.email); fd.set("phone", infoForm.phone);
     startTransition(async () => {
       const res = await updateTeacherBasics(fd);
       if (res.error) return flash(res.error);
-      setTeacher(t => ({ ...t, ...infoForm, phone: infoForm.phone || null, bio: infoForm.bio || null }));
+      setTeacher(t => ({ ...t, ...infoForm, phone: infoForm.phone || null }));
       setEditingInfo(false);
       flash("Teacher info updated");
     });
@@ -457,7 +457,8 @@ export function TeacherProfileAdmin({
                 </h1>
                 <p className="text-sm text-slate">{teacher.email}</p>
                 {teacher.phone && <p className="text-sm text-slate">{teacher.phone}</p>}
-                {teacher.bio && <p className="text-sm text-slate mt-1">{teacher.bio}</p>}
+                {teacher.title && <p className="text-xs text-lavender-dark mt-1">{teacher.title}</p>}
+                {teacher.bio_short && <p className="text-sm text-slate mt-1">{teacher.bio_short}</p>}
                 <div className="flex items-center gap-3 mt-2">
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${teacher.isActive ? "bg-success/10 text-success" : "bg-error/10 text-error"}`}>
                     {teacher.isActive ? "Active" : "Inactive"}
@@ -478,7 +479,6 @@ export function TeacherProfileAdmin({
                 </div>
                 <input className={inputCls} value={infoForm.email} onChange={e => setInfoForm(f => ({ ...f, email: e.target.value }))} placeholder="Email" />
                 <input className={inputCls} value={infoForm.phone} onChange={e => setInfoForm(f => ({ ...f, phone: e.target.value }))} placeholder="Phone" />
-                <textarea className={textareaCls} rows={2} value={infoForm.bio} onChange={e => setInfoForm(f => ({ ...f, bio: e.target.value }))} placeholder="Bio" />
                 <div className="flex gap-2">
                   <button className={btnPrimary} onClick={saveBasics} disabled={isPending}>Save</button>
                   <button className={btnSecondary} onClick={() => setEditingInfo(false)}>Cancel</button>
@@ -487,6 +487,23 @@ export function TeacherProfileAdmin({
             )}
           </div>
         </div>
+      </div>
+
+      {/* I. Enhanced Bio — moved up for visibility */}
+      <div className={cardCls}>
+        <h2 className={headingCls}>Bio & Details</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <label className="text-xs text-slate">Title<input className={inputCls} value={bioForm.title} onChange={e => setBioForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Owner, Director" /></label>
+          <label className="text-xs text-slate">Years Experience<input type="number" className={inputCls} value={bioForm.years_experience} onChange={e => setBioForm(f => ({ ...f, years_experience: e.target.value }))} /></label>
+        </div>
+        <label className="text-xs text-slate">Short Bio (for cards)<textarea className={textareaCls} rows={2} value={bioForm.bio_short} onChange={e => setBioForm(f => ({ ...f, bio_short: e.target.value }))} placeholder="1-2 sentence summary for teacher cards" /></label>
+        <label className="text-xs text-slate">Full Bio<textarea className={textareaCls} rows={6} value={bioForm.bio_full} onChange={e => setBioForm(f => ({ ...f, bio_full: e.target.value }))} placeholder="Full biography for teacher profile page" /></label>
+        <label className="text-xs text-slate">Education<input className={inputCls} value={bioForm.education} onChange={e => setBioForm(f => ({ ...f, education: e.target.value }))} placeholder="e.g. B.F.A. in Dance, University of Arizona" /></label>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <label className="text-xs text-slate">Instagram<input className={inputCls} value={bioForm.social_instagram} onChange={e => setBioForm(f => ({ ...f, social_instagram: e.target.value }))} placeholder="https://instagram.com/..." /></label>
+          <label className="text-xs text-slate">LinkedIn<input className={inputCls} value={bioForm.social_linkedin} onChange={e => setBioForm(f => ({ ...f, social_linkedin: e.target.value }))} placeholder="https://linkedin.com/in/..." /></label>
+        </div>
+        <button className={btnPrimary} onClick={saveEnhancedBio} disabled={isPending}>Save Bio</button>
       </div>
 
       {/* B. Specialties */}
@@ -635,22 +652,7 @@ export function TeacherProfileAdmin({
         )}
       </div>
 
-      {/* I. Enhanced Bio */}
-      <div className={cardCls}>
-        <h2 className={headingCls}>Enhanced Bio</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <label className="text-xs text-slate">Title<input className={inputCls} value={bioForm.title} onChange={e => setBioForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Owner, Director" /></label>
-          <label className="text-xs text-slate">Years Experience<input type="number" className={inputCls} value={bioForm.years_experience} onChange={e => setBioForm(f => ({ ...f, years_experience: e.target.value }))} /></label>
-        </div>
-        <label className="text-xs text-slate">Short Bio<textarea className={textareaCls} rows={2} value={bioForm.bio_short} onChange={e => setBioForm(f => ({ ...f, bio_short: e.target.value }))} /></label>
-        <label className="text-xs text-slate">Full Bio<textarea className={textareaCls} rows={6} value={bioForm.bio_full} onChange={e => setBioForm(f => ({ ...f, bio_full: e.target.value }))} /></label>
-        <label className="text-xs text-slate">Education<input className={inputCls} value={bioForm.education} onChange={e => setBioForm(f => ({ ...f, education: e.target.value }))} /></label>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <label className="text-xs text-slate">Instagram URL<input className={inputCls} value={bioForm.social_instagram} onChange={e => setBioForm(f => ({ ...f, social_instagram: e.target.value }))} placeholder="https://instagram.com/..." /></label>
-          <label className="text-xs text-slate">LinkedIn URL<input className={inputCls} value={bioForm.social_linkedin} onChange={e => setBioForm(f => ({ ...f, social_linkedin: e.target.value }))} placeholder="https://linkedin.com/in/..." /></label>
-        </div>
-        <button className={btnPrimary} onClick={saveEnhancedBio} disabled={isPending}>Save Enhanced Bio</button>
-      </div>
+      {/* Section I moved up — see below Section A */}
 
       {/* J. Disciplines */}
       <div className={cardCls}>
