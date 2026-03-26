@@ -29,16 +29,24 @@ export async function updateEnhancedBio(formData: FormData) {
 
   console.log("[updateEnhancedBio] teacherId:", teacherId, "payload:", JSON.stringify(payload));
 
-  const { data, error, count } = await supabase
+  // Use plain update without .select().single() — avoids RLS issues on the read-back
+  const { error } = await supabase
     .from("profiles")
     .update(payload)
-    .eq("id", teacherId)
-    .select("id, title, bio_short")
-    .single();
+    .eq("id", teacherId);
 
-  console.log("[updateEnhancedBio] result:", { data, error: error?.message, count });
+  console.log("[updateEnhancedBio] error:", error?.message ?? "none");
 
   if (error) return { error: error.message };
+
+  // Verify the update took effect
+  const { data: verify } = await supabase
+    .from("profiles")
+    .select("title, bio_short")
+    .eq("id", teacherId)
+    .single();
+
+  console.log("[updateEnhancedBio] verify:", verify);
 
   revalidatePath("/admin/teachers");
   revalidatePath(`/admin/teachers/${teacherId}/profile`);
