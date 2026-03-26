@@ -2,6 +2,7 @@ import Image from "next/image";
 import { PortalNav } from "@/components/layouts/portal-nav";
 import { PortalUserMenu } from "@/components/layouts/portal-user-menu";
 import { AngelinaChat } from "@/components/angelina/AngelinaChat";
+import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import { RoleProvider } from "@/context/RoleContext";
 import { requireRole } from "@/lib/auth/requireRole";
 import { getStudioSettings } from "@/lib/queries/studio-settings";
@@ -70,9 +71,7 @@ export default async function PortalLayout({
         <main className="sm:hidden px-4 py-6">{children}</main>
 
         {/* Bottom tab bar (mobile) */}
-        <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-silver bg-white sm:hidden">
-          <PortalNav mobile />
-        </nav>
+        <MobileBottomNav variant="portal" />
         <AngelinaChat role="parent" mode="floating" enabled={angelinaEnabled} />
       </div>
     </RoleProvider>
