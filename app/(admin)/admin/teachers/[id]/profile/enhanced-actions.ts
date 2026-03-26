@@ -15,24 +15,33 @@ export async function updateEnhancedBio(formData: FormData) {
   if (!teacherId) return { error: "Missing teacherId" };
 
   const yearsRaw = formData.get("years_experience") as string;
-  const yearsExperience = yearsRaw ? Number(yearsRaw) : null;
+  const yearsExperience = yearsRaw && yearsRaw.trim() !== "" ? Number(yearsRaw) : null;
 
-  const { error } = await supabase
+  const payload = {
+    title: (formData.get("title") as string) || null,
+    bio_short: (formData.get("bio_short") as string) || null,
+    bio_full: (formData.get("bio_full") as string) || null,
+    years_experience: yearsExperience,
+    education: (formData.get("education") as string) || null,
+    social_instagram: (formData.get("social_instagram") as string) || null,
+    social_linkedin: (formData.get("social_linkedin") as string) || null,
+  };
+
+  console.log("[updateEnhancedBio] teacherId:", teacherId, "payload:", JSON.stringify(payload));
+
+  const { data, error, count } = await supabase
     .from("profiles")
-    .update({
-      title: (formData.get("title") as string) || null,
-      bio_short: (formData.get("bio_short") as string) || null,
-      bio_full: (formData.get("bio_full") as string) || null,
-      years_experience: yearsExperience,
-      education: (formData.get("education") as string) || null,
-      social_instagram: (formData.get("social_instagram") as string) || null,
-      social_linkedin: (formData.get("social_linkedin") as string) || null,
-    })
-    .eq("id", teacherId);
+    .update(payload)
+    .eq("id", teacherId)
+    .select("id, title, bio_short")
+    .single();
+
+  console.log("[updateEnhancedBio] result:", { data, error: error?.message, count });
 
   if (error) return { error: error.message };
 
   revalidatePath("/admin/teachers");
+  revalidatePath(`/admin/teachers/${teacherId}/profile`);
   return {};
 }
 

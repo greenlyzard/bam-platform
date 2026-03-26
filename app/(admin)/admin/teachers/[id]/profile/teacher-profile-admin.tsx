@@ -298,12 +298,37 @@ export function TeacherProfileAdmin({
 
   // ── I. Enhanced Bio save ──
   function saveEnhancedBio() {
-    const fd = new FormData(); fd.set("teacherId", teacher.id);
-    Object.entries(bioForm).forEach(([k, v]) => fd.set(k, v));
+    const fd = new FormData();
+    fd.set("teacherId", teacher.id);
+    fd.set("title", bioForm.title);
+    fd.set("bio_short", bioForm.bio_short);
+    fd.set("bio_full", bioForm.bio_full);
+    fd.set("years_experience", bioForm.years_experience);
+    fd.set("education", bioForm.education);
+    fd.set("social_instagram", bioForm.social_instagram);
+    fd.set("social_linkedin", bioForm.social_linkedin);
     startTransition(async () => {
-      const res = await updateEnhancedBio(fd);
-      if (res.error) return flash(res.error);
-      flash("Enhanced bio saved");
+      try {
+        const res = await updateEnhancedBio(fd);
+        if (res.error) {
+          flash(`Error: ${res.error}`);
+        } else {
+          // Update local state to reflect saved values
+          setTeacher((t) => ({
+            ...t,
+            title: bioForm.title || null,
+            bio_short: bioForm.bio_short || null,
+            bio_full: bioForm.bio_full || null,
+            years_experience: bioForm.years_experience ? Number(bioForm.years_experience) : null,
+            education: bioForm.education || null,
+            social_instagram: bioForm.social_instagram || null,
+            social_linkedin: bioForm.social_linkedin || null,
+          }));
+          flash("Enhanced bio saved");
+        }
+      } catch (e) {
+        flash(`Save failed: ${e}`);
+      }
     });
   }
 
