@@ -278,10 +278,12 @@ async function createBillingForSession(
           .single();
 
         if (creditAccount) {
+          const newBalance = creditAccount.balance - amountOwed;
+
           await supabase
             .from("credit_accounts")
             .update({
-              balance: creditAccount.balance - amountOwed,
+              balance: newBalance,
               updated_at: new Date().toISOString(),
             })
             .eq("id", creditAccount.id);
@@ -297,6 +299,54 @@ async function createBillingForSession(
             reference_type: "private_session",
             reference_id: sessionId,
           });
+
+          // Low balance notification (≤ 2 credits remaining)
+          if (newBalance <= 2) {
+            try {
+              // Get student's parent for notification
+              const { data: studentRow } = await supabase
+                .from("students")
+                .select("parent_id, first_name")
+                .eq("id", studentId)
+                .single();
+
+              if (studentRow?.parent_id) {
+                await supabase.from("notifications").insert({
+                  tenant_id: tenantId,
+                  recipient_id: studentRow.parent_id,
+                  notification_type: "low_credit_balance",
+                  title: "Credit balance running low",
+                  body: `${studentRow.first_name} has ${newBalance} credit${newBalance !== 1 ? "s" : ""} remaining. Purchase a pack to keep booking sessions.`,
+                  metadata: { student_id: studentId, balance: newBalance },
+                });
+              }
+
+              // Send email via Resend (best effort)
+              try {
+                const { sendEmail } = await import("@/lib/email/send");
+                if (studentRow?.parent_id) {
+                  const { data: parentProfile } = await supabase
+                    .from("profiles")
+                    .select("email, first_name")
+                    .eq("id", studentRow.parent_id)
+                    .single();
+
+                  if (parentProfile?.email) {
+                    await sendEmail("low-credit-balance", parentProfile.email, {
+                      parent_name: parentProfile.first_name ?? "there",
+                      student_name: studentRow.first_name ?? "your student",
+                      balance: String(newBalance),
+                      action_url: `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/portal/billing`,
+                    });
+                  }
+                }
+              } catch (emailErr) {
+                console.warn("[privates:billing] Low balance email failed", emailErr);
+              }
+            } catch (notifErr) {
+              console.warn("[privates:billing] Low balance notification failed", notifErr);
+            }
+          }
         }
       } catch (err) {
         console.warn("[privates:billing:creditDeduct] Skipped:", err);
@@ -591,6 +641,55 @@ export async function cancelPrivateSession(formData: FormData) {
   revalidatePath("/admin/privates");
   revalidatePath("/teach/privates");
   return {};
+}
+
+// ---------------------------------------------------------------------------
+// updatePrivateSessionStatus
+// ---------------------------------------------------------------------------
+
+export async function checkStudentCredits(formData: FormData) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const studentIds = JSON.parse(formData.get("studentIds") as string ?? "[]") as string[];
+  const tenantId = formData.get("tenantId") as string;
+  const teacherId = formData.get("teacherId") as string;
+  const sessionType = (formData.get("sessionType") as string) || "solo";
+
+  if (studentIds.length === 0) return { credits: [] };
+
+  // Get point cost from teacher_rate_cards
+  let pointCost = 2; // default
+  try {
+    const { data: rateCard } = await supabase
+      .from("teacher_rate_cards")
+      .select("point_cost")
+      .eq("teacher_id", teacherId)
+      .eq("session_type", sessionType)
+      .eq("is_active", true)
+      .single();
+    if (rateCard?.point_cost) pointCost = rateCard.point_cost;
+  } catch {}
+
+  // Get credit balances for all students
+  const credits: { studentId: string; balance: number; pointCost: number; sufficient: boolean }[] = [];
+  for (const sid of studentIds) {
+    try {
+      const { data: account } = await supabase
+        .from("credit_accounts")
+        .select("balance")
+        .eq("tenant_id", tenantId)
+        .eq("student_id", sid)
+        .single();
+      const balance = account?.balance ?? 0;
+      credits.push({ studentId: sid, balance, pointCost, sufficient: balance >= pointCost });
+    } catch {
+      credits.push({ studentId: sid, balance: 0, pointCost, sufficient: false });
+    }
+  }
+
+  return { credits, pointCost };
 }
 
 // ---------------------------------------------------------------------------

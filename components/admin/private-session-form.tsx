@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { SimpleSelect } from "@/components/ui/select";
 import { createClient } from "@/lib/supabase/client";
-import { createPrivateSession } from "@/app/(admin)/admin/privates/actions";
+import { createPrivateSession, checkStudentCredits } from "@/app/(admin)/admin/privates/actions";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -120,6 +120,7 @@ export function PrivateSessionForm({
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [teacherId, setTeacherId] = useState(defaultTeacherId ?? "");
+  const [creditInfo, setCreditInfo] = useState<{ studentId: string; balance: number; pointCost: number; sufficient: boolean }[]>([]);
 
   // Auto-calc endTime when startTime or duration changes
   useEffect(() => {
@@ -158,6 +159,22 @@ export function PrivateSessionForm({
       }
     })();
   }, [defaultTeacherId]);
+
+  // Fetch credit balances when students or teacher change
+  useEffect(() => {
+    if (studentIds.length === 0 || !teacherId) {
+      setCreditInfo([]);
+      return;
+    }
+    const fd = new FormData();
+    fd.set("studentIds", JSON.stringify(studentIds));
+    fd.set("tenantId", tenantId);
+    fd.set("teacherId", teacherId);
+    fd.set("sessionType", sessionType);
+    checkStudentCredits(fd).then((result) => {
+      if ("credits" in result && Array.isArray(result.credits)) setCreditInfo(result.credits as typeof creditInfo);
+    });
+  }, [studentIds, teacherId, sessionType, tenantId]);
 
   // Filtered students for search
   const filteredStudents = useMemo(() => {
@@ -314,6 +331,14 @@ export function PrivateSessionForm({
                     className="inline-flex items-center gap-1 rounded-full bg-lavender/15 text-dark-lavender text-xs font-medium px-2.5 py-1"
                   >
                     {studentName(id)}
+                    {creditInfo.find(c => c.studentId === id) && (() => {
+                      const ci = creditInfo.find(c => c.studentId === id)!;
+                      return (
+                        <span className={`text-[10px] ml-1 ${ci.sufficient ? "text-success" : "text-gold-dark"}`}>
+                          ({ci.balance} credits{!ci.sufficient ? ` — needs ${ci.pointCost}` : ""})
+                        </span>
+                      );
+                    })()}
                     <button type="button" onClick={() => toggleStudent(id)} className="hover:text-red-500">&times;</button>
                   </span>
                 ))}
