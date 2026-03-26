@@ -66,7 +66,26 @@ export default async function DashboardPage() {
             Book a Private
           </Link>
         )}
+        <Link
+          href="/portal/enroll"
+          className="inline-flex items-center gap-1.5 h-9 rounded-lg border border-lavender text-lavender hover:bg-lavender/5 text-sm font-semibold px-4 transition-colors mt-3 ml-2"
+        >
+          + Add a Class
+        </Link>
       </div>
+
+      {/* Re-Enrollment Banner — show seasonally */}
+      {hasStudents && (
+        <div className="rounded-xl border border-lavender/20 bg-lavender/5 p-4 flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <p className="text-sm font-semibold text-charcoal">Secure your spot for next season!</p>
+            <p className="text-xs text-slate mt-0.5">Re-enrollment is now open. Keep your dancer&apos;s schedule.</p>
+          </div>
+          <Link href="/portal/enroll" className="h-9 rounded-lg bg-lavender hover:bg-lavender-dark text-white text-sm font-semibold px-4 transition-colors inline-flex items-center">
+            Re-Enroll Now
+          </Link>
+        </div>
+      )}
 
       {/* No students yet — onboarding */}
       {!hasStudents && (
@@ -95,12 +114,16 @@ export default async function DashboardPage() {
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             {students.slice(0, 4).map((student) => (
-              <DancerCard
-                key={student.id}
-                student={student}
-                enrollmentCount={enrollmentCounts[student.id] ?? 0}
-                badgeCount={badgeCounts[student.id] ?? 0}
-              />
+              <div key={student.id} className="flex flex-col gap-1">
+                <DancerCard
+                  student={student}
+                  enrollmentCount={enrollmentCounts[student.id] ?? 0}
+                  badgeCount={badgeCounts[student.id] ?? 0}
+                />
+                <Link href={`/portal/enroll?student=${student.id}`} className="text-xs text-lavender hover:text-lavender-dark">
+                  + Enroll in Another Class
+                </Link>
+              </div>
             ))}
           </div>
         </section>
