@@ -18,10 +18,10 @@ export default async function TeachersPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-heading font-semibold text-charcoal">
-            Teachers
+            Staff
           </h1>
           <p className="mt-1 text-sm text-slate">
-            {teachers.length} teachers ·{" "}
+            {teachers.length} staff members ·{" "}
             {complianceIssues.length > 0 ? (
               <span className="text-error">
                 {complianceIssues.length} compliance issue

@@ -441,25 +441,50 @@ export function TeacherProfileAdmin({
 
       {/* A. Profile Header */}
       <div className={cardCls}>
-        <div className="flex items-start gap-4">
-          <div className="h-16 w-16 rounded-full bg-lavender/20 flex items-center justify-center text-lavender text-xl font-heading font-bold shrink-0">
-            {teacher.avatar_url ? (
-              <img src={teacher.avatar_url} alt="" className="h-16 w-16 rounded-full object-cover" />
-            ) : (
-              `${teacher.first_name[0]}${teacher.last_name[0]}`
-            )}
+        <div className="flex items-start gap-6">
+          {/* Large avatar on left */}
+          <div className="shrink-0 flex flex-col items-center gap-2">
+            <div className="h-[120px] w-[120px] rounded-full bg-lavender/20 flex items-center justify-center text-lavender text-3xl font-heading font-bold overflow-hidden">
+              {teacher.avatar_url ? (
+                <img src={teacher.avatar_url} alt="" className="h-full w-full object-cover" />
+              ) : (
+                `${teacher.first_name[0]}${teacher.last_name[0]}`
+              )}
+            </div>
+            <label className="text-xs text-lavender hover:text-lavender-dark cursor-pointer">
+              Change Photo
+              <input type="file" accept=".jpg,.jpeg,.png,.webp" className="hidden" onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const fd = new FormData();
+                fd.set("file", file);
+                fd.set("teacherId", teacher.id);
+                fd.set("tenantId", tenantId);
+                // Upload as avatar via the profile API
+                const res = await fetch(`/api/admin/students/${teacher.id}/avatar`, { method: "POST", body: fd });
+                if (res.ok) {
+                  const { url } = await res.json();
+                  setTeacher(t => ({ ...t, avatar_url: url }));
+                  flash("Photo updated");
+                } else {
+                  flash("Photo upload failed");
+                }
+                e.target.value = "";
+              }} />
+            </label>
           </div>
+          {/* Info on right */}
           <div className="flex-1 min-w-0">
             {!editingInfo ? (
               <>
-                <h1 className="text-xl font-heading font-bold text-charcoal">
+                <h1 className="text-2xl font-heading font-bold text-charcoal">
                   {teacher.first_name} {teacher.last_name}
                 </h1>
-                <p className="text-sm text-slate">{teacher.email}</p>
+                {teacher.title && <p className="text-sm text-lavender-dark font-medium">{teacher.title}</p>}
+                <p className="text-sm text-slate mt-1">{teacher.email}</p>
                 {teacher.phone && <p className="text-sm text-slate">{teacher.phone}</p>}
-                {teacher.title && <p className="text-xs text-lavender-dark mt-1">{teacher.title}</p>}
-                {teacher.bio_short && <p className="text-sm text-slate mt-1">{teacher.bio_short}</p>}
-                <div className="flex items-center gap-3 mt-2">
+                {teacher.bio_short && <p className="text-sm text-mist mt-2 italic">{teacher.bio_short}</p>}
+                <div className="flex items-center gap-3 mt-3">
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${teacher.isActive ? "bg-success/10 text-success" : "bg-error/10 text-error"}`}>
                     {teacher.isActive ? "Active" : "Inactive"}
                   </span>
