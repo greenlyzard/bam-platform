@@ -161,7 +161,7 @@ export default async function AdminDashboardPage() {
         </h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <QuickAction href="/admin/classes" icon="▦" label="Classes" />
-          <QuickAction href="/admin/teachers" icon="★" label="Teachers" />
+          <QuickAction href="/admin/staff" icon="★" label="Teachers" />
           <QuickAction href="/admin/students" icon="♡" label="Students" />
           <QuickAction href="/admin/expansion" icon="●" label="Expansion" />
           <QuickAction href="/admin/performances" icon="♛" label="Performances" />

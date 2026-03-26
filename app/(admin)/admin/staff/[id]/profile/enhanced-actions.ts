@@ -48,8 +48,8 @@ export async function updateEnhancedBio(formData: FormData) {
 
   console.log("[updateEnhancedBio] verify:", verify);
 
-  revalidatePath("/admin/teachers");
-  revalidatePath(`/admin/teachers/${teacherId}/profile`);
+  revalidatePath("/admin/staff");
+  revalidatePath(`/admin/staff/${teacherId}/profile`);
   return {};
 }
 
@@ -95,7 +95,7 @@ export async function addDiscipline(formData: FormData) {
 
   if (error) return { error: error.message };
 
-  revalidatePath("/admin/teachers");
+  revalidatePath("/admin/staff");
   return {};
 }
 
@@ -117,7 +117,7 @@ export async function removeDiscipline(formData: FormData) {
 
   if (error) return { error: error.message };
 
-  revalidatePath("/admin/teachers");
+  revalidatePath("/admin/staff");
   return {};
 }
 
@@ -150,7 +150,7 @@ export async function reorderDisciplines(formData: FormData) {
     if (error) return { error: error.message };
   }
 
-  revalidatePath("/admin/teachers");
+  revalidatePath("/admin/staff");
   return {};
 }
 
@@ -200,7 +200,7 @@ export async function addAffiliation(formData: FormData) {
 
   if (error) return { error: error.message };
 
-  revalidatePath("/admin/teachers");
+  revalidatePath("/admin/staff");
   return {};
 }
 
@@ -222,7 +222,7 @@ export async function removeAffiliation(formData: FormData) {
 
   if (error) return { error: error.message };
 
-  revalidatePath("/admin/teachers");
+  revalidatePath("/admin/staff");
   return {};
 }
 
@@ -254,7 +254,7 @@ export async function reorderAffiliations(formData: FormData) {
     if (error) return { error: error.message };
   }
 
-  revalidatePath("/admin/teachers");
+  revalidatePath("/admin/staff");
   return {};
 }
 
@@ -322,7 +322,7 @@ export async function uploadTeacherPhoto(formData: FormData) {
 
   if (insertError) return { error: insertError.message };
 
-  revalidatePath("/admin/teachers");
+  revalidatePath("/admin/staff");
   return { id: inserted.id, url: photoUrl };
 }
 
@@ -346,7 +346,7 @@ export async function updatePhotoCaption(formData: FormData) {
 
   if (error) return { error: error.message };
 
-  revalidatePath("/admin/teachers");
+  revalidatePath("/admin/staff");
   return {};
 }
 
@@ -390,7 +390,7 @@ export async function deletePhoto(formData: FormData) {
     }
   }
 
-  revalidatePath("/admin/teachers");
+  revalidatePath("/admin/staff");
   return {};
 }
 
@@ -422,7 +422,7 @@ export async function reorderPhotos(formData: FormData) {
     if (error) return { error: error.message };
   }
 
-  revalidatePath("/admin/teachers");
+  revalidatePath("/admin/staff");
   return {};
 }
 
@@ -445,6 +445,6 @@ export async function togglePhotoActive(formData: FormData) {
 
   if (error) return { error: error.message };
 
-  revalidatePath("/admin/teachers");
+  revalidatePath("/admin/staff");
   return {};
 }

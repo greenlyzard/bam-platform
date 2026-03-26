@@ -200,7 +200,7 @@ export function TeacherList({ teachers }: { teachers: Teacher[] }) {
                 {/* Profile link */}
                 <div className="mt-3 pt-3 border-t border-silver">
                   <a
-                    href={`/admin/teachers/${t.id}/profile`}
+                    href={`/admin/staff/${t.id}/profile`}
                     onClick={(e) => e.stopPropagation()}
                     className="inline-flex items-center gap-1 text-xs text-lavender hover:text-lavender-dark font-medium"
                   >

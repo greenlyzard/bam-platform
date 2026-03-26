@@ -18,7 +18,7 @@ export default async function TeacherSubstitutesPage({
     .eq("id", id)
     .single();
 
-  if (!profile) redirect("/admin/teachers");
+  if (!profile) redirect("/admin/staff");
 
   const { data: teacher } = await supabase
     .from("teachers")

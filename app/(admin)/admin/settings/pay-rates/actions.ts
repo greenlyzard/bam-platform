@@ -68,6 +68,6 @@ export async function updatePayRate(formData: FormData) {
   }
 
   revalidatePath("/admin/settings/pay-rates");
-  revalidatePath("/admin/teachers");
+  revalidatePath("/admin/staff");
   return { success: true };
 }

@@ -26,7 +26,7 @@ export async function updateTeacherBasics(formData: FormData) {
 
   if (error) return { error: error.message };
 
-  revalidatePath("/admin/teachers");
+  revalidatePath("/admin/staff");
   return {};
 }
 
@@ -51,7 +51,7 @@ export async function toggleTeacherActive(formData: FormData) {
 
   if (error) return { error: error.message };
 
-  revalidatePath("/admin/teachers");
+  revalidatePath("/admin/staff");
   return {};
 }
 
@@ -92,7 +92,7 @@ export async function addSpecialty(formData: FormData) {
 
   if (error) return { error: error.message };
 
-  revalidatePath("/admin/teachers");
+  revalidatePath("/admin/staff");
   return {};
 }
 
@@ -114,7 +114,7 @@ export async function removeSpecialty(formData: FormData) {
 
   if (error) return { error: error.message };
 
-  revalidatePath("/admin/teachers");
+  revalidatePath("/admin/staff");
   return {};
 }
 
@@ -140,7 +140,7 @@ export async function updateSpecialtyOrder(formData: FormData) {
 
   if (error) return { error: error.message };
 
-  revalidatePath("/admin/teachers");
+  revalidatePath("/admin/staff");
   return {};
 }
 
@@ -188,7 +188,7 @@ export async function upsertRateCard(formData: FormData) {
 
   if (error) return { error: error.message };
 
-  revalidatePath("/admin/teachers");
+  revalidatePath("/admin/staff");
   return {};
 }
 
@@ -231,7 +231,7 @@ export async function updateCompliance(formData: FormData) {
 
   if (error) return { error: error.message };
 
-  revalidatePath("/admin/teachers");
+  revalidatePath("/admin/staff");
   return {};
 }
 
@@ -282,6 +282,6 @@ export async function updateSubEligibility(formData: FormData) {
 
   if (error) return { error: error.message };
 
-  revalidatePath("/admin/teachers");
+  revalidatePath("/admin/staff");
   return {};
 }

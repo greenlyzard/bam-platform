@@ -282,7 +282,7 @@ export function TeacherEditDrawer({
             <div className="rounded-lg border border-lavender/20 bg-lavender/5 p-3">
               <p className="text-xs text-slate mb-2">Edit bio, disciplines, affiliations, and photos on the full profile page.</p>
               <a
-                href={`/admin/teachers/${teacherId}/profile`}
+                href={`/admin/staff/${teacherId}/profile`}
                 className="inline-flex items-center gap-1.5 h-8 rounded-md bg-lavender hover:bg-lavender-dark text-white text-xs font-semibold px-3 transition-colors"
               >
                 View Full Profile →
