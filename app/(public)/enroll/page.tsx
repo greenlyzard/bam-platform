@@ -1,5 +1,6 @@
 import { EnrollmentWizard } from "./enrollment-wizard";
 import { getClassCatalog } from "@/lib/queries/enroll";
+import { EnrollPageClient } from "./enroll-page-client";
 
 export const metadata = {
   title: "Enroll — Ballet Academy and Movement",
@@ -26,8 +27,8 @@ export default async function EnrollPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-4 py-8">
-        <EnrollmentWizard classes={classes} />
+      <main className="mx-auto max-w-5xl px-4 py-8">
+        <EnrollPageClient classes={classes} />
       </main>
 
       {/* Footer */}

@@ -402,3 +402,57 @@ export async function bookTrialClass(formData: FormData) {
     message: `Trial class booked for ${parsed.data.childName}! Check ${parsed.data.email} for confirmation details.`,
   };
 }
+
+// ── Trial Abuse Check ───────────────────────────────────────────
+
+/**
+ * Check trial_history for matching DOB + parent email to detect
+ * repeat trial usage. Returns { abused, approved }.
+ */
+export async function checkTrialAbuse(formData: FormData) {
+  const supabase = await createClient();
+
+  const dob = formData.get("dob") as string;
+  const parentEmail = formData.get("parentEmail") as string;
+
+  if (!dob || !parentEmail) {
+    return { abused: false, approved: false };
+  }
+
+  // Check trial_history for matching DOB + parent email
+  const { data: existing } = await supabase
+    .from("trial_history")
+    .select("id, approved_by")
+    .eq("student_dob", dob)
+    .eq("parent_email", parentEmail.toLowerCase())
+    .limit(1)
+    .maybeSingle();
+
+  if (!existing) {
+    return { abused: false, approved: false };
+  }
+
+  // Check if a super_admin has explicitly approved this repeat trial
+  const approved = !!existing.approved_by;
+
+  if (!approved) {
+    // Create admin notification for trial abuse detection
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    await supabase.from("admin_notifications").insert({
+      type: "trial_abuse",
+      title: "Possible repeat trial detected",
+      message: `Parent email ${parentEmail} attempted a second trial for a student with DOB ${dob}.`,
+      metadata: {
+        parent_email: parentEmail,
+        student_dob: dob,
+        user_id: user?.id ?? null,
+        trial_history_id: existing.id,
+      },
+    });
+  }
+
+  return { abused: true, approved };
+}
