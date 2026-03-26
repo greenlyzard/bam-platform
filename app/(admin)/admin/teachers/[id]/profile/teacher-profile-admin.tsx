@@ -11,7 +11,7 @@ import {
 import {
   updateEnhancedBio, addDiscipline, removeDiscipline, reorderDisciplines,
   addAffiliation, removeAffiliation, reorderAffiliations,
-  uploadTeacherPhoto, updatePhotoCaption, deletePhoto, reorderPhotos,
+  uploadTeacherPhoto, updatePhotoCaption, deletePhoto, reorderPhotos, togglePhotoActive,
 } from "./enhanced-actions";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
@@ -32,7 +32,7 @@ interface Teacher {
 interface IconItem { id: string; name: string; image_url: string | null; category: string | null; sort_order: number }
 interface Discipline { id: string; teacher_id: string; icon_id: string | null; name: string; is_certified: boolean; sort_order: number; icon_library?: IconItem | null }
 interface Affiliation { id: string; teacher_id: string; icon_id: string | null; name: string; affiliation_type: string; role: string | null; years: string | null; location: string | null; sort_order: number; icon_library?: IconItem | null }
-interface TeacherPhoto { id: string; teacher_id: string; photo_url: string; caption: string | null; sort_order: number }
+interface TeacherPhoto { id: string; teacher_id: string; photo_url: string; caption: string | null; sort_order: number; is_active?: boolean }
 interface Specialty { id: string; specialty: string; sort_order: number }
 interface RateCard {
   id: string; session_type: string;
@@ -361,16 +361,31 @@ export function TeacherProfileAdmin({
   }
 
   // ── L. Photos ──
+  const [uploadingCount, setUploadingCount] = useState(0);
   function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]; if (!file) return;
-    const fd = new FormData(); fd.set("tenantId", tenantId); fd.set("teacherId", teacher.id); fd.set("file", file);
-    startTransition(async () => {
-      const res = await uploadTeacherPhoto(fd);
-      if (res.error) return flash(res.error);
-      setTPhotos(p => [...p, { id: res.id!, teacher_id: teacher.id, photo_url: res.url!, caption: null, sort_order: p.length }]);
-      flash("Photo uploaded");
-    });
+    const files = e.target.files; if (!files || files.length === 0) return;
+    const fileArr = Array.from(files);
+    setUploadingCount(c => c + fileArr.length);
+    for (const file of fileArr) {
+      const fd = new FormData(); fd.set("tenantId", tenantId); fd.set("teacherId", teacher.id); fd.set("file", file);
+      startTransition(async () => {
+        const res = await uploadTeacherPhoto(fd);
+        setUploadingCount(c => c - 1);
+        if (res.error) return flash(res.error);
+        setTPhotos(p => [...p, { id: res.id!, teacher_id: teacher.id, photo_url: res.url!, caption: null, sort_order: p.length, is_active: true }]);
+        flash("Photo uploaded");
+      });
+    }
     e.target.value = "";
+  }
+  function handleTogglePhotoActive(photoId: string, isActive: boolean) {
+    const fd = new FormData(); fd.set("photoId", photoId); fd.set("isActive", String(isActive));
+    startTransition(async () => {
+      const res = await togglePhotoActive(fd);
+      if (res.error) return flash(res.error);
+      setTPhotos(p => p.map(ph => ph.id === photoId ? { ...ph, is_active: isActive } : ph));
+      flash(isActive ? "Photo activated" : "Photo hidden");
+    });
   }
   function handleCaptionSave(photoId: string, caption: string) {
     const fd = new FormData(); fd.set("photoId", photoId); fd.set("caption", caption);
@@ -690,21 +705,46 @@ export function TeacherProfileAdmin({
       {/* L. Photo Gallery */}
       <div className={cardCls}>
         <h2 className={headingCls}>Photo Gallery</h2>
-        {tPhotos.length === 0 ? <p className="text-sm text-slate">No photos uploaded</p> : (
+
+        {/* Drag-and-drop upload zone */}
+        <label
+          className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-silver rounded-xl p-8 cursor-pointer hover:border-lavender hover:bg-lavender/5 transition-colors"
+          onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add("border-lavender", "bg-lavender/5"); }}
+          onDragLeave={e => { e.currentTarget.classList.remove("border-lavender", "bg-lavender/5"); }}
+          onDrop={e => {
+            e.preventDefault(); e.currentTarget.classList.remove("border-lavender", "bg-lavender/5");
+            const dt = e.dataTransfer; if (dt?.files?.length) {
+              const input = e.currentTarget.querySelector("input") as HTMLInputElement;
+              if (input) { input.files = dt.files; input.dispatchEvent(new Event("change", { bubbles: true })); }
+            }
+          }}
+        >
+          <svg className="w-8 h-8 text-slate" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 16V4m0 0l-4 4m4-4l4 4M4 20h16" /></svg>
+          <span className="text-sm text-slate">Drop photos here or click to browse</span>
+          <span className="text-xs text-silver">JPG, PNG, WebP</span>
+          <input type="file" accept=".jpg,.jpeg,.png,.webp" multiple className="hidden" onChange={handlePhotoUpload} />
+        </label>
+
+        {/* Uploading indicator */}
+        {uploadingCount > 0 && (
+          <div className="flex items-center gap-2 text-sm text-lavender">
+            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>
+            Uploading {uploadingCount} photo{uploadingCount > 1 ? "s" : ""}...
+          </div>
+        )}
+
+        {/* Photo grid */}
+        {tPhotos.length > 0 && (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handlePhotoDragEnd}>
             <SortableContext items={tPhotos.map(p => p.id)} strategy={verticalListSortingStrategy}>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {tPhotos.map(p => (
-                  <SortablePhotoCard key={p.id} photo={p} onCaptionSave={handleCaptionSave} onDelete={handleDeletePhoto} />
+                  <SortablePhotoCard key={p.id} photo={p} onCaptionSave={handleCaptionSave} onDelete={handleDeletePhoto} onToggleActive={handleTogglePhotoActive} />
                 ))}
               </div>
             </SortableContext>
           </DndContext>
         )}
-        <label className={btnSecondary + " cursor-pointer"}>
-          + Upload Photo
-          <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
-        </label>
       </div>
 
       {/* M. Contact Channels */}
@@ -879,28 +919,60 @@ function SortableAffilCard({ affil, onRemove }: { affil: Affiliation; onRemove: 
   );
 }
 
-function SortablePhotoCard({ photo, onCaptionSave, onDelete }: {
-  photo: TeacherPhoto; onCaptionSave: (id: string, caption: string) => void; onDelete: (id: string) => void;
+function SortablePhotoCard({ photo, onCaptionSave, onDelete, onToggleActive }: {
+  photo: TeacherPhoto; onCaptionSave: (id: string, caption: string) => void; onDelete: (id: string) => void; onToggleActive: (id: string, active: boolean) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: photo.id });
   const style = { transform: CSS.Transform.toString(transform), transition };
   const [editing, setEditing] = useState(false);
   const [caption, setCaption] = useState(photo.caption ?? "");
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const isActive = photo.is_active !== false;
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="relative group cursor-grab">
-      <img src={photo.photo_url} alt={photo.caption ?? ""} className="w-full aspect-square object-cover rounded-lg" />
-      <button onClick={() => onDelete(photo.id)}
-        className="absolute top-1 right-1 h-5 w-5 rounded-full bg-error/80 text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">&times;</button>
-      {!editing ? (
-        <p className="text-xs text-slate mt-1 truncate cursor-text" onClick={() => setEditing(true)}>
-          {photo.caption || "Add caption..."}
-        </p>
-      ) : (
-        <input className="w-full text-xs border border-silver rounded px-1 py-0.5 mt-1" autoFocus value={caption}
-          onChange={e => setCaption(e.target.value)}
-          onBlur={() => { onCaptionSave(photo.id, caption); setEditing(false); }}
-          onKeyDown={e => { if (e.key === "Enter") { onCaptionSave(photo.id, caption); setEditing(false); } }} />
-      )}
+    <div ref={setNodeRef} style={style} className={`relative group rounded-lg border ${isActive ? "border-silver" : "border-silver/50 opacity-60"} bg-white overflow-hidden`}>
+      {/* Drag handle */}
+      <div {...attributes} {...listeners} className="absolute top-1 left-1 z-10 cursor-grab p-1 rounded bg-white/80 opacity-0 group-hover:opacity-100 transition-opacity">
+        <svg className="w-3.5 h-3.5 text-slate" fill="currentColor" viewBox="0 0 16 16"><circle cx="5" cy="3" r="1.5"/><circle cx="11" cy="3" r="1.5"/><circle cx="5" cy="8" r="1.5"/><circle cx="11" cy="8" r="1.5"/><circle cx="5" cy="13" r="1.5"/><circle cx="11" cy="13" r="1.5"/></svg>
+      </div>
+
+      <img src={photo.photo_url} alt={photo.caption ?? ""} className="w-full aspect-square object-cover" />
+
+      <div className="p-2 space-y-1.5">
+        {/* Caption */}
+        {!editing ? (
+          <p className="text-xs text-slate truncate cursor-text" onClick={() => setEditing(true)}>
+            {photo.caption || "Add caption..."}
+          </p>
+        ) : (
+          <input className="w-full text-xs border border-silver rounded px-1 py-0.5" autoFocus value={caption}
+            onChange={e => setCaption(e.target.value)}
+            onBlur={() => { onCaptionSave(photo.id, caption); setEditing(false); }}
+            onKeyDown={e => { if (e.key === "Enter") { onCaptionSave(photo.id, caption); setEditing(false); } }} />
+        )}
+
+        {/* Controls row */}
+        <div className="flex items-center justify-between">
+          {/* Active toggle */}
+          <button
+            onClick={() => onToggleActive(photo.id, !isActive)}
+            className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${isActive ? "bg-success/10 text-success" : "bg-silver/20 text-slate"}`}
+          >
+            {isActive ? "Active" : "Hidden"}
+          </button>
+
+          {/* Delete */}
+          {!confirmDelete ? (
+            <button onClick={() => setConfirmDelete(true)}
+              className="text-[10px] text-slate hover:text-error transition-colors">&times; Delete</button>
+          ) : (
+            <span className="text-[10px] flex items-center gap-1">
+              Delete?
+              <button onClick={() => { onDelete(photo.id); setConfirmDelete(false); }} className="text-error font-semibold">Yes</button>
+              <button onClick={() => setConfirmDelete(false)} className="text-slate font-semibold">No</button>
+            </span>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

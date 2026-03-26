@@ -265,7 +265,7 @@ export async function uploadTeacherPhoto(formData: FormData) {
 
   // Upload to Supabase Storage
   const { error: uploadError } = await supabase.storage
-    .from("teacher-photos")
+    .from("avatars")
     .upload(storagePath, file, {
       contentType: file.type,
       upsert: false,
@@ -275,7 +275,7 @@ export async function uploadTeacherPhoto(formData: FormData) {
 
   // Get the public URL
   const { data: urlData } = supabase.storage
-    .from("teacher-photos")
+    .from("avatars")
     .getPublicUrl(storagePath);
 
   const photoUrl = urlData.publicUrl;
@@ -369,7 +369,7 @@ export async function deletePhoto(formData: FormData) {
     const idx = photo.photo_url.indexOf(marker);
     if (idx !== -1) {
       const storagePath = "teacher-photos/" + photo.photo_url.slice(idx + marker.length);
-      await supabase.storage.from("teacher-photos").remove([storagePath]);
+      await supabase.storage.from("avatars").remove([storagePath]);
     }
   }
 
@@ -404,6 +404,29 @@ export async function reorderPhotos(formData: FormData) {
 
     if (error) return { error: error.message };
   }
+
+  revalidatePath("/admin/teachers");
+  return {};
+}
+
+// ---------------------------------------------------------------------------
+// 12. Toggle photo active status
+// ---------------------------------------------------------------------------
+export async function togglePhotoActive(formData: FormData) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const photoId = formData.get("photoId") as string;
+  const isActive = formData.get("isActive") === "true";
+  if (!photoId) return { error: "Missing photoId" };
+
+  const { error } = await supabase
+    .from("teacher_photos")
+    .update({ is_active: isActive })
+    .eq("id", photoId);
+
+  if (error) return { error: error.message };
 
   revalidatePath("/admin/teachers");
   return {};
