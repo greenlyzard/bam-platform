@@ -98,6 +98,14 @@ export default async function ClassesPage() {
     .eq("tenant_id", user.tenantId!)
     .order("sort_order");
 
+  // Column list is driven by class_field_config table. To add a new field, insert a row — no code changes needed.
+  const { data: fieldConfigRows } = await supabase
+    .from("class_field_config")
+    .select("field_key, label, field_type, admin_visible, admin_default_on, is_core, sort_order, group_name")
+    .eq("tenant_id", user.tenantId!)
+    .eq("admin_visible", true)
+    .order("sort_order");
+
   // Fetch class phases
   const { data: classPhases } = await supabase
     .from("class_phases")
@@ -127,6 +135,7 @@ export default async function ClassesPage() {
       closures={closures ?? []}
       pricingRules={pricingRules ?? []}
       classPhases={classPhases ?? []}
+      fieldConfig={fieldConfigRows ?? []}
       tenantId={user.tenantId!}
     />
   );

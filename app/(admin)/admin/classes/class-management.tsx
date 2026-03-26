@@ -162,45 +162,58 @@ interface ColumnConfig {
   key: string;
   label: string;
   visible: boolean;
+  fieldType?: string;
 }
 
-const DEFAULT_COLUMNS: ColumnConfig[] = [
-  { key: "name", label: "Name", visible: true },
-  { key: "teachers", label: "Teacher(s)", visible: true },
-  { key: "levels", label: "Levels", visible: true },
-  { key: "disciplines", label: "Disciplines", visible: true },
-  { key: "daytime", label: "Day/Time", visible: true },
-  { key: "season", label: "Season", visible: true },
-  { key: "enrolled", label: "Enrolled", visible: true },
-  { key: "status", label: "Status", visible: true },
-  { key: "onlinereg", label: "Online Reg", visible: true },
-  { key: "capacity", label: "Capacity", visible: false },
-  { key: "type", label: "Type", visible: false },
-  { key: "startdate", label: "Start Date", visible: false },
-  { key: "enddate", label: "End Date", visible: false },
-  { key: "room", label: "Room/Location", visible: false },
-];
-
-// Name column cannot be hidden
-const LOCKED_COLUMNS = new Set(["name"]);
+type FieldConfigRow = {
+  field_key: string;
+  label: string;
+  field_type: string;
+  admin_default_on: boolean;
+  is_core: boolean;
+  sort_order: number;
+  group_name: string;
+};
 
 const COLUMNS_STORAGE_KEY = "bam-classes-columns";
 
-function loadColumns(): ColumnConfig[] {
-  if (typeof window === "undefined") return DEFAULT_COLUMNS;
+function buildDefaultColumns(config: FieldConfigRow[]): ColumnConfig[] {
+  return config.map((f) => ({
+    key: f.field_key,
+    label: f.label,
+    visible: f.admin_default_on,
+    fieldType: f.field_type,
+  }));
+}
+
+function buildLockedColumns(config: FieldConfigRow[]): Set<string> {
+  return new Set(config.filter((f) => f.is_core).map((f) => f.field_key));
+}
+
+function loadColumns(defaults: ColumnConfig[]): ColumnConfig[] {
+  if (typeof window === "undefined") return defaults;
   try {
     const saved = localStorage.getItem(COLUMNS_STORAGE_KEY);
-    if (!saved) return DEFAULT_COLUMNS;
+    if (!saved) return defaults;
     const parsed = JSON.parse(saved) as ColumnConfig[];
-    // Merge with defaults to handle new columns added later
-    const savedKeys = new Set(parsed.map((c) => c.key));
+    // Build a map of saved visibility preferences
+    const savedMap = new Map(parsed.map((c) => [c.key, c.visible]));
+    // Merge: keep DB order, use saved visibility where available, default for new keys
+    const defaultKeys = new Set(defaults.map((d) => d.key));
     const merged = [
-      ...parsed.filter((c) => DEFAULT_COLUMNS.some((d) => d.key === c.key)),
-      ...DEFAULT_COLUMNS.filter((d) => !savedKeys.has(d.key)),
+      // Saved columns that still exist in DB config (preserve user order)
+      ...parsed
+        .filter((c) => defaultKeys.has(c.key))
+        .map((c) => {
+          const def = defaults.find((d) => d.key === c.key)!;
+          return { ...def, visible: c.visible };
+        }),
+      // New DB keys not yet in localStorage — use admin_default_on
+      ...defaults.filter((d) => !savedMap.has(d.key)),
     ];
     return merged;
   } catch {
-    return DEFAULT_COLUMNS;
+    return defaults;
   }
 }
 
@@ -230,6 +243,7 @@ export function ClassManagement({
   closures,
   pricingRules: initialPricingRules,
   classPhases: initialClassPhases,
+  fieldConfig,
   tenantId,
 }: {
   classes: ClassRecord[];
@@ -242,6 +256,7 @@ export function ClassManagement({
   closures: ClosureRecord[];
   pricingRules: PricingRule[];
   classPhases: ClassPhase[];
+  fieldConfig: FieldConfigRow[];
   tenantId: string;
 }) {
   const [classes, setClasses] = useState(initialClasses);
@@ -266,13 +281,19 @@ export function ClassManagement({
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
   const activeFilterCount = [filterSeason, filterTeacher, filterLevel, filterDiscipline, filterDay, filterType, filterStatus].filter(Boolean).length;
+
+  // Column config driven by class_field_config table
+  const DEFAULT_COLUMNS = buildDefaultColumns(fieldConfig);
+  const LOCKED_COLUMNS = buildLockedColumns(fieldConfig);
+
   const [columns, setColumns] = useState<ColumnConfig[]>(DEFAULT_COLUMNS);
   const [columnsPopoverOpen, setColumnsPopoverOpen] = useState(false);
   const columnsPopoverRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setColumns(loadColumns());
-  }, []);
+    setColumns(loadColumns(DEFAULT_COLUMNS));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fieldConfig]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -947,7 +968,7 @@ ${(byDay[d] ?? [])
                   <th
                     key={col.key}
                     className={`px-3 py-2 text-xs font-semibold text-mist ${
-                      col.key === "enrolled" || col.key === "status" || col.key === "onlinereg" ? "text-center" : "text-left"
+                      col.fieldType === "integer" || col.fieldType === "currency" || col.key === "enrolled" || col.key === "status" || col.key === "onlinereg" ? "text-center" : "text-left"
                     }`}
                   >
                     {col.label}
@@ -963,13 +984,12 @@ ${(byDay[d] ?? [])
                   const isFull = c.enrolledCount >= maxEnroll;
                   const seasonName = seasons.find((s) => s.id === c.season_id)?.name ?? c.season ?? "—";
 
+                  // Special-case columns that need joins or custom rendering
                   switch (col.key) {
                     case "name":
                       return <td key={col.key} className="px-3 py-2"><span className="font-medium text-charcoal">{c.name}</span></td>;
                     case "teachers":
                       return <td key={col.key} className="px-3 py-2 text-slate text-xs">{getTeacherNames(c.id, c.legacyTeacherName)}</td>;
-                    case "levels":
-                      return <td key={col.key} className="px-3 py-2 text-xs text-slate">{c.levels?.join(", ") ?? "—"}</td>;
                     case "disciplines":
                       return <td key={col.key} className="px-3 py-2 text-xs text-slate">{getDisciplineNames(c.discipline_ids)}</td>;
                     case "daytime":
@@ -1007,22 +1027,70 @@ ${(byDay[d] ?? [])
                           </button>
                         </td>
                       );
-                    case "capacity":
-                      return <td key={col.key} className="px-3 py-2 text-center text-xs text-slate">{maxEnroll}</td>;
                     case "type": {
                       const types: string[] = [];
                       if (c.is_rehearsal) types.push("Rehearsal");
                       if (c.is_performance) types.push("Performance");
                       return <td key={col.key} className="px-3 py-2 text-xs text-slate">{types.length > 0 ? types.join(", ") : "—"}</td>;
                     }
-                    case "startdate":
-                      return <td key={col.key} className="px-3 py-2 text-xs text-slate whitespace-nowrap">{c.start_date ?? "—"}</td>;
-                    case "enddate":
-                      return <td key={col.key} className="px-3 py-2 text-xs text-slate whitespace-nowrap">{c.end_date ?? "—"}</td>;
-                    case "room":
-                      return <td key={col.key} className="px-3 py-2 text-xs text-slate">{c.room ?? "—"}</td>;
+                  }
+
+                  // Generic rendering based on field_type from class_field_config
+                  const value = (c as unknown as Record<string, unknown>)[col.key];
+                  const ft = col.fieldType;
+
+                  switch (ft) {
+                    case "boolean":
+                      return (
+                        <td key={col.key} className="px-3 py-2 text-center">
+                          {value ? (
+                            <span className="inline-flex items-center rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700">Yes</span>
+                          ) : (
+                            <span className="text-xs text-mist">—</span>
+                          )}
+                        </td>
+                      );
+                    case "integer":
+                      return <td key={col.key} className="px-3 py-2 text-center text-xs text-slate">{value != null ? String(value) : "—"}</td>;
+                    case "currency":
+                      return (
+                        <td key={col.key} className="px-3 py-2 text-center text-xs text-slate">
+                          {value != null ? `$${(Number(value) / 100).toFixed(2)}` : "—"}
+                        </td>
+                      );
+                    case "date": {
+                      let formatted = "—";
+                      if (value) {
+                        const d = new Date(String(value));
+                        if (!isNaN(d.getTime())) {
+                          formatted = `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}/${d.getFullYear()}`;
+                        }
+                      }
+                      return <td key={col.key} className="px-3 py-2 text-xs text-slate whitespace-nowrap">{formatted}</td>;
+                    }
+                    case "time": {
+                      let formatted = "—";
+                      if (value) {
+                        formatted = formatTime(String(value));
+                      }
+                      return <td key={col.key} className="px-3 py-2 text-xs text-slate whitespace-nowrap">{formatted}</td>;
+                    }
+                    case "array": {
+                      const arr = Array.isArray(value) ? value as string[] : [];
+                      let display = "—";
+                      if (arr.length > 0) {
+                        display = arr.length <= 2 ? arr.join(", ") : `${arr.slice(0, 2).join(", ")} and ${arr.length - 2} more`;
+                      }
+                      return <td key={col.key} className="px-3 py-2 text-xs text-slate">{display}</td>;
+                    }
+                    case "textarea": {
+                      const str = value != null ? String(value) : "";
+                      const display = str.length > 45 ? `${str.slice(0, 45)}…` : str || "—";
+                      return <td key={col.key} className="px-3 py-2 text-xs text-slate">{display}</td>;
+                    }
+                    case "text":
                     default:
-                      return <td key={col.key} className="px-3 py-2" />;
+                      return <td key={col.key} className="px-3 py-2 text-xs text-slate">{value != null ? String(value) : "—"}</td>;
                   }
                 }
 
