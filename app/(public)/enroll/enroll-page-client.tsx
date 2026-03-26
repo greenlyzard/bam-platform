@@ -1,11 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { EnrollmentChat } from "@/components/angelina/enrollment-chat";
+import { EnrollmentChat } from "@/components/assistant/enrollment-chat";
 import { EnrollmentWizard } from "./enrollment-wizard";
+import type { AssistantConfig } from "@/lib/assistant/config";
 
 interface EnrollPageClientProps {
   classes: any[];
+  config: AssistantConfig;
+  studioName: string;
+  tenantId: string;
 }
 
 const STEPS = [
@@ -19,7 +23,7 @@ const STEPS = [
   "Confirmation",
 ];
 
-export function EnrollPageClient({ classes }: EnrollPageClientProps) {
+export function EnrollPageClient({ classes, config, studioName, tenantId }: EnrollPageClientProps) {
   const [preferForm, setPreferForm] = useState(false);
 
   if (preferForm) {
@@ -28,7 +32,8 @@ export function EnrollPageClient({ classes }: EnrollPageClientProps) {
         <button
           type="button"
           onClick={() => setPreferForm(false)}
-          className="mb-4 text-sm text-lavender hover:underline"
+          style={{ color: config.primaryColor }}
+          className="mb-4 text-sm hover:underline"
         >
           &larr; Switch to guided enrollment
         </button>
@@ -43,7 +48,8 @@ export function EnrollPageClient({ classes }: EnrollPageClientProps) {
         <button
           type="button"
           onClick={() => setPreferForm(true)}
-          className="text-sm text-mist hover:text-lavender hover:underline"
+          className="text-sm text-mist hover:underline"
+          style={{ "--assistant-color": config.primaryColor } as React.CSSProperties}
         >
           Prefer a form?
         </button>
@@ -52,33 +58,48 @@ export function EnrollPageClient({ classes }: EnrollPageClientProps) {
       {/* Mobile: full-screen chat */}
       <div className="md:hidden">
         <div className="h-[calc(100vh-200px)] rounded-2xl border border-silver/30 bg-cream">
-          <EnrollmentChat />
+          <EnrollmentChat config={config} studioName={studioName} tenantId={tenantId} />
         </div>
       </div>
 
-      {/* Desktop: two-column layout */}
-      <div className="hidden md:grid md:grid-cols-3 md:gap-8">
-        <div className="col-span-2">
+      {/* Desktop: 60/40 layout */}
+      <div className="hidden md:grid md:grid-cols-5 md:gap-8">
+        <div className="col-span-3">
           <div className="h-[600px] rounded-2xl border border-silver/30 bg-cream">
-            <EnrollmentChat />
+            <EnrollmentChat config={config} studioName={studioName} tenantId={tenantId} />
           </div>
         </div>
 
         {/* Step progress tracker */}
-        <div className="col-span-1">
+        <div className="col-span-2">
           <div className="sticky top-8 rounded-2xl border border-silver/30 bg-white p-6 shadow-sm">
             <h3 className="mb-4 text-sm font-semibold text-charcoal">
               Enrollment Progress
             </h3>
             <ol className="space-y-3">
-              {STEPS.map((label, i) => (
-                <li key={i} className="flex items-center gap-3">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-silver/50 text-xs text-mist">
-                    {i + 1}
-                  </span>
-                  <span className="text-sm text-mist">{label}</span>
-                </li>
-              ))}
+              {STEPS.map((label, i) => {
+                const isCurrent = i === 0; // Step tracking is visual only at page level
+                return (
+                  <li key={i} className="flex items-center gap-3">
+                    <span
+                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-medium"
+                      style={
+                        isCurrent
+                          ? { backgroundColor: config.primaryColor, color: "#fff" }
+                          : { borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", color: "rgba(0,0,0,0.35)" }
+                      }
+                    >
+                      {i + 1}
+                    </span>
+                    <span
+                      className="text-sm"
+                      style={{ color: isCurrent ? config.primaryColor : undefined }}
+                    >
+                      {label}
+                    </span>
+                  </li>
+                );
+              })}
             </ol>
           </div>
         </div>
