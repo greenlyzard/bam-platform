@@ -197,6 +197,17 @@ export function TeacherList({ teachers }: { teachers: Teacher[] }) {
                   )}
                 </div>
 
+                {/* Profile link */}
+                <div className="mt-3 pt-3 border-t border-silver">
+                  <a
+                    href={`/admin/teachers/${t.id}/profile`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="inline-flex items-center gap-1 text-xs text-lavender hover:text-lavender-dark font-medium"
+                  >
+                    View Full Profile →
+                  </a>
+                </div>
+
                 {/* Welcome email status */}
                 <div className="mt-3 pt-3 border-t border-silver flex items-center gap-3">
                   {t.welcomeSentAt ? (
