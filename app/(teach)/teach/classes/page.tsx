@@ -1,6 +1,7 @@
 import { requireTeacher } from "@/lib/auth/guards";
 import { getMyClasses } from "@/lib/queries/teach";
 import { EmptyState } from "@/components/bam/empty-state";
+import Link from "next/link";
 
 const DAY_NAMES = [
   "Sunday",
@@ -77,51 +78,65 @@ export default async function MyClassesPage() {
                 {DAY_NAMES[day]}
               </h2>
               <div className="space-y-3">
-                {byDay[day].map((cls) => (
-                  <div
-                    key={cls.id}
-                    className="rounded-xl border border-silver bg-white p-4 hover:shadow-sm transition-shadow"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span
-                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                              styleColors[cls.style] ?? "bg-cloud text-slate"
-                            }`}
-                          >
-                            {cls.style?.replace("_", " ")}
-                          </span>
-                          <span className="inline-flex items-center rounded-full bg-cloud px-2 py-0.5 text-xs font-medium text-slate">
-                            {cls.level?.replace("_", " ")}
-                          </span>
-                        </div>
-                        <h3 className="font-semibold text-charcoal">
-                          {cls.name}
-                        </h3>
-                        <p className="text-sm text-slate mt-0.5">
-                          {cls.start_time && formatTime(cls.start_time)}
-                          {cls.end_time && ` – ${formatTime(cls.end_time)}`}
-                          {cls.room && (
-                            <span className="text-mist"> · {cls.room}</span>
-                          )}
-                        </p>
-                        {cls.age_min != null && cls.age_max != null && (
-                          <p className="text-xs text-mist mt-0.5">
-                            Ages {cls.age_min}–{cls.age_max} · Max{" "}
-                            {cls.max_students} students
+                {byDay[day].map((cls) => {
+                  const todayDow = new Date().getDay();
+                  const isToday = cls.day_of_week === todayDow;
+                  return (
+                    <div
+                      key={cls.id}
+                      className="rounded-xl border border-silver bg-white p-4 hover:shadow-sm transition-shadow"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <Link href={`/teach/classes/${cls.id}/roster`} className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span
+                              className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                                styleColors[cls.style] ?? "bg-cloud text-slate"
+                              }`}
+                            >
+                              {cls.style?.replace("_", " ")}
+                            </span>
+                            <span className="inline-flex items-center rounded-full bg-cloud px-2 py-0.5 text-xs font-medium text-slate">
+                              {cls.level?.replace("_", " ")}
+                            </span>
+                          </div>
+                          <h3 className="font-semibold text-charcoal">
+                            {cls.name}
+                          </h3>
+                          <p className="text-sm text-slate mt-0.5">
+                            {cls.start_time && formatTime(cls.start_time)}
+                            {cls.end_time && ` – ${formatTime(cls.end_time)}`}
+                            {cls.room && (
+                              <span className="text-mist"> · {cls.room}</span>
+                            )}
                           </p>
-                        )}
+                          {cls.age_min != null && cls.age_max != null && (
+                            <p className="text-xs text-mist mt-0.5">
+                              Ages {cls.age_min}–{cls.age_max} · Max{" "}
+                              {cls.max_students} students
+                            </p>
+                          )}
+                        </Link>
+                        <div className="flex flex-col gap-1.5 shrink-0">
+                          <Link
+                            href={`/teach/classes/${cls.id}/roster`}
+                            className="inline-flex h-9 items-center rounded-lg border border-silver px-3 text-xs font-medium text-slate hover:text-charcoal hover:border-lavender transition-colors"
+                          >
+                            Roster
+                          </Link>
+                          {isToday && (
+                            <Link
+                              href={`/teach/classes/${cls.id}/attendance`}
+                              className="inline-flex h-9 items-center rounded-lg bg-lavender/10 px-3 text-xs font-medium text-lavender-dark hover:bg-lavender/20 transition-colors"
+                            >
+                              Attendance
+                            </Link>
+                          )}
+                        </div>
                       </div>
-                      <a
-                        href={`/teach/attendance?class=${cls.id}`}
-                        className="shrink-0 inline-flex h-9 items-center rounded-lg border border-silver px-3 text-xs font-medium text-slate hover:text-charcoal hover:border-lavender transition-colors"
-                      >
-                        Attendance
-                      </a>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </section>
           ))}
