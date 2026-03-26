@@ -1,16 +1,10 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import type { ScheduleInstance } from "@/lib/schedule/types";
 import { getLevelColor } from "@/lib/schedule/types";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { SimpleSelect } from "@/components/ui/select";
 
 // ── Helpers ───────────────────────────────────────────────────
 
@@ -72,9 +66,9 @@ function getWeekLabel(weekStart: string): string {
   const startMonth = start.toLocaleDateString("en-US", { month: "short" });
   const endMonth = end.toLocaleDateString("en-US", { month: "short" });
   if (startMonth === endMonth) {
-    return `${startMonth} ${start.getDate()} – ${end.getDate()}, ${start.getFullYear()}`;
+    return `${startMonth} ${start.getDate()} \u2013 ${end.getDate()}, ${start.getFullYear()}`;
   }
-  return `${startMonth} ${start.getDate()} – ${endMonth} ${end.getDate()}, ${end.getFullYear()}`;
+  return `${startMonth} ${start.getDate()} \u2013 ${endMonth} ${end.getDate()}, ${end.getFullYear()}`;
 }
 
 function getTodayStr(): string {
@@ -91,6 +85,47 @@ const DAY_OPTIONS = [
   { value: "6", label: "Saturday" },
   { value: "0", label: "Sunday" },
 ];
+
+// ── Field Picker Config ──────────────────────────────────────
+
+interface FieldConfig {
+  key: string;
+  label: string;
+  visible: boolean;
+}
+
+const DEFAULT_FIELDS: FieldConfig[] = [
+  { key: "teacher", label: "Teacher", visible: true },
+  { key: "room", label: "Room", visible: true },
+  { key: "enrollment", label: "Enrollment", visible: true },
+  { key: "level", label: "Level", visible: false },
+  { key: "classType", label: "Class Type", visible: false },
+];
+
+const FIELDS_STORAGE_KEY = "bam-schedule-fields";
+
+function loadFields(): FieldConfig[] {
+  if (typeof window === "undefined") return DEFAULT_FIELDS;
+  try {
+    const saved = localStorage.getItem(FIELDS_STORAGE_KEY);
+    if (!saved) return DEFAULT_FIELDS;
+    const parsed = JSON.parse(saved) as FieldConfig[];
+    const savedKeys = new Set(parsed.map((c) => c.key));
+    const merged = [
+      ...parsed.filter((c) => DEFAULT_FIELDS.some((d) => d.key === c.key)),
+      ...DEFAULT_FIELDS.filter((d) => !savedKeys.has(d.key)),
+    ];
+    return merged;
+  } catch {
+    return DEFAULT_FIELDS;
+  }
+}
+
+function saveFields(fields: FieldConfig[]) {
+  try {
+    localStorage.setItem(FIELDS_STORAGE_KEY, JSON.stringify(fields));
+  } catch {}
+}
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -115,20 +150,23 @@ function SessionCard({
   instance,
   compact = false,
   onClick,
+  visibleFields,
 }: {
   instance: ScheduleInstance;
   compact?: boolean;
   onClick?: () => void;
+  visibleFields?: Set<string>;
 }) {
   const isCancelled = instance.status === "cancelled";
   const levelColor = isCancelled ? "#B0ADB5" : getLevelColor(instance.classLevel);
+  const showField = (key: string) => !visibleFields || visibleFields.has(key);
 
   return (
     <button
       onClick={onClick}
       className={`w-full text-left rounded-lg border-l-4 p-2 text-xs hover:shadow-sm cursor-pointer transition-shadow ${
         isCancelled ? "bg-cloud/60 opacity-60" : "bg-white"
-      }`}
+      } print:bg-white print:border print:border-charcoal`}
       style={{ borderLeftColor: levelColor }}
     >
       <div
@@ -143,18 +181,18 @@ function SessionCard({
       </div>
       {!compact && (
         <>
-          {instance.teacherName && (
+          {showField("teacher") && instance.teacherName && (
             <div className="mt-0.5 text-mist">{instance.teacherName}</div>
           )}
           <div className="mt-0.5 flex items-center gap-2 text-mist">
-            {instance.roomName && <span>{instance.roomName}</span>}
-            {instance.maxStudents != null && (
-              <span>
+            {showField("room") && instance.roomName && <span>{instance.roomName}</span>}
+            {showField("enrollment") && instance.maxStudents != null && (
+              <span className="print:hidden">
                 {instance.enrolledCount ?? 0}/{instance.maxStudents}
               </span>
             )}
           </div>
-          {instance.classLevel && (
+          {showField("level") && instance.classLevel && (
             <span
               className="mt-1 inline-block rounded-full px-1.5 py-0.5 text-[10px] font-medium"
               style={{
@@ -163,6 +201,11 @@ function SessionCard({
               }}
             >
               {instance.classLevel}
+            </span>
+          )}
+          {showField("classType") && instance.classStyle && (
+            <span className="mt-1 ml-1 inline-block rounded-full bg-cloud px-1.5 py-0.5 text-[10px] font-medium text-slate">
+              {instance.classStyle}
             </span>
           )}
         </>
@@ -247,7 +290,7 @@ function DetailPanel({
             </div>
             <div className="rounded-xl border border-silver bg-white p-4 text-center">
               <div className="text-xs font-medium text-mist uppercase tracking-wide">Max</div>
-              <div className="mt-1 text-2xl font-semibold text-charcoal">{instance.maxStudents ?? "–"}</div>
+              <div className="mt-1 text-2xl font-semibold text-charcoal">{instance.maxStudents ?? "\u2013"}</div>
             </div>
             <div className="rounded-xl border border-silver bg-white p-4 text-center">
               <div className="text-xs font-medium text-mist uppercase tracking-wide">Status</div>
@@ -318,6 +361,52 @@ export function ScheduleCalendar({
   const [roomFilter, setRoomFilter] = useState(initialFilters.room);
   const [dayFilter, setDayFilter] = useState(initialFilters.day);
 
+  // Mobile state
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+  const [expandedDays, setExpandedDays] = useState<Set<string>>(() => new Set([getTodayStr()]));
+
+  // Field picker state
+  const [fields, setFields] = useState<FieldConfig[]>(DEFAULT_FIELDS);
+  const [fieldsPopoverOpen, setFieldsPopoverOpen] = useState(false);
+  const fieldsPopoverRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setFields(loadFields());
+  }, []);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (fieldsPopoverRef.current && !fieldsPopoverRef.current.contains(e.target as Node)) {
+        setFieldsPopoverOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  function updateFields(newFields: FieldConfig[]) {
+    setFields(newFields);
+    saveFields(newFields);
+  }
+
+  function toggleFieldVisible(key: string) {
+    const newFields = fields.map((f) =>
+      f.key === key ? { ...f, visible: !f.visible } : f
+    );
+    updateFields(newFields);
+  }
+
+  function resetFields() {
+    updateFields(DEFAULT_FIELDS);
+  }
+
+  const visibleFields = useMemo(
+    () => new Set(fields.filter((f) => f.visible).map((f) => f.key)),
+    [fields]
+  );
+
+  const activeFilterCount = [teacherFilter, levelFilter, roomFilter, dayFilter].filter(Boolean).length;
+
   // Radix Select requires non-empty values, so we use "__all__" as sentinel
   const handleFilterChange = (setter: (v: string) => void) => (value: string) => {
     setter(value === "__all__" ? "" : value);
@@ -379,52 +468,170 @@ export function ScheduleCalendar({
   const today = getTodayStr();
   const weekDates = getWeekDates(weekStart);
 
+  // SimpleSelect option arrays
+  const teacherOptions = [
+    { value: "__all__", label: "All Teachers" },
+    ...teachers.map((t) => ({ value: t.id, label: t.name })),
+  ];
+  const levelOptions = [
+    { value: "__all__", label: "All Levels" },
+    ...levels.map((l) => ({ value: l, label: l })),
+  ];
+  const roomOptions = [
+    { value: "__all__", label: "All Rooms" },
+    ...rooms.map((r) => ({ value: r.id, label: r.name })),
+  ];
+  const dayOptions = [
+    { value: "__all__", label: "All Days" },
+    ...DAY_OPTIONS,
+  ];
+
   // ── Print ───────────────────────────────────────────────────
 
   const handlePrint = () => {
     window.print();
   };
 
-  // ── Week View ───────────────────────────────────────────────
+  // ── Mobile day toggle ──────────────────────────────────────
 
-  const renderWeekView = () => (
-    <div className="grid grid-cols-6 gap-3 print:grid-cols-3 print:gap-2">
+  const toggleDay = (date: string) => {
+    setExpandedDays((prev) => {
+      const next = new Set(prev);
+      if (next.has(date)) {
+        next.delete(date);
+      } else {
+        next.add(date);
+      }
+      return next;
+    });
+  };
+
+  // ── Mobile Day List View ───────────────────────────────────
+
+  const renderMobileDayList = () => (
+    <div className="space-y-2 md:hidden">
       {weekDates.map((date) => {
         const daySessions = byDate[date] ?? [];
         const isToday = date === today;
+        const isExpanded = expandedDays.has(date);
         return (
-          <div key={date} className="min-h-[200px] print:min-h-0 print:break-inside-avoid">
-            <div
-              className={`mb-2 rounded-lg px-3 py-2 text-center ${
-                isToday ? "bg-lavender text-white" : "bg-white border border-silver"
-              } print:bg-white print:border print:border-charcoal print:text-charcoal`}
+          <div key={date} className="rounded-xl border border-silver bg-white overflow-hidden">
+            <button
+              onClick={() => toggleDay(date)}
+              className={`w-full flex items-center justify-between px-4 py-3 text-left ${
+                isToday ? "bg-lavender/10" : ""
+              }`}
             >
-              <div className={`text-xs font-medium ${isToday ? "text-white/80" : "text-mist"} print:text-charcoal`}>
-                {getDayName(date)}
-              </div>
-              <div className={`text-sm font-semibold ${isToday ? "text-white" : "text-charcoal"} print:text-charcoal`}>
-                {formatDateLabel(date)}
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              {daySessions.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-silver p-3 text-center text-xs text-mist print:hidden">
-                  No sessions
+              <div className="flex items-center gap-3">
+                <div>
+                  <span className="text-sm font-semibold text-charcoal">
+                    {getFullDayName(date)}
+                  </span>
+                  <span className="ml-2 text-sm text-slate">
+                    {formatDateLabel(date)}
+                  </span>
                 </div>
-              ) : (
-                daySessions.map((inst) => (
-                  <SessionCard
-                    key={inst.id}
-                    instance={inst}
-                    onClick={() => setSelectedInstance(inst)}
-                  />
-                ))
-              )}
-            </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-mist">
+                  {daySessions.length} class{daySessions.length !== 1 ? "es" : ""}
+                </span>
+                <svg
+                  className={`h-4 w-4 text-mist transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </button>
+            {isExpanded && daySessions.length > 0 && (
+              <div className="border-t border-silver divide-y divide-silver">
+                {daySessions.map((inst) => {
+                  const isCancelled = inst.status === "cancelled";
+                  return (
+                    <button
+                      key={inst.id}
+                      onClick={() => setSelectedInstance(inst)}
+                      className={`w-full text-left px-4 py-3 hover:bg-cloud/30 ${isCancelled ? "opacity-50" : ""}`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <span className={`text-sm font-medium text-charcoal ${isCancelled ? "line-through" : ""}`}>
+                            {formatTime(inst.start_time)} – {formatTime(inst.end_time)}
+                          </span>
+                          <div className={`text-sm text-charcoal ${isCancelled ? "line-through" : ""}`}>
+                            {inst.className ?? "Untitled"}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-1 flex items-center gap-3 text-xs text-mist">
+                        {inst.roomName && <span>{inst.roomName}</span>}
+                        {inst.teacherName && <span>{inst.teacherName}</span>}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {isExpanded && daySessions.length === 0 && (
+              <div className="border-t border-silver px-4 py-4 text-center text-xs text-mist">
+                No classes scheduled
+              </div>
+            )}
           </div>
         );
       })}
     </div>
+  );
+
+  // ── Week View ───────────────────────────────────────────────
+
+  const renderWeekView = () => (
+    <>
+      {/* Desktop grid */}
+      <div className="hidden md:grid grid-cols-6 gap-3 print:grid print:grid-cols-3 print:gap-2">
+        {weekDates.map((date) => {
+          const daySessions = byDate[date] ?? [];
+          const isToday = date === today;
+          return (
+            <div key={date} className="min-h-[200px] print:min-h-0 print:break-inside-avoid">
+              <div
+                className={`mb-2 rounded-lg px-3 py-2 text-center ${
+                  isToday ? "bg-lavender text-white" : "bg-white border border-silver"
+                } print:bg-white print:border print:border-charcoal print:text-charcoal`}
+              >
+                <div className={`text-xs font-medium ${isToday ? "text-white/80" : "text-mist"} print:text-charcoal`}>
+                  {getDayName(date)}
+                </div>
+                <div className={`text-sm font-semibold ${isToday ? "text-white" : "text-charcoal"} print:text-charcoal`}>
+                  {formatDateLabel(date)}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                {daySessions.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-silver p-3 text-center text-xs text-mist print:hidden">
+                    No sessions
+                  </div>
+                ) : (
+                  daySessions.map((inst) => (
+                    <SessionCard
+                      key={inst.id}
+                      instance={inst}
+                      onClick={() => setSelectedInstance(inst)}
+                      visibleFields={visibleFields}
+                    />
+                  ))
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {/* Mobile day list */}
+      {renderMobileDayList()}
+    </>
   );
 
   // ── List View ───────────────────────────────────────────────
@@ -443,16 +650,25 @@ export function ScheduleCalendar({
               <h3 className="text-sm font-semibold text-charcoal mb-2">
                 {getFullDayName(date)}, {formatDateLabel(date)}
               </h3>
-              <div className="rounded-xl border border-silver bg-white overflow-hidden">
+              {/* Desktop table */}
+              <div className="hidden md:block rounded-xl border border-silver bg-white overflow-hidden print:block">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-silver bg-cloud/50">
                       <th className="px-4 py-2 text-left font-medium text-slate">Time</th>
                       <th className="px-4 py-2 text-left font-medium text-slate">Class</th>
-                      <th className="px-4 py-2 text-left font-medium text-slate">Level</th>
-                      <th className="px-4 py-2 text-left font-medium text-slate">Teacher</th>
-                      <th className="px-4 py-2 text-left font-medium text-slate">Room</th>
-                      <th className="px-4 py-2 text-right font-medium text-slate">Enrolled</th>
+                      {visibleFields.has("level") && (
+                        <th className="px-4 py-2 text-left font-medium text-slate">Level</th>
+                      )}
+                      {visibleFields.has("teacher") && (
+                        <th className="px-4 py-2 text-left font-medium text-slate">Teacher</th>
+                      )}
+                      {visibleFields.has("room") && (
+                        <th className="px-4 py-2 text-left font-medium text-slate">Room</th>
+                      )}
+                      {visibleFields.has("enrollment") && (
+                        <th className="px-4 py-2 text-right font-medium text-slate">Enrolled</th>
+                      )}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-silver">
@@ -471,27 +687,59 @@ export function ScheduleCalendar({
                           <td className={`px-4 py-2.5 font-medium text-charcoal ${isCancelled ? "line-through" : ""}`}>
                             {inst.className ?? "Untitled"}
                           </td>
-                          <td className="px-4 py-2.5">
-                            {inst.classLevel && (
-                              <span
-                                className="inline-block rounded-full px-2 py-0.5 text-xs font-medium"
-                                style={{ backgroundColor: `${levelColor}30`, color: levelColor }}
-                              >
-                                {inst.classLevel}
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-2.5 text-slate">{inst.teacherName ?? "–"}</td>
-                          <td className="px-4 py-2.5 text-slate">{inst.roomName ?? "–"}</td>
-                          <td className="px-4 py-2.5 text-right text-slate">
-                            {inst.enrolledCount ?? 0}
-                            {inst.maxStudents != null && `/${inst.maxStudents}`}
-                          </td>
+                          {visibleFields.has("level") && (
+                            <td className="px-4 py-2.5">
+                              {inst.classLevel && (
+                                <span
+                                  className="inline-block rounded-full px-2 py-0.5 text-xs font-medium"
+                                  style={{ backgroundColor: `${levelColor}30`, color: levelColor }}
+                                >
+                                  {inst.classLevel}
+                                </span>
+                              )}
+                            </td>
+                          )}
+                          {visibleFields.has("teacher") && (
+                            <td className="px-4 py-2.5 text-slate">{inst.teacherName ?? "\u2013"}</td>
+                          )}
+                          {visibleFields.has("room") && (
+                            <td className="px-4 py-2.5 text-slate">{inst.roomName ?? "\u2013"}</td>
+                          )}
+                          {visibleFields.has("enrollment") && (
+                            <td className="px-4 py-2.5 text-right text-slate">
+                              {inst.enrolledCount ?? 0}
+                              {inst.maxStudents != null && `/${inst.maxStudents}`}
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
+              </div>
+              {/* Mobile list */}
+              <div className="md:hidden space-y-1.5">
+                {byDate[date].map((inst) => {
+                  const isCancelled = inst.status === "cancelled";
+                  return (
+                    <button
+                      key={inst.id}
+                      onClick={() => setSelectedInstance(inst)}
+                      className={`w-full text-left rounded-xl border border-silver bg-white px-4 py-3 hover:bg-cloud/30 ${isCancelled ? "opacity-50" : ""}`}
+                    >
+                      <div className={`text-sm font-medium text-charcoal ${isCancelled ? "line-through" : ""}`}>
+                        {inst.className ?? "Untitled"}
+                      </div>
+                      <div className="mt-0.5 text-xs text-slate">
+                        {formatTime(inst.start_time)} – {formatTime(inst.end_time)}
+                      </div>
+                      <div className="mt-1 flex items-center gap-3 text-xs text-mist">
+                        {inst.roomName && <span>{inst.roomName}</span>}
+                        {inst.teacherName && <span>{inst.teacherName}</span>}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           ))
@@ -529,6 +777,7 @@ export function ScheduleCalendar({
                     <SessionCard
                       instance={inst}
                       onClick={() => setSelectedInstance(inst)}
+                      visibleFields={visibleFields}
                     />
                   </div>
                 ))}
@@ -548,6 +797,17 @@ export function ScheduleCalendar({
 
   return (
     <div>
+      {/* Print styles */}
+      <style jsx global>{`
+        @media print {
+          @page { size: landscape; margin: 0.5in; }
+          body { background: white !important; }
+          nav, header, footer, .print\\:hidden { display: none !important; }
+          .print\\:block { display: block !important; }
+          .print\\:grid { display: grid !important; }
+        }
+      `}</style>
+
       {/* Print-only header */}
       <div className="hidden print:block mb-6">
         <h1 className="text-2xl font-heading font-bold text-charcoal text-center">
@@ -555,6 +815,15 @@ export function ScheduleCalendar({
         </h1>
         <p className="text-center text-sm text-slate mt-1">
           Weekly Schedule — {getWeekLabel(weekStart)}
+        </p>
+        <p className="text-center text-xs text-mist mt-0.5">
+          Generated: {new Date().toLocaleString("en-US", {
+            month: "long",
+            day: "numeric",
+            year: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+          })}
         </p>
       </div>
 
@@ -564,7 +833,7 @@ export function ScheduleCalendar({
           <h1 className="font-heading text-2xl font-semibold text-charcoal">Schedule</h1>
           <p className="mt-1 text-sm text-slate">
             {getWeekLabel(weekStart)}
-            {isRecurring && <span className="ml-2 text-xs text-mist italic">· Showing recurring weekly schedule</span>}
+            {isRecurring && <span className="ml-2 text-xs text-mist italic">&middot; Showing recurring weekly schedule</span>}
           </p>
         </div>
 
@@ -585,6 +854,22 @@ export function ScheduleCalendar({
               </button>
             ))}
           </div>
+
+          {/* Mobile Filter Button */}
+          <button
+            onClick={() => setMobileFilterOpen(true)}
+            className="md:hidden rounded-lg border border-silver bg-white px-3 py-1.5 text-sm font-medium text-slate hover:bg-cloud transition-colors flex items-center gap-1.5"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+            </svg>
+            Filter
+            {activeFilterCount > 0 && (
+              <span className="ml-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-lavender text-[10px] font-bold text-white">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
 
           {/* Week Navigation */}
           <div className="flex items-center gap-1">
@@ -612,84 +897,108 @@ export function ScheduleCalendar({
             </button>
           </div>
 
-          {/* Print */}
+          {/* Print — desktop only */}
           <button
             onClick={handlePrint}
-            className="rounded-lg border border-silver bg-white px-3 py-1.5 text-sm font-medium text-slate hover:bg-cloud transition-colors flex items-center gap-1.5"
+            className="hidden md:flex rounded-lg border border-silver bg-white px-3 py-1.5 text-sm font-medium text-slate hover:bg-cloud transition-colors items-center gap-1.5"
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
             </svg>
             Print
           </button>
+
+          {/* Fields — desktop only */}
+          <div ref={fieldsPopoverRef} className="relative hidden md:inline-flex">
+            <button
+              onClick={() => setFieldsPopoverOpen(!fieldsPopoverOpen)}
+              className="rounded-lg border border-silver bg-white px-3 py-1.5 text-sm font-medium text-slate hover:bg-cloud transition-colors flex items-center gap-1.5"
+            >
+              <svg className="h-4 w-4 text-mist" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+              Fields
+            </button>
+            {fieldsPopoverOpen && (
+              <div className="absolute right-0 top-full mt-1 w-56 rounded-xl border border-silver bg-white shadow-lg z-30 py-1">
+                <div className="px-3 py-2 border-b border-silver">
+                  <p className="text-xs font-semibold text-charcoal">Show / hide fields</p>
+                </div>
+                <div className="max-h-72 overflow-y-auto py-1">
+                  {fields.map((field) => (
+                    <label
+                      key={field.key}
+                      className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-cloud/50 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={field.visible}
+                        onChange={() => toggleFieldVisible(field.key)}
+                        className="h-3.5 w-3.5 rounded border-silver text-lavender focus:ring-lavender/30"
+                      />
+                      <span className="text-sm text-charcoal">{field.label}</span>
+                    </label>
+                  ))}
+                </div>
+                <div className="px-3 py-2 border-t border-silver">
+                  <button
+                    onClick={resetFields}
+                    className="text-xs text-lavender hover:text-lavender-dark font-medium"
+                  >
+                    Reset to default
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="mb-5 rounded-xl border border-silver bg-white p-4 print:hidden">
+      {/* Desktop Filters */}
+      <div className="mb-5 rounded-xl border border-silver bg-white p-4 print:hidden hidden md:block">
         <div className="flex flex-wrap items-end gap-3">
           {/* Teacher */}
           <div className="min-w-[180px]">
             <label className="block text-xs font-medium text-mist uppercase tracking-wide mb-1">Teacher</label>
-            <Select value={teacherFilter || "__all__"} onValueChange={handleFilterChange(setTeacherFilter)}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Teachers" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">All Teachers</SelectItem>
-                {teachers.map((t) => (
-                  <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SimpleSelect
+              value={teacherFilter || "__all__"}
+              onValueChange={handleFilterChange(setTeacherFilter)}
+              options={teacherOptions}
+              placeholder="All Teachers"
+            />
           </div>
 
           {/* Level */}
           <div className="min-w-[160px]">
             <label className="block text-xs font-medium text-mist uppercase tracking-wide mb-1">Level</label>
-            <Select value={levelFilter || "__all__"} onValueChange={handleFilterChange(setLevelFilter)}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Levels" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">All Levels</SelectItem>
-                {levels.map((l) => (
-                  <SelectItem key={l} value={l}>{l}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SimpleSelect
+              value={levelFilter || "__all__"}
+              onValueChange={handleFilterChange(setLevelFilter)}
+              options={levelOptions}
+              placeholder="All Levels"
+            />
           </div>
 
           {/* Room */}
           <div className="min-w-[160px]">
             <label className="block text-xs font-medium text-mist uppercase tracking-wide mb-1">Room</label>
-            <Select value={roomFilter || "__all__"} onValueChange={handleFilterChange(setRoomFilter)}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Rooms" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">All Rooms</SelectItem>
-                {rooms.map((r) => (
-                  <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SimpleSelect
+              value={roomFilter || "__all__"}
+              onValueChange={handleFilterChange(setRoomFilter)}
+              options={roomOptions}
+              placeholder="All Rooms"
+            />
           </div>
 
           {/* Day of Week */}
           <div className="min-w-[150px]">
             <label className="block text-xs font-medium text-mist uppercase tracking-wide mb-1">Day</label>
-            <Select value={dayFilter || "__all__"} onValueChange={handleFilterChange(setDayFilter)}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Days" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">All Days</SelectItem>
-                {DAY_OPTIONS.map((d) => (
-                  <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SimpleSelect
+              value={dayFilter || "__all__"}
+              onValueChange={handleFilterChange(setDayFilter)}
+              options={dayOptions}
+              placeholder="All Days"
+            />
           </div>
 
           {/* Actions */}
@@ -711,6 +1020,75 @@ export function ScheduleCalendar({
           </div>
         </div>
       </div>
+
+      {/* Mobile filter drawer */}
+      {mobileFilterOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setMobileFilterOpen(false)} />
+          <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-xl max-h-[80vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-silver px-4 py-3 flex items-center justify-between z-10 rounded-t-2xl">
+              <h3 className="text-sm font-semibold text-charcoal">Filters</h3>
+              <button
+                onClick={() => setMobileFilterOpen(false)}
+                className="flex h-7 w-7 items-center justify-center rounded-lg text-slate hover:text-charcoal hover:bg-cloud"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-mist uppercase tracking-wide mb-1">Teacher</label>
+                <SimpleSelect
+                  value={teacherFilter || "__all__"}
+                  onValueChange={handleFilterChange(setTeacherFilter)}
+                  options={teacherOptions}
+                  placeholder="All Teachers"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-mist uppercase tracking-wide mb-1">Level</label>
+                <SimpleSelect
+                  value={levelFilter || "__all__"}
+                  onValueChange={handleFilterChange(setLevelFilter)}
+                  options={levelOptions}
+                  placeholder="All Levels"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-mist uppercase tracking-wide mb-1">Room</label>
+                <SimpleSelect
+                  value={roomFilter || "__all__"}
+                  onValueChange={handleFilterChange(setRoomFilter)}
+                  options={roomOptions}
+                  placeholder="All Rooms"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-mist uppercase tracking-wide mb-1">Day</label>
+                <SimpleSelect
+                  value={dayFilter || "__all__"}
+                  onValueChange={handleFilterChange(setDayFilter)}
+                  options={dayOptions}
+                  placeholder="All Days"
+                />
+              </div>
+            </div>
+            <div className="sticky bottom-0 bg-white border-t border-silver px-4 py-3">
+              <button
+                onClick={() => {
+                  applyFilters();
+                  setMobileFilterOpen(false);
+                }}
+                className="w-full h-10 rounded-lg bg-lavender hover:bg-lavender-dark text-white font-semibold text-sm transition-colors"
+              >
+                Apply Filters
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Count */}
       <div className="mb-4 flex items-center justify-between print:hidden">
@@ -736,6 +1114,11 @@ export function ScheduleCalendar({
           onClose={() => setSelectedInstance(null)}
         />
       )}
+
+      {/* Print-only footer */}
+      <div className="hidden print:block mt-8 pt-4 border-t border-silver text-center text-xs text-mist">
+        Ballet Academy and Movement — Confidential
+      </div>
     </div>
   );
 }

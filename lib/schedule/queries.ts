@@ -555,8 +555,9 @@ export async function getClassesAsScheduleInstances(filters: {
     weekDates[dow] = dateStr;
   }
 
-  // Map classes to ScheduleInstance[]
+  // Map classes to ScheduleInstance[] — deduplicate by class_id + day_of_week
   let instances: ScheduleInstance[] = [];
+  const seen = new Set<string>();
   for (const c of classes) {
     if (!c.start_time || !c.end_time) continue;
 
@@ -567,6 +568,10 @@ export async function getClassesAsScheduleInstances(filters: {
     const displayName = c.name;
 
     for (const dow of daysToMap) {
+      const key = `${c.id}-${dow}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
       const eventDate = weekDates[dow];
       if (!eventDate) continue;
 
