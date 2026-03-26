@@ -305,7 +305,7 @@ function AssignRoleDialog({
 
   const availableRoles = isSuperAdmin
     ? ALL_ROLES
-    : ALL_ROLES.filter((r) => r.value !== "super_admin");
+    : ALL_ROLES.filter((r) => r.value !== "super_admin" && r.value !== "finance_admin");
 
   return (
     <div className="rounded-xl border border-lavender/30 bg-lavender/5 p-5 space-y-4">

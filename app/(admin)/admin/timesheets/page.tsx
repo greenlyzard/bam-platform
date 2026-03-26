@@ -1,5 +1,6 @@
 import { requireRole } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
+import { canViewPayRates, canExportPayroll } from "@/lib/rbac/permissions";
 import { ExportCsvButton } from "./export-csv";
 import { TimesheetsClient } from "./timesheets-client";
 import Link from "next/link";
@@ -330,6 +331,8 @@ export default async function AdminTimesheetsPage({
       entryTypeLabels={ENTRY_TYPE_LABELS}
       isTeacherOnly={isTeacherOnly}
       isAdmin={currentUser.roles.some((r) => ["finance_admin", "admin", "super_admin"].includes(r))}
+      canViewRates={await canViewPayRates(currentUser.id)}
+      canExport={await canExportPayroll(currentUser.id)}
       billingRecords={billingRecords}
     />
   );

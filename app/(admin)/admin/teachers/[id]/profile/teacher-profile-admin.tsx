@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { SimpleSelect } from "@/components/ui/select";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 import {
   updateTeacherBasics, toggleTeacherActive, addSpecialty, removeSpecialty,
   updateSpecialtyOrder, upsertRateCard, updateCompliance, updateSubEligibility,
@@ -57,6 +58,12 @@ interface ClassAssignment {
   classId: string; className: string; dayOfWeek: number;
   startTime: string; endTime: string; levels: string[] | null;
   enrolled: number; capacity: number;
+}
+
+interface ContactChannel {
+  id: string; profile_id: string; channel_type: string; value: string;
+  is_primary: boolean; email_opt_in: boolean | null; sms_opt_in: boolean | null;
+  klaviyo_synced: boolean | null; quo_synced: boolean | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -175,6 +182,15 @@ export function TeacherProfileAdmin({
     eligible_disciplines: sub?.eligible_disciplines ?? [] as string[],
     notes: sub?.notes ?? "",
   });
+
+  // Contact channels state
+  const [contactChannels, setContactChannels] = useState<ContactChannel[]>([]);
+  useEffect(() => {
+    const sb = createClient();
+    sb.from("contact_channels").select("*").eq("profile_id", init.id).then(({ data }) => {
+      if (data) setContactChannels(data);
+    });
+  }, [init.id]);
 
   function flash(msg: string) { setToast(msg); setTimeout(() => setToast(""), 3000); }
 
@@ -688,6 +704,59 @@ export function TeacherProfileAdmin({
           + Upload Photo
           <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
         </label>
+      </div>
+
+      {/* M. Contact Channels */}
+      <div className={cardCls}>
+        <h2 className={headingCls}>Contact Channels</h2>
+        {contactChannels.length === 0 ? (
+          <p className="text-sm text-slate">No contact channels configured</p>
+        ) : (
+          <>
+            {/* Email channels */}
+            {contactChannels.filter(c => c.channel_type === "email").length > 0 && (
+              <div className="space-y-2">
+                <h3 className="text-sm font-semibold text-charcoal">Email</h3>
+                {contactChannels.filter(c => c.channel_type === "email").map(ch => (
+                  <div key={ch.id} className="flex items-center gap-2 flex-wrap text-sm border border-silver/50 rounded-lg px-3 py-2">
+                    <span className="font-medium text-charcoal">{ch.value}</span>
+                    {ch.is_primary && (
+                      <span className="inline-flex items-center rounded-full bg-lavender/10 text-lavender-dark px-2 py-0.5 text-[10px] font-semibold">Primary</span>
+                    )}
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${ch.email_opt_in ? "bg-success/10 text-success" : "bg-silver/20 text-slate"}`}>
+                      Marketing: {ch.email_opt_in ? "On" : "Off"}
+                    </span>
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${ch.klaviyo_synced ? "bg-info/10 text-info" : "bg-silver/20 text-slate"}`}>
+                      Klaviyo: {ch.klaviyo_synced ? "Synced" : "Not synced"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {/* Phone channels */}
+            {contactChannels.filter(c => c.channel_type === "phone").length > 0 && (
+              <div className="space-y-2">
+                <h3 className="text-sm font-semibold text-charcoal">Phone</h3>
+                {contactChannels.filter(c => c.channel_type === "phone").map(ch => (
+                  <div key={ch.id} className="flex items-center gap-2 flex-wrap text-sm border border-silver/50 rounded-lg px-3 py-2">
+                    <span className="font-medium text-charcoal">{ch.value}</span>
+                    {ch.is_primary && (
+                      <span className="inline-flex items-center rounded-full bg-lavender/10 text-lavender-dark px-2 py-0.5 text-[10px] font-semibold">Primary</span>
+                    )}
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                      ch.sms_opt_in === true ? "bg-success/10 text-success" : ch.sms_opt_in === false ? "bg-error/10 text-error" : "bg-silver/20 text-slate"
+                    }`}>
+                      SMS: {ch.sms_opt_in === true ? "Opted In" : ch.sms_opt_in === false ? "Opted Out" : "Unknown"}
+                    </span>
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${ch.quo_synced ? "bg-info/10 text-info" : "bg-silver/20 text-slate"}`}>
+                      Quo: {ch.quo_synced ? "Synced" : "Not synced"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

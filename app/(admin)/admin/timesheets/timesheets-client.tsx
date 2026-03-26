@@ -222,6 +222,8 @@ export function TimesheetsClient({
   entryTypeLabels,
   isTeacherOnly,
   isAdmin,
+  canViewRates,
+  canExport,
   billingRecords,
 }: {
   view: string;
@@ -243,6 +245,8 @@ export function TimesheetsClient({
   entryTypeLabels: Record<string, string>;
   isTeacherOnly: boolean;
   isAdmin: boolean;
+  canViewRates?: boolean;
+  canExport?: boolean;
   billingRecords?: PrivateBillingRecord[];
 }) {
   const [quickMode, setQuickMode] = useState(false);
@@ -322,7 +326,7 @@ export function TimesheetsClient({
           >
             Payroll Report →
           </Link>
-          {csvRows.length > 0 && <ExportCsvButton rows={csvRows} />}
+          {csvRows.length > 0 && canExport && <ExportCsvButton rows={csvRows} />}
         </div>
       </div>
 
