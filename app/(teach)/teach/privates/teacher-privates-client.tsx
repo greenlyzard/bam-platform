@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
+import { confirmPrivateSession, declinePrivateSession } from "./actions";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -23,6 +24,8 @@ interface Session {
   status: string;
   session_notes: string | null;
   parent_visible_notes: string | null;
+  booking_source: string | null;
+  availability_slot_id: string | null;
 }
 
 interface Props {
@@ -146,6 +149,60 @@ function SessionCard({
           </span>
         )}
       </div>
+      {/* Confirm/Decline for parent-booked sessions */}
+      {session.booking_source === "parent" && session.status === "scheduled" && (
+        <ParentBookingActions sessionId={session.id} />
+      )}
+    </div>
+  );
+}
+
+function ParentBookingActions({ sessionId }: { sessionId: string }) {
+  const [isPending, startTransition] = useTransition();
+  const [declining, setDeclining] = useState(false);
+
+  function handleConfirm() {
+    startTransition(async () => {
+      const fd = new FormData();
+      fd.set("sessionId", sessionId);
+      await confirmPrivateSession(fd);
+    });
+  }
+
+  function handleDecline() {
+    startTransition(async () => {
+      const fd = new FormData();
+      fd.set("sessionId", sessionId);
+      await declinePrivateSession(fd);
+      setDeclining(false);
+    });
+  }
+
+  return (
+    <div className="flex items-center gap-2 mt-2 pt-2 border-t border-silver/50">
+      <span className="text-xs text-gold-dark font-medium mr-auto">Parent booking — awaiting your confirmation</span>
+      <button
+        onClick={handleConfirm}
+        disabled={isPending}
+        className="h-7 rounded-md bg-success hover:bg-success/90 text-white text-xs font-semibold px-3 disabled:opacity-50"
+      >
+        Confirm
+      </button>
+      {!declining ? (
+        <button
+          onClick={() => setDeclining(true)}
+          disabled={isPending}
+          className="h-7 rounded-md border border-error/30 text-error text-xs font-medium px-3 disabled:opacity-50"
+        >
+          Decline
+        </button>
+      ) : (
+        <span className="flex items-center gap-1">
+          <span className="text-xs text-slate">Decline?</span>
+          <button onClick={handleDecline} disabled={isPending} className="text-xs text-error font-semibold disabled:opacity-50">Yes</button>
+          <button onClick={() => setDeclining(false)} className="text-xs text-slate">No</button>
+        </span>
+      )}
     </div>
   );
 }

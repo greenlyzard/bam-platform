@@ -1,10 +1,12 @@
 import { requireParent } from "@/lib/auth/guards";
 import { getMyStudents, getMyEnrollments, getMyStudentBadges, getMyFamily } from "@/lib/queries/portal";
 import { getStudioSettings } from "@/lib/queries/studio-settings";
+import { createClient } from "@/lib/supabase/server";
 import { ClassCard } from "@/components/bam/ClassCard";
 import { DancerCard } from "@/components/bam/DancerCard";
 import { BadgeDisplay } from "@/components/bam/BadgeDisplay";
 import { EmptyState } from "@/components/bam/empty-state";
+import Link from "next/link";
 
 export default async function DashboardPage() {
   const user = await requireParent();
@@ -19,6 +21,22 @@ export default async function DashboardPage() {
 
   const hasStudents = students.length > 0;
   const hasEnrollments = enrollments.length > 0;
+
+  // Check if family has active booking approvals for private self-booking
+  let canBookPrivate = false;
+  try {
+    if (family?.id) {
+      const supabase = await createClient();
+      const { count } = await supabase
+        .from("teacher_booking_approvals")
+        .select("id", { count: "exact", head: true })
+        .eq("family_id", family.id)
+        .eq("is_active", true);
+      canBookPrivate = (count ?? 0) > 0;
+    }
+  } catch {
+    // table may not exist — skip gracefully
+  }
 
   // Count enrollments and badges per student
   const enrollmentCounts: Record<string, number> = {};
@@ -40,6 +58,14 @@ export default async function DashboardPage() {
         <p className="mt-1 text-sm text-slate">
           Here&apos;s what&apos;s happening at {studioName}.
         </p>
+        {canBookPrivate && (
+          <Link
+            href="/portal/book-private"
+            className="inline-flex items-center gap-1.5 mt-3 h-9 rounded-lg bg-lavender hover:bg-lavender-dark text-white text-sm font-semibold px-4 transition-colors"
+          >
+            Book a Private
+          </Link>
+        )}
       </div>
 
       {/* No students yet — onboarding */}

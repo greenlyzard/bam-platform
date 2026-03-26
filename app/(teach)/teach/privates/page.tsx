@@ -10,7 +10,7 @@ export default async function TeacherPrivatesPage() {
   const { data: sessions } = await supabase
     .from("private_sessions")
     .select(
-      "id, tenant_id, session_type, session_date, start_time, end_time, duration_minutes, studio, student_ids, co_teacher_ids, is_recurring, recurrence_rule, status, session_notes, parent_visible_notes"
+      "id, tenant_id, session_type, session_date, start_time, end_time, duration_minutes, studio, student_ids, co_teacher_ids, is_recurring, recurrence_rule, status, session_notes, parent_visible_notes, booking_source, availability_slot_id"
     )
     .eq("primary_teacher_id", user.id)
     .order("session_date", { ascending: false });
