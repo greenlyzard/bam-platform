@@ -979,3 +979,134 @@ export async function adminDeleteEntry(formData: FormData) {
   revalidatePath("/admin/timesheets");
   return { success: true };
 }
+
+// ── Rate Override ─────────────────────────────────────────────
+
+export async function rateOverrideEntry(formData: FormData) {
+  const { supabase, user, profile, isAdmin, error: authError } = await requireAuth();
+  if (authError || !user) return { error: authError ?? "Unauthorized" };
+  if (!isAdmin) return { error: "Admin required" };
+
+  const entryId = formData.get("entryId") as string;
+  const newRate = parseFloat(formData.get("newRate") as string);
+  const reason = (formData.get("reason") as string) ?? "";
+  const source = (formData.get("source") as string) ?? "Admin Decision";
+
+  if (!entryId || isNaN(newRate)) return { error: "Entry ID and rate required." };
+
+  const { data: entry } = await supabase
+    .from("timesheet_entries")
+    .select("id, tenant_id, rate_amount")
+    .eq("id", entryId)
+    .single();
+
+  if (!entry) return { error: "Entry not found." };
+
+  const { error } = await supabase
+    .from("timesheet_entries")
+    .update({ rate_amount: newRate, rate_override: true, rate_override_by: user.id })
+    .eq("id", entryId);
+
+  if (error) return { error: error.message };
+
+  await logChange(supabase, {
+    tenantId: entry.tenant_id,
+    entryId,
+    changedBy: user.id,
+    changedByName: getAdminName(profile),
+    changeType: "rate_override",
+    fieldChanged: "rate_amount",
+    oldValue: entry.rate_amount != null ? String(entry.rate_amount) : undefined,
+    newValue: String(newRate),
+    note: `${reason}${source ? ` [Source: ${source}]` : ""}`,
+  });
+
+  revalidatePath("/admin/timesheets");
+  return { success: true };
+}
+
+// ── Teacher Flag Response ─────────────────────────────────────
+
+export async function respondToFlag(formData: FormData) {
+  const { supabase, user, profile, teacherProfileId, error: authError } = await requireAuth();
+  if (authError || !user) return { error: authError ?? "Unauthorized" };
+
+  const entryId = formData.get("entryId") as string;
+  const response = (formData.get("response") as string) ?? "";
+
+  if (!entryId || !response.trim()) return { error: "Entry ID and response required." };
+
+  if (teacherProfileId) {
+    const access = await verifyTeacherEntryAccess(supabase, entryId, teacherProfileId);
+    if (!access.allowed) return { error: access.error ?? "Not authorized" };
+  }
+
+  const { data: entry } = await supabase
+    .from("timesheet_entries")
+    .select("id, tenant_id, status")
+    .eq("id", entryId)
+    .single();
+
+  if (!entry) return { error: "Entry not found." };
+  if (entry.status !== "flagged") return { error: "Entry is not flagged." };
+
+  const { error } = await supabase
+    .from("timesheet_entries")
+    .update({ flag_response: response.trim(), flag_responded_at: new Date().toISOString(), status: "submitted" })
+    .eq("id", entryId);
+
+  if (error) return { error: error.message };
+
+  const teacherName = profile ? [profile.first_name, profile.last_name].filter(Boolean).join(" ") : "Teacher";
+
+  await logChange(supabase, {
+    tenantId: entry.tenant_id, entryId, changedBy: user.id,
+    changedByName: teacherName, changeType: "flag_resolved", note: response.trim(),
+  });
+
+  // Notify admins
+  try {
+    const { data: adminRoles } = await supabase
+      .from("profile_roles").select("user_id")
+      .in("role", ["finance_admin", "admin", "super_admin"]).eq("is_active", true);
+    if (adminRoles?.length) {
+      await supabase.from("notifications").insert(
+        adminRoles.map((r) => ({
+          recipient_id: r.user_id, notification_type: "timesheet_flag_response",
+          title: `${teacherName} responded to your question`,
+          body: `Review the response in timesheets.`, metadata: { entry_id: entryId },
+        }))
+      );
+    }
+  } catch (e) { console.warn("[timesheets:respondToFlag] Notification failed", e); }
+
+  revalidatePath("/admin/timesheets");
+  return { success: true };
+}
+
+// ── Export with paid_at marking ───────────────────────────────
+
+export async function exportAndMarkPaid(formData: FormData) {
+  const { supabase, user, profile, isAdmin, error: authError } = await requireAuth();
+  if (authError || !user) return { error: authError ?? "Unauthorized" };
+  if (!isAdmin) return { error: "Admin required" };
+
+  const entryIds = JSON.parse(formData.get("entryIds") as string ?? "[]") as string[];
+  if (entryIds.length === 0) return { error: "No entries to export." };
+
+  const now = new Date().toISOString();
+  await supabase.from("timesheet_entries").update({ paid_at: now }).in("id", entryIds).eq("status", "approved");
+
+  const adminName = getAdminName(profile);
+  for (const eid of entryIds) {
+    try {
+      await logChange(supabase, {
+        tenantId: "", entryId: eid, changedBy: user.id, changedByName: adminName,
+        changeType: "exported", note: `Exported ${now}`,
+      });
+    } catch {}
+  }
+
+  revalidatePath("/admin/timesheets");
+  return { success: true, count: entryIds.length };
+}

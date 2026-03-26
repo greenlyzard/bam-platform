@@ -188,15 +188,26 @@ export default async function AdminTimesheetsPage({
       last_name: string | null;
       email: string | null;
     } | null;
+    const teacher = teacherMap.get(ts?.teacher_id ?? "");
     return {
+      id: e.id,
       teacher:
         [prof?.first_name, prof?.last_name].filter(Boolean).join(" ") || "Unknown",
+      teacherLastName: prof?.last_name ?? "",
+      teacherFirstName: prof?.first_name ?? "",
       email: prof?.email ?? "",
+      employmentType: teacher?.employmentType ?? "",
       date: e.date,
       type: e.entry_type,
       hours: e.total_hours,
+      rate: (e as Record<string, unknown>).rate_amount as number | null ?? null,
+      totalPay: (e as Record<string, unknown>).rate_amount != null ? e.total_hours * ((e as Record<string, unknown>).rate_amount as number) : null,
       description: e.description ?? "",
-      status: ts?.status ?? "",
+      status: e.status ?? ts?.status ?? "",
+      rateOverride: (e as Record<string, unknown>).rate_override as boolean ?? false,
+      notes: e.notes ?? "",
+      productionTag: e.production_name ?? e.event_tag ?? "",
+      isSubstitute: e.entry_type === "substitute",
     };
   });
 

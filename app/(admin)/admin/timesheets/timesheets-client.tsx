@@ -92,13 +92,23 @@ interface PayPeriod {
 }
 
 interface CsvRow {
+  id: string;
   teacher: string;
+  teacherLastName?: string;
+  teacherFirstName?: string;
   email: string;
+  employmentType?: string;
   date: string;
   type: string;
   hours: number;
+  rate?: number | null;
+  totalPay?: number | null;
   description: string;
   status: string;
+  rateOverride?: boolean;
+  notes?: string;
+  productionTag?: string;
+  isSubstitute?: boolean;
 }
 
 interface PrivateBillingSplit {
