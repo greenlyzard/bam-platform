@@ -4,7 +4,10 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { SimpleSelect } from "@/components/ui/select";
-import { addStaffMember } from "./staff-actions";
+import { addStaffMember, updateStaffOrder, resetStaffOrder } from "./staff-actions";
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 interface StaffMember {
   id: string;
@@ -19,6 +22,7 @@ interface StaffMember {
   classCount: number;
   disciplines: { name: string; iconUrl: string | null }[];
   compliance: { mandated: boolean; background: boolean; w9: boolean };
+  sortOrder: number | null;
 }
 
 const ROLE_BADGES: Record<string, string> = {
@@ -40,7 +44,37 @@ function getRoleBadgeClass(roles: string[]): string {
   return ROLE_BADGES.teacher;
 }
 
-export function StaffList({ staff, allDisciplines, tenantId }: { staff: StaffMember[]; allDisciplines: string[]; tenantId: string }) {
+export function StaffList({ staff: initialStaff, allDisciplines, tenantId, isSuperAdmin = false, hasCustomOrder = false }: { staff: StaffMember[]; allDisciplines: string[]; tenantId: string; isSuperAdmin?: boolean; hasCustomOrder?: boolean }) {
+  const [staffOrder, setStaffOrder] = useState(initialStaff);
+  const staff = staffOrder;
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setStaffOrder((prev) => {
+      const oi = prev.findIndex((s) => s.id === active.id);
+      const ni = prev.findIndex((s) => s.id === over.id);
+      const next = arrayMove(prev, oi, ni);
+      // Save to DB
+      const fd = new FormData();
+      fd.set("orderedIds", JSON.stringify(next.map((s) => s.id)));
+      updateStaffOrder(fd).then((res) => {
+        if (!res.error) { setToast("Custom order saved"); setTimeout(() => setToast(""), 3000); }
+      });
+      return next;
+    });
+  }
+
+  function handleResetOrder() {
+    const fd = new FormData();
+    fd.set("tenantId", tenantId);
+    startTransition(async () => {
+      const res = await resetStaffOrder(fd);
+      if (!res.error) { setToast("Reset to alphabetical"); setTimeout(() => setToast(""), 3000); router.refresh(); }
+    });
+  }
+
   const searchParams = useSearchParams();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -108,12 +142,19 @@ export function StaffList({ staff, allDisciplines, tenantId }: { staff: StaffMem
             {activeFilter === "active" && ` · ${activeCount} active`}
           </p>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="h-10 rounded-lg bg-lavender hover:bg-lavender-dark text-white font-semibold text-sm px-5 transition-colors"
-        >
-          + Add Staff Member
-        </button>
+        <div className="flex items-center gap-2">
+          {isSuperAdmin && hasCustomOrder && (
+            <button onClick={handleResetOrder} disabled={isPending} className="h-10 rounded-lg border border-silver text-slate text-sm px-4 hover:bg-cloud transition-colors disabled:opacity-50">
+              Reset to alphabetical
+            </button>
+          )}
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="h-10 rounded-lg bg-lavender hover:bg-lavender-dark text-white font-semibold text-sm px-5 transition-colors"
+          >
+            + Add Staff Member
+          </button>
+        </div>
       </div>
 
       {/* Filter bar */}
@@ -193,6 +234,8 @@ export function StaffList({ staff, allDisciplines, tenantId }: { staff: StaffMem
           <p className="text-sm text-mist">No staff members match your filters.</p>
         </div>
       ) : (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={filtered.map((s) => s.id)} strategy={verticalListSortingStrategy}>
         <div className="grid gap-4 sm:grid-cols-2">
           {filtered.map((s) => {
             const name = [s.firstName, s.lastName].filter(Boolean).join(" ") || "Unknown";
@@ -200,12 +243,7 @@ export function StaffList({ staff, allDisciplines, tenantId }: { staff: StaffMem
             const isCompliant = s.compliance.mandated && s.compliance.background && s.compliance.w9;
 
             return (
-              <div
-                key={s.id}
-                className={`rounded-xl border border-silver bg-white p-4 transition-shadow hover:shadow-sm ${
-                  !s.isActive ? "opacity-60" : ""
-                }`}
-              >
+              <SortableStaffCard key={s.id} id={s.id} isSuperAdmin={isSuperAdmin} isActive={s.isActive}>
                 <div className="flex items-start gap-3">
                   {/* Avatar */}
                   <div className="h-[60px] w-[60px] rounded-full bg-lavender/20 flex items-center justify-center text-lavender text-lg font-heading font-bold shrink-0 overflow-hidden">
@@ -276,10 +314,12 @@ export function StaffList({ staff, allDisciplines, tenantId }: { staff: StaffMem
                     </Link>
                   </div>
                 </div>
-              </div>
+              </SortableStaffCard>
             );
           })}
         </div>
+        </SortableContext>
+        </DndContext>
       )}
 
       {/* Add Staff Modal */}
@@ -336,5 +376,21 @@ export function StaffList({ staff, allDisciplines, tenantId }: { staff: StaffMem
         </div>
       )}
     </>
+  );
+}
+
+function SortableStaffCard({ id, isSuperAdmin, isActive, children }: { id: string; isSuperAdmin: boolean; isActive: boolean; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+
+  return (
+    <div ref={setNodeRef} style={style} className={`rounded-xl border border-silver bg-white p-4 transition-shadow hover:shadow-sm ${!isActive ? "opacity-60" : ""}`}>
+      {isSuperAdmin && (
+        <div {...attributes} {...listeners} className="float-right cursor-grab active:cursor-grabbing text-mist hover:text-slate p-1">
+          <span className="text-sm select-none">⠿</span>
+        </div>
+      )}
+      {children}
+    </div>
   );
 }

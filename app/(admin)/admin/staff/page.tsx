@@ -26,7 +26,7 @@ export default async function StaffPage() {
   // Fetch profiles
   const { data: profiles } = await supabase
     .from("profiles")
-    .select("id, first_name, last_name, email, phone, avatar_url, title, bio_short")
+    .select("id, first_name, last_name, email, phone, avatar_url, title, bio_short, sort_order")
     .in("id", userIds);
 
   // Fetch teacher_disciplines + icon_library
@@ -96,11 +96,31 @@ export default async function StaffPage() {
     classCount: classCounts[p.id] ?? 0,
     disciplines: disciplinesByTeacher[p.id] ?? [],
     compliance: complianceMap[p.id] ?? { mandated: false, background: false, w9: false },
+    sortOrder: (p as any).sort_order as number | null,
   }));
+
+  // Sort: if any have sort_order, use it; otherwise alphabetical
+  const hasCustomOrder = staff.some((s) => s.sortOrder != null);
+  if (hasCustomOrder) {
+    staff.sort((a, b) => {
+      if (a.sortOrder != null && b.sortOrder != null) return a.sortOrder - b.sortOrder;
+      if (a.sortOrder != null) return -1;
+      if (b.sortOrder != null) return 1;
+      return (a.lastName ?? "").localeCompare(b.lastName ?? "");
+    });
+  } else {
+    staff.sort((a, b) => {
+      const ln = (a.lastName ?? "").localeCompare(b.lastName ?? "");
+      if (ln !== 0) return ln;
+      return (a.firstName ?? "").localeCompare(b.firstName ?? "");
+    });
+  }
+
+  const isSuperAdmin = user.roles?.includes("super_admin") ?? false;
 
   return (
     <div className="space-y-6">
-      <StaffList staff={staff} allDisciplines={allDisciplines} tenantId={user.tenantId!} />
+      <StaffList staff={staff} allDisciplines={allDisciplines} tenantId={user.tenantId!} isSuperAdmin={isSuperAdmin} hasCustomOrder={hasCustomOrder} />
     </div>
   );
 }

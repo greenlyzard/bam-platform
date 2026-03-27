@@ -1,9 +1,11 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 
 export async function addStaffMember(formData: FormData) {
+  // Verify caller is authenticated admin
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -19,8 +21,11 @@ export async function addStaffMember(formData: FormData) {
     return { error: "First name and email are required" };
   }
 
-  // Check if profile already exists for this email
-  const { data: existing } = await supabase
+  // Use admin client for all writes (bypasses RLS)
+  const admin = createAdminClient();
+
+  // Check if profile already exists
+  const { data: existing } = await admin
     .from("profiles")
     .select("id")
     .eq("email", email.trim().toLowerCase())
@@ -31,54 +36,35 @@ export async function addStaffMember(formData: FormData) {
   if (existing) {
     profileId = existing.id;
   } else {
-    // Create auth user via admin API — use service role if available, otherwise create profile directly
-    // Since we use the anon key client, we create the profile record directly
-    // The user will set their password when they receive the welcome email
-    const { data: authUser, error: authErr } = await supabase.auth.admin.createUser({
+    // Create auth user via service role admin API
+    const { data: authUser, error: authErr } = await admin.auth.admin.createUser({
       email: email.trim().toLowerCase(),
       email_confirm: true,
       user_metadata: { first_name: firstName.trim(), last_name: lastName.trim() },
     });
 
     if (authErr) {
-      // If admin API not available (anon key), just create profile directly
-      console.warn("[addStaff] auth.admin.createUser failed:", authErr.message);
-      // Try inserting profile directly
-      const { data: newProfile, error: profileErr } = await supabase
-        .from("profiles")
-        .insert({
-          first_name: firstName.trim(),
-          last_name: lastName.trim(),
-          email: email.trim().toLowerCase(),
-        })
-        .select("id")
-        .single();
-
-      if (profileErr) return { error: `Could not create profile: ${profileErr.message}` };
-      profileId = newProfile.id;
-    } else {
-      profileId = authUser.user.id;
-      // Profile should be created by the auth trigger, but ensure it exists
-      await supabase.from("profiles").upsert({
-        id: profileId,
-        first_name: firstName.trim(),
-        last_name: lastName.trim(),
-        email: email.trim().toLowerCase(),
-      }, { onConflict: "id" });
+      console.error("[addStaff] createUser failed:", authErr.message);
+      return { error: `Could not create user: ${authErr.message}` };
     }
+
+    profileId = authUser.user.id;
+
+    // Ensure profile exists (auth trigger may create it, but upsert to be safe)
+    await admin.from("profiles").upsert({
+      id: profileId,
+      first_name: firstName.trim(),
+      last_name: lastName.trim(),
+      email: email.trim().toLowerCase(),
+    }, { onConflict: "id" });
   }
 
   // Insert role
-  const { error: roleErr } = await supabase
+  const { error: roleErr } = await admin
     .from("profile_roles")
-    .insert({
-      user_id: profileId,
-      role,
-      tenant_id: tenantId,
-      is_active: true,
-    });
+    .insert({ user_id: profileId, role, tenant_id: tenantId, is_active: true });
 
-  if (roleErr && roleErr.code !== "23505") { // ignore duplicate
+  if (roleErr && roleErr.code !== "23505") {
     return { error: `Could not assign role: ${roleErr.message}` };
   }
 
@@ -97,4 +83,50 @@ export async function addStaffMember(formData: FormData) {
 
   revalidatePath("/admin/staff");
   return { id: profileId };
+}
+
+export async function updateStaffOrder(formData: FormData) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const orderedIds = JSON.parse(formData.get("orderedIds") as string ?? "[]") as string[];
+  if (orderedIds.length === 0) return { error: "No IDs provided" };
+
+  const admin = createAdminClient();
+  for (let i = 0; i < orderedIds.length; i++) {
+    const { error } = await admin
+      .from("profiles")
+      .update({ sort_order: i })
+      .eq("id", orderedIds[i]);
+    if (error) return { error: error.message };
+  }
+
+  revalidatePath("/admin/staff");
+  return {};
+}
+
+export async function resetStaffOrder(formData: FormData) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const tenantId = formData.get("tenantId") as string;
+  if (!tenantId) return { error: "Missing tenantId" };
+
+  // Get all staff profile IDs for this tenant
+  const admin = createAdminClient();
+  const { data: roles } = await admin
+    .from("profile_roles")
+    .select("user_id")
+    .eq("tenant_id", tenantId)
+    .in("role", ["teacher", "admin", "super_admin"]);
+
+  const ids = [...new Set((roles ?? []).map((r) => r.user_id))];
+  if (ids.length > 0) {
+    await admin.from("profiles").update({ sort_order: null }).in("id", ids);
+  }
+
+  revalidatePath("/admin/staff");
+  return {};
 }

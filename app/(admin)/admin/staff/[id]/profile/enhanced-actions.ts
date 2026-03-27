@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 
 // ---------------------------------------------------------------------------
@@ -280,8 +281,9 @@ export async function uploadTeacherPhoto(formData: FormData) {
   const timestamp = Date.now();
   const storagePath = `teacher-photos/${teacherId}/${timestamp}.${ext}`;
 
-  // Upload to Supabase Storage
-  const { error: uploadError } = await supabase.storage
+  // Upload to Supabase Storage using admin client (bypasses RLS)
+  const admin = createAdminClient();
+  const { error: uploadError } = await admin.storage
     .from("avatars")
     .upload(storagePath, file, {
       contentType: file.type,
@@ -291,7 +293,7 @@ export async function uploadTeacherPhoto(formData: FormData) {
   if (uploadError) return { error: uploadError.message };
 
   // Get the public URL
-  const { data: urlData } = supabase.storage
+  const { data: urlData } = admin.storage
     .from("avatars")
     .getPublicUrl(storagePath);
 
@@ -386,7 +388,7 @@ export async function deletePhoto(formData: FormData) {
     const idx = photo.photo_url.indexOf(marker);
     if (idx !== -1) {
       const storagePath = "teacher-photos/" + photo.photo_url.slice(idx + marker.length);
-      await supabase.storage.from("avatars").remove([storagePath]);
+      await createAdminClient().storage.from("avatars").remove([storagePath]);
     }
   }
 
