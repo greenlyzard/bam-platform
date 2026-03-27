@@ -274,7 +274,7 @@ export function ClassManagement({
   const [filterDiscipline, setFilterDiscipline] = useState("");
   const [filterDay, setFilterDay] = useState("");
   const [filterType, setFilterType] = useState("");
-  const [filterStatus, setFilterStatus] = useState("");
+  const [filterStatus, setFilterStatus] = useState("active");
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [drawerClass, setDrawerClass] = useState<ClassRecord | null>(null);
@@ -283,6 +283,8 @@ export function ClassManagement({
   const [bulkOpen, setBulkOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+  const [sortKey, setSortKey] = useState<string>("day_of_week");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   const activeFilterCount = [filterSeason, filterTeacher, filterLevel, filterDiscipline, filterDay, filterType, filterStatus].filter(Boolean).length;
 
@@ -384,6 +386,24 @@ export function ClassManagement({
     if (filterStatus === "hidden" && !c.is_hidden) return false;
     if (filterStatus === "inactive" && c.is_active) return false;
     return true;
+  }).sort((a, b) => {
+    const aVal = (a as unknown as Record<string, unknown>)[sortKey];
+    const bVal = (b as unknown as Record<string, unknown>)[sortKey];
+    if (aVal == null && bVal == null) return 0;
+    if (aVal == null) return 1;
+    if (bVal == null) return -1;
+    if (sortKey === "day_of_week") {
+      if (aVal !== bVal) return sortDir === "asc" ? Number(aVal) - Number(bVal) : Number(bVal) - Number(aVal);
+      const aTime = a.start_time ?? "";
+      const bTime = b.start_time ?? "";
+      return aTime < bTime ? -1 : aTime > bTime ? 1 : 0;
+    }
+    if (typeof aVal === "number" && typeof bVal === "number") {
+      return sortDir === "asc" ? aVal - bVal : bVal - aVal;
+    }
+    const aStr = String(aVal).toLowerCase();
+    const bStr = String(bVal).toLowerCase();
+    return sortDir === "asc" ? aStr.localeCompare(bStr) : bStr.localeCompare(aStr);
   });
 
   // ── Teacher name helper ──────────────────────────────
@@ -974,11 +994,22 @@ ${(byDay[d] ?? [])
                 {columns.filter((col) => col.visible).map((col) => (
                   <th
                     key={col.key}
-                    className={`px-3 py-2 text-xs font-semibold text-mist ${
-                      col.fieldType === "integer" || col.fieldType === "currency" || col.key === "enrolled" || col.key === "status" || col.key === "onlinereg" ? "text-center" : "text-left"
+                    onClick={() => {
+                      if (sortKey === col.key) {
+                        setSortDir((d) => d === "asc" ? "desc" : "asc");
+                      } else {
+                        setSortKey(col.key);
+                        setSortDir("asc");
+                      }
+                    }}
+                    className={`px-3 py-2 text-xs font-semibold text-mist cursor-pointer select-none hover:text-charcoal ${
+                      col.fieldType === "integer" || col.fieldType === "currency" || col.key === "enrolled_count" || col.key === "status" || col.key === "online_registration" ? "text-center" : "text-left"
                     }`}
                   >
-                    {col.label}
+                    <span className="inline-flex items-center gap-1">
+                      {col.label}
+                      {sortKey === col.key ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
+                    </span>
                   </th>
                 ))}
                 <th className="px-3 py-2 w-12" />
@@ -1013,6 +1044,15 @@ ${(byDay[d] ?? [])
                           {c.start_time && c.end_time ? `${formatTime(c.start_time)}–${formatTime(c.end_time)}` : "—"}
                         </td>
                       );
+                    case "discipline_icon": {
+                      const disc = c.discipline ?? "";
+                      const iconLookup: Record<string, string> = {
+                        "Ballet": "🩰", "Jazz": "🎵", "Contemporary": "🌊",
+                        "Hip Hop": "🎤", "Pilates": "⭕", "Musical Theater": "🎭",
+                        "Pom": "🎀", "Stretching": "🧘", "Movement": "💃",
+                      };
+                      return <td key={col.key} className="px-3 py-2 text-center text-lg">{iconLookup[disc] ?? "—"}</td>;
+                    }
                     case "season":
                       return <td key={col.key} className="px-3 py-2 text-xs text-slate">{seasonName}</td>;
                     case "enrolled":
