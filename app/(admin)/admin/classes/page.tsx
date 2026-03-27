@@ -1,10 +1,10 @@
 import { requireAdmin } from "@/lib/auth/guards";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { ClassManagement } from "./class-management";
 
 export default async function ClassesPage() {
   const user = await requireAdmin();
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   // Fetch classes (no tenant_id on classes table)
   const { data: classes } = await supabase
@@ -112,12 +112,6 @@ export default async function ClassesPage() {
     .select("*")
     .eq("tenant_id", user.tenantId!)
     .order("start_date");
-
-  console.log("DEBUG teachers count:", teachers?.length);
-  console.log("DEBUG classTeachers count:", classTeachers?.length);
-  console.log("DEBUG legacyTeacherNames keys:", Object.keys(legacyTeacherNames).length);
-  console.log("DEBUG classes count:", classes?.length);
-  console.log("DEBUG fieldConfig count:", fieldConfigRows?.length);
 
   return (
     <ClassManagement
