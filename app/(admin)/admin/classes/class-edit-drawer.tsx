@@ -220,6 +220,9 @@ export function ClassEditDrawer({
   const [isPerformance, setIsPerformance] = useState(
     classData?.is_performance ?? false
   );
+  const [colorHex, setColorHex] = useState(
+    (classData as any)?.color_hex ?? "#9C8BBF"
+  );
 
   // ── Section 6: Phases ────────────────────────────────
   const [phaseRows, setPhaseRows] = useState<PhaseRow[]>(() =>
@@ -400,6 +403,7 @@ export function ClassEditDrawer({
       new_expires_at: isNewFlag && newExpiresAt ? newExpiresAt : null,
       is_rehearsal: isRehearsal,
       is_performance: isPerformance,
+      color_hex: colorHex || null,
       is_active: true,
       status: "active",
       teacher_id:
@@ -973,6 +977,26 @@ export function ClassEditDrawer({
               checked={isPerformance}
               onChange={setIsPerformance}
             />
+          </Section>
+
+          {/* ── Calendar Color ──────────────────────────── */}
+          <Section title="Calendar Color">
+            <div className="flex items-center gap-3">
+              <input
+                type="color"
+                value={colorHex}
+                onChange={(e) => setColorHex(e.target.value)}
+                className="h-10 w-10 rounded-lg border border-silver cursor-pointer"
+              />
+              <input
+                type="text"
+                value={colorHex}
+                onChange={(e) => setColorHex(e.target.value)}
+                maxLength={7}
+                className="w-24 h-10 rounded-lg border border-silver px-3 text-sm text-charcoal font-mono focus:border-lavender focus:outline-none"
+              />
+              <div className="h-8 w-16 rounded" style={{ backgroundColor: colorHex }} />
+            </div>
           </Section>
 
           {/* ── SECTION 6: Class Phases ─────────────────── */}

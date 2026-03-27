@@ -246,6 +246,9 @@ export function ClassManagement({
   fieldConfig,
   roomMap = {},
   locationMap = {},
+  activeRooms = [],
+  privateSessionsRaw = [],
+  studioClosures = [],
   tenantId,
 }: {
   classes: ClassRecord[];
@@ -261,6 +264,9 @@ export function ClassManagement({
   fieldConfig: FieldConfigRow[];
   roomMap?: Record<string, string>;
   locationMap?: Record<string, string>;
+  activeRooms?: Array<{ id: string; name: string; color_hex: string | null }>;
+  privateSessionsRaw?: Array<{ id: string; session_date: string; start_time: string; end_time: string; status: string; studio: string | null; primary_teacher_id: string | null; student_ids: string[]; notes: string | null }>;
+  studioClosures?: Array<{ id: string; closed_date: string; reason: string | null }>;
   tenantId: string;
 }) {
   const [classes, setClasses] = useState(initialClasses);
@@ -285,6 +291,26 @@ export function ClassManagement({
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [sortKey, setSortKey] = useState<string>("day_of_week");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  const [calendarFields, setCalendarFields] = useState(() => {
+    const defaults = [
+      { key: "time", label: "Time", visible: true, locked: true },
+      { key: "name", label: "Class Name", visible: true, locked: true },
+      { key: "teacher", label: "Teacher", visible: true, locked: false },
+      { key: "levels", label: "Levels", visible: true, locked: false },
+      { key: "room", label: "Room", visible: true, locked: false },
+      { key: "enrolled", label: "Enrolled", visible: false, locked: false },
+    ];
+    if (typeof window === "undefined") return defaults;
+    try { const s = localStorage.getItem("bam-calendar-fields"); if (s) return JSON.parse(s); } catch {}
+    return defaults;
+  });
+  const [showCalFieldPicker, setShowCalFieldPicker] = useState(false);
+  const [calWeekStart, setCalWeekStart] = useState(() => {
+    const now = new Date(); const day = now.getDay(); const diff = day === 0 ? -6 : 1 - day;
+    const mon = new Date(now); mon.setDate(now.getDate() + diff); mon.setHours(0,0,0,0); return mon;
+  });
+  const [calRoomFilter, setCalRoomFilter] = useState("all");
 
   const activeFilterCount = [filterSeason, filterTeacher, filterLevel, filterDiscipline, filterDay, filterType, filterStatus].filter(Boolean).length;
 
@@ -679,70 +705,243 @@ ${(byDay[d] ?? [])
 
   // ── Calendar View ────────────────────────────────────
   function renderCalendar() {
-    const hours = Array.from({ length: 13 }, (_, i) => i + 8); // 8am to 8pm
-    const days = [1, 2, 3, 4, 5, 6, 0]; // Mon-Sat, Sun
+    const SLOT_HEIGHT = 48;
+    const TIME_COL_WIDTH = 72;
 
-    function getClassColor(c: ClassRecord) {
-      if (c.is_rehearsal) return "bg-amber-100 border-amber-300 text-amber-800";
-      if (c.is_performance) return "bg-rose-100 border-rose-300 text-rose-800";
-      return "bg-lavender/10 border-lavender/30 text-lavender-dark";
+    function timeToMinutes(t: string): number {
+      const [h, m] = t.split(":").map(Number);
+      return h * 60 + (m || 0);
+    }
+    function formatTimeShort(t: string): string {
+      const [h, m] = t.split(":");
+      const hr = parseInt(h, 10);
+      const ampm = hr >= 12 ? "PM" : "AM";
+      const dh = hr > 12 ? hr - 12 : hr === 0 ? 12 : hr;
+      return `${dh}:${m} ${ampm}`;
+    }
+    function getLevelColor(levels: string[]): string {
+      const l = (levels[0] || "").toLowerCase();
+      if (l.includes("petite")) return "#FDEBD0";
+      if (l.includes("1")) return "#D5F5E3";
+      if (l.includes("2")) return "#D6EAF8";
+      if (l.includes("3")) return "#E8DAEF";
+      if (l.includes("4")) return "#FADBD8";
+      if (l.includes("adult") || l.includes("teen")) return "#FCF3CF";
+      return "#EBF5FB";
+    }
+    function isFieldVisible(key: string) {
+      return calendarFields.find((f: { key: string; visible: boolean }) => f.key === key)?.visible ?? false;
     }
 
+    // Week days: Mon-Sat (6 days)
+    const weekDays = Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(calWeekStart);
+      d.setDate(d.getDate() + i);
+      return d;
+    });
+    const timeSlots = Array.from({ length: 27 }, (_, i) => 480 + i * 30); // 8:00-21:00
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    // Build closure set
+    const closedDates = new Set(studioClosures.map((sc) => sc.closed_date));
+    const closureReasonMap = new Map(studioClosures.map((sc) => [sc.closed_date, sc.reason]));
+
+    // Room color map
+    const roomColorMap = new Map(activeRooms.map((r) => [r.id, r.color_hex || "#9C8BBF"]));
+
+    // Nav helpers
+    const prevWeek = () => { const d = new Date(calWeekStart); d.setDate(d.getDate() - 7); setCalWeekStart(d); };
+    const nextWeek = () => { const d = new Date(calWeekStart); d.setDate(d.getDate() + 7); setCalWeekStart(d); };
+    const goToday = () => {
+      const now = new Date(); const day = now.getDay(); const diff = day === 0 ? -6 : 1 - day;
+      const mon = new Date(now); mon.setDate(now.getDate() + diff); mon.setHours(0,0,0,0); setCalWeekStart(mon);
+    };
+    const weekLabel = `${weekDays[0].toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${weekDays[5].toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+
+    const gridH = timeSlots.length * SLOT_HEIGHT;
+
+    // Print calendar
+    const handleCalPrint = () => { window.print(); };
+
+    // Save field prefs
+    const toggleCalField = (key: string) => {
+      const next = calendarFields.map((f: { key: string; visible: boolean; locked: boolean }) =>
+        f.key === key && !f.locked ? { ...f, visible: !f.visible } : f
+      );
+      setCalendarFields(next);
+      try { localStorage.setItem("bam-calendar-fields", JSON.stringify(next)); } catch {}
+    };
+    const resetCalFields = () => {
+      const defaults = [
+        { key: "time", label: "Time", visible: true, locked: true },
+        { key: "name", label: "Class Name", visible: true, locked: true },
+        { key: "teacher", label: "Teacher", visible: true, locked: false },
+        { key: "levels", label: "Levels", visible: true, locked: false },
+        { key: "room", label: "Room", visible: true, locked: false },
+        { key: "enrolled", label: "Enrolled", visible: false, locked: false },
+      ];
+      setCalendarFields(defaults);
+      try { localStorage.setItem("bam-calendar-fields", JSON.stringify(defaults)); } catch {}
+    };
+
     return (
-      <div className="rounded-xl border border-silver bg-white overflow-x-auto">
-        <div className="min-w-[800px]">
-          {/* Header */}
-          <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-silver">
-            <div className="p-2" />
-            {days.map((d) => (
-              <div
-                key={d}
-                className="p-2 text-center text-xs font-semibold text-mist border-l border-silver"
-              >
-                {DAY_NAMES_FULL[d]}
-              </div>
-            ))}
-          </div>
-          {/* Time grid */}
-          {hours.map((hour) => (
-            <div
-              key={hour}
-              className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-silver/50 min-h-[48px]"
+      <div className="space-y-3 print-calendar">
+        {/* Controls */}
+        <div className="flex flex-wrap items-center gap-2">
+          <button onClick={prevWeek} className="rounded border border-silver px-2 py-1 text-xs text-slate hover:bg-cloud">&larr; Prev</button>
+          <button onClick={goToday} className="rounded border border-silver px-2 py-1 text-xs text-slate hover:bg-cloud">Today</button>
+          <span className="text-sm font-semibold text-charcoal">{weekLabel}</span>
+          <button onClick={nextWeek} className="rounded border border-silver px-2 py-1 text-xs text-slate hover:bg-cloud">Next &rarr;</button>
+          <div className="ml-auto flex items-center gap-2">
+            <select
+              value={calRoomFilter}
+              onChange={(e) => setCalRoomFilter(e.target.value)}
+              className="appearance-none bg-white border border-silver rounded-md px-3 py-1.5 text-sm text-charcoal focus:outline-none focus:border-lavender focus:ring-2 focus:ring-lavender/20 cursor-pointer"
             >
-              <div className="p-1 text-xs text-mist text-right pr-2">
-                {hour > 12 ? hour - 12 : hour}
-                {hour >= 12 ? "pm" : "am"}
-              </div>
-              {days.map((d) => {
-                const dayClasses = filtered.filter((c) => {
-                  const classDays =
-                    c.days_of_week && c.days_of_week.length > 0
-                      ? c.days_of_week
-                      : c.day_of_week != null
-                        ? [c.day_of_week]
-                        : [];
-                  if (!classDays.includes(d)) return false;
-                  if (!c.start_time) return false;
-                  const startHour = parseInt(c.start_time.split(":")[0]);
-                  return startHour === hour;
-                });
-                return (
-                  <div key={d} className="border-l border-silver/50 p-0.5 relative">
-                    {dayClasses.map((c) => (
+              <option value="all">All Rooms</option>
+              {activeRooms.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+            </select>
+            <div className="relative">
+              <button onClick={() => setShowCalFieldPicker(!showCalFieldPicker)} className="rounded border border-silver px-2 py-1 text-xs text-slate hover:bg-cloud">Fields</button>
+              {showCalFieldPicker && (
+                <div className="absolute right-0 top-full mt-1 w-48 rounded-xl border border-silver bg-white shadow-lg z-30 py-1">
+                  <div className="px-3 py-2 border-b border-silver"><p className="text-xs font-semibold text-charcoal">Calendar Fields</p></div>
+                  <div className="py-1">
+                    {calendarFields.map((f: { key: string; label: string; visible: boolean; locked: boolean }) => (
+                      <label key={f.key} className="flex items-center gap-2 px-3 py-1 text-xs text-charcoal hover:bg-cloud cursor-pointer">
+                        <input type="checkbox" checked={f.visible} disabled={f.locked} onChange={() => toggleCalField(f.key)} className="rounded" />
+                        {f.label}{f.locked && <span className="text-mist ml-auto text-[10px]">required</span>}
+                      </label>
+                    ))}
+                  </div>
+                  <div className="px-3 py-2 border-t border-silver">
+                    <button onClick={resetCalFields} className="text-xs text-lavender hover:text-lavender-dark font-medium">Reset</button>
+                  </div>
+                </div>
+              )}
+            </div>
+            <button onClick={handleCalPrint} className="rounded border border-silver px-2 py-1 text-xs text-slate hover:bg-cloud">Print</button>
+          </div>
+        </div>
+
+        {/* Calendar grid */}
+        <div className="rounded-xl border border-silver bg-white overflow-x-auto">
+          <div style={{ display: "grid", gridTemplateColumns: `${TIME_COL_WIDTH}px repeat(6, 1fr)`, minWidth: 900 }}>
+            {/* Day headers */}
+            <div className="border-b border-silver p-2" />
+            {weekDays.map((wd, i) => {
+              const dateStr = wd.toISOString().slice(0, 10);
+              const isToday = dateStr === todayStr;
+              const isClosed = closedDates.has(dateStr);
+              return (
+                <div key={i} className={`border-b border-l border-silver p-2 text-center ${isToday ? "bg-lavender/10" : ""}`}>
+                  <div className="text-xs font-semibold text-mist">{["Mon","Tue","Wed","Thu","Fri","Sat"][i]}</div>
+                  <div className={`text-sm font-semibold ${isToday ? "text-lavender" : "text-charcoal"}`}>{wd.getDate()}</div>
+                  {isClosed && <span className="inline-block mt-0.5 text-[10px] bg-red-100 text-red-600 rounded px-1">{closureReasonMap.get(dateStr) || "Closed"}</span>}
+                </div>
+              );
+            })}
+
+            {/* Time column + day columns with events */}
+            <div className="relative" style={{ height: gridH }}>
+              {timeSlots.map((mins, i) => {
+                const isHour = mins % 60 === 0;
+                const hr = Math.floor(mins / 60);
+                const dh = hr > 12 ? hr - 12 : hr === 0 ? 12 : hr;
+                return isHour ? (
+                  <div key={i} className="absolute right-2 text-xs text-mist" style={{ top: i * SLOT_HEIGHT - 6 }}>
+                    {dh}{hr >= 12 ? "pm" : "am"}
+                  </div>
+                ) : null;
+              })}
+            </div>
+            {weekDays.map((wd, dayIdx) => {
+              const dateStr = wd.toISOString().slice(0, 10);
+              const dow = wd.getDay();
+              const isClosed = closedDates.has(dateStr);
+
+              // Classes for this day
+              const dayClasses = filtered.filter((c) => {
+                const cDays = c.days_of_week?.length ? c.days_of_week : c.day_of_week != null ? [c.day_of_week] : [];
+                return cDays.includes(dow) && c.start_time;
+              });
+
+              // Private sessions for this day
+              const dayPrivates = privateSessionsRaw.filter((ps) => ps.session_date === dateStr && ps.status !== "cancelled");
+
+              return (
+                <div key={dayIdx} className="relative border-l border-silver" style={{ height: gridH }}>
+                  {/* Grid lines */}
+                  {timeSlots.map((_, si) => (
+                    <div key={si} className="absolute w-full border-b border-silver/30" style={{ top: si * SLOT_HEIGHT, height: SLOT_HEIGHT }} />
+                  ))}
+
+                  {/* Studio closure overlay */}
+                  {isClosed && <div className="absolute inset-0 bg-red-50/60 z-10 pointer-events-none" />}
+
+                  {/* Class events */}
+                  {dayClasses.map((c) => {
+                    const startMins = timeToMinutes(c.start_time!);
+                    const endMins = c.end_time ? timeToMinutes(c.end_time) : startMins + 60;
+                    const duration = endMins - startMins;
+                    const top = ((startMins - 480) / 30) * SLOT_HEIGHT;
+                    const height = Math.max(SLOT_HEIGHT, (duration / 30) * SLOT_HEIGHT);
+                    const bgColor = (c as any).color_hex || getLevelColor(c.levels || []);
+                    const roomColor = c.room ? roomColorMap.get(c.room) || "#9C8BBF" : "#ccc";
+                    const dimmed = calRoomFilter !== "all" && c.room !== calRoomFilter;
+
+                    return (
                       <button
                         key={c.id}
                         onClick={() => openEdit(c)}
-                        className={`w-full text-left rounded px-1.5 py-0.5 text-xs border mb-0.5 truncate ${getClassColor(c)}`}
+                        className="absolute left-1 right-1 rounded text-left overflow-hidden z-20 hover:ring-2 hover:ring-lavender/40 transition-shadow"
+                        style={{
+                          top, height, backgroundColor: bgColor, borderLeft: `3px solid ${roomColor}`,
+                          opacity: dimmed ? 0.3 : 1, padding: "2px 4px",
+                        }}
                       >
-                        {c.name}
+                        <div className="text-[10px] leading-tight text-charcoal space-y-px">
+                          {isFieldVisible("time") && <div className="font-semibold">{formatTimeShort(c.start_time!)}{c.end_time ? `–${formatTimeShort(c.end_time)}` : ""}</div>}
+                          {isFieldVisible("name") && <div className="font-semibold truncate">{c.name}</div>}
+                          {isFieldVisible("teacher") && <div className="truncate text-slate">{getTeacherNames(c.id, c.legacyTeacherName)}</div>}
+                          {isFieldVisible("levels") && c.levels?.length ? <div className="truncate text-slate">{c.levels.join(", ")}</div> : null}
+                          {isFieldVisible("room") && c.room && <div className="truncate text-slate">{roomMap[c.room] || c.room}</div>}
+                          {isFieldVisible("enrolled") && <div className="text-slate">{c.enrolledCount}/{c.max_enrollment ?? c.max_students}</div>}
+                        </div>
                       </button>
-                    ))}
-                  </div>
-                );
-              })}
-            </div>
-          ))}
+                    );
+                  })}
+
+                  {/* Private sessions */}
+                  {dayPrivates.map((ps) => {
+                    const startMins = timeToMinutes(ps.start_time);
+                    const endMins = timeToMinutes(ps.end_time);
+                    const duration = endMins - startMins;
+                    const top = ((startMins - 480) / 30) * SLOT_HEIGHT;
+                    const height = Math.max(SLOT_HEIGHT, (duration / 30) * SLOT_HEIGHT);
+                    const teacherName = ps.primary_teacher_id ? (teachers.find((t) => t.id === ps.primary_teacher_id)?.name ?? "—") : "—";
+                    return (
+                      <div
+                        key={ps.id}
+                        className="absolute left-1 right-1 rounded z-20 overflow-hidden"
+                        style={{ top, height, backgroundColor: "#f3f4f6", border: "1.5px dashed #9ca3af", padding: "2px 4px" }}
+                      >
+                        <div className="text-[10px] leading-tight text-gray-600 space-y-px">
+                          <div className="font-semibold">Private</div>
+                          <div>{formatTimeShort(ps.start_time)}–{formatTimeShort(ps.end_time)}</div>
+                          <div className="truncate">{teacherName}</div>
+                          {ps.notes && <div className="truncate italic">{ps.notes}</div>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
         </div>
+        {/* Print styles */}
+        <style>{`@media print { .print-calendar { break-inside: avoid; } .print-calendar button { pointer-events: none; } }`}</style>
       </div>
     );
   }

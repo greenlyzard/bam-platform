@@ -114,13 +114,24 @@ export default async function ClassesPage() {
     .order("start_date");
 
   // Fetch rooms and locations for name resolution
-  const { data: roomRows } = await supabase.from("rooms").select("id, name");
+  const { data: roomRows } = await supabase.from("rooms").select("id, name, color_hex, is_active").eq("is_active", true);
   const roomMap: Record<string, string> = {};
   for (const r of roomRows ?? []) roomMap[r.id] = r.name;
 
   const { data: locationRows } = await supabase.from("studio_locations").select("id, name");
   const locationMap: Record<string, string> = {};
   for (const l of locationRows ?? []) locationMap[l.id] = l.name;
+
+  // Fetch private sessions and studio closures for calendar view
+  const { data: privateSessionsRaw } = await supabase
+    .from("private_sessions")
+    .select("id, session_date, start_time, end_time, status, studio, primary_teacher_id, student_ids, session_notes")
+    .neq("status", "cancelled");
+
+  const { data: studioClosureRows } = await supabase
+    .from("studio_closures")
+    .select("id, closed_date, reason")
+    .eq("tenant_id", user.tenantId!);
 
   return (
     <ClassManagement
@@ -147,6 +158,9 @@ export default async function ClassesPage() {
       fieldConfig={fieldConfigRows ?? []}
       roomMap={roomMap}
       locationMap={locationMap}
+      activeRooms={(roomRows ?? []).map(r => ({ id: r.id, name: r.name, color_hex: (r as any).color_hex ?? null }))}
+      privateSessionsRaw={(privateSessionsRaw ?? []).map((p: any) => ({ id: p.id, session_date: p.session_date, start_time: p.start_time, end_time: p.end_time, status: p.status, studio: p.studio, primary_teacher_id: p.primary_teacher_id, student_ids: p.student_ids ?? [], notes: p.session_notes }))}
+      studioClosures={(studioClosureRows ?? []).map((c: any) => ({ id: c.id, closed_date: c.closed_date, reason: c.reason }))}
       tenantId={user.tenantId!}
     />
   );
