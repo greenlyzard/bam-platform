@@ -13,15 +13,23 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const documentType = form.get("document_type") as string;
   const groupName = (form.get("group_name") as string) || null;
   const notes = (form.get("notes") as string) || null;
-  const tenantId = form.get("tenantId") as string;
 
   if (!file) return NextResponse.json({ error: "No file provided" }, { status: 400 });
+
+  // Resolve tenant_id from profile_roles server-side
+  const admin = createAdminClient();
+  const { data: roleRow } = await admin
+    .from("profile_roles")
+    .select("tenant_id")
+    .eq("user_id", profileId)
+    .limit(1)
+    .maybeSingle();
+  const tenantId = roleRow?.tenant_id ?? "";
 
   const timestamp = Date.now();
   const path = `staff-documents/${profileId}/${timestamp}_${file.name}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
-  const admin = createAdminClient();
   const { error: uploadErr } = await admin.storage.from("avatars").upload(path, buffer, {
     contentType: file.type,
     upsert: false,

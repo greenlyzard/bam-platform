@@ -321,7 +321,7 @@ export function TeacherProfileAdmin({
 
   // ── F. Sub eligibility save ──
   function saveSubElig() {
-    const fd = new FormData(); fd.set("teacherId", teacher.id);
+    const fd = new FormData(); fd.set("teacherId", teacher.id); fd.set("tenantId", tenantId);
     fd.set("is_sub_eligible", String(subForm.is_sub_eligible));
     fd.set("eligible_levels", JSON.stringify(subForm.eligible_levels));
     fd.set("eligible_disciplines", JSON.stringify(subForm.eligible_disciplines));

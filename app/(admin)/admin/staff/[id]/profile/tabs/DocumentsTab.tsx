@@ -57,10 +57,7 @@ export default function DocumentsTab({ teacherId }: { teacherId: string }) {
       form.append("document_type", docType);
       if (groupName) form.append("group_name", groupName);
       if (notes) form.append("notes", notes);
-
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      form.append("tenantId", session?.user?.app_metadata?.tenant_id || "");
+      // tenant_id resolved server-side from profile_roles in the API route
 
       await fetch(`/api/admin/staff/${teacherId}/documents`, { method: "POST", body: form });
       setShowUpload(false);

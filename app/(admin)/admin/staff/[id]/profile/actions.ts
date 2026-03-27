@@ -270,6 +270,7 @@ export async function updateSubEligibility(formData: FormData) {
     .from("teacher_sub_eligibility")
     .upsert(
       {
+        tenant_id: (formData.get("tenantId") as string) || undefined,
         teacher_id: teacherId,
         is_sub_eligible: isSubEligible,
         eligible_levels: eligibleLevels,
@@ -277,7 +278,7 @@ export async function updateSubEligibility(formData: FormData) {
         notes: (formData.get("notes") as string) || null,
         updated_by: user.id,
       },
-      { onConflict: "teacher_id" }
+      { onConflict: "tenant_id,teacher_id" }
     );
 
   if (error) return { error: error.message };

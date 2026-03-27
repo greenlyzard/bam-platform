@@ -39,7 +39,7 @@ export default function ClassesTab({ teacherId }: { teacherId: string }) {
       if (sessions && sessions.length > 0) {
         const studentIds = [...new Set(sessions.flatMap((s: any) => s.student_ids || []))];
         const { data: students } = studentIds.length
-          ? await supabase.from("profiles").select("id, first_name, last_name").in("id", studentIds)
+          ? await supabase.from("students").select("id, first_name, last_name").in("id", studentIds)
           : { data: [] };
         const nameMap = Object.fromEntries(
           (students || []).map((s: any) => [s.id, `${s.first_name} ${s.last_name}`])
