@@ -100,7 +100,7 @@ export default async function StaffPage() {
 
   return (
     <div className="space-y-6">
-      <StaffList staff={staff} allDisciplines={allDisciplines} />
+      <StaffList staff={staff} allDisciplines={allDisciplines} tenantId={user.tenantId!} />
     </div>
   );
 }

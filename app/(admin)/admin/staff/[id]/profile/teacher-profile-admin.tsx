@@ -12,6 +12,7 @@ import {
   updateEnhancedBio, addDiscipline, removeDiscipline, reorderDisciplines,
   addAffiliation, removeAffiliation, reorderAffiliations,
   uploadTeacherPhoto, updatePhotoCaption, deletePhoto, reorderPhotos, togglePhotoActive,
+  addStaffRole, removeStaffRole,
 } from "./enhanced-actions";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
@@ -186,14 +187,47 @@ export function TeacherProfileAdmin({
 
   // Contact channels state
   const [contactChannels, setContactChannels] = useState<ContactChannel[]>([]);
+  // Roles state
+  const [staffRoles, setStaffRoles] = useState<{ role: string; is_active: boolean }[]>([]);
+  const [addRoleOpen, setAddRoleOpen] = useState(false);
+  const [newRole, setNewRole] = useState("teacher");
+  const [confirmRemoveRole, setConfirmRemoveRole] = useState<string | null>(null);
+
   useEffect(() => {
     const sb = createClient();
     sb.from("contact_channels").select("*").eq("profile_id", init.id).then(({ data }) => {
       if (data) setContactChannels(data);
     });
+    sb.from("profile_roles").select("role, is_active").eq("user_id", init.id).then(({ data }) => {
+      if (data) setStaffRoles(data);
+    });
   }, [init.id]);
 
   function flash(msg: string) { setToast(msg); setTimeout(() => setToast(""), 3000); }
+
+  function handleAddRole() {
+    const fd = new FormData();
+    fd.set("profileId", teacher.id); fd.set("role", newRole); fd.set("tenantId", tenantId);
+    startTransition(async () => {
+      const res = await addStaffRole(fd);
+      if (res.error) return flash(res.error);
+      setStaffRoles(r => [...r, { role: newRole, is_active: true }]);
+      setAddRoleOpen(false);
+      flash("Role added");
+    });
+  }
+
+  function handleRemoveRole(role: string) {
+    const fd = new FormData();
+    fd.set("profileId", teacher.id); fd.set("role", role);
+    startTransition(async () => {
+      const res = await removeStaffRole(fd);
+      if (res.error) return flash(res.error);
+      setStaffRoles(r => r.filter(x => x.role !== role));
+      setConfirmRemoveRole(null);
+      flash("Role removed");
+    });
+  }
 
   // ── A. Save basics ──
   function saveBasics() {
@@ -512,6 +546,40 @@ export function TeacherProfileAdmin({
             )}
           </div>
         </div>
+      </div>
+
+      {/* N. Role & Access */}
+      <div className={cardCls}>
+        <h2 className={headingCls}>Role & Access</h2>
+        <div className="flex flex-wrap gap-2">
+          {staffRoles.map((r) => (
+            <span key={r.role} className="inline-flex items-center gap-1.5 rounded-full bg-lavender/10 text-lavender-dark px-3 py-1 text-sm font-medium">
+              {r.role === "super_admin" ? "Studio Owner" : r.role === "finance_admin" ? "Finance Admin" : r.role.charAt(0).toUpperCase() + r.role.slice(1)}
+              {confirmRemoveRole === r.role ? (
+                <span className="flex items-center gap-1 ml-1">
+                  <button onClick={() => handleRemoveRole(r.role)} className="text-error text-xs font-semibold">Yes</button>
+                  <button onClick={() => setConfirmRemoveRole(null)} className="text-slate text-xs">No</button>
+                </span>
+              ) : (
+                <button onClick={() => setConfirmRemoveRole(r.role)} className="text-lavender hover:text-error text-xs ml-1">&times;</button>
+              )}
+            </span>
+          ))}
+          {staffRoles.length === 0 && <span className="text-sm text-mist">No roles assigned</span>}
+        </div>
+        {!addRoleOpen ? (
+          <button className={btnSecondary} onClick={() => setAddRoleOpen(true)}>+ Add Role</button>
+        ) : (
+          <div className="flex gap-2 items-end">
+            <SimpleSelect value={newRole} onValueChange={setNewRole} options={[
+              { value: "teacher", label: "Teacher" },
+              { value: "admin", label: "Admin" },
+              { value: "finance_admin", label: "Finance Admin" },
+            ]} placeholder="Select role" className="w-48" />
+            <button className={btnPrimary} onClick={handleAddRole} disabled={isPending}>Add</button>
+            <button className={btnSecondary} onClick={() => setAddRoleOpen(false)}>Cancel</button>
+          </div>
+        )}
       </div>
 
       {/* I. Enhanced Bio — moved up for visibility */}

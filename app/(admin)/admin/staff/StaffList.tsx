@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { SimpleSelect } from "@/components/ui/select";
+import { addStaffMember } from "./staff-actions";
 
 interface StaffMember {
   id: string;
@@ -38,8 +40,10 @@ function getRoleBadgeClass(roles: string[]): string {
   return ROLE_BADGES.teacher;
 }
 
-export function StaffList({ staff, allDisciplines }: { staff: StaffMember[]; allDisciplines: string[] }) {
+export function StaffList({ staff, allDisciplines, tenantId }: { staff: StaffMember[]; allDisciplines: string[]; tenantId: string }) {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
 
   const [search, setSearch] = useState(searchParams.get("q") ?? "");
   const [activeFilter, setActiveFilter] = useState<"active" | "inactive" | "all">(
@@ -47,6 +51,10 @@ export function StaffList({ staff, allDisciplines }: { staff: StaffMember[]; all
   );
   const [roleFilter, setRoleFilter] = useState<string[]>([]);
   const [discFilter, setDiscFilter] = useState<string[]>([]);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addForm, setAddForm] = useState({ firstName: "", lastName: "", email: "", role: "teacher", employmentType: "w2", sendWelcome: true });
+  const [addError, setAddError] = useState("");
+  const [toast, setToast] = useState("");
 
   // Filter
   const filtered = staff.filter((s) => {
@@ -54,9 +62,12 @@ export function StaffList({ staff, allDisciplines }: { staff: StaffMember[]; all
     if (activeFilter === "active" && !s.isActive) return false;
     if (activeFilter === "inactive" && s.isActive) return false;
 
-    // Role filter
+    // Role filter — "admin" chip matches both admin AND super_admin
     if (roleFilter.length > 0) {
-      const hasRole = roleFilter.some((r) => s.roles.includes(r));
+      const hasRole = roleFilter.some((r) => {
+        if (r === "admin") return s.roles.includes("admin") || s.roles.includes("super_admin");
+        return s.roles.includes(r);
+      });
       if (!hasRole) return false;
     }
 
@@ -85,6 +96,9 @@ export function StaffList({ staff, allDisciplines }: { staff: StaffMember[]; all
 
   return (
     <>
+      {/* Toast */}
+      {toast && <div className="fixed top-4 right-4 z-50 rounded-lg bg-charcoal text-white px-4 py-2 text-sm shadow-lg">{toast}</div>}
+
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
@@ -94,6 +108,12 @@ export function StaffList({ staff, allDisciplines }: { staff: StaffMember[]; all
             {activeFilter === "active" && ` · ${activeCount} active`}
           </p>
         </div>
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="h-10 rounded-lg bg-lavender hover:bg-lavender-dark text-white font-semibold text-sm px-5 transition-colors"
+        >
+          + Add Staff Member
+        </button>
       </div>
 
       {/* Filter bar */}
@@ -259,6 +279,60 @@ export function StaffList({ staff, allDisciplines }: { staff: StaffMember[]; all
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Add Staff Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setShowAddModal(false)} />
+          <div className="relative bg-white rounded-2xl shadow-xl max-w-md w-full mx-4 p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-heading font-semibold text-charcoal">Add Staff Member</h2>
+              <button onClick={() => setShowAddModal(false)} className="text-slate hover:text-charcoal text-lg">✕</button>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <input className="h-9 rounded-md border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:outline-none" placeholder="First Name *" value={addForm.firstName} onChange={e => setAddForm(f => ({ ...f, firstName: e.target.value }))} />
+              <input className="h-9 rounded-md border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:outline-none" placeholder="Last Name *" value={addForm.lastName} onChange={e => setAddForm(f => ({ ...f, lastName: e.target.value }))} />
+            </div>
+            <input className="w-full h-9 rounded-md border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:outline-none" placeholder="Email *" type="email" value={addForm.email} onChange={e => setAddForm(f => ({ ...f, email: e.target.value }))} />
+            <SimpleSelect value={addForm.role} onValueChange={v => setAddForm(f => ({ ...f, role: v }))} options={[{ value: "teacher", label: "Teacher" }, { value: "admin", label: "Admin" }, { value: "super_admin", label: "Studio Owner" }]} placeholder="Role" />
+            <SimpleSelect value={addForm.employmentType} onValueChange={v => setAddForm(f => ({ ...f, employmentType: v }))} options={[{ value: "w2", label: "Employee (W-2)" }, { value: "1099", label: "Contractor (1099)" }]} placeholder="Employment Type" />
+            <label className="flex items-center gap-2 text-sm text-charcoal cursor-pointer">
+              <input type="checkbox" checked={addForm.sendWelcome} onChange={e => setAddForm(f => ({ ...f, sendWelcome: e.target.checked }))} className="h-4 w-4 rounded border-silver text-lavender" />
+              Send welcome email with login link
+            </label>
+            {addError && <p className="text-xs text-error">{addError}</p>}
+            <div className="flex gap-3">
+              <button
+                disabled={isPending || !addForm.firstName.trim() || !addForm.email.trim()}
+                onClick={() => {
+                  setAddError("");
+                  const fd = new FormData();
+                  fd.set("firstName", addForm.firstName);
+                  fd.set("lastName", addForm.lastName);
+                  fd.set("email", addForm.email);
+                  fd.set("role", addForm.role);
+                  fd.set("employmentType", addForm.employmentType);
+                  fd.set("sendWelcome", String(addForm.sendWelcome));
+                  fd.set("tenantId", tenantId);
+                  startTransition(async () => {
+                    const res = await addStaffMember(fd);
+                    if (res.error) { setAddError(res.error); return; }
+                    setShowAddModal(false);
+                    setAddForm({ firstName: "", lastName: "", email: "", role: "teacher", employmentType: "w2", sendWelcome: true });
+                    setToast(`${addForm.firstName} has been added to your team`);
+                    setTimeout(() => setToast(""), 3000);
+                    router.refresh();
+                  });
+                }}
+                className="h-10 rounded-lg bg-lavender hover:bg-lavender-dark text-white font-semibold text-sm px-5 transition-colors disabled:opacity-50"
+              >
+                {isPending ? "Adding..." : "Add Staff Member"}
+              </button>
+              <button onClick={() => setShowAddModal(false)} className="h-10 rounded-lg border border-silver text-slate text-sm px-5">Cancel</button>
+            </div>
+          </div>
         </div>
       )}
     </>

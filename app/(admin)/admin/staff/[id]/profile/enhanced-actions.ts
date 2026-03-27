@@ -448,3 +448,51 @@ export async function togglePhotoActive(formData: FormData) {
   revalidatePath("/admin/staff");
   return {};
 }
+
+// ---------------------------------------------------------------------------
+// 13. Add staff role
+// ---------------------------------------------------------------------------
+export async function addStaffRole(formData: FormData) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const profileId = formData.get("profileId") as string;
+  const role = formData.get("role") as string;
+  const tenantId = formData.get("tenantId") as string;
+  if (!profileId || !role || !tenantId) return { error: "Missing required fields" };
+
+  if (["admin", "finance_admin", "super_admin"].includes(role)) {
+    const { data: callerRole } = await supabase.from("profile_roles").select("role").eq("user_id", user.id).eq("role", "super_admin").eq("is_active", true).maybeSingle();
+    if (!callerRole) return { error: "Only Studio Owners can assign this role" };
+  }
+
+  const { error } = await supabase.from("profile_roles").insert({ user_id: profileId, role, tenant_id: tenantId, is_active: true });
+  if (error) { if (error.code === "23505") return { error: "Role already assigned" }; return { error: error.message }; }
+  revalidatePath("/admin/staff");
+  return {};
+}
+
+// ---------------------------------------------------------------------------
+// 14. Remove staff role
+// ---------------------------------------------------------------------------
+export async function removeStaffRole(formData: FormData) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const profileId = formData.get("profileId") as string;
+  const role = formData.get("role") as string;
+  if (!profileId || !role) return { error: "Missing required fields" };
+
+  if (["admin", "finance_admin", "super_admin"].includes(role)) {
+    const { data: callerRole } = await supabase.from("profile_roles").select("role").eq("user_id", user.id).eq("role", "super_admin").eq("is_active", true).maybeSingle();
+    if (!callerRole) return { error: "Only Studio Owners can remove this role" };
+  }
+  if (profileId === user.id && role === "super_admin") return { error: "Cannot remove your own Studio Owner role" };
+
+  const { error } = await supabase.from("profile_roles").delete().eq("user_id", profileId).eq("role", role);
+  if (error) return { error: error.message };
+  revalidatePath("/admin/staff");
+  return {};
+}
