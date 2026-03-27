@@ -9,7 +9,7 @@ export default async function TeacherProfilePage() {
   // Fetch own profile
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, first_name, last_name, email, phone, avatar_url, bio")
+    .select("id, first_name, last_name, email, phone, avatar_url, title, bio_short, bio_full, years_experience, education, social_instagram, social_linkedin")
     .eq("id", user.id)
     .single();
 

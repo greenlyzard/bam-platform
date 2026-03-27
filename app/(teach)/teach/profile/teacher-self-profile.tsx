@@ -11,7 +11,10 @@ import {
 // ---------------------------------------------------------------------------
 interface Teacher {
   id: string; first_name: string; last_name: string; email: string;
-  phone: string | null; avatar_url: string | null; bio: string | null;
+  phone: string | null; avatar_url: string | null;
+  title?: string | null; bio_short?: string | null; bio_full?: string | null;
+  years_experience?: number | null; education?: string | null;
+  social_instagram?: string | null; social_linkedin?: string | null;
   isActive: boolean;
 }
 interface Specialty { id: string; specialty: string; sort_order: number }
@@ -101,7 +104,7 @@ export function TeacherSelfProfile({
   const [editingInfo, setEditingInfo] = useState(false);
   const [infoForm, setInfoForm] = useState({
     first_name: teacher.first_name, last_name: teacher.last_name,
-    email: teacher.email, phone: teacher.phone ?? "", bio: teacher.bio ?? "",
+    email: teacher.email, phone: teacher.phone ?? "", bio: teacher.bio_short ?? "",
   });
   const [newSpec, setNewSpec] = useState("");
 
@@ -201,7 +204,7 @@ export function TeacherSelfProfile({
                 </h2>
                 <p className="text-sm text-slate">{teacher.email}</p>
                 {teacher.phone && <p className="text-sm text-slate">{teacher.phone}</p>}
-                {teacher.bio && <p className="text-sm text-slate mt-1">{teacher.bio}</p>}
+                {teacher.bio_short && <p className="text-sm text-slate mt-1">{teacher.bio_short}</p>}
                 <div className="flex items-center gap-3 mt-2">
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${teacher.isActive ? "bg-success/10 text-success" : "bg-error/10 text-error"}`}>
                     {teacher.isActive ? "Active" : "Inactive"}
@@ -222,7 +225,7 @@ export function TeacherSelfProfile({
                 <textarea className={textareaCls} rows={3} value={infoForm.bio} onChange={e => setInfoForm(f => ({ ...f, bio: e.target.value }))} placeholder="Tell us about yourself..." />
                 <div className="flex gap-2">
                   <button className={btnPrimary} onClick={saveBasics} disabled={isPending}>Save</button>
-                  <button className={btnSecondary} onClick={() => { setEditingInfo(false); setInfoForm({ first_name: teacher.first_name, last_name: teacher.last_name, email: teacher.email, phone: teacher.phone ?? "", bio: teacher.bio ?? "" }); }}>Cancel</button>
+                  <button className={btnSecondary} onClick={() => { setEditingInfo(false); setInfoForm({ first_name: teacher.first_name, last_name: teacher.last_name, email: teacher.email, phone: teacher.phone ?? "", bio: teacher.bio_short ?? "" }); }}>Cancel</button>
                 </div>
               </div>
             )}

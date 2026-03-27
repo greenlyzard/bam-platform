@@ -23,7 +23,7 @@ import { IconPicker } from "@/components/ui/icon-picker";
 // ---------------------------------------------------------------------------
 interface Teacher {
   id: string; first_name: string; last_name: string; email: string;
-  phone: string | null; avatar_url: string | null; bio: string | null;
+  phone: string | null; avatar_url: string | null;
   title?: string | null; bio_short?: string | null; bio_full?: string | null;
   years_experience?: number | null; education?: string | null;
   social_instagram?: string | null; social_linkedin?: string | null;

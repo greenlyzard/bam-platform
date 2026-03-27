@@ -24,7 +24,7 @@ export async function updateTeacherBasics(formData: FormData) {
       last_name: formData.get("last_name") as string,
       email: formData.get("email") as string,
       phone: (formData.get("phone") as string) || null,
-      bio: (formData.get("bio") as string) || null,
+      bio_short: (formData.get("bio") as string) || null,
     })
     .eq("id", teacherId);
 

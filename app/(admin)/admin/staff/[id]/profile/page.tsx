@@ -18,7 +18,7 @@ export default async function AdminStaffProfilePage({
   // Fetch teacher profile — use maybeSingle to avoid PostgREST 406 on 0 rows
   const { data: profile, error: profileErr } = await supabase
     .from("profiles")
-    .select("id, first_name, last_name, email, phone, avatar_url, bio, title, bio_short, bio_full, years_experience, education, social_instagram, social_linkedin")
+    .select("id, first_name, last_name, email, phone, avatar_url, title, bio_short, bio_full, years_experience, education, social_instagram, social_linkedin")
     .eq("id", teacherId)
     .maybeSingle();
 
