@@ -24,11 +24,10 @@ export default async function ClassesPage() {
     enrollmentCounts[e.class_id] = (enrollmentCounts[e.class_id] ?? 0) + 1;
   }
 
-  // Fetch class_teachers with profile names
+  // Fetch class_teachers — no tenant filter, admin client bypasses RLS
   const { data: classTeachers } = await supabase
     .from("class_teachers")
-    .select("*")
-    .eq("tenant_id", user.tenantId!);
+    .select("*");
 
   // Fetch teacher profiles (VIEW — no tenant_id)
   const { data: teachers } = await supabase

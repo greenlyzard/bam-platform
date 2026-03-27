@@ -389,6 +389,9 @@ export function ClassManagement({
   // ── Teacher name helper ──────────────────────────────
   function getTeacherNames(classId: string, legacyName: string | null): string {
     const assigned = classTeachersData.filter((ct) => ct.class_id === classId);
+    if (assigned.length === 0 && teachers.length > 0) {
+      console.log("DEBUG no ct match", classId, "ctData count:", classTeachersData.length, "first2:", classTeachersData.slice(0, 2));
+    }
     if (assigned.length > 0) {
       return assigned
         .map((ct) => {
@@ -997,7 +1000,19 @@ ${(byDay[d] ?? [])
                     case "disciplines":
                       return <td key={col.key} className="px-3 py-2 text-xs text-slate">{getDisciplineNames(c.discipline_ids)}</td>;
                     case "daytime":
-                      return <td key={col.key} className="px-3 py-2 text-xs text-slate whitespace-nowrap">{getDayTime(c)}</td>;
+                    case "day_of_week": {
+                      // Day only (no time)
+                      const dayStr = c.days_of_week && c.days_of_week.length > 0
+                        ? c.days_of_week.map((d) => DAY_NAMES[d]).join(", ")
+                        : c.day_of_week != null ? DAY_NAMES[c.day_of_week] : "—";
+                      return <td key={col.key} className="px-3 py-2 text-xs text-slate whitespace-nowrap">{dayStr}</td>;
+                    }
+                    case "start_time":
+                      return (
+                        <td key={col.key} className="px-3 py-2 text-xs text-slate whitespace-nowrap">
+                          {c.start_time && c.end_time ? `${formatTime(c.start_time)}–${formatTime(c.end_time)}` : "—"}
+                        </td>
+                      );
                     case "season":
                       return <td key={col.key} className="px-3 py-2 text-xs text-slate">{seasonName}</td>;
                     case "enrolled":
@@ -1012,6 +1027,10 @@ ${(byDay[d] ?? [])
                       return (
                         <td key={col.key} className="px-3 py-2 text-center">
                           <div className="flex items-center justify-center gap-1 flex-wrap">
+                            {c.status === "active" && <span className="inline-flex items-center rounded-full bg-success/10 px-1.5 py-0.5 text-[10px] font-medium text-success">Active</span>}
+                            {c.status === "archived" && <span className="inline-flex items-center rounded-full bg-cloud px-1.5 py-0.5 text-[10px] font-medium text-slate">Archived</span>}
+                            {c.status === "draft" && <span className="inline-flex items-center rounded-full bg-gold/10 px-1.5 py-0.5 text-[10px] font-medium text-gold-dark">Draft</span>}
+                            {c.status === "full" && <span className="inline-flex items-center rounded-full bg-error/10 px-1.5 py-0.5 text-[10px] font-medium text-error">Full</span>}
                             {c.is_new && <span className="inline-flex items-center rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700">NEW</span>}
                             {c.is_hidden && <span className="inline-flex items-center rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600">HIDDEN</span>}
                             {c.is_rehearsal && <span className="inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">REHEARSAL</span>}
