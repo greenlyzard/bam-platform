@@ -495,7 +495,7 @@ export function TeacherProfileAdmin({
                 fd.set("teacherId", teacher.id);
                 fd.set("tenantId", tenantId);
                 // Upload as avatar via the profile API
-                const res = await fetch(`/api/admin/students/${teacher.id}/avatar`, { method: "POST", body: fd });
+                const res = await fetch(`/api/admin/profiles/${teacher.id}/avatar`, { method: "POST", body: fd });
                 if (res.ok) {
                   const { url } = await res.json();
                   setTeacher(t => ({ ...t, avatar_url: url }));
