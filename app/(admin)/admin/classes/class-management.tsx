@@ -244,6 +244,8 @@ export function ClassManagement({
   pricingRules: initialPricingRules,
   classPhases: initialClassPhases,
   fieldConfig,
+  roomMap = {},
+  locationMap = {},
   tenantId,
 }: {
   classes: ClassRecord[];
@@ -257,6 +259,8 @@ export function ClassManagement({
   pricingRules: PricingRule[];
   classPhases: ClassPhase[];
   fieldConfig: FieldConfigRow[];
+  roomMap?: Record<string, string>;
+  locationMap?: Record<string, string>;
   tenantId: string;
 }) {
   const [classes, setClasses] = useState(initialClasses);
@@ -1038,6 +1042,14 @@ ${(byDay[d] ?? [])
                   // Generic rendering based on field_type from class_field_config
                   const value = (c as unknown as Record<string, unknown>)[col.key];
                   const ft = col.fieldType;
+
+                  // Resolve room_id and location_id to names
+                  if (col.key === "room_id" && value) {
+                    return <td key={col.key} className="px-3 py-2 text-xs text-slate">{roomMap[String(value)] ?? "—"}</td>;
+                  }
+                  if (col.key === "location_id" && value) {
+                    return <td key={col.key} className="px-3 py-2 text-xs text-slate">{locationMap[String(value)] ?? "—"}</td>;
+                  }
 
                   switch (ft) {
                     case "boolean":

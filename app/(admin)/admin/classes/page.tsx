@@ -113,6 +113,15 @@ export default async function ClassesPage() {
     .eq("tenant_id", user.tenantId!)
     .order("start_date");
 
+  // Fetch rooms and locations for name resolution
+  const { data: roomRows } = await supabase.from("rooms").select("id, name");
+  const roomMap: Record<string, string> = {};
+  for (const r of roomRows ?? []) roomMap[r.id] = r.name;
+
+  const { data: locationRows } = await supabase.from("studio_locations").select("id, name");
+  const locationMap: Record<string, string> = {};
+  for (const l of locationRows ?? []) locationMap[l.id] = l.name;
+
   return (
     <ClassManagement
       classes={(classes ?? []).map((c) => ({
@@ -136,6 +145,8 @@ export default async function ClassesPage() {
       pricingRules={pricingRules ?? []}
       classPhases={classPhases ?? []}
       fieldConfig={fieldConfigRows ?? []}
+      roomMap={roomMap}
+      locationMap={locationMap}
       tenantId={user.tenantId!}
     />
   );
