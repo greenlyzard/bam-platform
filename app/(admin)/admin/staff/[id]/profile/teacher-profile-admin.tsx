@@ -18,6 +18,11 @@ import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type D
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { IconPicker } from "@/components/ui/icon-picker";
+import ClassesTab from "./tabs/ClassesTab";
+import ScheduleTab from "./tabs/ScheduleTab";
+import TimecardsTab from "./tabs/TimecardsTab";
+import DocumentsTab from "./tabs/DocumentsTab";
+import CommunicationsTab from "./tabs/CommunicationsTab";
 
 // ---------------------------------------------------------------------------
 // Interfaces
@@ -122,13 +127,16 @@ export function TeacherProfileAdmin({
   availabilityCount, privateCount, tenantId,
   disciplines: initDiscs = [], affiliations: initAffils = [],
   photos: initPhotos = [], iconLibrary = [],
+  canViewPayRates = false,
 }: {
   teacher: Teacher; specialties: Specialty[]; rateCards: RateCard[];
   compliance: Compliance | null; subEligibility: SubEligibility | null;
   classes: ClassAssignment[]; availabilityCount: number; privateCount: number; tenantId: string;
   disciplines?: Discipline[]; affiliations?: Affiliation[];
   photos?: TeacherPhoto[]; iconLibrary?: IconItem[];
+  canViewPayRates?: boolean;
 }) {
+  const [activeTab, setActiveTab] = useState("profile");
   const [teacher, setTeacher] = useState(init);
   const [specs, setSpecs] = useState(initSpecs);
   const [rates, setRates] = useState(initRates);
@@ -472,6 +480,33 @@ export function TeacherProfileAdmin({
           {toast}
         </div>
       )}
+
+      {/* Tab Navigation */}
+      <div className="flex gap-1 border-b border-silver overflow-x-auto">
+        {[
+          { key: "profile", label: "Profile" },
+          { key: "classes", label: "Classes" },
+          { key: "schedule", label: "Schedule" },
+          ...(canViewPayRates ? [{ key: "timecards", label: "Timecards" }] : []),
+          { key: "documents", label: "Documents" },
+          { key: "communications", label: "Communications" },
+        ].map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+              activeTab === tab.key
+                ? "border-lavender text-lavender-dark"
+                : "border-transparent text-slate hover:text-charcoal"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab: Profile */}
+      {activeTab === "profile" && <>
 
       {/* A. Profile Header */}
       <div className={cardCls}>
@@ -919,6 +954,23 @@ export function TeacherProfileAdmin({
           </>
         )}
       </div>
+
+      </>}
+
+      {/* Tab: Classes */}
+      {activeTab === "classes" && <ClassesTab teacherId={teacher.id} />}
+
+      {/* Tab: Schedule */}
+      {activeTab === "schedule" && <ScheduleTab teacherId={teacher.id} />}
+
+      {/* Tab: Timecards */}
+      {activeTab === "timecards" && <TimecardsTab teacherId={teacher.id} canView={canViewPayRates} />}
+
+      {/* Tab: Documents */}
+      {activeTab === "documents" && <DocumentsTab teacherId={teacher.id} />}
+
+      {/* Tab: Communications */}
+      {activeTab === "communications" && <CommunicationsTab teacherId={teacher.id} />}
     </div>
   );
 }

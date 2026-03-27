@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
+import { canViewPayRates } from "@/lib/rbac/permissions";
 import Link from "next/link";
 import { TeacherProfileAdmin } from "./teacher-profile-admin";
 
@@ -114,6 +115,7 @@ export default async function AdminStaffProfilePage({
         availabilityCount={availabilityResult?.count ?? 0} privateCount={privateResult?.count ?? 0}
         tenantId={user.tenantId!} disciplines={disciplines} affiliations={affiliations}
         photos={photos} iconLibrary={iconLibrary}
+        canViewPayRates={await canViewPayRates(user.id)}
       />
     </div>
   );
