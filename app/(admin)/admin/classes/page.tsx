@@ -30,10 +30,11 @@ export default async function ClassesPage() {
     .select("*");
 
   // Fetch teacher profiles (VIEW — no tenant_id)
-  const { data: teachers } = await supabase
+  const { data: teachers, error: teacherError } = await supabase
     .from("teacher_profiles")
     .select("id, first_name, last_name, email, is_active")
     .eq("is_active", true);
+  console.log("TEACHER QUERY result:", teachers?.length, "error:", teacherError?.message);
 
   // Also get legacy teacher_id names from profiles
   const legacyTeacherIds = [
