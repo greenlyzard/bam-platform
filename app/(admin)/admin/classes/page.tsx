@@ -113,6 +113,12 @@ export default async function ClassesPage() {
     .eq("tenant_id", user.tenantId!)
     .order("start_date");
 
+  console.log("DEBUG teachers count:", teachers?.length);
+  console.log("DEBUG classTeachers count:", classTeachers?.length);
+  console.log("DEBUG legacyTeacherNames keys:", Object.keys(legacyTeacherNames).length);
+  console.log("DEBUG classes count:", classes?.length);
+  console.log("DEBUG fieldConfig count:", fieldConfigRows?.length);
+
   return (
     <ClassManagement
       classes={(classes ?? []).map((c) => ({
