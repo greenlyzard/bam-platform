@@ -705,8 +705,218 @@ ${(byDay[d] ?? [])
 
   // ── Calendar View ────────────────────────────────────
   function renderCalendar() {
-    const SLOT_HEIGHT = 48;
-    const TIME_COL_WIDTH = 72;
+    const SH = 48; // slot height px
+    const TW = 72; // time col width px
+    const RW = 140; // room col width px
+
+    function t2m(t: string): number { if (!t) return 0; const [h, m] = t.split(":").map(Number); return h * 60 + (m || 0); }
+    function fmtTime(t: string): string { if (!t) return ""; const [h, m] = t.split(":").map(Number); const ap = h >= 12 ? "PM" : "AM"; return `${h > 12 ? h - 12 : h === 0 ? 12 : h}:${(m || 0).toString().padStart(2, "0")} ${ap}`; }
+    function lvlColor(levels: string[]): string {
+      const l = (levels?.[0] ?? "").toLowerCase();
+      if (l.includes("petite")) return "#F9D5E5";
+      if (l === "level 1") return "#E8D5F9";
+      if (l.startsWith("level 2")) return "#D5E8F9";
+      if (l.startsWith("level 3")) return "#D5F9E8";
+      if (l.startsWith("level 4")) return "#F9F0D5";
+      if (l.includes("adult") || l.includes("teen")) return "#F9E8D5";
+      return "#EDE9F4";
+    }
+    function isVis(key: string) { return calendarFields.find((f: { key: string; visible: boolean }) => f.key === key)?.visible ?? false; }
+
+    // Build week days (Mon-Sat)
+    const weekDays: Date[] = Array.from({ length: 6 }, (_, i) => { const d = new Date(calWeekStart); d.setDate(calWeekStart.getDate() + i); return d; });
+    // Rooms to show
+    const visibleRooms = calRoomFilter === "all" ? activeRooms : activeRooms.filter(r => r.id === calRoomFilter);
+    const roomCount = visibleRooms.length || 1;
+    // Time slots 8:00-21:00
+    const slots: string[] = [];
+    for (let h = 8; h <= 21; h++) { slots.push(`${h.toString().padStart(2, "0")}:00`); if (h < 21) slots.push(`${h.toString().padStart(2, "0")}:30`); }
+    const totalW = TW + 6 * roomCount * RW;
+    const today = new Date().toDateString();
+
+    // Double booking detection (skip Pilates Room)
+    const dbWarnings: string[] = [];
+    weekDays.forEach(day => {
+      visibleRooms.filter(r => !r.name.toLowerCase().includes("pilates")).forEach(room => {
+        const dc = filtered.filter(c => { const cd = (c.days_of_week?.[0] ?? c.day_of_week); return cd === day.getDay() && (c as any).room_id === room.id; });
+        for (let i = 0; i < dc.length; i++) for (let j = i + 1; j < dc.length; j++) {
+          const as = t2m(dc[i].start_time ?? ""), ae = t2m(dc[i].end_time ?? ""), bs = t2m(dc[j].start_time ?? ""), be = t2m(dc[j].end_time ?? "");
+          if (as < be && bs < ae) { dbWarnings.push(`${room.name} ${day.toLocaleDateString("en-US", { weekday: "short" })}`); break; }
+        }
+      });
+    });
+
+    return (
+      <div className="space-y-3 print-calendar">
+        {/* Controls */}
+        <div className="flex items-center justify-between flex-wrap gap-2 print:hidden">
+          <div className="flex items-center gap-2">
+            <button onClick={() => { const d = new Date(calWeekStart); d.setDate(d.getDate() - 7); setCalWeekStart(d); }} className="px-2 py-1 text-sm border border-silver rounded hover:bg-cloud">←</button>
+            <button onClick={() => { const n = new Date(); const day = n.getDay(); const diff = day === 0 ? -6 : 1 - day; const m = new Date(n); m.setDate(n.getDate() + diff); m.setHours(0,0,0,0); setCalWeekStart(m); }} className="px-3 py-1 text-sm border border-silver rounded hover:bg-cloud">Today</button>
+            <span className="text-sm font-medium text-charcoal">Week of {calWeekStart.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+            <button onClick={() => { const d = new Date(calWeekStart); d.setDate(d.getDate() + 7); setCalWeekStart(d); }} className="px-2 py-1 text-sm border border-silver rounded hover:bg-cloud">→</button>
+          </div>
+          <div className="flex items-center gap-2">
+            <select value={calRoomFilter} onChange={e => setCalRoomFilter(e.target.value)} className="text-sm border border-silver rounded px-2 py-1">
+              <option value="all">All Rooms</option>
+              {activeRooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+            </select>
+            <div className="relative">
+              <button onClick={() => setShowCalFieldPicker(v => !v)} className="px-3 py-1 text-sm border border-silver rounded hover:bg-cloud">⚙ Fields</button>
+              {showCalFieldPicker && (
+                <div className="absolute right-0 top-8 z-50 bg-white border border-silver rounded-lg shadow-lg p-3 w-52">
+                  <div className="text-xs font-semibold text-mist mb-2">Show on events</div>
+                  {calendarFields.map((f: { key: string; label: string; visible: boolean; locked?: boolean }, i: number) => (
+                    <label key={f.key} className="flex items-center gap-2 py-0.5 text-sm text-charcoal cursor-pointer">
+                      <input type="checkbox" checked={f.visible} disabled={f.locked} onChange={e => { const u = calendarFields.map((x: any, j: number) => j === i ? { ...x, visible: e.target.checked } : x); setCalendarFields(u); localStorage.setItem("bam-calendar-fields", JSON.stringify(u)); }} className="h-3.5 w-3.5 rounded border-silver text-lavender" />
+                      {f.label}{f.locked && <span className="text-[10px] text-mist ml-auto">required</span>}
+                    </label>
+                  ))}
+                  <button onClick={() => { const d = [{ key: "time", label: "Time", visible: true, locked: true },{ key: "name", label: "Class Name", visible: true, locked: true },{ key: "teacher", label: "Teacher", visible: true, locked: false },{ key: "levels", label: "Levels", visible: true, locked: false },{ key: "room", label: "Room", visible: true, locked: false },{ key: "enrolled", label: "Enrolled", visible: false, locked: false }]; setCalendarFields(d); localStorage.removeItem("bam-calendar-fields"); }} className="mt-2 text-xs text-lavender hover:underline">Reset</button>
+                </div>
+              )}
+            </div>
+            <button onClick={() => window.print()} className="px-3 py-1 text-sm border border-silver rounded hover:bg-cloud">🖨</button>
+          </div>
+        </div>
+
+        {/* Room legend */}
+        <div className="flex flex-wrap gap-2 print:hidden">
+          {activeRooms.map(r => (
+            <span key={r.id} className="inline-flex items-center gap-1.5 text-xs text-charcoal px-2 py-1 rounded-full border border-silver/50">
+              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: r.color_hex ?? "#9C8BBF" }} />
+              {r.name}
+            </span>
+          ))}
+        </div>
+
+        {/* Double booking warnings */}
+        {dbWarnings.length > 0 && (
+          <div className="bg-error/5 border border-error/20 rounded-lg px-4 py-2 text-sm text-error print:hidden">
+            ⚠️ Double booking: {[...new Set(dbWarnings)].join(" · ")}
+          </div>
+        )}
+
+        {/* Calendar grid */}
+        <div className="rounded-lg border border-silver overflow-auto relative" style={{ maxHeight: "calc(100vh - 220px)" }}>
+          <div style={{ minWidth: totalW, position: "relative" }}>
+            {/* HEADER ROW 1: Day names spanning room sub-columns */}
+            <div className="flex sticky top-0 z-20 bg-white border-b border-silver">
+              <div className="shrink-0 sticky left-0 z-30 bg-white border-r border-silver" style={{ width: TW }} />
+              {weekDays.map(day => {
+                const isToday = day.toDateString() === today;
+                const closure = studioClosures.find(c => c.closed_date === day.toISOString().split("T")[0]);
+                return (
+                  <div key={day.toISOString()} className={`text-center py-2 border-r border-silver ${isToday ? "bg-lavender/10" : ""}`} style={{ width: roomCount * RW }}>
+                    <div className={`text-xs font-semibold ${isToday ? "text-lavender" : "text-charcoal"}`}>{day.toLocaleDateString("en-US", { weekday: "short" })}</div>
+                    <div className={`text-sm ${isToday ? "text-lavender font-bold" : "text-slate"}`}>{day.toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>
+                    {closure && <div className="text-[10px] bg-error/10 text-error rounded px-1 mt-0.5 truncate mx-1">🚫 {closure.reason ?? "Closed"}</div>}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* HEADER ROW 2: Room sub-headers */}
+            <div className="flex sticky top-[52px] z-20 bg-white border-b border-silver">
+              <div className="shrink-0 sticky left-0 z-30 bg-white border-r border-silver" style={{ width: TW }} />
+              {weekDays.map(day => (
+                <div key={`rh-${day.toISOString()}`} className="flex border-r border-silver">
+                  {visibleRooms.map(room => (
+                    <div key={`${day.toISOString()}-${room.id}`} className="text-center py-1 border-r border-silver/50 last:border-r-0" style={{ width: RW, borderBottom: `2px solid ${room.color_hex ?? "#9C8BBF"}`, backgroundColor: `${room.color_hex ?? "#9C8BBF"}15` }}>
+                      <div className="flex items-center justify-center gap-1">
+                        <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: room.color_hex ?? "#9C8BBF" }} />
+                        <span className="text-[10px] font-medium text-charcoal truncate">{room.name}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+
+            {/* GRID BODY: time slot rows (visual grid lines only) */}
+            <div className="relative">
+              {slots.map(slot => (
+                <div key={slot} className="flex border-b border-silver/30" style={{ height: SH }}>
+                  <div className="shrink-0 sticky left-0 z-10 bg-white border-r border-silver flex items-start justify-end pr-2 pt-1" style={{ width: TW }}>
+                    {slot.endsWith(":00") && <span className="text-[10px] text-mist">{fmtTime(slot)}</span>}
+                  </div>
+                  {weekDays.map(day => (
+                    <div key={`${slot}-${day.toISOString()}`} className="flex border-r border-silver/20">
+                      {visibleRooms.map(room => (
+                        <div key={`${slot}-${day.toISOString()}-${room.id}`} className="border-r border-silver/10 last:border-r-0" style={{ width: RW }} />
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              ))}
+
+              {/* EVENT OVERLAYS — absolutely positioned per day×room column */}
+              {weekDays.map((day, dayIdx) => {
+                const dayOfWeek = day.getDay();
+                const dateStr = day.toISOString().split("T")[0];
+                const closure = studioClosures.find(c => c.closed_date === dateStr);
+
+                return visibleRooms.map((room, roomIdx) => {
+                  const colLeft = TW + (dayIdx * roomCount + roomIdx) * RW;
+                  const dayClasses = filtered.filter(c => {
+                    const cd = c.days_of_week?.[0] ?? c.day_of_week;
+                    return cd === dayOfWeek && (c as any).room_id === room.id;
+                  });
+                  const dayPrivates = (privateSessionsRaw ?? []).filter(p => p.session_date === dateStr && p.studio === room.name);
+
+                  return (
+                    <div key={`overlay-${day.toISOString()}-${room.id}`} className="absolute top-0" style={{ left: colLeft, width: RW, height: slots.length * SH }}>
+                      {/* Closure overlay */}
+                      {closure && <div className="absolute inset-0 bg-error/5 z-[3]" />}
+
+                      {/* Class events */}
+                      {dayClasses.map(c => {
+                        const sm = t2m(c.start_time ?? "09:00"), em = t2m(c.end_time ?? "10:00");
+                        const top = ((sm - 480) / 30) * SH;
+                        const h = Math.max(((em - sm) / 30) * SH, SH);
+                        const bg = (c as any).color_hex || lvlColor(c.levels ?? []);
+                        const rc = room.color_hex ?? "#9C8BBF";
+                        const tn = getTeacherNames(c.id, c.legacyTeacherName);
+                        return (
+                          <div key={c.id} onClick={() => openEdit(c)} className="absolute rounded overflow-hidden cursor-pointer hover:brightness-95 transition-all mx-0.5" style={{ top, height: h, left: 0, right: 0, backgroundColor: bg, borderLeft: `3px solid ${rc}`, zIndex: 5 }}>
+                            <div className="p-1 h-full overflow-hidden flex flex-col gap-0">
+                              {isVis("time") && <div className="text-[10px] font-semibold text-gray-600 leading-tight">{fmtTime(c.start_time ?? "")}–{fmtTime(c.end_time ?? "")}</div>}
+                              {isVis("name") && <div className="text-[11px] font-medium text-gray-800 leading-tight line-clamp-2">{c.name}</div>}
+                              {isVis("teacher") && tn && tn !== "—" && <div className="text-[10px] text-gray-500 leading-tight truncate">{tn}</div>}
+                              {isVis("levels") && (c.levels ?? []).length > 0 && <div className="text-[9px] text-gray-500 truncate">{(c.levels ?? []).join(", ")}</div>}
+                              {isVis("enrolled") && <div className="text-[9px] text-gray-500">{c.enrolledCount ?? 0}/{c.max_enrollment ?? "—"}</div>}
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {/* Private sessions */}
+                      {dayPrivates.map(p => {
+                        const sm = t2m(p.start_time ?? "09:00"), em = t2m(p.end_time ?? "10:00");
+                        const top = ((sm - 480) / 30) * SH;
+                        const h = Math.max(((em - sm) / 30) * SH, SH);
+                        const tn = teachers.find(t => t.id === p.primary_teacher_id);
+                        return (
+                          <div key={p.id} className="absolute rounded overflow-hidden mx-0.5" style={{ top, height: h, left: 0, right: 0, backgroundColor: "#F5F5F5", borderLeft: "2px dashed #999", zIndex: 4 }}>
+                            <div className="p-1 text-[10px] text-gray-500"><span className="font-semibold">Private</span>{tn && <> · {tn.name}</>}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                });
+              })}
+            </div>
+          </div>
+        </div>
+        <style>{`@media print { nav, header, .print\\:hidden { display: none !important; } * { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }`}</style>
+      </div>
+    );
+  }
+
+  function renderCalendarOLD_DISABLED() {
+    const SLOT_HEIGHT_OLD = 48;
+    const TIME_COL_WIDTH_OLD = 72;
 
     function timeToMinutes(t: string): number {
       const [h, m] = t.split(":").map(Number);
@@ -758,7 +968,7 @@ ${(byDay[d] ?? [])
     };
     const weekLabel = `${weekDays[0].toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${weekDays[5].toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
 
-    const gridH = timeSlots.length * SLOT_HEIGHT;
+    const gridH = timeSlots.length * SLOT_HEIGHT_OLD;
 
     // Print calendar
     const handleCalPrint = () => { window.print(); };
@@ -826,7 +1036,7 @@ ${(byDay[d] ?? [])
 
         {/* Calendar grid */}
         <div className="rounded-xl border border-silver bg-white overflow-x-auto">
-          <div style={{ display: "grid", gridTemplateColumns: `${TIME_COL_WIDTH}px repeat(6, 1fr)`, minWidth: 900 }}>
+          <div style={{ display: "grid", gridTemplateColumns: `${TIME_COL_WIDTH_OLD}px repeat(6, 1fr)`, minWidth: 900 }}>
             {/* Day headers */}
             <div className="border-b border-silver p-2" />
             {weekDays.map((wd, i) => {
@@ -849,7 +1059,7 @@ ${(byDay[d] ?? [])
                 const hr = Math.floor(mins / 60);
                 const dh = hr > 12 ? hr - 12 : hr === 0 ? 12 : hr;
                 return isHour ? (
-                  <div key={i} className="absolute right-2 text-xs text-mist" style={{ top: i * SLOT_HEIGHT - 6 }}>
+                  <div key={i} className="absolute right-2 text-xs text-mist" style={{ top: i * SLOT_HEIGHT_OLD - 6 }}>
                     {dh}{hr >= 12 ? "pm" : "am"}
                   </div>
                 ) : null;
@@ -873,7 +1083,7 @@ ${(byDay[d] ?? [])
                 <div key={dayIdx} className="relative border-l border-silver" style={{ height: gridH }}>
                   {/* Grid lines */}
                   {timeSlots.map((_, si) => (
-                    <div key={si} className="absolute w-full border-b border-silver/30" style={{ top: si * SLOT_HEIGHT, height: SLOT_HEIGHT }} />
+                    <div key={si} className="absolute w-full border-b border-silver/30" style={{ top: si * SLOT_HEIGHT_OLD, height: SLOT_HEIGHT_OLD }} />
                   ))}
 
                   {/* Studio closure overlay */}
@@ -884,8 +1094,8 @@ ${(byDay[d] ?? [])
                     const startMins = timeToMinutes(c.start_time!);
                     const endMins = c.end_time ? timeToMinutes(c.end_time) : startMins + 60;
                     const duration = endMins - startMins;
-                    const top = ((startMins - 480) / 30) * SLOT_HEIGHT;
-                    const height = Math.max(SLOT_HEIGHT, (duration / 30) * SLOT_HEIGHT);
+                    const top = ((startMins - 480) / 30) * SLOT_HEIGHT_OLD;
+                    const height = Math.max(SLOT_HEIGHT_OLD, (duration / 30) * SLOT_HEIGHT_OLD);
                     const bgColor = (c as any).color_hex || getLevelColor(c.levels || []);
                     const roomColor = c.room ? roomColorMap.get(c.room) || "#9C8BBF" : "#ccc";
                     const dimmed = calRoomFilter !== "all" && c.room !== calRoomFilter;
@@ -917,8 +1127,8 @@ ${(byDay[d] ?? [])
                     const startMins = timeToMinutes(ps.start_time);
                     const endMins = timeToMinutes(ps.end_time);
                     const duration = endMins - startMins;
-                    const top = ((startMins - 480) / 30) * SLOT_HEIGHT;
-                    const height = Math.max(SLOT_HEIGHT, (duration / 30) * SLOT_HEIGHT);
+                    const top = ((startMins - 480) / 30) * SLOT_HEIGHT_OLD;
+                    const height = Math.max(SLOT_HEIGHT_OLD, (duration / 30) * SLOT_HEIGHT_OLD);
                     const teacherName = ps.primary_teacher_id ? (teachers.find((t) => t.id === ps.primary_teacher_id)?.name ?? "—") : "—";
                     return (
                       <div
