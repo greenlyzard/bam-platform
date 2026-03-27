@@ -995,7 +995,7 @@ ${(byDay[d] ?? [])
                   switch (col.key) {
                     case "name":
                       return <td key={col.key} className="px-3 py-2"><span className="font-medium text-charcoal">{c.name}</span></td>;
-                    case "teachers":
+                    case "teacher_id":
                       return <td key={col.key} className="px-3 py-2 text-slate text-xs">{getTeacherNames(c.id, c.legacyTeacherName)}</td>;
                     case "disciplines":
                       return <td key={col.key} className="px-3 py-2 text-xs text-slate">{getDisciplineNames(c.discipline_ids)}</td>;
