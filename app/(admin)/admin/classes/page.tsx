@@ -133,6 +133,18 @@ export default async function ClassesPage() {
     .select("id, closed_date, reason")
     .eq("tenant_id", user.tenantId!);
 
+  // Fetch class color palette from studio settings
+  const { data: studioSettingsData } = await supabase
+    .from("studio_settings")
+    .select("custom_colors")
+    .single();
+
+  const classColorPalette: string[] =
+    (studioSettingsData?.custom_colors as any)?.class_palette ?? [
+      "#9C8BBF","#F9D5E5","#E8D5F9","#D5E8F9","#D5F9E8",
+      "#F9F0D5","#F9E8D5","#EDE9F4","#F5E6FF","#E6F0FF",
+    ];
+
   return (
     <ClassManagement
       classes={(classes ?? []).map((c) => ({
@@ -161,6 +173,7 @@ export default async function ClassesPage() {
       activeRooms={(roomRows ?? []).map(r => ({ id: r.id, name: r.name, color_hex: (r as any).color_hex ?? null }))}
       privateSessionsRaw={(privateSessionsRaw ?? []).map((p: any) => ({ id: p.id, session_date: p.session_date, start_time: p.start_time, end_time: p.end_time, status: p.status, studio: p.studio, primary_teacher_id: p.primary_teacher_id, student_ids: p.student_ids ?? [], notes: p.session_notes }))}
       studioClosures={(studioClosureRows ?? []).map((c: any) => ({ id: c.id, closed_date: c.closed_date, reason: c.reason }))}
+      classColorPalette={classColorPalette}
       tenantId={user.tenantId!}
     />
   );

@@ -250,6 +250,7 @@ export function ClassManagement({
   activeRooms = [],
   privateSessionsRaw = [],
   studioClosures = [],
+  classColorPalette = [],
   tenantId,
 }: {
   classes: ClassRecord[];
@@ -268,6 +269,7 @@ export function ClassManagement({
   activeRooms?: Array<{ id: string; name: string; color_hex: string | null }>;
   privateSessionsRaw?: Array<{ id: string; session_date: string; start_time: string; end_time: string; status: string; studio: string | null; primary_teacher_id: string | null; student_ids: string[]; notes: string | null }>;
   studioClosures?: Array<{ id: string; closed_date: string; reason: string | null }>;
+  classColorPalette?: string[];
   tenantId: string;
 }) {
   const [classes, setClasses] = useState(initialClasses);
@@ -1657,6 +1659,7 @@ ${(byDay[d] ?? [])
               : []
           }
           rooms={activeRooms}
+          classColorPalette={classColorPalette}
           tenantId={tenantId}
           onClose={() => setDrawerOpen(false)}
           onSaved={handleSaved}

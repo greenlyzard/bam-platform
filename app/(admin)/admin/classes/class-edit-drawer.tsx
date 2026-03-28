@@ -90,6 +90,7 @@ export function ClassEditDrawer({
   pricingRules,
   classPhases,
   rooms,
+  classColorPalette,
   tenantId,
   onClose,
   onSaved,
@@ -109,6 +110,7 @@ export function ClassEditDrawer({
   pricingRules: PricingRule[];
   classPhases: ClassPhase[];
   rooms: Array<{ id: string; name: string }>;
+  classColorPalette: string[];
   tenantId: string;
   onClose: () => void;
   onSaved: (c: ClassRecord) => void;
@@ -223,7 +225,7 @@ export function ClassEditDrawer({
   const [isPerformance, setIsPerformance] = useState(
     classData?.is_performance ?? false
   );
-  const [colorHex, setColorHex] = useState(
+  const [colorHex, setColorHex] = useState<string | null>(
     (classData as any)?.color_hex ?? "#9C8BBF"
   );
 
@@ -999,21 +1001,78 @@ export function ClassEditDrawer({
 
           {/* ── Calendar Color ──────────────────────────── */}
           <Section title="Calendar Color">
-            <div className="flex items-center gap-3">
-              <input
-                type="color"
-                value={colorHex}
-                onChange={(e) => setColorHex(e.target.value)}
-                className="h-10 w-10 rounded-lg border border-silver cursor-pointer"
-              />
-              <input
-                type="text"
-                value={colorHex}
-                onChange={(e) => setColorHex(e.target.value)}
-                maxLength={7}
-                className="w-24 h-10 rounded-lg border border-silver px-3 text-sm text-charcoal font-mono focus:border-lavender focus:outline-none"
-              />
-              <div className="h-8 w-16 rounded" style={{ backgroundColor: colorHex }} />
+            <div className="space-y-2">
+              {/* Palette swatches */}
+              <div className="flex flex-wrap gap-2">
+                {classColorPalette.map(color => (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => setColorHex(color)}
+                    className={`w-7 h-7 rounded-full border-2 transition-all ${
+                      colorHex === color
+                        ? "border-charcoal scale-110 shadow-md"
+                        : "border-transparent hover:border-gray-300"
+                    }`}
+                    style={{ backgroundColor: color }}
+                    title={color}
+                  />
+                ))}
+                {/* Custom color swatch if current color not in palette */}
+                {colorHex && !classColorPalette.includes(colorHex) && (
+                  <button
+                    type="button"
+                    className="w-7 h-7 rounded-full border-2 border-charcoal scale-110 shadow-md"
+                    style={{ backgroundColor: colorHex }}
+                    title={colorHex}
+                  />
+                )}
+              </div>
+
+              {/* Custom color input row */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={colorHex ?? "#9C8BBF"}
+                  onChange={e => setColorHex(e.target.value)}
+                  className="w-8 h-8 rounded cursor-pointer border border-gray-200"
+                />
+                <input
+                  type="text"
+                  value={colorHex ?? ""}
+                  onChange={e => setColorHex(e.target.value)}
+                  placeholder="#9C8BBF"
+                  className="w-24 text-xs border border-gray-200 rounded px-2 py-1"
+                />
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!colorHex || classColorPalette.includes(colorHex)) return;
+                    await fetch("/api/admin/studio-settings/palette", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ color: colorHex }),
+                    });
+                  }}
+                  className={`text-xs px-2 py-1 rounded border ${
+                    colorHex && !classColorPalette.includes(colorHex)
+                      ? "border-lavender text-lavender hover:bg-lavender/10 cursor-pointer"
+                      : "border-gray-200 text-gray-300 cursor-not-allowed"
+                  }`}
+                  disabled={!colorHex || classColorPalette.includes(colorHex)}
+                >
+                  + Add to palette
+                </button>
+                {colorHex && (
+                  <button
+                    type="button"
+                    onClick={() => setColorHex(null)}
+                    className="text-xs text-mist hover:text-red-400"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
             </div>
           </Section>
 
