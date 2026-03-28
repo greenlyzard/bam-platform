@@ -89,6 +89,7 @@ export function ClassEditDrawer({
   classTeachers,
   pricingRules,
   classPhases,
+  rooms,
   tenantId,
   onClose,
   onSaved,
@@ -107,6 +108,7 @@ export function ClassEditDrawer({
   classTeachers: ClassTeacher[];
   pricingRules: PricingRule[];
   classPhases: ClassPhase[];
+  rooms: Array<{ id: string; name: string }>;
   tenantId: string;
   onClose: () => void;
   onSaved: (c: ClassRecord) => void;
@@ -150,6 +152,7 @@ export function ClassEditDrawer({
   const [startDate, setStartDate] = useState(classData?.start_date ?? "");
   const [endDate, setEndDate] = useState(classData?.end_date ?? "");
   const [seasonId, setSeasonId] = useState(classData?.season_id ?? "");
+  const [roomId, setRoomId] = useState(classData?.room_id ?? "");
 
   // ── Resources ───────────────────────────────────────
   const [allResources, setAllResources] = useState<{ id: string; name: string; type: string; is_active: boolean }[]>([]);
@@ -394,6 +397,7 @@ export function ClassEditDrawer({
       start_date: startDate || null,
       end_date: endDate || null,
       season_id: seasonId || null,
+      room_id: roomId || null,
       max_enrollment: maxEnrollment ? parseInt(maxEnrollment) : null,
       max_students: maxEnrollment ? parseInt(maxEnrollment) : 10,
       show_capacity_public: showCapacity,
@@ -814,18 +818,32 @@ export function ClassEditDrawer({
                 />
               </Field>
             </div>
-            <Field label="Season">
-              <SimpleSelect
-                value={seasonId}
-                onValueChange={(val) => setSeasonId(val === "__none__" ? "" : val)}
-                options={[
-                  { value: "__none__", label: "No season" },
-                  ...seasons.map((s) => ({ value: s.id, label: s.name })),
-                ]}
-                placeholder="No season"
-                className="w-full"
-              />
-            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Season">
+                <SimpleSelect
+                  value={seasonId}
+                  onValueChange={(val) => setSeasonId(val === "__none__" ? "" : val)}
+                  options={[
+                    { value: "__none__", label: "No season" },
+                    ...seasons.map((s) => ({ value: s.id, label: s.name })),
+                  ]}
+                  placeholder="No season"
+                  className="w-full"
+                />
+              </Field>
+              <Field label="Room">
+                <SimpleSelect
+                  value={roomId}
+                  onValueChange={(val) => setRoomId(val === "__none__" ? "" : val)}
+                  options={[
+                    { value: "__none__", label: "No room" },
+                    ...rooms.map((r) => ({ value: r.id, label: r.name })),
+                  ]}
+                  placeholder="No room"
+                  className="w-full"
+                />
+              </Field>
+            </div>
             {closureWarnings.length > 0 && (
               <div className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">
                 {closureWarnings.length} closure date

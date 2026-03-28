@@ -31,6 +31,7 @@ export interface ClassRecord {
   start_time: string | null;
   end_time: string | null;
   room: string | null;
+  room_id: string | null;
   max_students: number;
   is_active: boolean;
   teacher_id: string | null;
@@ -1655,6 +1656,7 @@ ${(byDay[d] ?? [])
                 )
               : []
           }
+          rooms={activeRooms}
           tenantId={tenantId}
           onClose={() => setDrawerOpen(false)}
           onSaved={handleSaved}
