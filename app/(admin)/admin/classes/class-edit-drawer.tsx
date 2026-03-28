@@ -228,6 +228,7 @@ export function ClassEditDrawer({
   const [colorHex, setColorHex] = useState<string | null>(
     (classData as any)?.color_hex ?? "#9C8BBF"
   );
+  const [editingPalette, setEditingPalette] = useState(false);
 
   // ── Section 6: Phases ────────────────────────────────
   const [phaseRows, setPhaseRows] = useState<PhaseRow[]>(() =>
@@ -1002,24 +1003,58 @@ export function ClassEditDrawer({
           {/* ── Calendar Color ──────────────────────────── */}
           <Section title="Calendar Color">
             <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-mist uppercase tracking-wide">
+                  Calendar Color
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setEditingPalette(v => !v)}
+                  className={`text-xs px-2 py-0.5 rounded border transition-colors ${
+                    editingPalette
+                      ? "border-red-300 text-red-400 bg-red-50"
+                      : "border-gray-200 text-mist hover:text-charcoal"
+                  }`}
+                >
+                  {editingPalette ? "Done" : "Edit palette"}
+                </button>
+              </div>
               {/* Palette swatches */}
               <div className="flex flex-wrap gap-2">
                 {classColorPalette.map(color => (
-                  <button
-                    key={color}
-                    type="button"
-                    onClick={() => setColorHex(color)}
-                    className={`w-7 h-7 rounded-full border-2 transition-all ${
-                      colorHex === color
-                        ? "border-charcoal scale-110 shadow-md"
-                        : "border-transparent hover:border-gray-300"
-                    }`}
-                    style={{ backgroundColor: color }}
-                    title={color}
-                  />
+                  <div key={color} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => !editingPalette && setColorHex(color)}
+                      className={`w-7 h-7 rounded-full border-2 transition-all ${
+                        colorHex === color && !editingPalette
+                          ? "border-charcoal scale-110 shadow-md"
+                          : "border-transparent hover:border-gray-300"
+                      } ${editingPalette ? "opacity-70" : ""}`}
+                      style={{ backgroundColor: color }}
+                      title={color}
+                    />
+                    {editingPalette && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await fetch("/api/admin/studio-settings/palette", {
+                            method: "DELETE",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ color }),
+                          });
+                          if (colorHex === color) setColorHex(null);
+                        }}
+                        className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] leading-none flex items-center justify-center hover:bg-red-600 shadow-sm"
+                        title="Remove from palette"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
                 ))}
                 {/* Custom color swatch if current color not in palette */}
-                {colorHex && !classColorPalette.includes(colorHex) && (
+                {colorHex && !classColorPalette.includes(colorHex) && !editingPalette && (
                   <button
                     type="button"
                     className="w-7 h-7 rounded-full border-2 border-charcoal scale-110 shadow-md"
