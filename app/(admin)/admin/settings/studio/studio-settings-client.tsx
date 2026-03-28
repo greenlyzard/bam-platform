@@ -66,7 +66,28 @@ function IdentitySection({ settings }: { settings: StudioSettings | null }) {
   const [logoUrl, setLogoUrl] = useState(settings?.logo_url ?? "");
   const [faviconUrl, setFaviconUrl] = useState(settings?.favicon_url ?? "");
   const [saving, setSaving] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingFavicon, setUploadingFavicon] = useState(false);
   const [toast, setToast] = useState("");
+
+  async function handleUpload(file: File, type: "logo" | "favicon") {
+    const setter = type === "logo" ? setUploadingLogo : setUploadingFavicon;
+    setter(true);
+    const form = new FormData();
+    form.set("file", file);
+    form.set("type", type);
+    const res = await fetch("/api/admin/studio/logo", { method: "POST", body: form });
+    const data = await res.json();
+    setter(false);
+    if (data.url) {
+      if (type === "logo") setLogoUrl(data.url);
+      else setFaviconUrl(data.url);
+      setToast(`${type === "logo" ? "Logo" : "Favicon"} uploaded`);
+      setTimeout(() => setToast(""), 2000);
+    } else {
+      setToast(data.error ?? "Upload failed");
+    }
+  }
 
   async function handleSave() {
     setSaving(true);
@@ -105,46 +126,72 @@ function IdentitySection({ settings }: { settings: StudioSettings | null }) {
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-charcoal mb-1.5">
-            Logo URL
-          </label>
-          <div className="flex items-start gap-4">
+        {/* Logo */}
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-charcoal">Logo</label>
+          {logoUrl && (
+            <div className="flex items-center gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={logoUrl} alt="Logo" className="h-12 object-contain" />
+              <span className="text-xs text-mist truncate max-w-48">{logoUrl}</span>
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <label className="cursor-pointer px-3 py-1.5 text-sm border border-gray-200 rounded hover:bg-gray-50 flex items-center gap-1.5 shrink-0">
+              {logoUrl ? "Replace" : "Upload"} Logo
+              <input
+                type="file"
+                accept=".png,.jpg,.jpeg,.svg"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleUpload(file, "logo");
+                }}
+              />
+            </label>
             <input
               type="url"
               value={logoUrl}
               onChange={(e) => setLogoUrl(e.target.value)}
-              placeholder="https://example.com/logo.png"
-              className="flex-1 max-w-md h-11 rounded-lg border border-silver bg-white px-4 text-sm text-charcoal placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
+              placeholder="or paste URL"
+              className="flex-1 max-w-sm h-9 text-sm border border-gray-200 rounded-lg px-3 text-charcoal placeholder:text-mist focus:border-lavender focus:outline-none"
             />
-            {logoUrl && (
-              <div className="h-12 w-12 rounded-lg border border-silver bg-white flex items-center justify-center overflow-hidden shrink-0">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={logoUrl} alt="Logo" className="max-h-full max-w-full object-contain" />
-              </div>
-            )}
           </div>
+          {uploadingLogo && <p className="text-xs text-mist">Uploading logo...</p>}
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-charcoal mb-1.5">
-            Favicon URL
-          </label>
-          <div className="flex items-start gap-4">
+        {/* Favicon */}
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-charcoal">Favicon</label>
+          {faviconUrl && (
+            <div className="flex items-center gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={faviconUrl} alt="Favicon" className="w-8 h-8 object-contain" />
+              <span className="text-xs text-mist truncate max-w-48">{faviconUrl}</span>
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <label className="cursor-pointer px-3 py-1.5 text-sm border border-gray-200 rounded hover:bg-gray-50 flex items-center gap-1.5 shrink-0">
+              {faviconUrl ? "Replace" : "Upload"} Favicon
+              <input
+                type="file"
+                accept=".ico,.png,.svg"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleUpload(file, "favicon");
+                }}
+              />
+            </label>
             <input
               type="url"
               value={faviconUrl}
               onChange={(e) => setFaviconUrl(e.target.value)}
-              placeholder="https://example.com/favicon.png"
-              className="flex-1 max-w-md h-11 rounded-lg border border-silver bg-white px-4 text-sm text-charcoal placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
+              placeholder="or paste URL"
+              className="flex-1 max-w-sm h-9 text-sm border border-gray-200 rounded-lg px-3 text-charcoal placeholder:text-mist focus:border-lavender focus:outline-none"
             />
-            {faviconUrl && (
-              <div className="h-10 w-10 rounded-lg border border-silver bg-white flex items-center justify-center overflow-hidden shrink-0">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={faviconUrl} alt="Favicon" className="h-8 w-8 object-contain" />
-              </div>
-            )}
           </div>
+          {uploadingFavicon && <p className="text-xs text-mist">Uploading favicon...</p>}
         </div>
 
         <div className="flex items-center gap-3">
