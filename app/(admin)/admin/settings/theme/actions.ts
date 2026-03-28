@@ -54,17 +54,22 @@ export async function updateThemeSettings(formData: FormData) {
     // ignore invalid JSON — use empty overrides
   }
 
-  // Check if settings row exists
+  // Check if settings row exists — also fetch custom_colors to preserve non-theme keys (e.g. class_palette)
   const { data: existing } = await supabase
     .from("studio_settings")
-    .select("id")
+    .select("id, custom_colors")
     .limit(1)
     .single();
+
+  const mergedColors = {
+    ...((existing?.custom_colors as Record<string, unknown>) ?? {}),
+    ...customColors,
+  };
 
   const settingsPayload = {
     studio_name: parsed.data.studio_name,
     theme_preset: parsed.data.theme_preset,
-    custom_colors: customColors,
+    custom_colors: mergedColors,
     heading_font: parsed.data.heading_font,
     body_font: parsed.data.body_font,
     logo_url: parsed.data.logo_url || null,
