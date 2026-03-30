@@ -71,7 +71,7 @@ export default function ClassesTab({ teacherId }: { teacherId: string }) {
         <div className="space-y-2">
           {currentClasses.length === 0 && <p className="text-slate-500 text-sm">No current classes assigned.</p>}
           {currentClasses.map((c: any) => (
-            <Link key={c.id} href="/admin/classes" className="flex items-center justify-between p-3 bg-white rounded-lg border border-cloud hover:border-lavender hover:shadow-sm transition-all">
+            <Link key={c.id} href={`/admin/classes?editClass=${c.id}`} className="flex items-center justify-between p-3 bg-white rounded-lg border border-cloud hover:border-lavender hover:shadow-sm transition-all">
               <div>
                 <p className="font-medium text-sm">{c.name}</p>
                 <p className="text-xs text-slate-500">
@@ -92,7 +92,7 @@ export default function ClassesTab({ teacherId }: { teacherId: string }) {
               <h4 className="text-xs font-semibold text-slate-400 uppercase mb-2">{season}</h4>
               <div className="space-y-2">
                 {classes.map((c: any) => (
-                  <Link key={c.id} href="/admin/classes" className="flex items-center justify-between p-3 bg-white rounded-lg border border-cloud hover:border-lavender hover:shadow-sm transition-all">
+                  <Link key={c.id} href={`/admin/classes?editClass=${c.id}`} className="flex items-center justify-between p-3 bg-white rounded-lg border border-cloud hover:border-lavender hover:shadow-sm transition-all">
                     <div>
                       <p className="font-medium text-sm">{c.name}</p>
                       <p className="text-xs text-slate-500">

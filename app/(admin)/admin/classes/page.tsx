@@ -2,7 +2,12 @@ import { requireAdmin } from "@/lib/auth/guards";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ClassManagement } from "./class-management";
 
-export default async function ClassesPage() {
+export default async function ClassesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ editClass?: string }>;
+}) {
+  const { editClass } = await searchParams;
   const user = await requireAdmin();
   const supabase = createAdminClient();
 
@@ -174,6 +179,7 @@ export default async function ClassesPage() {
       privateSessionsRaw={(privateSessionsRaw ?? []).map((p: any) => ({ id: p.id, session_date: p.session_date, start_time: p.start_time, end_time: p.end_time, status: p.status, studio: p.studio, primary_teacher_id: p.primary_teacher_id, student_ids: p.student_ids ?? [], notes: p.session_notes }))}
       studioClosures={(studioClosureRows ?? []).map((c: any) => ({ id: c.id, closed_date: c.closed_date, reason: c.reason }))}
       classColorPalette={classColorPalette}
+      initialEditClassId={editClass ?? null}
       tenantId={user.tenantId!}
     />
   );

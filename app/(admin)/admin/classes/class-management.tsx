@@ -251,6 +251,7 @@ export function ClassManagement({
   privateSessionsRaw = [],
   studioClosures = [],
   classColorPalette = [],
+  initialEditClassId = null,
   tenantId,
 }: {
   classes: ClassRecord[];
@@ -270,6 +271,7 @@ export function ClassManagement({
   privateSessionsRaw?: Array<{ id: string; session_date: string; start_time: string; end_time: string; status: string; studio: string | null; primary_teacher_id: string | null; student_ids: string[]; notes: string | null }>;
   studioClosures?: Array<{ id: string; closed_date: string; reason: string | null }>;
   classColorPalette?: string[];
+  initialEditClassId?: string | null;
   tenantId: string;
 }) {
   const [classes, setClasses] = useState(initialClasses);
@@ -507,6 +509,17 @@ export function ClassManagement({
     setIsNewClass(false);
     setDrawerOpen(true);
   }
+
+  // Auto-open edit drawer if deep-linked via ?editClass=...
+  const didAutoOpen = useRef(false);
+  useEffect(() => {
+    if (!initialEditClassId || didAutoOpen.current) return;
+    const match = classes.find((c) => c.id === initialEditClassId);
+    if (match) {
+      openEdit(match);
+      didAutoOpen.current = true;
+    }
+  }, [initialEditClassId, classes.length]);
 
   function handleSaved(updatedClass: ClassRecord) {
     setClasses((prev) => {
