@@ -4,6 +4,8 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/bam/theme-provider";
 import { getStudioSettings } from "@/lib/queries/studio-settings";
 
+export const dynamic = "force-dynamic";
+
 const cormorant = Cormorant_Garamond({
   variable: "--font-heading",
   subsets: ["latin"],
@@ -41,12 +43,8 @@ export async function generateMetadata(): Promise<Metadata> {
     icons: {
       icon: faviconUrl
         ? [{ url: faviconUrl }]
-        : [
-            { url: "/favicon.ico", sizes: "48x48" },
-            { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
-            { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
-          ],
-      shortcut: faviconUrl ?? "/favicon-16x16.png",
+        : [{ url: "/favicon.ico" }],
+      shortcut: faviconUrl ?? "/favicon.ico",
       apple: appIconUrl ?? "/apple-touch-icon.png",
     },
   };
