@@ -138,7 +138,7 @@ function IdentitySection({ settings }: { settings: StudioSettings | null }) {
           accept=".png,.jpg,.jpeg,.svg"
           uploading={uploading === "logo_light"}
           onFileSelect={(file) => handleUpload(file, "logo_light")}
-          onUrlChange={setLogoLightUrl}
+
           previewClassName="h-12 object-contain"
         />
 
@@ -150,7 +150,7 @@ function IdentitySection({ settings }: { settings: StudioSettings | null }) {
           accept=".png,.jpg,.jpeg,.svg"
           uploading={uploading === "logo_dark"}
           onFileSelect={(file) => handleUpload(file, "logo_dark")}
-          onUrlChange={setLogoDarkUrl}
+
           previewClassName="h-12 object-contain"
         />
 
@@ -162,7 +162,7 @@ function IdentitySection({ settings }: { settings: StudioSettings | null }) {
           accept=".ico,.png"
           uploading={uploading === "favicon"}
           onFileSelect={(file) => handleUpload(file, "favicon")}
-          onUrlChange={setFaviconUrl}
+
           previewClassName="w-8 h-8 object-contain"
         />
 
@@ -191,7 +191,6 @@ function BrandingUploadField({
   accept,
   uploading,
   onFileSelect,
-  onUrlChange,
   previewClassName,
 }: {
   label: string;
@@ -200,17 +199,20 @@ function BrandingUploadField({
   accept: string;
   uploading: boolean;
   onFileSelect: (file: File) => void;
-  onUrlChange: (url: string) => void;
   previewClassName: string;
 }) {
+  const filename = url ? url.split("/").pop()?.split("?")[0] ?? "" : "";
+
   return (
     <div className="space-y-2">
       <label className="block text-sm font-medium text-charcoal">{label}</label>
       {url && (
         <div className="flex items-center gap-3">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={url} alt={label} className={previewClassName} />
-          <span className="text-xs text-mist truncate max-w-48">{url}</span>
+          <div className={label === "Light Logo" ? "bg-gray-900 rounded p-2 inline-block" : ""}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={url} alt={label} className={previewClassName} />
+          </div>
+          <span className="text-xs text-mist truncate max-w-48">{filename}</span>
         </div>
       )}
       <div className="flex items-center gap-2">
@@ -226,13 +228,6 @@ function BrandingUploadField({
             }}
           />
         </label>
-        <input
-          type="url"
-          value={url}
-          onChange={(e) => onUrlChange(e.target.value)}
-          placeholder="or paste URL"
-          className="flex-1 max-w-sm h-9 text-sm border border-gray-200 rounded-lg px-3 text-charcoal placeholder:text-mist focus:border-lavender focus:outline-none"
-        />
       </div>
       {uploading && <p className="text-xs text-lavender">Uploading...</p>}
       <p className="text-xs text-mist">{hint}</p>
