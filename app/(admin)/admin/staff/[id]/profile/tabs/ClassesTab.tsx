@@ -17,10 +17,12 @@ export default function ClassesTab({ teacherId }: { teacherId: string }) {
 
       const res = await fetch(`/api/admin/staff/${teacherId}/classes`);
       if (!res.ok) {
+        console.log("CLASSES API error:", res.status, await res.text());
         setLoading(false);
         return;
       }
       const data = await res.json();
+      console.log("CLASSES API response:", data);
 
       const allClasses = data.classes ?? [];
       setCurrentClasses(allClasses.filter((c: any) => c.is_active));
