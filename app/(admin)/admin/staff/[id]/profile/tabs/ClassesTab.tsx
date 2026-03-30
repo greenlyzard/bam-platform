@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import Link from "next/link";
 
 const DAYS = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const SUB_TABS = ["Current Classes", "Past Classes", "Private Sessions"] as const;
@@ -17,12 +18,10 @@ export default function ClassesTab({ teacherId }: { teacherId: string }) {
 
       const res = await fetch(`/api/admin/staff/${teacherId}/classes`);
       if (!res.ok) {
-        console.log("CLASSES API error:", res.status, await res.text());
         setLoading(false);
         return;
       }
       const data = await res.json();
-      console.log("CLASSES API response:", data);
 
       const allClasses = data.classes ?? [];
       setCurrentClasses(allClasses.filter((c: any) => c.is_active));
@@ -72,7 +71,7 @@ export default function ClassesTab({ teacherId }: { teacherId: string }) {
         <div className="space-y-2">
           {currentClasses.length === 0 && <p className="text-slate-500 text-sm">No current classes assigned.</p>}
           {currentClasses.map((c: any) => (
-            <div key={c.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-cloud">
+            <Link key={c.id} href="/admin/classes" className="flex items-center justify-between p-3 bg-white rounded-lg border border-cloud hover:border-lavender hover:shadow-sm transition-all">
               <div>
                 <p className="font-medium text-sm">{c.name}</p>
                 <p className="text-xs text-slate-500">
@@ -80,7 +79,7 @@ export default function ClassesTab({ teacherId }: { teacherId: string }) {
                 </p>
               </div>
               <span className="text-xs text-slate-500">{c.enrolled_count ?? 0}/{c.max_enrollment ?? "—"}</span>
-            </div>
+            </Link>
           ))}
         </div>
       )}
@@ -93,14 +92,14 @@ export default function ClassesTab({ teacherId }: { teacherId: string }) {
               <h4 className="text-xs font-semibold text-slate-400 uppercase mb-2">{season}</h4>
               <div className="space-y-2">
                 {classes.map((c: any) => (
-                  <div key={c.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-cloud">
+                  <Link key={c.id} href="/admin/classes" className="flex items-center justify-between p-3 bg-white rounded-lg border border-cloud hover:border-lavender hover:shadow-sm transition-all">
                     <div>
                       <p className="font-medium text-sm">{c.name}</p>
                       <p className="text-xs text-slate-500">
                         {c.discipline} &middot; {DAYS[c.day_of_week] || c.day_of_week} &middot; {c.start_time}&#8211;{c.end_time}
                       </p>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             </div>
