@@ -1,7 +1,5 @@
 "use client";
 import { useState, useEffect } from "react";
-import { createClient } from "@/lib/supabase/client";
-import Link from "next/link";
 
 const DAYS = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const SUB_TABS = ["Current Classes", "Past Classes", "Private Sessions"] as const;
@@ -14,43 +12,27 @@ export default function ClassesTab({ teacherId }: { teacherId: string }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const supabase = createClient();
-
     async function fetchData() {
       setLoading(true);
 
-      // Current classes
-      const { data: currentCt } = await supabase
-        .from("class_teachers")
-        .select("classes(*)")
-        .eq("teacher_id", teacherId);
-      const allClasses = (currentCt || []).map((ct: any) => ct.classes).filter(Boolean);
+      const res = await fetch(`/api/admin/staff/${teacherId}/classes`);
+      if (!res.ok) {
+        setLoading(false);
+        return;
+      }
+      const data = await res.json();
+
+      const allClasses = data.classes ?? [];
       setCurrentClasses(allClasses.filter((c: any) => c.is_active));
       setPastClasses(allClasses.filter((c: any) => !c.is_active));
 
-      // Private sessions
-      const { data: sessions } = await supabase
-        .from("private_sessions")
-        .select("id, session_type, session_date, start_time, end_time, duration_minutes, status, student_ids")
-        .eq("primary_teacher_id", teacherId)
-        .order("session_date", { ascending: false })
-        .limit(50);
-
-      if (sessions && sessions.length > 0) {
-        const studentIds = [...new Set(sessions.flatMap((s: any) => s.student_ids || []))];
-        const { data: students } = studentIds.length
-          ? await supabase.from("students").select("id, first_name, last_name").in("id", studentIds)
-          : { data: [] };
-        const nameMap = Object.fromEntries(
-          (students || []).map((s: any) => [s.id, `${s.first_name} ${s.last_name}`])
-        );
-        setPrivateSessions(
-          sessions.map((s: any) => ({
-            ...s,
-            student_names: (s.student_ids || []).map((id: string) => nameMap[id] || "Unknown").join(", "),
-          }))
-        );
-      }
+      const sessions = data.privateSessions ?? [];
+      setPrivateSessions(
+        sessions.map((s: any) => ({
+          ...s,
+          student_names: (s.student_ids || []).join(", "),
+        }))
+      );
 
       setLoading(false);
     }
@@ -132,7 +114,7 @@ export default function ClassesTab({ teacherId }: { teacherId: string }) {
               <div>
                 <p className="font-medium text-sm">{s.student_names || "No students"}</p>
                 <p className="text-xs text-slate-500">
-                  {s.session_date} &middot; {s.start_time}&#8211;{s.end_time} &middot; {s.duration_minutes}min
+                  {s.session_date} &middot; {s.start_time}&#8211;{s.end_time}
                 </p>
               </div>
               <span className={`text-xs px-2 py-0.5 rounded-full ${
