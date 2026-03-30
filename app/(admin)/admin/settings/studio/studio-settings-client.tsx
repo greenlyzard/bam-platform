@@ -13,7 +13,10 @@ interface StudioSettings {
   id: string;
   studio_name: string;
   logo_url: string | null;
+  logo_light_url: string | null;
+  logo_dark_url: string | null;
   favicon_url: string | null;
+  app_icon_url: string | null;
 }
 
 interface Location {
@@ -63,26 +66,26 @@ export function StudioSettingsClient({
 // ── SECTION 1: Studio Identity ──────────────────────────
 function IdentitySection({ settings }: { settings: StudioSettings | null }) {
   const [studioName, setStudioName] = useState(settings?.studio_name ?? "");
-  const [logoUrl, setLogoUrl] = useState(settings?.logo_url ?? "");
+  const [logoLightUrl, setLogoLightUrl] = useState(settings?.logo_light_url ?? settings?.logo_url ?? "");
+  const [logoDarkUrl, setLogoDarkUrl] = useState(settings?.logo_dark_url ?? "");
   const [faviconUrl, setFaviconUrl] = useState(settings?.favicon_url ?? "");
   const [saving, setSaving] = useState(false);
-  const [uploadingLogo, setUploadingLogo] = useState(false);
-  const [uploadingFavicon, setUploadingFavicon] = useState(false);
+  const [uploading, setUploading] = useState<string | null>(null);
   const [toast, setToast] = useState("");
 
-  async function handleUpload(file: File, type: "logo" | "favicon") {
-    const setter = type === "logo" ? setUploadingLogo : setUploadingFavicon;
-    setter(true);
+  async function handleUpload(file: File, type: string) {
+    setUploading(type);
     const form = new FormData();
     form.set("file", file);
     form.set("type", type);
     const res = await fetch("/api/admin/studio/logo", { method: "POST", body: form });
     const data = await res.json();
-    setter(false);
+    setUploading(null);
     if (data.url) {
-      if (type === "logo") setLogoUrl(data.url);
-      else setFaviconUrl(data.url);
-      setToast(`${type === "logo" ? "Logo" : "Favicon"} uploaded`);
+      if (type === "logo_light") setLogoLightUrl(data.url);
+      else if (type === "logo_dark") setLogoDarkUrl(data.url);
+      else if (type === "favicon") setFaviconUrl(data.url);
+      setToast("Uploaded");
       setTimeout(() => setToast(""), 2000);
     } else {
       setToast(data.error ?? "Upload failed");
@@ -93,7 +96,8 @@ function IdentitySection({ settings }: { settings: StudioSettings | null }) {
     setSaving(true);
     const result = await updateStudioIdentity({
       studio_name: studioName,
-      logo_url: logoUrl || null,
+      logo_light_url: logoLightUrl || null,
+      logo_dark_url: logoDarkUrl || null,
       favicon_url: faviconUrl || null,
     });
     setSaving(false);
@@ -126,73 +130,41 @@ function IdentitySection({ settings }: { settings: StudioSettings | null }) {
           />
         </div>
 
-        {/* Logo */}
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-charcoal">Logo</label>
-          {logoUrl && (
-            <div className="flex items-center gap-3">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={logoUrl} alt="Logo" className="h-12 object-contain" />
-              <span className="text-xs text-mist truncate max-w-48">{logoUrl}</span>
-            </div>
-          )}
-          <div className="flex items-center gap-2">
-            <label className="cursor-pointer px-3 py-1.5 text-sm border border-gray-200 rounded hover:bg-gray-50 flex items-center gap-1.5 shrink-0">
-              {logoUrl ? "Replace" : "Upload"} Logo
-              <input
-                type="file"
-                accept=".png,.jpg,.jpeg,.svg"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleUpload(file, "logo");
-                }}
-              />
-            </label>
-            <input
-              type="url"
-              value={logoUrl}
-              onChange={(e) => setLogoUrl(e.target.value)}
-              placeholder="or paste URL"
-              className="flex-1 max-w-sm h-9 text-sm border border-gray-200 rounded-lg px-3 text-charcoal placeholder:text-mist focus:border-lavender focus:outline-none"
-            />
-          </div>
-          {uploadingLogo && <p className="text-xs text-mist">Uploading logo...</p>}
-        </div>
+        {/* Light Logo */}
+        <BrandingUploadField
+          label="Light Logo"
+          hint="Used on dark backgrounds, portal header"
+          url={logoLightUrl}
+          accept=".png,.jpg,.jpeg,.svg"
+          uploading={uploading === "logo_light"}
+          onFileSelect={(file) => handleUpload(file, "logo_light")}
+          onUrlChange={setLogoLightUrl}
+          previewClassName="h-12 object-contain"
+        />
+
+        {/* Dark Logo */}
+        <BrandingUploadField
+          label="Dark Logo"
+          hint="Used on light backgrounds, emails, documents"
+          url={logoDarkUrl}
+          accept=".png,.jpg,.jpeg,.svg"
+          uploading={uploading === "logo_dark"}
+          onFileSelect={(file) => handleUpload(file, "logo_dark")}
+          onUrlChange={setLogoDarkUrl}
+          previewClassName="h-12 object-contain"
+        />
 
         {/* Favicon */}
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-charcoal">Favicon</label>
-          {faviconUrl && (
-            <div className="flex items-center gap-3">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={faviconUrl} alt="Favicon" className="w-8 h-8 object-contain" />
-              <span className="text-xs text-mist truncate max-w-48">{faviconUrl}</span>
-            </div>
-          )}
-          <div className="flex items-center gap-2">
-            <label className="cursor-pointer px-3 py-1.5 text-sm border border-gray-200 rounded hover:bg-gray-50 flex items-center gap-1.5 shrink-0">
-              {faviconUrl ? "Replace" : "Upload"} Favicon
-              <input
-                type="file"
-                accept=".ico,.png,.svg"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleUpload(file, "favicon");
-                }}
-              />
-            </label>
-            <input
-              type="url"
-              value={faviconUrl}
-              onChange={(e) => setFaviconUrl(e.target.value)}
-              placeholder="or paste URL"
-              className="flex-1 max-w-sm h-9 text-sm border border-gray-200 rounded-lg px-3 text-charcoal placeholder:text-mist focus:border-lavender focus:outline-none"
-            />
-          </div>
-          {uploadingFavicon && <p className="text-xs text-mist">Uploading favicon...</p>}
-        </div>
+        <BrandingUploadField
+          label="Favicon"
+          hint="Browser tab icon, 32x32 or 64x64 recommended"
+          url={faviconUrl}
+          accept=".ico,.png"
+          uploading={uploading === "favicon"}
+          onFileSelect={(file) => handleUpload(file, "favicon")}
+          onUrlChange={setFaviconUrl}
+          previewClassName="w-8 h-8 object-contain"
+        />
 
         <div className="flex items-center gap-3">
           <button
@@ -208,6 +180,63 @@ function IdentitySection({ settings }: { settings: StudioSettings | null }) {
         </div>
       </div>
     </section>
+  );
+}
+
+// ── Branding Upload Field ────────────────────────────────
+function BrandingUploadField({
+  label,
+  hint,
+  url,
+  accept,
+  uploading,
+  onFileSelect,
+  onUrlChange,
+  previewClassName,
+}: {
+  label: string;
+  hint: string;
+  url: string;
+  accept: string;
+  uploading: boolean;
+  onFileSelect: (file: File) => void;
+  onUrlChange: (url: string) => void;
+  previewClassName: string;
+}) {
+  return (
+    <div className="space-y-2">
+      <label className="block text-sm font-medium text-charcoal">{label}</label>
+      {url && (
+        <div className="flex items-center gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={url} alt={label} className={previewClassName} />
+          <span className="text-xs text-mist truncate max-w-48">{url}</span>
+        </div>
+      )}
+      <div className="flex items-center gap-2">
+        <label className="cursor-pointer px-3 py-1.5 text-sm border border-gray-200 rounded hover:bg-gray-50 flex items-center gap-1.5 shrink-0">
+          {url ? "Replace" : "Upload"} {label}
+          <input
+            type="file"
+            accept={accept}
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onFileSelect(file);
+            }}
+          />
+        </label>
+        <input
+          type="url"
+          value={url}
+          onChange={(e) => onUrlChange(e.target.value)}
+          placeholder="or paste URL"
+          className="flex-1 max-w-sm h-9 text-sm border border-gray-200 rounded-lg px-3 text-charcoal placeholder:text-mist focus:border-lavender focus:outline-none"
+        />
+      </div>
+      {uploading && <p className="text-xs text-lavender">Uploading...</p>}
+      <p className="text-xs text-mist">{hint}</p>
+    </div>
   );
 }
 

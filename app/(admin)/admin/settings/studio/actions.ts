@@ -7,7 +7,8 @@ const STUDIO_SETTINGS_ID = "807cadc5-405f-4d24-9225-ae8458a31577";
 
 export async function updateStudioIdentity(payload: {
   studio_name: string;
-  logo_url: string | null;
+  logo_light_url: string | null;
+  logo_dark_url: string | null;
   favicon_url: string | null;
 }): Promise<{ success: boolean; error?: string }> {
   const supabase = createAdminClient();
@@ -15,7 +16,8 @@ export async function updateStudioIdentity(payload: {
     .from("studio_settings")
     .update({
       studio_name: payload.studio_name,
-      logo_url: payload.logo_url || null,
+      logo_light_url: payload.logo_light_url || null,
+      logo_dark_url: payload.logo_dark_url || null,
       favicon_url: payload.favicon_url || null,
       updated_at: new Date().toISOString(),
     })

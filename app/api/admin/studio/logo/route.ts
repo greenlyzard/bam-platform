@@ -12,6 +12,16 @@ const ALLOWED_TYPES = [
   "image/vnd.microsoft.icon",
 ];
 
+const VALID_UPLOAD_TYPES = ["logo", "logo_light", "logo_dark", "favicon", "app_icon"] as const;
+
+const COLUMN_MAP: Record<string, string> = {
+  logo: "logo_url",
+  logo_light: "logo_light_url",
+  logo_dark: "logo_dark_url",
+  favicon: "favicon_url",
+  app_icon: "app_icon_url",
+};
+
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
   const {
@@ -21,6 +31,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
+  // Verify admin role
+  const admin = createAdminClient();
+  const { data: roles } = await admin
+    .from("profile_roles")
+    .select("role")
+    .eq("user_id", user.id)
+    .eq("is_active", true);
+
+  const adminRoles = ["admin", "super_admin", "studio_admin", "finance_admin"];
+  const isAdmin = (roles ?? []).some((r) => adminRoles.includes(r.role));
+  if (!isAdmin) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
   const type = formData.get("type") as string | null;
@@ -28,7 +52,7 @@ export async function POST(req: NextRequest) {
   if (!file) {
     return NextResponse.json({ error: "No file provided" }, { status: 400 });
   }
-  if (!type || !["logo", "favicon"].includes(type)) {
+  if (!type || !VALID_UPLOAD_TYPES.includes(type as (typeof VALID_UPLOAD_TYPES)[number])) {
     return NextResponse.json({ error: "Invalid type" }, { status: 400 });
   }
   if (file.size > 2 * 1024 * 1024) {
@@ -41,8 +65,6 @@ export async function POST(req: NextRequest) {
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "png";
   const path = `studio-branding/${type}.${ext}`;
 
-  const admin = createAdminClient();
-
   const { error: uploadError } = await admin.storage
     .from("avatars")
     .upload(path, file, { upsert: true, contentType: file.type });
@@ -54,7 +76,7 @@ export async function POST(req: NextRequest) {
   const { data: urlData } = admin.storage.from("avatars").getPublicUrl(path);
   const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
 
-  const updateField = type === "logo" ? "logo_url" : "favicon_url";
+  const updateField = COLUMN_MAP[type];
   const { error: updateError } = await admin
     .from("studio_settings")
     .update({ [updateField]: publicUrl, updated_at: new Date().toISOString() })
