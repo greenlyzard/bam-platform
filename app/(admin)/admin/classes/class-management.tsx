@@ -85,6 +85,8 @@ export interface TeacherOption {
 export interface DisciplineOption {
   id: string;
   name: string;
+  icon_id?: string | null;
+  icon_url?: string | null;
 }
 
 export interface CurriculumOption {
@@ -902,11 +904,17 @@ ${(byDay[d] ?? [])
                         const bg = (c as any).color_hex || lvlColor(c.levels ?? []);
                         const rc = room.color_hex ?? "#9C8BBF";
                         const tn = getTeacherNames(c.id, c.legacyTeacherName);
+                        const calDiscId = c.discipline_ids?.[0];
+                        const calDisc = calDiscId ? disciplines.find((d) => d.id === calDiscId) : disciplines.find((d) => d.name === c.discipline);
                         return (
                           <div key={c.id} onClick={() => openEdit(c)} className={`absolute rounded overflow-hidden cursor-pointer hover:brightness-95 transition-all mx-0.5 ${closure ? "opacity-30" : ""}`} style={{ top, height: h, left: 0, right: 0, backgroundColor: bg, borderLeft: `3px solid ${rc}`, zIndex: 5 }}>
+                            {calDisc?.icon_url && (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={calDisc.icon_url} alt={calDisc.name} className="absolute top-1 right-1 w-5 h-5 rounded-full object-cover opacity-80" />
+                            )}
                             <div className="p-1 h-full overflow-hidden flex flex-col gap-0">
                               {isVis("time") && <div className="text-[10px] font-semibold text-gray-600 leading-tight">{fmtTime(c.start_time ?? "")}–{fmtTime(c.end_time ?? "")}</div>}
-                              {isVis("name") && <div className="text-[11px] font-medium text-gray-800 leading-tight line-clamp-2">{c.name}</div>}
+                              {isVis("name") && <div className="text-[11px] font-medium text-gray-800 leading-tight line-clamp-2 pr-5">{c.name}</div>}
                               {isVis("teacher") && tn && tn !== "—" && <div className="text-[10px] text-gray-500 leading-tight truncate">{tn}</div>}
                               {isVis("levels") && (c.levels ?? []).length > 0 && <div className="text-[9px] text-gray-500 truncate">{(c.levels ?? []).join(", ")}</div>}
                               {isVis("enrolled") && <div className="text-[9px] text-gray-500">{c.enrolledCount ?? 0}/{c.max_enrollment ?? "—"}</div>}
@@ -1497,13 +1505,26 @@ ${(byDay[d] ?? [])
                         </td>
                       );
                     case "discipline_icon": {
-                      const disc = c.discipline ?? "";
-                      const iconLookup: Record<string, string> = {
-                        "Ballet": "🩰", "Jazz": "🎵", "Contemporary": "🌊",
-                        "Hip Hop": "🎤", "Pilates": "⭕", "Musical Theater": "🎭",
-                        "Pom": "🎀", "Stretching": "🧘", "Movement": "💃",
-                      };
-                      return <td key={col.key} className="px-3 py-2 text-center text-lg">{iconLookup[disc] ?? "—"}</td>;
+                      const discId = c.discipline_ids?.[0];
+                      const disc = discId
+                        ? disciplines.find((d) => d.id === discId)
+                        : disciplines.find((d) => d.name === c.discipline);
+                      if (disc?.icon_url) {
+                        return (
+                          <td key={col.key} className="px-3 py-2 text-center">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={disc.icon_url} alt={disc.name} className="w-8 h-8 rounded-full object-cover mx-auto" />
+                          </td>
+                        );
+                      }
+                      const dname = disc?.name ?? c.discipline ?? "";
+                      return (
+                        <td key={col.key} className="px-3 py-2 text-center">
+                          <div className="w-8 h-8 rounded-full bg-lavender/20 flex items-center justify-center mx-auto text-xs font-medium text-lavender">
+                            {dname.charAt(0)}
+                          </div>
+                        </td>
+                      );
                     }
                     case "season":
                       return <td key={col.key} className="px-3 py-2 text-xs text-slate">{seasonName}</td>;

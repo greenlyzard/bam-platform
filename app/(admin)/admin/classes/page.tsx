@@ -60,13 +60,35 @@ export default async function ClassesPage({
     }
   }
 
-  // Fetch disciplines (tenant-scoped)
-  const { data: disciplines } = await supabase
+  // Fetch disciplines with icon URLs (tenant-scoped)
+  const { data: disciplineRows } = await supabase
     .from("disciplines")
-    .select("*")
+    .select("id, name, icon_id")
     .eq("tenant_id", user.tenantId!)
     .eq("is_active", true)
     .order("sort_order");
+
+  // Fetch discipline icons from icon_library
+  const { data: disciplineIcons } = await supabase
+    .from("icon_library")
+    .select("id, name, icon_url")
+    .eq("category", "discipline");
+
+  const iconMap: Record<string, string> = {};
+  const iconByName: Record<string, string> = {};
+  for (const ic of disciplineIcons ?? []) {
+    if (ic.icon_url) {
+      iconMap[ic.id] = ic.icon_url;
+      iconByName[ic.name.toLowerCase()] = ic.icon_url;
+    }
+  }
+
+  const disciplines = (disciplineRows ?? []).map((d) => ({
+    id: d.id,
+    name: d.name,
+    icon_id: d.icon_id ?? null,
+    icon_url: d.icon_id ? (iconMap[d.icon_id] ?? null) : (iconByName[d.name.toLowerCase()] ?? null),
+  }));
 
   // Fetch curriculum (tenant-scoped)
   const { data: curriculum } = await supabase
