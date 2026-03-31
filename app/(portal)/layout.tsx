@@ -40,7 +40,7 @@ export default async function PortalLayout({
   const portalAdmin = createAdminClient();
   const [{ data: tenant }, { data: adminRole }] = await Promise.all([
     supabase.from("tenants").select("angelina_enabled").eq("slug", "bam").single(),
-    portalAdmin.from("profile_roles").select("id").eq("user_id", session.user.id).in("role", ["super_admin", "admin"]).eq("is_active", true).maybeSingle(),
+    portalAdmin.from("profile_roles").select("id").eq("user_id", session.user.id).in("role", ["super_admin", "admin"]).eq("is_active", true).limit(1).maybeSingle(),
   ]);
   const angelinaEnabled = tenant?.angelina_enabled ?? true;
 

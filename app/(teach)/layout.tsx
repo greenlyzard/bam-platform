@@ -35,7 +35,7 @@ export default async function TeachLayout({
   const [{ data: tenant }, { data: studioSettings }, { data: adminRole }] = await Promise.all([
     supabase.from("tenants").select("angelina_enabled").eq("slug", "bam").single(),
     adminClient.from("studio_settings").select("logo_dark_url, logo_url, studio_name").single(),
-    adminClient.from("profile_roles").select("id").eq("user_id", session.user.id).in("role", ["super_admin", "admin"]).eq("is_active", true).maybeSingle(),
+    adminClient.from("profile_roles").select("id").eq("user_id", session.user.id).in("role", ["super_admin", "admin"]).eq("is_active", true).limit(1).maybeSingle(),
   ]);
   const angelinaEnabled = tenant?.angelina_enabled ?? true;
   const teachLogoUrl = studioSettings?.logo_dark_url ?? studioSettings?.logo_url;
