@@ -393,6 +393,7 @@ export async function createPrivateSession(formData: FormData) {
   const availabilitySlotId = (formData.get("availability_slot_id") as string) || null;
   const sessionNotes = (formData.get("session_notes") as string) || null;
   const parentVisibleNotes = (formData.get("parent_visible_notes") as string) || null;
+  const studentCanSeeNotes = formData.get("student_can_see_notes") === "true";
 
   let studentIds: string[] = [];
   try {
@@ -451,6 +452,7 @@ export async function createPrivateSession(formData: FormData) {
       availability_slot_id: availabilitySlotId,
       session_notes: sessionNotes,
       parent_visible_notes: parentVisibleNotes,
+      student_can_see_notes: studentCanSeeNotes,
       ical_uid: icalUid,
       created_by: user.id,
     })

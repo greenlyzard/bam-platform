@@ -4,6 +4,11 @@ import { useState, useEffect, useMemo } from "react";
 import { SimpleSelect } from "@/components/ui/select";
 import { createClient } from "@/lib/supabase/client";
 import { createPrivateSession, checkStudentCredits } from "@/app/(admin)/admin/privates/actions";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -114,8 +119,11 @@ export function PrivateSessionForm({
   const [billingModel, setBillingModel] = useState("split_equal");
   const [sessionNotes, setSessionNotes] = useState("");
   const [parentVisibleNotes, setParentVisibleNotes] = useState("");
+  const [noteVisibility, setNoteVisibility] = useState("parent_only");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [closureWarning, setClosureWarning] = useState<string | null>(null);
+  const [pendingFormData, setPendingFormData] = useState<FormData | null>(null);
 
   // Data
   const [students, setStudents] = useState<Student[]>([]);
@@ -202,6 +210,24 @@ export function PrivateSessionForm({
     return s.is_adult || !s.family_id ? `${label} (Adult)` : label;
   };
 
+  async function proceedWithBooking(fd: FormData) {
+    setClosureWarning(null);
+    setPendingFormData(null);
+    setLoading(true);
+    try {
+      const result = await createPrivateSession(fd);
+      if (result?.error) {
+        setError(result.error);
+      } else {
+        onCreated?.();
+      }
+    } catch (e: any) {
+      setError(e?.message || "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   // Submit
   const handleSubmit = async () => {
     setError("");
@@ -238,6 +264,7 @@ export function PrivateSessionForm({
       fd.set("billing_model", billingModel);
       fd.set("session_notes", sessionNotes);
       fd.set("parent_visible_notes", parentVisibleNotes);
+      fd.set("student_can_see_notes", noteVisibility === "student_and_parent" || noteVisibility === "student_only" ? "true" : "false");
       fd.set("booking_source", defaultTeacherId ? "teacher" : "admin");
 
       // Check if selected date is a studio closure
@@ -246,29 +273,19 @@ export function PrivateSessionForm({
         if (closureRes.ok) {
           const { closure } = await closureRes.json();
           if (closure) {
-            const confirmed = window.confirm(
-              `⚠️ The studio is closed on this date (${closure.reason}). ` +
-              `Are you sure you want to schedule a private lesson?`
-            );
-            if (!confirmed) {
-              setLoading(false);
-              return;
-            }
+            setPendingFormData(fd);
+            setClosureWarning(closure.reason);
+            setLoading(false);
+            return;
           }
         }
       } catch {
         // Closure check failed — proceed anyway
       }
 
-      const result = await createPrivateSession(fd);
-      if (result?.error) {
-        setError(result.error);
-      } else {
-        onCreated?.();
-      }
-    } catch (e: any) {
-      setError(e?.message || "Something went wrong");
-    } finally {
+      await proceedWithBooking(fd);
+    } catch {
+      // errors handled in proceedWithBooking
       setLoading(false);
     }
   };
@@ -473,14 +490,34 @@ export function PrivateSessionForm({
               placeholder="Staff-only notes..."
             />
           </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Parent Visible Notes</label>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-gray-600">Student / Parent Notes</label>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-mist">Visible to:</span>
+                <select
+                  value={noteVisibility}
+                  onChange={(e) => setNoteVisibility(e.target.value)}
+                  className="text-xs border border-gray-200 rounded px-2 py-1"
+                >
+                  <option value="parent_only">Parent only</option>
+                  <option value="student_and_parent">Student + Parent</option>
+                  <option value="student_only">Student only</option>
+                </select>
+              </div>
+            </div>
             <textarea
               rows={2}
               value={parentVisibleNotes}
               onChange={(e) => setParentVisibleNotes(e.target.value)}
               className={inputCls}
-              placeholder="Visible to parents..."
+              placeholder={
+                noteVisibility === "student_only"
+                  ? "Visible to student only..."
+                  : noteVisibility === "student_and_parent"
+                  ? "Visible to student and parent..."
+                  : "Visible to parent only..."
+              }
             />
           </div>
         </div>
@@ -504,6 +541,28 @@ export function PrivateSessionForm({
           </button>
         </div>
       </div>
+
+      {/* Closure warning dialog */}
+      <AlertDialog open={!!closureWarning} onOpenChange={() => setClosureWarning(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Studio Closed on This Date</AlertDialogTitle>
+            <AlertDialogDescription>
+              The studio is closed on this date ({closureWarning}).
+              Are you sure you want to schedule a private lesson?
+              The student and teacher will need to arrange access separately.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setClosureWarning(null); setPendingFormData(null); }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={() => { if (pendingFormData) proceedWithBooking(pendingFormData); }}>
+              Schedule Anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
