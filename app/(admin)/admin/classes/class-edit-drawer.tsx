@@ -16,19 +16,10 @@ import type {
   ClassPhase,
 } from "./class-management";
 
-const LEVEL_OPTIONS = [
-  "Petites",
-  "Level 1",
-  "Level 2A",
-  "Level 2B",
-  "Level 2C",
-  "Level 3A",
-  "Level 3B",
-  "Level 3C",
-  "Level 4A",
-  "Level 4B",
-  "Level 4C",
-  "Adult/Teen",
+const DEFAULT_LEVEL_OPTIONS = [
+  "Petites", "Level 1", "Level 2A", "Level 2B", "Level 2C",
+  "Level 3A", "Level 3B", "Level 3C", "Level 4A", "Level 4B",
+  "Level 4C", "Adult/Teen",
 ];
 
 const DAY_LABELS = [
@@ -91,6 +82,7 @@ export function ClassEditDrawer({
   classPhases,
   rooms,
   classColorPalette,
+  availableLevels = DEFAULT_LEVEL_OPTIONS,
   tenantId,
   onClose,
   onSaved,
@@ -111,6 +103,7 @@ export function ClassEditDrawer({
   classPhases: ClassPhase[];
   rooms: Array<{ id: string; name: string }>;
   classColorPalette: string[];
+  availableLevels?: string[];
   tenantId: string;
   onClose: () => void;
   onSaved: (c: ClassRecord) => void;
@@ -695,7 +688,7 @@ export function ClassEditDrawer({
             {/* Levels multi-select */}
             <Field label="Levels">
               <div className="flex flex-wrap gap-1.5">
-                {LEVEL_OPTIONS.map((level) => (
+                {availableLevels.map((level) => (
                   <button
                     key={level}
                     type="button"

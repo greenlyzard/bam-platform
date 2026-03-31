@@ -150,6 +150,22 @@ export default async function ClassesPage({
       "#F9F0D5","#F9E8D5","#EDE9F4","#F5E6FF","#E6F0FF",
     ];
 
+  // Get available levels from studio_settings or derive from classes
+  const configuredLevels: string[] = (studioSettingsData?.custom_colors as any)?.level_list ?? [];
+  let availableLevels = configuredLevels;
+  if (availableLevels.length === 0) {
+    // Fallback: derive from existing class data
+    availableLevels = [...new Set(
+      (classes ?? []).flatMap((c: any) => c.levels ?? []).filter((l: string) => l && !l.includes(",")).map((l: string) => l.trim())
+    )].sort((a, b) => {
+      if (a === "Petites") return -1;
+      if (b === "Petites") return 1;
+      if (a.includes("Adult")) return 1;
+      if (b.includes("Adult")) return -1;
+      return a.localeCompare(b, undefined, { numeric: true });
+    });
+  }
+
   // Check if admin is also a teacher
   const { data: teacherRole } = await supabase
     .from("profile_roles")
@@ -198,6 +214,7 @@ export default async function ClassesPage({
       studioClosures={(studioClosureRows ?? []).map((c: any) => ({ id: c.id, closed_date: c.closed_date, reason: c.reason }))}
       classColorPalette={classColorPalette}
       initialEditClassId={editClass ?? null}
+      availableLevels={availableLevels}
       isTeacher={!!teacherRole}
       myClassIds={myClassIds}
       tenantId={user.tenantId!}

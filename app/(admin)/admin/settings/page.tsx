@@ -105,6 +105,30 @@ const studioSettings: SettingsItem[] = [
     href: "/admin/settings/team",
     icon: "◉",
   },
+  {
+    label: "Icons Library",
+    description: "Manage discipline and affiliation icons",
+    href: "/admin/settings/icons",
+    icon: "◎",
+  },
+  {
+    label: "Class Fields",
+    description: "Configure visible fields on the class list",
+    href: "/admin/settings/class-fields",
+    icon: "▦",
+  },
+  {
+    label: "Theme & Branding",
+    description: "Colors, fonts, and visual style",
+    href: "/admin/settings/theme",
+    icon: "◈",
+  },
+  {
+    label: "Levels",
+    description: "Manage class level names and order",
+    href: "/admin/settings/levels",
+    icon: "≡",
+  },
 ];
 
 const platformSettings: SettingsItem[] = [

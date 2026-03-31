@@ -238,7 +238,32 @@ export function IconsClient({ icons: initialIcons, tenantId }: { icons: Icon[]; 
                   {icon.icon_url ? (
                     <img src={icon.icon_url} alt={icon.name} className="w-16 h-16 rounded-full object-cover" />
                   ) : (
-                    <span className="text-lg font-medium text-lavender">{icon.name.charAt(0).toUpperCase()}</span>
+                    <label className="cursor-pointer flex flex-col items-center gap-1 text-center">
+                      <span className="text-lg font-medium text-lavender">{icon.name.charAt(0).toUpperCase()}</span>
+                      <span className="text-[9px] text-mist">Upload</span>
+                      <input
+                        type="file"
+                        accept=".png,.jpg,.jpeg,.svg,.webp"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const fd = new FormData();
+                          fd.set("file", file);
+                          const res = await uploadIconToStorage(fd);
+                          if (!res.error && res.url) {
+                            const ufd = new FormData();
+                            ufd.set("id", icon.id);
+                            ufd.set("name", icon.name);
+                            ufd.set("category", icon.category);
+                            ufd.set("icon_url", res.url);
+                            ufd.set("website_url", icon.website_url ?? "");
+                            await updateIcon(ufd);
+                            setIcons(p => p.map(i => i.id === icon.id ? { ...i, icon_url: res.url! } : i));
+                          }
+                        }}
+                      />
+                    </label>
                   )}
                 </div>
                 {editingId === icon.id ? (

@@ -251,6 +251,7 @@ export function ClassManagement({
   privateSessionsRaw = [],
   studioClosures = [],
   classColorPalette = [],
+  availableLevels = [],
   initialEditClassId = null,
   isTeacher = false,
   myClassIds = [],
@@ -273,6 +274,7 @@ export function ClassManagement({
   privateSessionsRaw?: Array<{ id: string; session_date: string; start_time: string; end_time: string; status: string; studio: string | null; primary_teacher_id: string | null; student_ids: string[]; notes: string | null }>;
   studioClosures?: Array<{ id: string; closed_date: string; reason: string | null }>;
   classColorPalette?: string[];
+  availableLevels?: string[];
   initialEditClassId?: string | null;
   isTeacher?: boolean;
   myClassIds?: string[];
@@ -1297,7 +1299,7 @@ ${(byDay[d] ?? [])
             filterDay={filterDay} setFilterDay={setFilterDay}
             filterType={filterType} setFilterType={setFilterType}
             filterStatus={filterStatus} setFilterStatus={setFilterStatus}
-            seasons={seasons} teachers={teachers} disciplines={disciplines}
+            seasons={seasons} teachers={teachers} disciplines={disciplines} availableLevels={availableLevels}
           />
           {isTeacher && myClassIds.length > 0 && (
             <button
@@ -1698,6 +1700,7 @@ ${(byDay[d] ?? [])
           }
           rooms={activeRooms}
           classColorPalette={classColorPalette}
+          availableLevels={availableLevels}
           tenantId={tenantId}
           onClose={() => setDrawerOpen(false)}
           onSaved={handleSaved}
@@ -1891,6 +1894,7 @@ function FilterSelects({
   filterType, setFilterType,
   filterStatus, setFilterStatus,
   seasons, teachers, disciplines,
+  availableLevels,
   stacked,
 }: {
   filterSeason: string; setFilterSeason: (v: string) => void;
@@ -1903,6 +1907,7 @@ function FilterSelects({
   seasons: { id: string; name: string }[];
   teachers: { id: string; name: string }[];
   disciplines: { id: string; name: string }[];
+  availableLevels?: string[];
   stacked?: boolean;
 }) {
   const cls = stacked ? "w-full" : "w-[140px]";
@@ -1910,7 +1915,7 @@ function FilterSelects({
     <>
       <SimpleSelect value={filterSeason || "__all__"} onValueChange={(val) => setFilterSeason(val === "__all__" ? "" : val)} options={[{ value: "__all__", label: "All Seasons" }, ...seasons.map((s) => ({ value: s.id, label: s.name }))]} placeholder="All Seasons" className={cls} />
       <SimpleSelect value={filterTeacher || "__all__"} onValueChange={(val) => setFilterTeacher(val === "__all__" ? "" : val)} options={[{ value: "__all__", label: "All Teachers" }, ...teachers.map((t) => ({ value: t.id, label: t.name }))]} placeholder="All Teachers" className={cls} />
-      <SimpleSelect value={filterLevel || "__all__"} onValueChange={(val) => setFilterLevel(val === "__all__" ? "" : val)} options={[{ value: "__all__", label: "All Levels" }, ...LEVEL_OPTIONS.map((l) => ({ value: l, label: l }))]} placeholder="All Levels" className={cls} />
+      <SimpleSelect value={filterLevel || "__all__"} onValueChange={(val) => setFilterLevel(val === "__all__" ? "" : val)} options={[{ value: "__all__", label: "All Levels" }, ...((availableLevels ?? []).length > 0 ? (availableLevels ?? []) : LEVEL_OPTIONS).map((l) => ({ value: l, label: l }))]} placeholder="All Levels" className={cls} />
       <SimpleSelect value={filterDiscipline || "__all__"} onValueChange={(val) => setFilterDiscipline(val === "__all__" ? "" : val)} options={[{ value: "__all__", label: "All Disciplines" }, ...disciplines.map((d) => ({ value: d.id, label: d.name }))]} placeholder="All Disciplines" className={cls} />
       <SimpleSelect value={filterDay || "__all__"} onValueChange={(val) => setFilterDay(val === "__all__" ? "" : val)} options={[{ value: "__all__", label: "All Days" }, ...[1, 2, 3, 4, 5, 6, 0].map((d) => ({ value: String(d), label: DAY_NAMES_FULL[d] }))]} placeholder="All Days" className={cls} />
       <SimpleSelect value={filterType || "__all__"} onValueChange={(val) => setFilterType(val === "__all__" ? "" : val)} options={[{ value: "__all__", label: "All Types" }, { value: "class", label: "Class" }, { value: "rehearsal", label: "Rehearsal" }, { value: "performance", label: "Performance" }]} placeholder="All Types" className={cls} />
