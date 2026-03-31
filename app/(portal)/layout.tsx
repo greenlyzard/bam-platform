@@ -50,19 +50,18 @@ export default async function PortalLayout({
         {/* Top header */}
         <header className="sticky top-0 z-40 border-b border-silver bg-white/80 backdrop-blur-sm">
           <div className="flex h-14 items-center justify-between px-4 max-w-5xl mx-auto">
-            <a href="/portal/dashboard" className="flex items-center gap-2.5">
-              {(settings?.logo_dark_url || settings?.logo_url) ? (
+            <a href="/portal/dashboard" className="flex items-center gap-2">
+              {(settings?.logo_dark_url || settings?.logo_url) && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={settings.logo_dark_url ?? settings.logo_url}
                   alt={studioName}
                   className="h-8 w-auto object-contain"
                 />
-              ) : (
-                <span className="font-heading text-lg font-semibold text-charcoal">
-                  {studioName}
-                </span>
               )}
+              <span className="font-semibold text-charcoal text-sm hidden sm:block">
+                {studioName}
+              </span>
             </a>
             <div className="flex items-center gap-3">
               <span className="hidden sm:block text-sm text-slate">

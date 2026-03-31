@@ -48,21 +48,17 @@ export default async function AdminLayout({
         {/* Top header */}
         <header className="sticky top-0 z-40 border-b border-silver bg-white/80 backdrop-blur-sm">
           <div className="flex h-14 items-center justify-between px-4 lg:px-6">
-            <a
-              href="/admin/dashboard"
-              className="flex items-center gap-2.5"
-            >
-              {logoUrl ? (
+            <a href="/admin/dashboard" className="flex items-center gap-2">
+              {logoUrl && (
                 <img
                   src={logoUrl}
                   alt={settings?.studio_name ?? "Studio"}
                   className="h-8 w-auto object-contain"
                 />
-              ) : (
-                <span className="font-heading text-lg font-semibold text-charcoal">
-                  {settings?.studio_name ?? "Studio Admin"}
-                </span>
               )}
+              <span className="font-semibold text-charcoal text-sm hidden sm:block">
+                {settings?.studio_name ?? "Ballet Academy and Movement"}
+              </span>
             </a>
             <div className="flex items-center gap-3">
               <span className="hidden sm:block text-sm text-slate">

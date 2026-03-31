@@ -52,17 +52,16 @@ export default async function TeachLayout({
         <header className="sticky top-0 z-40 border-b border-silver bg-white/80 backdrop-blur-sm">
           <div className="flex h-14 items-center justify-between px-4 max-w-6xl mx-auto">
             <a href="/teach/dashboard" className="flex items-center gap-2">
-              {teachLogoUrl ? (
+              {teachLogoUrl && (
                 <img
                   src={teachLogoUrl}
                   alt={studioSettings?.studio_name ?? "Studio"}
                   className="h-8 w-auto object-contain"
                 />
-              ) : (
-                <span className="font-heading text-lg font-semibold text-charcoal">
-                  {studioSettings?.studio_name ?? "Teacher Portal"}
-                </span>
               )}
+              <span className="font-semibold text-charcoal text-sm hidden sm:block">
+                {studioSettings?.studio_name ?? "Ballet Academy and Movement"}
+              </span>
             </a>
             <div className="flex items-center gap-3">
               <span className="hidden sm:block text-sm text-slate">{today}</span>
