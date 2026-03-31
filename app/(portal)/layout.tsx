@@ -37,11 +37,11 @@ export default async function PortalLayout({
   const studioName = settings?.studio_name ?? "Ballet Academy & Movement";
 
   const supabase = await createClient();
-  const { data: tenant } = await supabase
-    .from("tenants")
-    .select("angelina_enabled")
-    .eq("slug", "bam")
-    .single();
+  const portalAdmin = createAdminClient();
+  const [{ data: tenant }, { data: adminRole }] = await Promise.all([
+    supabase.from("tenants").select("angelina_enabled").eq("slug", "bam").single(),
+    portalAdmin.from("profile_roles").select("id").eq("user_id", session.user.id).in("role", ["super_admin", "admin"]).eq("is_active", true).maybeSingle(),
+  ]);
   const angelinaEnabled = tenant?.angelina_enabled ?? true;
 
   return (
@@ -64,6 +64,14 @@ export default async function PortalLayout({
               </span>
             </a>
             <div className="flex items-center gap-3">
+              {adminRole && (
+                <a
+                  href="/admin/dashboard"
+                  className="text-xs px-3 py-1.5 border border-gray-200 rounded-full hover:bg-gray-50 text-mist hover:text-charcoal transition-colors"
+                >
+                  &larr; Admin
+                </a>
+              )}
               <span className="hidden sm:block text-sm text-slate">
                 {full_name ?? session.user.email}
               </span>

@@ -32,9 +32,10 @@ export default async function TeachLayout({
 
   const supabase = await createClient();
   const adminClient = createAdminClient();
-  const [{ data: tenant }, { data: studioSettings }] = await Promise.all([
+  const [{ data: tenant }, { data: studioSettings }, { data: adminRole }] = await Promise.all([
     supabase.from("tenants").select("angelina_enabled").eq("slug", "bam").single(),
     adminClient.from("studio_settings").select("logo_dark_url, logo_url, studio_name").single(),
+    adminClient.from("profile_roles").select("id").eq("user_id", session.user.id).in("role", ["super_admin", "admin"]).eq("is_active", true).maybeSingle(),
   ]);
   const angelinaEnabled = tenant?.angelina_enabled ?? true;
   const teachLogoUrl = studioSettings?.logo_dark_url ?? studioSettings?.logo_url;
@@ -64,6 +65,14 @@ export default async function TeachLayout({
               </span>
             </a>
             <div className="flex items-center gap-3">
+              {adminRole && (
+                <a
+                  href="/admin/dashboard"
+                  className="text-xs px-3 py-1.5 border border-gray-200 rounded-full hover:bg-gray-50 text-mist hover:text-charcoal transition-colors"
+                >
+                  &larr; Admin
+                </a>
+              )}
               <span className="hidden sm:block text-sm text-slate">{today}</span>
               <span className="hidden sm:block text-sm text-slate">
                 {full_name ?? session.user.email}
