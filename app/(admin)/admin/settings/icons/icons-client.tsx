@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useRef, useCallback } from "react";
 import { SimpleSelect } from "@/components/ui/select";
-import { createIcon, updateIcon, toggleIconActive, uploadIconToStorage, saveIconsToLibrary } from "./actions";
+import { createIcon, updateIcon, toggleIconActive, uploadIconToStorage, saveIconsToLibrary, deleteIcon } from "./actions";
 
 interface Icon {
   id: string; name: string; slug: string; category: string;
@@ -259,42 +259,62 @@ export function IconsClient({ icons: initialIcons, tenantId }: { icons: Icon[]; 
                   ) : (
                     <span className="text-lg font-medium text-lavender">{icon.name.charAt(0).toUpperCase()}</span>
                   )}
-                  {/* Upload/Replace overlay */}
-                  <label className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover/icon:opacity-100 transition-opacity cursor-pointer rounded-full">
+                  {/* Upload/Replace + Delete overlay */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/40 opacity-0 group-hover/icon:opacity-100 transition-opacity rounded-full">
                     {uploadingId === icon.id ? (
                       <span className="text-[10px] text-white animate-pulse">Uploading...</span>
                     ) : (
-                      <span className="text-[10px] text-white font-medium">{icon.icon_url ? "Replace" : "Upload"}</span>
+                      <>
+                        <label className="cursor-pointer text-[10px] text-white font-medium hover:underline">
+                          {icon.icon_url ? "Replace" : "Upload"}
+                          <input
+                            type="file"
+                            accept=".png,.jpg,.jpeg,.svg,.webp"
+                            className="hidden"
+                            disabled={uploadingId === icon.id}
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              setUploadingId(icon.id);
+                              const fd = new FormData();
+                              fd.set("file", file);
+                              const res = await uploadIconToStorage(fd);
+                              if (res.error || !res.url) {
+                                alert(`Upload failed: ${res.error ?? "Unknown error"}`);
+                                setUploadingId(null);
+                                return;
+                              }
+                              const ufd = new FormData();
+                              ufd.set("id", icon.id);
+                              ufd.set("name", icon.name);
+                              ufd.set("category", icon.category);
+                              ufd.set("icon_url", res.url);
+                              ufd.set("website_url", icon.website_url ?? "");
+                              await updateIcon(ufd);
+                              setIcons(p => p.map(i => i.id === icon.id ? { ...i, icon_url: res.url! } : i));
+                              setUploadingId(null);
+                            }}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (!window.confirm(`Delete ${icon.name}? This cannot be undone.`)) return;
+                            const res = await deleteIcon(icon.id);
+                            if (res.error) {
+                              alert(`Delete failed: ${res.error}`);
+                            } else {
+                              setIcons(p => p.filter(i => i.id !== icon.id));
+                            }
+                          }}
+                          className="text-[10px] text-red-300 hover:text-red-100 font-medium"
+                        >
+                          Delete
+                        </button>
+                      </>
                     )}
-                    <input
-                      type="file"
-                      accept=".png,.jpg,.jpeg,.svg,.webp"
-                      className="hidden"
-                      disabled={uploadingId === icon.id}
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        setUploadingId(icon.id);
-                        const fd = new FormData();
-                        fd.set("file", file);
-                        const res = await uploadIconToStorage(fd);
-                        if (res.error || !res.url) {
-                          alert(`Upload failed: ${res.error ?? "Unknown error"}`);
-                          setUploadingId(null);
-                          return;
-                        }
-                        const ufd = new FormData();
-                        ufd.set("id", icon.id);
-                        ufd.set("name", icon.name);
-                        ufd.set("category", icon.category);
-                        ufd.set("icon_url", res.url);
-                        ufd.set("website_url", icon.website_url ?? "");
-                        await updateIcon(ufd);
-                        setIcons(p => p.map(i => i.id === icon.id ? { ...i, icon_url: res.url! } : i));
-                        setUploadingId(null);
-                      }}
-                    />
-                  </label>
+                  </div>
                 </div>
                 {editingId === icon.id ? (
                   <EditInline icon={icon} onSave={handleSaveEdit} onCancel={() => setEditingId(null)} />

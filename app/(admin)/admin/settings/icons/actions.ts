@@ -157,7 +157,41 @@ export async function uploadIconToStorage(formData: FormData): Promise<{ url: st
 }
 
 // ---------------------------------------------------------------------------
-// 5. Save Icons to Library (batch)
+// 5. Delete Icon
+// ---------------------------------------------------------------------------
+export async function deleteIcon(id: string): Promise<{ error?: string; success?: boolean }> {
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const admin = createAdminClient();
+
+  // Get the icon first to delete from storage too
+  const { data: icon } = await admin
+    .from("icon_library")
+    .select("icon_url")
+    .eq("id", id)
+    .single();
+
+  // Delete from DB
+  const { error } = await admin
+    .from("icon_library")
+    .delete()
+    .eq("id", id);
+
+  if (error) return { error: error.message };
+
+  // Try to delete from storage if it's a Supabase storage URL
+  if (icon?.icon_url?.includes("supabase")) {
+    const path = icon.icon_url.split("/storage/v1/object/public/avatars/")[1];
+    if (path) {
+      await admin.storage.from("avatars").remove([path.split("?")[0]]);
+    }
+  }
+
+  revalidatePath("/admin/settings/icons");
+  return { success: true };
+}
+
+// ---------------------------------------------------------------------------
+// 6. Save Icons to Library (batch)
 // ---------------------------------------------------------------------------
 export async function saveIconsToLibrary(formData: FormData) {
   const supabase = await createClient();
