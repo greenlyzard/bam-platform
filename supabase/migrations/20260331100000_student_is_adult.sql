@@ -1,2 +1,0 @@
-ALTER TABLE public.students
-ADD COLUMN IF NOT EXISTS is_adult BOOLEAN DEFAULT false;

@@ -106,7 +106,7 @@ export function PrivateSessionForm({
   const [endTime, setEndTime] = useState("16:00");
   const [studio, setStudio] = useState("Studio 1");
   const [studentIds, setStudentIds] = useState<string[]>([]);
-  const [coTeacherId, setCoTeacherId] = useState("");
+  const [coTeacherId, setCoTeacherId] = useState("__none__");
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurrenceRule, setRecurrenceRule] = useState("weekly");
   const [sessionRate, setSessionRate] = useState("");
@@ -121,7 +121,7 @@ export function PrivateSessionForm({
   const [students, setStudents] = useState<Student[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [teacherId, setTeacherId] = useState(defaultTeacherId ?? "");
+  const [teacherId, setTeacherId] = useState(defaultTeacherId ?? "__none__");
   const [creditInfo, setCreditInfo] = useState<{ studentId: string; balance: number; pointCost: number; sufficient: boolean }[]>([]);
 
   // Auto-calc endTime when startTime or duration changes
@@ -138,7 +138,7 @@ export function PrivateSessionForm({
       const { data: studentRows } = await supabase
         .from("students")
         .select("id, first_name, last_name, family_id, is_adult")
-        .eq("is_active", true)
+        .eq("active", true)
         .order("last_name");
       if (studentRows) setStudents(studentRows);
 
@@ -164,7 +164,7 @@ export function PrivateSessionForm({
 
   // Fetch credit balances when students or teacher change
   useEffect(() => {
-    if (studentIds.length === 0 || !teacherId) {
+    if (studentIds.length === 0 || !teacherId || teacherId === "__none__") {
       setCreditInfo([]);
       return;
     }
@@ -209,7 +209,7 @@ export function PrivateSessionForm({
       setError("Date and times are required.");
       return;
     }
-    if (!teacherId) {
+    if (!teacherId || teacherId === "__none__") {
       setError("Please select a teacher.");
       return;
     }
@@ -230,7 +230,7 @@ export function PrivateSessionForm({
       fd.set("studio", studio);
       fd.set("primary_teacher_id", teacherId);
       fd.set("student_ids", JSON.stringify(studentIds));
-      fd.set("co_teacher_ids", coTeacherId ? JSON.stringify([coTeacherId]) : "[]");
+      fd.set("co_teacher_ids", coTeacherId && coTeacherId !== "__none__" ? JSON.stringify([coTeacherId]) : "[]");
       fd.set("is_recurring", String(isRecurring));
       if (isRecurring) fd.set("recurrence_rule", recurrenceRule);
       if (sessionRate) fd.set("session_rate", sessionRate);
@@ -277,10 +277,13 @@ export function PrivateSessionForm({
     .filter((t) => t.id !== teacherId)
     .map((t) => ({ value: t.id, label: `${t.first_name} ${t.last_name}` }));
 
-  const primaryTeacherOptions = teachers.map((t) => ({
-    value: t.id,
-    label: `${t.first_name} ${t.last_name}`,
-  }));
+  const primaryTeacherOptions = [
+    { value: "__none__", label: "Select teacher..." },
+    ...teachers.map((t) => ({
+      value: t.id,
+      label: `${t.first_name} ${t.last_name}`,
+    })),
+  ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -401,7 +404,7 @@ export function PrivateSessionForm({
             <SimpleSelect
               value={coTeacherId}
               onValueChange={setCoTeacherId}
-              options={[{ value: "", label: "None" }, ...teacherOptions]}
+              options={[{ value: "__none__", label: "None" }, ...teacherOptions]}
               placeholder="None"
             />
           </div>
