@@ -356,6 +356,7 @@ export function ScheduleCalendar({
 }: ScheduleCalendarProps) {
   const router = useRouter();
   const [view, setView] = useState<"week" | "list" | "room">("week");
+  const [showClosedClasses, setShowClosedClasses] = useState(false);
   const [selectedInstance, setSelectedInstance] = useState<ScheduleInstance | null>(null);
 
   const [teacherFilter, setTeacherFilter] = useState(initialFilters.teacher);
@@ -597,22 +598,30 @@ export function ScheduleCalendar({
     <>
       {/* Closure banner */}
       {closures.length > 0 && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 print:hidden">
-          <span className="text-red-500">&#128683;</span>
-          <div>
-            <span className="text-sm font-medium text-red-700">
-              Studio Closed: {closures[0].reason}
-            </span>
-            <span className="text-xs text-red-500 ml-2">
-              {closures.map((c) =>
-                new Date(c.closed_date + "T00:00:00").toLocaleDateString("en-US", {
-                  weekday: "short",
-                  month: "short",
-                  day: "numeric",
-                })
-              ).join(", ")}
-            </span>
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between gap-2 print:hidden">
+          <div className="flex items-center gap-2">
+            <span className="text-red-500">&#128683;</span>
+            <div>
+              <span className="text-sm font-medium text-red-700">
+                Studio Closed: {closures[0].reason}
+              </span>
+              <span className="text-xs text-red-500 ml-2">
+                {closures.map((c) =>
+                  new Date(c.closed_date + "T00:00:00").toLocaleDateString("en-US", {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                  })
+                ).join(", ")}
+              </span>
+            </div>
           </div>
+          <button
+            onClick={() => setShowClosedClasses((v) => !v)}
+            className="text-xs px-3 py-1 border border-red-200 rounded-full text-red-500 hover:bg-red-100 transition-colors whitespace-nowrap"
+          >
+            {showClosedClasses ? "Hide classes" : "Show classes"}
+          </button>
         </div>
       )}
 
@@ -642,22 +651,28 @@ export function ScheduleCalendar({
                   &#128683; {closureReasonMap.get(date) ?? "Closed"}
                 </div>
               )}
-              <div className={`space-y-1.5 ${isClosed ? "opacity-40 pointer-events-none" : ""}`}>
-                {daySessions.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-silver p-3 text-center text-xs text-mist print:hidden">
-                    {isClosed ? "Studio closed" : "No sessions"}
-                  </div>
-                ) : (
-                  daySessions.map((inst) => (
-                    <SessionCard
-                      key={inst.id}
-                      instance={inst}
-                      onClick={() => setSelectedInstance(inst)}
-                      visibleFields={visibleFields}
-                    />
-                  ))
-                )}
-              </div>
+              {isClosed && !showClosedClasses ? (
+                <div className="text-center text-xs text-red-400 py-4">
+                  Studio closed
+                </div>
+              ) : (
+                <div className={`space-y-1.5 ${isClosed ? "opacity-40 pointer-events-none" : ""}`}>
+                  {daySessions.length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-silver p-3 text-center text-xs text-mist print:hidden">
+                      No sessions
+                    </div>
+                  ) : (
+                    daySessions.map((inst) => (
+                      <SessionCard
+                        key={inst.id}
+                        instance={inst}
+                        onClick={() => setSelectedInstance(inst)}
+                        visibleFields={visibleFields}
+                      />
+                    ))
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
