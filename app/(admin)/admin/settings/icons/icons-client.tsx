@@ -52,6 +52,8 @@ export function IconsClient({ icons: initialIcons, tenantId }: { icons: Icon[]; 
   const [newCategory, setNewCategory] = useState("discipline");
   const [newIconUrl, setNewIconUrl] = useState("");
   const [newWebsiteUrl, setNewWebsiteUrl] = useState("");
+  const [newIconFile, setNewIconFile] = useState<File | null>(null);
+  const [newIconUploading, setNewIconUploading] = useState(false);
 
   const filtered = icons.filter(i => {
     if (categoryFilter !== "all" && i.category !== categoryFilter) return false;
@@ -69,14 +71,30 @@ export function IconsClient({ icons: initialIcons, tenantId }: { icons: Icon[]; 
     });
   }
 
-  function handleAdd() {
+  async function handleAdd() {
     if (!newName.trim()) return;
+    let iconUrl = newIconUrl;
+
+    // Upload file first if selected
+    if (newIconFile) {
+      setNewIconUploading(true);
+      const ufd = new FormData();
+      ufd.set("file", newIconFile);
+      const uploadRes = await uploadIconToStorage(ufd);
+      setNewIconUploading(false);
+      if (uploadRes.error || !uploadRes.url) {
+        alert(`Upload failed: ${uploadRes.error ?? "Unknown error"}`);
+        return;
+      }
+      iconUrl = uploadRes.url;
+    }
+
     startTransition(async () => {
       const fd = new FormData();
       fd.set("name", newName); fd.set("category", newCategory);
-      fd.set("icon_url", newIconUrl); fd.set("website_url", newWebsiteUrl); fd.set("tenantId", tenantId);
+      fd.set("icon_url", iconUrl); fd.set("website_url", newWebsiteUrl); fd.set("tenantId", tenantId);
       const res = await createIcon(fd);
-      if (!res.error) { setNewName(""); setNewIconUrl(""); setNewWebsiteUrl(""); }
+      if (!res.error) { setNewName(""); setNewIconUrl(""); setNewWebsiteUrl(""); setNewIconFile(null); }
     });
   }
 
@@ -235,49 +253,48 @@ export function IconsClient({ icons: initialIcons, tenantId }: { icons: Icon[]; 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {filtered.map(icon => (
               <div key={icon.id} className="bg-white border border-silver rounded-lg p-3 flex flex-col items-center gap-2 relative group">
-                <div className="w-16 h-16 rounded-full bg-cloud flex items-center justify-center overflow-hidden">
+                <div className="w-16 h-16 rounded-full bg-cloud flex items-center justify-center overflow-hidden relative group/icon">
                   {icon.icon_url ? (
                     <img src={icon.icon_url} alt={icon.name} className="w-16 h-16 rounded-full object-cover" />
                   ) : (
-                    <label className="cursor-pointer flex flex-col items-center gap-1 text-center">
-                      {uploadingId === icon.id ? (
-                        <span className="text-[10px] text-mist animate-pulse">Uploading...</span>
-                      ) : (
-                        <>
-                          <span className="text-lg font-medium text-lavender">{icon.name.charAt(0).toUpperCase()}</span>
-                          <span className="text-[9px] text-mist">Upload</span>
-                        </>
-                      )}
-                      <input
-                        type="file"
-                        accept=".png,.jpg,.jpeg,.svg,.webp"
-                        className="hidden"
-                        disabled={uploadingId === icon.id}
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0];
-                          if (!file) return;
-                          setUploadingId(icon.id);
-                          const fd = new FormData();
-                          fd.set("file", file);
-                          const res = await uploadIconToStorage(fd);
-                          if (res.error || !res.url) {
-                            alert(`Upload failed: ${res.error ?? "Unknown error"}`);
-                            setUploadingId(null);
-                            return;
-                          }
-                          const ufd = new FormData();
-                          ufd.set("id", icon.id);
-                          ufd.set("name", icon.name);
-                          ufd.set("category", icon.category);
-                          ufd.set("icon_url", res.url);
-                          ufd.set("website_url", icon.website_url ?? "");
-                          await updateIcon(ufd);
-                          setIcons(p => p.map(i => i.id === icon.id ? { ...i, icon_url: res.url! } : i));
-                          setUploadingId(null);
-                        }}
-                      />
-                    </label>
+                    <span className="text-lg font-medium text-lavender">{icon.name.charAt(0).toUpperCase()}</span>
                   )}
+                  {/* Upload/Replace overlay */}
+                  <label className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover/icon:opacity-100 transition-opacity cursor-pointer rounded-full">
+                    {uploadingId === icon.id ? (
+                      <span className="text-[10px] text-white animate-pulse">Uploading...</span>
+                    ) : (
+                      <span className="text-[10px] text-white font-medium">{icon.icon_url ? "Replace" : "Upload"}</span>
+                    )}
+                    <input
+                      type="file"
+                      accept=".png,.jpg,.jpeg,.svg,.webp"
+                      className="hidden"
+                      disabled={uploadingId === icon.id}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setUploadingId(icon.id);
+                        const fd = new FormData();
+                        fd.set("file", file);
+                        const res = await uploadIconToStorage(fd);
+                        if (res.error || !res.url) {
+                          alert(`Upload failed: ${res.error ?? "Unknown error"}`);
+                          setUploadingId(null);
+                          return;
+                        }
+                        const ufd = new FormData();
+                        ufd.set("id", icon.id);
+                        ufd.set("name", icon.name);
+                        ufd.set("category", icon.category);
+                        ufd.set("icon_url", res.url);
+                        ufd.set("website_url", icon.website_url ?? "");
+                        await updateIcon(ufd);
+                        setIcons(p => p.map(i => i.id === icon.id ? { ...i, icon_url: res.url! } : i));
+                        setUploadingId(null);
+                      }}
+                    />
+                  </label>
                 </div>
                 {editingId === icon.id ? (
                   <EditInline icon={icon} onSave={handleSaveEdit} onCancel={() => setEditingId(null)} />
@@ -308,13 +325,33 @@ export function IconsClient({ icons: initialIcons, tenantId }: { icons: Icon[]; 
           {/* Add form */}
           <div className="bg-white rounded-xl border border-silver p-4">
             <h2 className="text-sm font-semibold text-charcoal mb-3">+ Add Icon</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <input type="text" placeholder="Icon name" value={newName} onChange={e => setNewName(e.target.value)} className={inputCls} />
               <SimpleSelect value={newCategory} onValueChange={setNewCategory} options={catOpts} placeholder="Category" />
-              <input type="url" placeholder="Icon URL" value={newIconUrl} onChange={e => setNewIconUrl(e.target.value)} className={inputCls} />
+              <div className="flex items-center gap-2">
+                <input type="url" placeholder="Icon URL" value={newIconUrl} onChange={e => { setNewIconUrl(e.target.value); setNewIconFile(null); }} className={inputCls + " flex-1"} disabled={!!newIconFile} />
+                <span className="text-xs text-mist">or</span>
+                <label className="cursor-pointer px-3 py-1.5 text-xs border border-gray-200 rounded hover:bg-gray-50 shrink-0">
+                  {newIconFile ? newIconFile.name.slice(0, 15) + "..." : "Upload file"}
+                  <input
+                    type="file"
+                    accept=".png,.jpg,.jpeg,.svg,.webp"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) { setNewIconFile(f); setNewIconUrl(""); }
+                    }}
+                  />
+                </label>
+                {newIconFile && (
+                  <button onClick={() => setNewIconFile(null)} className="text-xs text-mist hover:text-red-400">x</button>
+                )}
+              </div>
               <input type="url" placeholder="Website URL" value={newWebsiteUrl} onChange={e => setNewWebsiteUrl(e.target.value)} className={inputCls} />
             </div>
-            <button onClick={handleAdd} disabled={isPending || !newName.trim()} className="mt-3 px-4 py-2 bg-lavender text-white text-sm rounded-md hover:bg-lavender-dark transition-colors disabled:opacity-50">Save Icon</button>
+            <button onClick={handleAdd} disabled={isPending || newIconUploading || !newName.trim()} className="mt-3 px-4 py-2 bg-lavender text-white text-sm rounded-md hover:bg-lavender-dark transition-colors disabled:opacity-50">
+              {newIconUploading ? "Uploading..." : isPending ? "Saving..." : "Save Icon"}
+            </button>
           </div>
         </div>
       )}
