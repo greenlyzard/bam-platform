@@ -64,12 +64,12 @@ export function AlertDialogCancel({ children, onClick }: { children: React.React
   );
 }
 
-export function AlertDialogAction({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) {
+export function AlertDialogAction({ children, onClick, className }: { children: React.ReactNode; onClick?: () => void; className?: string }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="rounded-lg bg-lavender hover:bg-lavender-dark px-4 py-2 text-sm font-medium text-white transition-colors"
+      className={className ?? "rounded-lg bg-lavender hover:bg-lavender-dark px-4 py-2 text-sm font-medium text-white transition-colors"}
     >
       {children}
     </button>

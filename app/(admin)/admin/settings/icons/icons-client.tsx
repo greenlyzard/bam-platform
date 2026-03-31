@@ -3,6 +3,11 @@
 import { useState, useTransition, useRef, useCallback } from "react";
 import { SimpleSelect } from "@/components/ui/select";
 import { createIcon, updateIcon, toggleIconActive, uploadIconToStorage, saveIconsToLibrary, deleteIcon } from "./actions";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Icon {
   id: string; name: string; slug: string; category: string;
@@ -43,6 +48,7 @@ export function IconsClient({ icons: initialIcons, tenantId }: { icons: Icon[]; 
   const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [deleteIconTarget, setDeleteIconTarget] = useState<{ id: string; name: string } | null>(null);
   const [isPending, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
@@ -298,15 +304,9 @@ export function IconsClient({ icons: initialIcons, tenantId }: { icons: Icon[]; 
                         </label>
                         <button
                           type="button"
-                          onClick={async (e) => {
+                          onClick={(e) => {
                             e.stopPropagation();
-                            if (!window.confirm(`Delete ${icon.name}? This cannot be undone.`)) return;
-                            const res = await deleteIcon(icon.id);
-                            if (res.error) {
-                              alert(`Delete failed: ${res.error}`);
-                            } else {
-                              setIcons(p => p.filter(i => i.id !== icon.id));
-                            }
+                            setDeleteIconTarget({ id: icon.id, name: icon.name });
                           }}
                           className="text-[10px] text-red-300 hover:text-red-100 font-medium"
                         >
@@ -375,6 +375,37 @@ export function IconsClient({ icons: initialIcons, tenantId }: { icons: Icon[]; 
           </div>
         </div>
       )}
+
+      {/* Delete icon confirmation dialog */}
+      <AlertDialog open={!!deleteIconTarget} onOpenChange={() => setDeleteIconTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Icon</AlertDialogTitle>
+            <AlertDialogDescription>
+              Delete &ldquo;{deleteIconTarget?.name}&rdquo;? This cannot be undone.
+              The icon file will also be removed from storage.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteIconTarget(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (!deleteIconTarget) return;
+                const res = await deleteIcon(deleteIconTarget.id);
+                if (res.error) {
+                  alert(`Delete failed: ${res.error}`);
+                } else {
+                  setIcons((p) => p.filter((i) => i.id !== deleteIconTarget.id));
+                }
+                setDeleteIconTarget(null);
+              }}
+              className="rounded-lg bg-red-500 hover:bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

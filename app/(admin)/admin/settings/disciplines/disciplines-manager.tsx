@@ -1,22 +1,36 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { useCallback, useRef, useState } from "react";
+import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Discipline {
   id: string;
   name: string;
   description: string | null;
+  icon_id: string | null;
   is_active: boolean;
   sort_order: number;
+}
+
+interface IconOption {
+  id: string;
+  name: string;
+  icon_url: string | null;
 }
 
 export function DisciplinesManager({
   initialData,
   tenantId,
+  iconLibrary,
 }: {
   initialData: Discipline[];
   tenantId: string;
+  iconLibrary: IconOption[];
 }) {
   const [items, setItems] = useState<Discipline[]>(initialData);
   const [newName, setNewName] = useState("");
@@ -24,25 +38,28 @@ export function DisciplinesManager({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editDesc, setEditDesc] = useState("");
+  const [editIconId, setEditIconId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const dragItem = useRef<number | null>(null);
   const dragOverItem = useRef<number | null>(null);
-
-  const supabase = createClient();
 
   const flash = useCallback((msg: string) => {
     setMessage(msg);
     setTimeout(() => setMessage(null), 2000);
   }, []);
 
+  function getIconUrl(iconId: string | null): string | null {
+    if (!iconId) return null;
+    return iconLibrary.find((i) => i.id === iconId)?.icon_url ?? null;
+  }
+
   async function addItem() {
     if (!newName.trim()) return;
     setSaving(true);
-    const maxOrder = items.reduce(
-      (max, i) => Math.max(max, i.sort_order),
-      0
-    );
+    const supabase = createAdminClient();
+    const maxOrder = items.reduce((max, i) => Math.max(max, i.sort_order), 0);
     const { data, error } = await supabase
       .from("disciplines")
       .insert({
@@ -66,11 +83,13 @@ export function DisciplinesManager({
   async function saveEdit(id: string) {
     if (!editName.trim()) return;
     setSaving(true);
+    const supabase = createAdminClient();
     const { error } = await supabase
       .from("disciplines")
       .update({
         name: editName.trim(),
         description: editDesc.trim() || null,
+        icon_id: editIconId,
       })
       .eq("id", id);
 
@@ -78,7 +97,7 @@ export function DisciplinesManager({
       setItems(
         items.map((i) =>
           i.id === id
-            ? { ...i, name: editName.trim(), description: editDesc.trim() || null }
+            ? { ...i, name: editName.trim(), description: editDesc.trim() || null, icon_id: editIconId }
             : i
         )
       );
@@ -89,19 +108,25 @@ export function DisciplinesManager({
   }
 
   async function toggleActive(id: string, currentState: boolean) {
+    const supabase = createAdminClient();
     const { error } = await supabase
       .from("disciplines")
       .update({ is_active: !currentState })
       .eq("id", id);
 
     if (!error) {
-      setItems(
-        items.map((i) =>
-          i.id === id ? { ...i, is_active: !currentState } : i
-        )
-      );
+      setItems(items.map((i) => (i.id === id ? { ...i, is_active: !currentState } : i)));
       flash(!currentState ? "Activated" : "Deactivated");
     }
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    const supabase = createAdminClient();
+    await supabase.from("disciplines").delete().eq("id", deleteTarget.id);
+    setItems((prev) => prev.filter((d) => d.id !== deleteTarget.id));
+    setDeleteTarget(null);
+    flash("Deleted");
   }
 
   function handleDragStart(index: number) {
@@ -120,21 +145,14 @@ export function DisciplinesManager({
     const [removed] = reordered.splice(dragItem.current, 1);
     reordered.splice(dragOverItem.current, 0, removed);
 
-    const updated = reordered.map((item, idx) => ({
-      ...item,
-      sort_order: idx + 1,
-    }));
-
+    const updated = reordered.map((item, idx) => ({ ...item, sort_order: idx + 1 }));
     setItems(updated);
     dragItem.current = null;
     dragOverItem.current = null;
 
-    // Persist all sort orders
+    const supabase = createAdminClient();
     for (const item of updated) {
-      await supabase
-        .from("disciplines")
-        .update({ sort_order: item.sort_order })
-        .eq("id", item.id);
+      await supabase.from("disciplines").update({ sort_order: item.sort_order }).eq("id", item.id);
     }
     flash("Reordered");
   }
@@ -142,17 +160,13 @@ export function DisciplinesManager({
   return (
     <div className="space-y-4">
       {message && (
-        <div className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
-          {message}
-        </div>
+        <div className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">{message}</div>
       )}
 
       {/* List */}
       <div className="rounded-xl border border-silver bg-white divide-y divide-silver">
         {items.length === 0 && (
-          <div className="p-6 text-center text-sm text-mist">
-            No disciplines yet. Add one below.
-          </div>
+          <div className="p-6 text-center text-sm text-mist">No disciplines yet. Add one below.</div>
         )}
         {items.map((item, index) => (
           <div
@@ -162,10 +176,20 @@ export function DisciplinesManager({
             onDragEnter={() => handleDragEnter(index)}
             onDragEnd={handleDragEnd}
             onDragOver={(e) => e.preventDefault()}
-            className={`flex items-center gap-3 px-4 py-3 cursor-grab active:cursor-grabbing ${
+            className={`group flex items-center gap-3 px-4 py-3 cursor-grab active:cursor-grabbing ${
               !item.is_active ? "opacity-50" : ""
             }`}
           >
+            {/* Icon */}
+            {getIconUrl(item.icon_id) ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={getIconUrl(item.icon_id)!} alt={item.name} className="w-8 h-8 rounded-full object-cover shrink-0" />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-lavender/20 flex items-center justify-center text-xs font-medium text-lavender shrink-0">
+                {item.name.charAt(0)}
+              </div>
+            )}
+
             <span className="text-mist select-none">⠿</span>
 
             {editingId === item.id ? (
@@ -191,6 +215,41 @@ export function DisciplinesManager({
                     if (e.key === "Escape") setEditingId(null);
                   }}
                 />
+                {/* Icon picker */}
+                <div className="space-y-1">
+                  <label className="text-xs text-mist">Icon</label>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditIconId(null)}
+                      className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs text-mist transition-all ${
+                        editIconId === null ? "border-lavender bg-lavender/10" : "border-gray-200 hover:border-gray-300"
+                      }`}
+                    >
+                      ✕
+                    </button>
+                    {iconLibrary.map((icon) => (
+                      <button
+                        key={icon.id}
+                        type="button"
+                        onClick={() => setEditIconId(icon.id)}
+                        className={`w-8 h-8 rounded-full border-2 overflow-hidden transition-all ${
+                          editIconId === icon.id ? "border-lavender scale-110 shadow-md" : "border-transparent hover:border-gray-300"
+                        }`}
+                        title={icon.name}
+                      >
+                        {icon.icon_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={icon.icon_url} alt={icon.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full bg-lavender/20 flex items-center justify-center text-xs text-lavender">
+                            {icon.name.charAt(0)}
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <div className="flex gap-2">
                   <button
                     onClick={() => saveEdit(item.id)}
@@ -214,12 +273,11 @@ export function DisciplinesManager({
                   setEditingId(item.id);
                   setEditName(item.name);
                   setEditDesc(item.description ?? "");
+                  setEditIconId(item.icon_id);
                 }}
               >
                 <p className="text-sm font-medium text-charcoal">{item.name}</p>
-                {item.description && (
-                  <p className="text-xs text-mist">{item.description}</p>
-                )}
+                {item.description && <p className="text-xs text-mist">{item.description}</p>}
               </div>
             )}
 
@@ -238,6 +296,12 @@ export function DisciplinesManager({
                     }`}
                   />
                 </button>
+                <button
+                  onClick={() => setDeleteTarget({ id: item.id, name: item.name })}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity text-xs text-red-400 hover:text-red-600 px-2"
+                >
+                  Delete
+                </button>
               </div>
             )}
           </div>
@@ -253,9 +317,7 @@ export function DisciplinesManager({
           onChange={(e) => setNewName(e.target.value)}
           placeholder="Discipline name"
           className="w-full rounded-lg border border-silver px-3 py-2 text-sm text-charcoal focus:border-lavender focus:outline-none focus:ring-1 focus:ring-lavender"
-          onKeyDown={(e) => {
-            if (e.key === "Enter") addItem();
-          }}
+          onKeyDown={(e) => { if (e.key === "Enter") addItem(); }}
         />
         <input
           type="text"
@@ -263,9 +325,7 @@ export function DisciplinesManager({
           onChange={(e) => setNewDesc(e.target.value)}
           placeholder="Description (optional)"
           className="w-full rounded-lg border border-silver px-3 py-2 text-sm text-mist focus:border-lavender focus:outline-none focus:ring-1 focus:ring-lavender"
-          onKeyDown={(e) => {
-            if (e.key === "Enter") addItem();
-          }}
+          onKeyDown={(e) => { if (e.key === "Enter") addItem(); }}
         />
         <button
           onClick={addItem}
@@ -275,6 +335,28 @@ export function DisciplinesManager({
           Add
         </button>
       </div>
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Discipline</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete &ldquo;{deleteTarget?.name}&rdquo;?
+              This will remove it from the disciplines list but won&apos;t affect existing class assignments.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteTarget(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="rounded-lg bg-red-500 hover:bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

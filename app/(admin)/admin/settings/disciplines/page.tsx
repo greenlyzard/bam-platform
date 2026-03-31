@@ -1,16 +1,24 @@
 import { requireAdmin } from "@/lib/auth/guards";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { DisciplinesManager } from "./disciplines-manager";
 
 export default async function DisciplinesPage() {
   const user = await requireAdmin();
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
-  const { data: disciplines } = await supabase
-    .from("disciplines")
-    .select("*")
-    .eq("tenant_id", user.tenantId!)
-    .order("sort_order", { ascending: true });
+  const [{ data: disciplines }, { data: iconLibrary }] = await Promise.all([
+    supabase
+      .from("disciplines")
+      .select("id, name, description, icon_id, is_active, sort_order")
+      .eq("tenant_id", user.tenantId!)
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("icon_library")
+      .select("id, name, icon_url, category")
+      .eq("category", "discipline")
+      .eq("is_active", true)
+      .order("name"),
+  ]);
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -32,8 +40,9 @@ export default async function DisciplinesPage() {
       </div>
 
       <DisciplinesManager
-        initialData={disciplines ?? []}
+        initialData={(disciplines ?? []).map(d => ({ ...d, icon_id: d.icon_id ?? null }))}
         tenantId={user.tenantId!}
+        iconLibrary={(iconLibrary ?? []).map(i => ({ id: i.id, name: i.name, icon_url: i.icon_url }))}
       />
     </div>
   );
