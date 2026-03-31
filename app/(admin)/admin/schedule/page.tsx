@@ -1,4 +1,5 @@
 import { requireAdmin } from "@/lib/auth/guards";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getScheduleInstances, getClassesAsScheduleInstances, getApprovedTeachers, getRooms, getDistinctLevels } from "@/lib/schedule/queries";
 import { ScheduleCalendar } from "./schedule-calendar";
 
@@ -57,12 +58,20 @@ export default async function AdminSchedulePage({
     tenantId: user.tenantId ?? undefined,
   };
 
-  const [sessionInstances, classInstances, teachers, rooms, levels] = await Promise.all([
+  const supabaseAdmin = createAdminClient();
+
+  const [sessionInstances, classInstances, teachers, rooms, levels, { data: closureRows }] = await Promise.all([
     getScheduleInstances(filterParams),
     getClassesAsScheduleInstances(filterParams),
     getApprovedTeachers(),
     getRooms(),
     getDistinctLevels(),
+    supabaseAdmin
+      .from("studio_closures")
+      .select("closed_date, reason")
+      .eq("tenant_id", "84d98f72-c82f-414f-8b17-172b802f6993")
+      .gte("closed_date", startDate)
+      .lte("closed_date", endDate),
   ]);
 
   // Use session instances if available, otherwise fall back to recurring classes
@@ -79,6 +88,7 @@ export default async function AdminSchedulePage({
           levels={levels}
           weekStart={weekStart}
           isRecurring={isRecurring}
+          closures={(closureRows ?? []).map(c => ({ closed_date: c.closed_date, reason: c.reason ?? "Closed" }))}
           initialFilters={{
             teacher: params.teacher || "",
             level: params.level || "",

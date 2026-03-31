@@ -136,6 +136,7 @@ interface ScheduleCalendarProps {
   levels: string[];
   weekStart: string;
   isRecurring?: boolean;
+  closures?: Array<{ closed_date: string; reason: string }>;
   initialFilters: {
     teacher: string;
     level: string;
@@ -350,6 +351,7 @@ export function ScheduleCalendar({
   levels,
   weekStart,
   isRecurring,
+  closures = [],
   initialFilters,
 }: ScheduleCalendarProps) {
   const router = useRouter();
@@ -588,31 +590,62 @@ export function ScheduleCalendar({
 
   // ── Week View ───────────────────────────────────────────────
 
+  const closedDateSet = new Set(closures.map((c) => c.closed_date));
+  const closureReasonMap = new Map(closures.map((c) => [c.closed_date, c.reason]));
+
   const renderWeekView = () => (
     <>
+      {/* Closure banner */}
+      {closures.length > 0 && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 print:hidden">
+          <span className="text-red-500">&#128683;</span>
+          <div>
+            <span className="text-sm font-medium text-red-700">
+              Studio Closed: {closures[0].reason}
+            </span>
+            <span className="text-xs text-red-500 ml-2">
+              {closures.map((c) =>
+                new Date(c.closed_date + "T00:00:00").toLocaleDateString("en-US", {
+                  weekday: "short",
+                  month: "short",
+                  day: "numeric",
+                })
+              ).join(", ")}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Desktop grid */}
       <div className="hidden md:grid grid-cols-6 gap-3 print:grid print:grid-cols-3 print:gap-2">
         {weekDates.map((date) => {
           const daySessions = byDate[date] ?? [];
           const isToday = date === today;
+          const isClosed = closedDateSet.has(date);
           return (
             <div key={date} className="min-h-[200px] print:min-h-0 print:break-inside-avoid">
               <div
                 className={`mb-2 rounded-lg px-3 py-2 text-center ${
+                  isClosed ? "bg-red-50 border border-red-200" :
                   isToday ? "bg-lavender text-white" : "bg-white border border-silver"
                 } print:bg-white print:border print:border-charcoal print:text-charcoal`}
               >
-                <div className={`text-xs font-medium ${isToday ? "text-white/80" : "text-mist"} print:text-charcoal`}>
+                <div className={`text-xs font-medium ${isClosed ? "text-red-400" : isToday ? "text-white/80" : "text-mist"} print:text-charcoal`}>
                   {getDayName(date)}
                 </div>
-                <div className={`text-sm font-semibold ${isToday ? "text-white" : "text-charcoal"} print:text-charcoal`}>
+                <div className={`text-sm font-semibold ${isClosed ? "text-red-600" : isToday ? "text-white" : "text-charcoal"} print:text-charcoal`}>
                   {formatDateLabel(date)}
                 </div>
               </div>
-              <div className="space-y-1.5">
+              {isClosed && (
+                <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-600 text-center font-medium">
+                  &#128683; {closureReasonMap.get(date) ?? "Closed"}
+                </div>
+              )}
+              <div className={`space-y-1.5 ${isClosed ? "opacity-40 pointer-events-none" : ""}`}>
                 {daySessions.length === 0 ? (
                   <div className="rounded-lg border border-dashed border-silver p-3 text-center text-xs text-mist print:hidden">
-                    No sessions
+                    {isClosed ? "Studio closed" : "No sessions"}
                   </div>
                 ) : (
                   daySessions.map((inst) => (
