@@ -554,11 +554,14 @@ export function ScheduleCalendar({
 
   const hasActiveFilters = teacherFilter || levelFilter || roomFilter || dayFilter;
 
-  // Group instances by date
+  // Group instances by date, sorted by start_time
   const byDate: Record<string, ScheduleInstance[]> = {};
   for (const i of instances) {
     if (!byDate[i.event_date]) byDate[i.event_date] = [];
     byDate[i.event_date].push(i);
+  }
+  for (const date of Object.keys(byDate)) {
+    byDate[date].sort((a, b) => a.start_time.localeCompare(b.start_time));
   }
 
   // Group instances by room
@@ -752,30 +755,47 @@ export function ScheduleCalendar({
                   &#128683; {closureReasonMap.get(date) ?? "Closed"}
                 </div>
               )}
-              {isClosed && !showClosedClasses ? (
-                <div className="text-center text-xs text-red-400 py-4">
-                  Studio closed
-                </div>
-              ) : (
-                <div className="space-y-1.5">
-                  {daySessions.length === 0 ? (
-                    <div className="rounded-lg border border-dashed border-silver p-3 text-center text-xs text-mist print:hidden">
-                      No sessions
-                    </div>
-                  ) : (
-                    daySessions.map((inst) => (
-                      <div key={inst.id} className={isClosed && inst.event_type !== "private_lesson" ? "opacity-40 pointer-events-none" : ""}>
-                      <SessionCard
-                        instance={inst}
-                        onClick={() => setSelectedInstance(inst)}
-                        visibleFields={visibleFields}
-                        fieldOrder={fieldOrder}
-                      />
+              {(() => {
+                const privateSessions = daySessions.filter((s) => s.event_type === "private_lesson");
+                const sessionsToShow = isClosed && !showClosedClasses
+                  ? privateSessions
+                  : daySessions;
+
+                return (
+                  <div className="space-y-1.5">
+                    {isClosed && !showClosedClasses && privateSessions.length === 0 ? (
+                      <div className="text-center text-xs text-red-400 py-4">
+                        Studio closed
                       </div>
-                    ))
-                  )}
-                </div>
-              )}
+                    ) : sessionsToShow.length === 0 ? (
+                      <div className="rounded-lg border border-dashed border-silver p-3 text-center text-xs text-mist print:hidden">
+                        No sessions
+                      </div>
+                    ) : (
+                      <>
+                        {isClosed && !showClosedClasses && (
+                          <div className="text-center text-xs text-red-400 py-1">
+                            Studio closed
+                          </div>
+                        )}
+                        {sessionsToShow.map((inst) => (
+                          <div
+                            key={inst.id}
+                            className={isClosed && inst.event_type !== "private_lesson" ? "opacity-40 pointer-events-none" : ""}
+                          >
+                            <SessionCard
+                              instance={inst}
+                              onClick={isClosed && inst.event_type !== "private_lesson" ? undefined : () => setSelectedInstance(inst)}
+                              visibleFields={visibleFields}
+                              fieldOrder={fieldOrder}
+                            />
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           );
         })}
