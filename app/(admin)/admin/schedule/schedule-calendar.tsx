@@ -5,6 +5,23 @@ import { useRouter } from "next/navigation";
 import type { ScheduleInstance } from "@/lib/schedule/types";
 import { getLevelColor } from "@/lib/schedule/types";
 import { SimpleSelect } from "@/components/ui/select";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 // ── Helpers ───────────────────────────────────────────────────
 
@@ -127,6 +144,50 @@ function saveFields(fields: FieldConfig[]) {
   } catch {}
 }
 
+// ── Sortable Field Row ───────────────────────────────────────
+
+function SortableFieldRow({
+  field,
+  onToggle,
+}: {
+  field: FieldConfig;
+  onToggle: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: field.key });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-2 px-3 py-1.5 hover:bg-cloud/50"
+    >
+      <span
+        {...attributes}
+        {...listeners}
+        className="text-mist hover:text-slate cursor-grab active:cursor-grabbing text-sm select-none"
+      >
+        ⠿
+      </span>
+      <label className="flex items-center gap-2 flex-1 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={field.visible}
+          onChange={onToggle}
+          className="h-3.5 w-3.5 rounded border-silver text-lavender focus:ring-lavender/30"
+        />
+        <span className="text-sm text-charcoal">{field.label}</span>
+      </label>
+    </div>
+  );
+}
+
 // ── Types ─────────────────────────────────────────────────────
 
 interface ScheduleCalendarProps {
@@ -152,16 +213,57 @@ function SessionCard({
   compact = false,
   onClick,
   visibleFields,
+  fieldOrder,
 }: {
   instance: ScheduleInstance;
   compact?: boolean;
   onClick?: () => void;
   visibleFields?: Set<string>;
+  fieldOrder?: string[];
 }) {
   const isCancelled = instance.status === "cancelled";
   const isPrivate = instance.event_type === "private_lesson";
   const levelColor = isCancelled ? "#B0ADB5" : isPrivate ? "#A855F7" : getLevelColor(instance.classLevel);
   const showField = (key: string) => !visibleFields || visibleFields.has(key);
+
+  const orderedKeys = fieldOrder ?? DEFAULT_FIELDS.map((f) => f.key);
+
+  function renderField(key: string) {
+    switch (key) {
+      case "teacher":
+        return showField("teacher") && instance.teacherName ? (
+          <div key="teacher" className="mt-0.5 text-mist">{instance.teacherName}</div>
+        ) : null;
+      case "room":
+        return showField("room") && instance.roomName ? (
+          <span key="room" className="text-mist">{instance.roomName}</span>
+        ) : null;
+      case "enrollment":
+        return showField("enrollment") && instance.maxStudents != null ? (
+          <span key="enrollment" className="text-mist print:hidden">
+            {instance.enrolledCount ?? 0}/{instance.maxStudents}
+          </span>
+        ) : null;
+      case "level":
+        return showField("level") && instance.classLevel ? (
+          <span
+            key="level"
+            className="mt-1 inline-block rounded-full px-1.5 py-0.5 text-[10px] font-medium"
+            style={{ backgroundColor: `${levelColor}30`, color: levelColor }}
+          >
+            {instance.classLevel}
+          </span>
+        ) : null;
+      case "classType":
+        return showField("classType") && instance.classStyle ? (
+          <span key="classType" className="mt-1 ml-1 inline-block rounded-full bg-cloud px-1.5 py-0.5 text-[10px] font-medium text-slate">
+            {instance.classStyle}
+          </span>
+        ) : null;
+      default:
+        return null;
+    }
+  }
 
   return (
     <button
@@ -189,35 +291,7 @@ function SessionCard({
         {formatTime(instance.start_time)} – {formatTime(instance.end_time)}
       </div>
       {!compact && (
-        <>
-          {showField("teacher") && instance.teacherName && (
-            <div className="mt-0.5 text-mist">{instance.teacherName}</div>
-          )}
-          <div className="mt-0.5 flex items-center gap-2 text-mist">
-            {showField("room") && instance.roomName && <span>{instance.roomName}</span>}
-            {showField("enrollment") && instance.maxStudents != null && (
-              <span className="print:hidden">
-                {instance.enrolledCount ?? 0}/{instance.maxStudents}
-              </span>
-            )}
-          </div>
-          {showField("level") && instance.classLevel && (
-            <span
-              className="mt-1 inline-block rounded-full px-1.5 py-0.5 text-[10px] font-medium"
-              style={{
-                backgroundColor: `${levelColor}30`,
-                color: levelColor,
-              }}
-            >
-              {instance.classLevel}
-            </span>
-          )}
-          {showField("classType") && instance.classStyle && (
-            <span className="mt-1 ml-1 inline-block rounded-full bg-cloud px-1.5 py-0.5 text-[10px] font-medium text-slate">
-              {instance.classStyle}
-            </span>
-          )}
-        </>
+        <>{orderedKeys.map((key) => renderField(key))}</>
       )}
     </button>
   );
@@ -411,8 +485,27 @@ export function ScheduleCalendar({
     updateFields(DEFAULT_FIELDS);
   }
 
+  const fieldSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  function handleFieldDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIdx = fields.findIndex((f) => f.key === active.id);
+    const newIdx = fields.findIndex((f) => f.key === over.id);
+    if (oldIdx === -1 || newIdx === -1) return;
+    updateFields(arrayMove(fields, oldIdx, newIdx));
+  }
+
   const visibleFields = useMemo(
     () => new Set(fields.filter((f) => f.visible).map((f) => f.key)),
+    [fields]
+  );
+
+  const fieldOrder = useMemo(
+    () => fields.map((f) => f.key),
     [fields]
   );
 
@@ -676,6 +769,7 @@ export function ScheduleCalendar({
                         instance={inst}
                         onClick={() => setSelectedInstance(inst)}
                         visibleFields={visibleFields}
+                        fieldOrder={fieldOrder}
                       />
                       </div>
                     ))
@@ -714,18 +808,16 @@ export function ScheduleCalendar({
                     <tr className="border-b border-silver bg-cloud/50">
                       <th className="px-4 py-2 text-left font-medium text-slate">Time</th>
                       <th className="px-4 py-2 text-left font-medium text-slate">Class</th>
-                      {visibleFields.has("level") && (
-                        <th className="px-4 py-2 text-left font-medium text-slate">Level</th>
-                      )}
-                      {visibleFields.has("teacher") && (
-                        <th className="px-4 py-2 text-left font-medium text-slate">Teacher</th>
-                      )}
-                      {visibleFields.has("room") && (
-                        <th className="px-4 py-2 text-left font-medium text-slate">Room</th>
-                      )}
-                      {visibleFields.has("enrollment") && (
-                        <th className="px-4 py-2 text-right font-medium text-slate">Enrolled</th>
-                      )}
+                      {fieldOrder.map((key) => {
+                        if (!visibleFields.has(key)) return null;
+                        const align = key === "enrollment" ? "text-right" : "text-left";
+                        const label = fields.find((f) => f.key === key)?.label ?? key;
+                        return (
+                          <th key={key} className={`px-4 py-2 ${align} font-medium text-slate`}>
+                            {label === "Enrollment" ? "Enrolled" : label}
+                          </th>
+                        );
+                      })}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-silver">
@@ -744,30 +836,43 @@ export function ScheduleCalendar({
                           <td className={`px-4 py-2.5 font-medium text-charcoal ${isCancelled ? "line-through" : ""}`}>
                             {inst.className ?? "Untitled"}
                           </td>
-                          {visibleFields.has("level") && (
-                            <td className="px-4 py-2.5">
-                              {inst.classLevel && (
-                                <span
-                                  className="inline-block rounded-full px-2 py-0.5 text-xs font-medium"
-                                  style={{ backgroundColor: `${levelColor}30`, color: levelColor }}
-                                >
-                                  {inst.classLevel}
-                                </span>
-                              )}
-                            </td>
-                          )}
-                          {visibleFields.has("teacher") && (
-                            <td className="px-4 py-2.5 text-slate">{inst.teacherName ?? "\u2013"}</td>
-                          )}
-                          {visibleFields.has("room") && (
-                            <td className="px-4 py-2.5 text-slate">{inst.roomName ?? "\u2013"}</td>
-                          )}
-                          {visibleFields.has("enrollment") && (
-                            <td className="px-4 py-2.5 text-right text-slate">
-                              {inst.enrolledCount ?? 0}
-                              {inst.maxStudents != null && `/${inst.maxStudents}`}
-                            </td>
-                          )}
+                          {fieldOrder.map((key) => {
+                            if (!visibleFields.has(key)) return null;
+                            switch (key) {
+                              case "level":
+                                return (
+                                  <td key="level" className="px-4 py-2.5">
+                                    {inst.classLevel && (
+                                      <span
+                                        className="inline-block rounded-full px-2 py-0.5 text-xs font-medium"
+                                        style={{ backgroundColor: `${levelColor}30`, color: levelColor }}
+                                      >
+                                        {inst.classLevel}
+                                      </span>
+                                    )}
+                                  </td>
+                                );
+                              case "teacher":
+                                return <td key="teacher" className="px-4 py-2.5 text-slate">{inst.teacherName ?? "\u2013"}</td>;
+                              case "room":
+                                return <td key="room" className="px-4 py-2.5 text-slate">{inst.roomName ?? "\u2013"}</td>;
+                              case "enrollment":
+                                return (
+                                  <td key="enrollment" className="px-4 py-2.5 text-right text-slate">
+                                    {inst.enrolledCount ?? 0}
+                                    {inst.maxStudents != null && `/${inst.maxStudents}`}
+                                  </td>
+                                );
+                              case "classType":
+                                return (
+                                  <td key="classType" className="px-4 py-2.5 text-slate">
+                                    {inst.classStyle ?? "\u2013"}
+                                  </td>
+                                );
+                              default:
+                                return null;
+                            }
+                          })}
                         </tr>
                       );
                     })}
@@ -835,6 +940,7 @@ export function ScheduleCalendar({
                       instance={inst}
                       onClick={() => setSelectedInstance(inst)}
                       visibleFields={visibleFields}
+                      fieldOrder={fieldOrder}
                     />
                   </div>
                 ))}
@@ -979,23 +1085,20 @@ export function ScheduleCalendar({
             {fieldsPopoverOpen && (
               <div className="absolute right-0 top-full mt-1 w-56 rounded-xl border border-silver bg-white shadow-lg z-30 py-1">
                 <div className="px-3 py-2 border-b border-silver">
-                  <p className="text-xs font-semibold text-charcoal">Show / hide fields</p>
+                  <p className="text-xs font-semibold text-charcoal">Show / reorder fields</p>
                 </div>
                 <div className="max-h-72 overflow-y-auto py-1">
-                  {fields.map((field) => (
-                    <label
-                      key={field.key}
-                      className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-cloud/50 cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={field.visible}
-                        onChange={() => toggleFieldVisible(field.key)}
-                        className="h-3.5 w-3.5 rounded border-silver text-lavender focus:ring-lavender/30"
-                      />
-                      <span className="text-sm text-charcoal">{field.label}</span>
-                    </label>
-                  ))}
+                  <DndContext sensors={fieldSensors} collisionDetection={closestCenter} onDragEnd={handleFieldDragEnd}>
+                    <SortableContext items={fields.map((f) => f.key)} strategy={verticalListSortingStrategy}>
+                      {fields.map((field) => (
+                        <SortableFieldRow
+                          key={field.key}
+                          field={field}
+                          onToggle={() => toggleFieldVisible(field.key)}
+                        />
+                      ))}
+                    </SortableContext>
+                  </DndContext>
                 </div>
                 <div className="px-3 py-2 border-t border-silver">
                   <button
