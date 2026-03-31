@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  saveDisciplineEdit, addDiscipline, toggleDisciplineActive,
+  updateDisciplineSortOrder, deleteDiscipline,
+} from "./actions";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription,
@@ -58,21 +61,12 @@ export function DisciplinesManager({
   async function addItem() {
     if (!newName.trim()) return;
     setSaving(true);
-    const supabase = createAdminClient();
     const maxOrder = items.reduce((max, i) => Math.max(max, i.sort_order), 0);
-    const { data, error } = await supabase
-      .from("disciplines")
-      .insert({
-        tenant_id: tenantId,
-        name: newName.trim(),
-        description: newDesc.trim() || null,
-        sort_order: maxOrder + 1,
-      })
-      .select()
-      .single();
-
-    if (!error && data) {
-      setItems([...items, data]);
+    const res = await addDiscipline(tenantId, newName.trim(), newDesc.trim() || null, maxOrder + 1);
+    if (res.error) {
+      alert(`Add failed: ${res.error}`);
+    } else if (res.item) {
+      setItems([...items, res.item]);
       setNewName("");
       setNewDesc("");
       flash("Added");
@@ -81,27 +75,14 @@ export function DisciplinesManager({
   }
 
   async function saveEdit(id: string) {
-    console.log("saveEdit called", { id, editName, editIconId });
     if (!editName.trim()) return;
     setSaving(true);
-    const supabase = createAdminClient();
-    const { error } = await supabase
-      .from("disciplines")
-      .update({
-        name: editName.trim(),
-        description: editDesc.trim() || null,
-        icon_id: editIconId,
-      })
-      .eq("id", id);
-
-    if (error) {
-      console.error("saveEdit error:", error);
-      alert(`Save failed: ${error.message}`);
+    const res = await saveDisciplineEdit(id, editName.trim(), editDesc.trim() || null, editIconId);
+    if (res.error) {
+      alert(`Save failed: ${res.error}`);
       setSaving(false);
       return;
     }
-
-
     setItems(
       items.map((i) =>
         i.id === id
@@ -115,13 +96,8 @@ export function DisciplinesManager({
   }
 
   async function toggleActive(id: string, currentState: boolean) {
-    const supabase = createAdminClient();
-    const { error } = await supabase
-      .from("disciplines")
-      .update({ is_active: !currentState })
-      .eq("id", id);
-
-    if (!error) {
+    const res = await toggleDisciplineActive(id, !currentState);
+    if (!res.error) {
       setItems(items.map((i) => (i.id === id ? { ...i, is_active: !currentState } : i)));
       flash(!currentState ? "Activated" : "Deactivated");
     }
@@ -129,11 +105,14 @@ export function DisciplinesManager({
 
   async function handleDelete() {
     if (!deleteTarget) return;
-    const supabase = createAdminClient();
-    await supabase.from("disciplines").delete().eq("id", deleteTarget.id);
-    setItems((prev) => prev.filter((d) => d.id !== deleteTarget.id));
+    const res = await deleteDiscipline(deleteTarget.id);
+    if (res.error) {
+      alert(`Delete failed: ${res.error}`);
+    } else {
+      setItems((prev) => prev.filter((d) => d.id !== deleteTarget.id));
+      flash("Deleted");
+    }
     setDeleteTarget(null);
-    flash("Deleted");
   }
 
   function handleDragStart(index: number) {
@@ -157,10 +136,7 @@ export function DisciplinesManager({
     dragItem.current = null;
     dragOverItem.current = null;
 
-    const supabase = createAdminClient();
-    for (const item of updated) {
-      await supabase.from("disciplines").update({ sort_order: item.sort_order }).eq("id", item.id);
-    }
+    await updateDisciplineSortOrder(updated.map((i) => ({ id: i.id, sort_order: i.sort_order })));
     flash("Reordered");
   }
 
