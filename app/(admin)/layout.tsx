@@ -15,7 +15,7 @@ export default async function AdminLayout({
   const { role, full_name, avatar_url } = session.profile;
 
   const supabase = await createClient();
-  const [{ data: settings }, { data: moduleRows }, { data: tenant }] = await Promise.all([
+  const [{ data: settings }, { data: moduleRows }, { data: tenant }, { data: userRoles }] = await Promise.all([
     supabase.from("studio_settings").select("logo_url, logo_dark_url, studio_name").limit(1).single(),
     supabase
       .from("platform_modules")
@@ -24,9 +24,12 @@ export default async function AdminLayout({
       )
       .order("sort_order"),
     supabase.from("tenants").select("angelina_enabled").eq("slug", "bam").single(),
+    supabase.from("profile_roles").select("role").eq("user_id", session.user.id).eq("is_active", true),
   ]);
   const logoUrl = settings?.logo_dark_url ?? settings?.logo_url;
   const angelinaEnabled = tenant?.angelina_enabled ?? true;
+  const isTeacher = userRoles?.some((r) => r.role === "teacher") ?? false;
+  const isParent = userRoles?.some((r) => r.role === "parent") ?? false;
   const userEmail = session.user.email;
 
   const modules: ModuleItem[] = (moduleRows ?? []).map((m) => ({
@@ -61,6 +64,16 @@ export default async function AdminLayout({
               </span>
             </a>
             <div className="flex items-center gap-3">
+              {isTeacher && (
+                <a href="/teach/dashboard" className="text-xs px-3 py-1.5 border border-gray-200 rounded-full hover:bg-gray-50 text-mist hover:text-charcoal transition-colors">
+                  Teacher Portal
+                </a>
+              )}
+              {isParent && (
+                <a href="/portal/dashboard" className="text-xs px-3 py-1.5 border border-gray-200 rounded-full hover:bg-gray-50 text-mist hover:text-charcoal transition-colors">
+                  Parent Portal
+                </a>
+              )}
               <span className="hidden sm:block text-sm text-slate">
                 {full_name ?? session.user.email}
               </span>
