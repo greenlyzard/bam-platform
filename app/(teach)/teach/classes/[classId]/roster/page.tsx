@@ -1,17 +1,5 @@
-import { requireTeacher } from "@/lib/auth/guards";
-import { createClient } from "@/lib/supabase/server";
-import { notFound } from "next/navigation";
+import { createAdminClient } from "@/lib/supabase/admin";
 import Link from "next/link";
-
-const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
-function formatTime(time: string): string {
-  const [h, m] = time.split(":");
-  const hour = parseInt(h, 10);
-  const ampm = hour >= 12 ? "PM" : "AM";
-  const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-  return `${displayHour}:${m} ${ampm}`;
-}
 
 function calculateAge(dob: string): number {
   const birth = new Date(dob + "T00:00:00");
@@ -33,29 +21,8 @@ export default async function ClassRosterPage({
 }: {
   params: Promise<{ classId: string }>;
 }) {
-  const user = await requireTeacher();
-  const supabase = await createClient();
   const { classId } = await params;
-
-  // Fetch class details
-  const { data: cls } = await supabase
-    .from("classes")
-    .select("id, name, day_of_week, start_time, end_time, room")
-    .eq("id", classId)
-    .single();
-
-  if (!cls) return notFound();
-
-  // Verify teacher is assigned to this class
-  const { data: assignment } = await supabase
-    .from("class_teachers")
-    .select("id")
-    .eq("class_id", classId)
-    .eq("teacher_id", user.id)
-    .limit(1)
-    .single();
-
-  if (!assignment) return notFound();
+  const supabase = createAdminClient();
 
   // Fetch enrolled students
   const { data: enrollments } = await supabase
@@ -71,43 +38,67 @@ export default async function ClassRosterPage({
     .eq("class_id", classId)
     .in("status", ["active", "trial"]);
 
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split("T")[0];
+
   const students = (enrollments ?? [])
     .filter((e) => e.student)
     .map((e) => {
       const s = e.student as any;
+      const isNew = e.enrolled_at && e.enrolled_at >= thirtyDaysAgoStr;
       return {
-        id: s.id,
-        firstName: s.first_name,
-        lastName: s.last_name,
-        avatarUrl: s.avatar_url,
-        level: s.current_level,
-        dob: s.date_of_birth,
-        enrolledAt: e.enrolled_at,
-        status: e.status,
+        id: s.id as string,
+        firstName: s.first_name as string,
+        lastName: s.last_name as string,
+        avatarUrl: s.avatar_url as string | null,
+        level: s.current_level as string | null,
+        dob: s.date_of_birth as string | null,
+        enrolledAt: e.enrolled_at as string | null,
+        status: e.status as string,
+        isNew,
       };
     })
     .sort((a, b) => a.lastName.localeCompare(b.lastName));
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-2 text-sm text-slate">
-        <Link href="/teach/classes" className="hover:text-charcoal transition-colors">
-          My Classes
-        </Link>
-        <span>/</span>
-        <span className="text-charcoal">Roster</span>
-      </div>
+  // Check attendance for follow-up flags (missed last 2+ sessions)
+  const studentIds = students.map((s) => s.id);
+  const missedMap: Record<string, number> = {};
 
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-heading font-semibold text-charcoal">{cls.name}</h1>
-          <p className="mt-1 text-sm text-slate">
-            {cls.day_of_week != null && DAY_NAMES[cls.day_of_week]}
-            {cls.start_time && ` · ${formatTime(cls.start_time)}`}
-            {cls.end_time && ` – ${formatTime(cls.end_time)}`}
-            {cls.room && <span className="text-mist"> · {cls.room}</span>}
-          </p>
-        </div>
+  if (studentIds.length > 0) {
+    // Get the last 4 session dates for this class
+    const { data: recentDates } = await supabase
+      .from("attendance_records")
+      .select("date")
+      .eq("class_id", classId)
+      .order("date", { ascending: false })
+      .limit(100);
+
+    const uniqueDates = [...new Set((recentDates ?? []).map((r) => r.date))].slice(0, 4);
+
+    if (uniqueDates.length >= 2) {
+      const lastTwoDates = uniqueDates.slice(0, 2);
+      const { data: recentRecords } = await supabase
+        .from("attendance_records")
+        .select("student_id, date, status")
+        .eq("class_id", classId)
+        .in("date", lastTwoDates)
+        .in("student_id", studentIds);
+
+      // Count absences in last 2 sessions
+      for (const sid of studentIds) {
+        const records = (recentRecords ?? []).filter((r) => r.student_id === sid);
+        const absentCount = records.filter((r) => r.status === "absent").length;
+        const missingCount = lastTwoDates.length - records.length; // not recorded = absent
+        missedMap[sid] = absentCount + missingCount;
+      }
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-slate">{students.length} student{students.length !== 1 ? "s" : ""}</p>
         <Link
           href={`/teach/classes/${classId}/attendance`}
           className="shrink-0 inline-flex h-9 items-center rounded-lg bg-lavender px-4 text-sm font-medium text-white hover:bg-lavender-dark transition-colors"
@@ -122,15 +113,16 @@ export default async function ClassRosterPage({
         </div>
       ) : (
         <div className="space-y-2">
-          <p className="text-sm text-slate">{students.length} student{students.length !== 1 ? "s" : ""}</p>
           {students.map((s) => {
             const initials = `${s.firstName[0]}${s.lastName[0]}`.toUpperCase();
+            const needsFollowUp = (missedMap[s.id] ?? 0) >= 2;
             return (
               <div
                 key={s.id}
-                className="flex items-center gap-3 rounded-xl border border-silver bg-white p-3 hover:shadow-sm transition-shadow"
+                className={`flex items-center gap-3 rounded-xl border bg-white p-3 hover:shadow-sm transition-shadow ${needsFollowUp ? "border-warning/40" : "border-silver"}`}
               >
                 {s.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img src={s.avatarUrl} alt="" className="h-10 w-10 rounded-full object-cover" />
                 ) : (
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-lavender/10 text-sm font-semibold text-lavender-dark">
@@ -138,9 +130,21 @@ export default async function ClassRosterPage({
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-charcoal truncate">
-                    {s.firstName} {s.lastName}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-charcoal truncate">
+                      {s.firstName} {s.lastName}
+                    </p>
+                    {s.isNew && (
+                      <span className="inline-flex items-center rounded-full bg-lavender/10 px-1.5 py-0.5 text-[10px] font-semibold text-lavender-dark">
+                        NEW
+                      </span>
+                    )}
+                    {needsFollowUp && (
+                      <span className="inline-flex items-center rounded-full bg-warning/10 px-1.5 py-0.5 text-[10px] font-semibold text-warning">
+                        FOLLOW UP
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-slate">
                     {s.level && <span>{s.level.replace(/_/g, " ")}</span>}
                     {s.dob && <span> · Age {calculateAge(s.dob)}</span>}

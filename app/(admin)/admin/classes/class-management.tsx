@@ -252,6 +252,8 @@ export function ClassManagement({
   studioClosures = [],
   classColorPalette = [],
   initialEditClassId = null,
+  isTeacher = false,
+  myClassIds = [],
   tenantId,
 }: {
   classes: ClassRecord[];
@@ -272,6 +274,8 @@ export function ClassManagement({
   studioClosures?: Array<{ id: string; closed_date: string; reason: string | null }>;
   classColorPalette?: string[];
   initialEditClassId?: string | null;
+  isTeacher?: boolean;
+  myClassIds?: string[];
   tenantId: string;
 }) {
   const [classes, setClasses] = useState(initialClasses);
@@ -286,6 +290,7 @@ export function ClassManagement({
   const [filterDay, setFilterDay] = useState("");
   const [filterType, setFilterType] = useState("");
   const [filterStatus, setFilterStatus] = useState("active");
+  const [filterMyClasses, setFilterMyClasses] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [drawerClass, setDrawerClass] = useState<ClassRecord | null>(null);
@@ -416,6 +421,8 @@ export function ClassManagement({
       return false;
     if (filterStatus === "hidden" && !c.is_hidden) return false;
     if (filterStatus === "inactive" && c.is_active) return false;
+    if (filterMyClasses && myClassIds.length > 0 && !myClassIds.includes(c.id))
+      return false;
     return true;
   }).sort((a, b) => {
     const aVal = (a as unknown as Record<string, unknown>)[sortKey];
@@ -1286,6 +1293,18 @@ ${(byDay[d] ?? [])
             filterStatus={filterStatus} setFilterStatus={setFilterStatus}
             seasons={seasons} teachers={teachers} disciplines={disciplines}
           />
+          {isTeacher && myClassIds.length > 0 && (
+            <button
+              onClick={() => setFilterMyClasses(!filterMyClasses)}
+              className={`h-9 rounded-lg px-3 text-xs font-medium transition-colors inline-flex items-center gap-1.5 ${
+                filterMyClasses
+                  ? "bg-lavender text-white"
+                  : "border border-silver bg-white text-slate hover:border-lavender"
+              }`}
+            >
+              My Classes
+            </button>
+          )}
         </div>
 
         {/* Mobile filter drawer */}

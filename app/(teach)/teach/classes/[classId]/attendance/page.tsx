@@ -1,6 +1,5 @@
 import { requireTeacher } from "@/lib/auth/guards";
-import { createClient } from "@/lib/supabase/server";
-import { notFound } from "next/navigation";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { AttendanceClient } from "./attendance-client";
 
 export default async function AttendancePage({
@@ -9,28 +8,14 @@ export default async function AttendancePage({
   params: Promise<{ classId: string }>;
 }) {
   const user = await requireTeacher();
-  const supabase = await createClient();
   const { classId } = await params;
+  const supabase = createAdminClient();
 
-  // Fetch class details
   const { data: cls } = await supabase
     .from("classes")
-    .select("id, name, day_of_week, start_time, end_time, room")
+    .select("name")
     .eq("id", classId)
     .single();
-
-  if (!cls) return notFound();
-
-  // Verify teacher is assigned
-  const { data: assignment } = await supabase
-    .from("class_teachers")
-    .select("id")
-    .eq("class_id", classId)
-    .eq("teacher_id", user.id)
-    .limit(1)
-    .single();
-
-  if (!assignment) return notFound();
 
   // Get tenant_id from profile
   const { data: profile } = await supabase
@@ -86,7 +71,7 @@ export default async function AttendancePage({
   return (
     <AttendanceClient
       classId={classId}
-      className={cls.name}
+      className={cls?.name ?? "Class"}
       students={students}
       existingRecords={existingRecords}
       tenantId={tenantId}

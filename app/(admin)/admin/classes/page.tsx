@@ -150,6 +150,24 @@ export default async function ClassesPage({
       "#F9F0D5","#F9E8D5","#EDE9F4","#F5E6FF","#E6F0FF",
     ];
 
+  // Check if admin is also a teacher
+  const { data: teacherRole } = await supabase
+    .from("profile_roles")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("role", "teacher")
+    .eq("is_active", true)
+    .maybeSingle();
+
+  let myClassIds: string[] = [];
+  if (teacherRole) {
+    const { data: ctRows } = await supabase
+      .from("class_teachers")
+      .select("class_id")
+      .eq("teacher_id", user.id);
+    myClassIds = (ctRows ?? []).map((c) => c.class_id);
+  }
+
   return (
     <ClassManagement
       classes={(classes ?? []).map((c) => ({
@@ -180,6 +198,8 @@ export default async function ClassesPage({
       studioClosures={(studioClosureRows ?? []).map((c: any) => ({ id: c.id, closed_date: c.closed_date, reason: c.reason }))}
       classColorPalette={classColorPalette}
       initialEditClassId={editClass ?? null}
+      isTeacher={!!teacherRole}
+      myClassIds={myClassIds}
       tenantId={user.tenantId!}
     />
   );
