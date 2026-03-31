@@ -159,23 +159,31 @@ function SessionCard({
   visibleFields?: Set<string>;
 }) {
   const isCancelled = instance.status === "cancelled";
-  const levelColor = isCancelled ? "#B0ADB5" : getLevelColor(instance.classLevel);
+  const isPrivate = instance.event_type === "private_lesson";
+  const levelColor = isCancelled ? "#B0ADB5" : isPrivate ? "#A855F7" : getLevelColor(instance.classLevel);
   const showField = (key: string) => !visibleFields || visibleFields.has(key);
 
   return (
     <button
       onClick={onClick}
       className={`w-full text-left rounded-lg border-l-4 p-2 text-xs hover:shadow-sm cursor-pointer transition-shadow ${
-        isCancelled ? "bg-cloud/60 opacity-60" : "bg-white"
+        isCancelled ? "bg-cloud/60 opacity-60" : isPrivate ? "bg-purple-50" : "bg-white"
       } print:bg-white print:border print:border-charcoal`}
       style={{ borderLeftColor: levelColor }}
     >
-      <div
-        className={`font-semibold text-charcoal leading-tight ${
-          isCancelled ? "line-through" : ""
-        }`}
-      >
-        {instance.className ?? "Untitled"}
+      <div className="flex items-start justify-between gap-1">
+        <div
+          className={`font-semibold text-charcoal leading-tight ${
+            isCancelled ? "line-through" : ""
+          }`}
+        >
+          {instance.className ?? "Untitled"}
+        </div>
+        {isPrivate && (
+          <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wide bg-purple-100 text-purple-600 rounded px-1 py-0.5">
+            Private
+          </span>
+        )}
       </div>
       <div className="mt-0.5 text-slate">
         {formatTime(instance.start_time)} – {formatTime(instance.end_time)}

@@ -75,6 +75,13 @@ const inputCls =
 // Helpers
 // ---------------------------------------------------------------------------
 
+function formatTime(t: string): string {
+  if (!t) return "";
+  const [h, m] = t.split(":").map(Number);
+  const ap = h >= 12 ? "PM" : "AM";
+  return `${h > 12 ? h - 12 : h === 0 ? 12 : h}:${(m || 0).toString().padStart(2, "0")} ${ap}`;
+}
+
 function addMinutes(time: string, mins: number): string {
   const [hh, mm] = time.split(":").map(Number);
   const total = hh * 60 + mm + mins;
@@ -123,6 +130,7 @@ export function PrivateSessionForm({
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [closureWarning, setClosureWarning] = useState<string | null>(null);
+  const [studioBookings, setStudioBookings] = useState<any[]>([]);
   const [pendingFormData, setPendingFormData] = useState<FormData | null>(null);
 
   // Data
@@ -185,6 +193,18 @@ export function PrivateSessionForm({
       if ("credits" in result && Array.isArray(result.credits)) setCreditInfo(result.credits as typeof creditInfo);
     });
   }, [studentIds, teacherId, sessionType, tenantId]);
+
+  // Fetch studio availability when date or studio changes
+  useEffect(() => {
+    if (!date || !studio || studio === "Other") {
+      setStudioBookings([]);
+      return;
+    }
+    fetch(`/api/admin/studio-availability?date=${date}&studio=${encodeURIComponent(studio)}`)
+      .then((r) => r.json())
+      .then((data) => setStudioBookings([...(data.classes ?? []), ...(data.privates ?? [])]))
+      .catch(() => setStudioBookings([]));
+  }, [date, studio]);
 
   // Filtered students for search
   const filteredStudents = useMemo(() => {
@@ -356,6 +376,17 @@ export function PrivateSessionForm({
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Studio</label>
             <SimpleSelect value={studio} onValueChange={setStudio} options={STUDIO_OPTIONS} placeholder="Studio" />
+            {studioBookings.length > 0 && (
+              <div className="mt-1 p-2 bg-gray-50 rounded text-xs space-y-1">
+                <div className="font-medium text-mist">Also booked in {studio}:</div>
+                {studioBookings.map((b: any) => (
+                  <div key={b.id} className="flex justify-between">
+                    <span className="text-charcoal truncate">{b.name}</span>
+                    <span className="text-mist shrink-0 ml-2">{formatTime(b.start_time)}–{formatTime(b.end_time)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Teacher */}

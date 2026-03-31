@@ -60,7 +60,7 @@ export default async function AdminSchedulePage({
 
   const supabaseAdmin = createAdminClient();
 
-  const [sessionInstances, classInstances, teachers, rooms, levels, { data: closureRows }] = await Promise.all([
+  const [sessionInstances, classInstances, teachers, rooms, levels, { data: closureRows }, { data: privateRows }] = await Promise.all([
     getScheduleInstances(filterParams),
     getClassesAsScheduleInstances(filterParams),
     getApprovedTeachers(),
@@ -72,10 +72,62 @@ export default async function AdminSchedulePage({
       .eq("tenant_id", "84d98f72-c82f-414f-8b17-172b802f6993")
       .gte("closed_date", startDate)
       .lte("closed_date", endDate),
+    supabaseAdmin
+      .from("private_sessions")
+      .select("id, session_date, start_time, end_time, studio, status, session_type, primary_teacher_id, student_ids, session_notes")
+      .eq("tenant_id", "84d98f72-c82f-414f-8b17-172b802f6993")
+      .neq("status", "cancelled")
+      .gte("session_date", startDate)
+      .lte("session_date", endDate),
   ]);
 
+  // Resolve student names for private sessions
+  const allStudentIds = [...new Set((privateRows ?? []).flatMap((p: any) => p.student_ids ?? []))];
+  const studentNameMap: Record<string, string> = {};
+  if (allStudentIds.length > 0) {
+    const { data: studentRows } = await supabaseAdmin
+      .from("students")
+      .select("id, first_name")
+      .in("id", allStudentIds);
+    for (const s of studentRows ?? []) studentNameMap[s.id] = s.first_name;
+  }
+
+  // Resolve teacher names for private sessions
+  const teacherNameMap: Record<string, string> = {};
+  for (const t of teachers) teacherNameMap[t.id] = t.name;
+
+  // Convert private sessions to ScheduleInstance format
+  const privateInstances = (privateRows ?? []).map((p: any) => {
+    const names = ((p.student_ids as string[]) ?? []).map((id: string) => studentNameMap[id] ?? "Student").join(", ");
+    return {
+      id: p.id,
+      tenant_id: "84d98f72-c82f-414f-8b17-172b802f6993",
+      class_id: null,
+      teacher_id: p.primary_teacher_id,
+      room_id: null,
+      event_type: "private_lesson",
+      event_date: p.session_date,
+      start_time: p.start_time,
+      end_time: p.end_time,
+      status: p.status,
+      cancellation_reason: null,
+      substitute_teacher_id: null,
+      notes: p.session_notes,
+      is_trial_eligible: false,
+      production_id: null,
+      className: `Private: ${names}`,
+      classLevel: null,
+      classStyle: p.session_type,
+      teacherName: teacherNameMap[p.primary_teacher_id] ?? null,
+      roomName: p.studio,
+      enrolledCount: ((p.student_ids as string[]) ?? []).length,
+      maxStudents: null,
+    };
+  });
+
   // Use session instances if available, otherwise fall back to recurring classes
-  const instances = sessionInstances.length > 0 ? sessionInstances : classInstances;
+  const baseInstances = sessionInstances.length > 0 ? sessionInstances : classInstances;
+  const instances = [...baseInstances, ...privateInstances];
   const isRecurring = sessionInstances.length === 0;
 
   return (
