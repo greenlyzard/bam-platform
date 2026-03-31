@@ -664,19 +664,20 @@ export function ScheduleCalendar({
                   Studio closed
                 </div>
               ) : (
-                <div className={`space-y-1.5 ${isClosed ? "opacity-40 pointer-events-none" : ""}`}>
+                <div className="space-y-1.5">
                   {daySessions.length === 0 ? (
                     <div className="rounded-lg border border-dashed border-silver p-3 text-center text-xs text-mist print:hidden">
                       No sessions
                     </div>
                   ) : (
                     daySessions.map((inst) => (
+                      <div key={inst.id} className={isClosed && inst.event_type !== "private_lesson" ? "opacity-40 pointer-events-none" : ""}>
                       <SessionCard
-                        key={inst.id}
                         instance={inst}
                         onClick={() => setSelectedInstance(inst)}
                         visibleFields={visibleFields}
                       />
+                      </div>
                     ))
                   )}
                 </div>

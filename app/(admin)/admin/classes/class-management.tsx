@@ -892,7 +892,7 @@ ${(byDay[d] ?? [])
                       {/* Closure overlay */}
                       {closure && <div className="absolute inset-0 bg-error/5 z-[3]" />}
 
-                      {/* Class events */}
+                      {/* Class events — dimmed during closures */}
                       {dayClasses.map(c => {
                         const sm = t2m(c.start_time ?? "09:00"), em = t2m(c.end_time ?? "10:00");
                         const top = ((sm - 480) / 30) * SH;
@@ -901,7 +901,7 @@ ${(byDay[d] ?? [])
                         const rc = room.color_hex ?? "#9C8BBF";
                         const tn = getTeacherNames(c.id, c.legacyTeacherName);
                         return (
-                          <div key={c.id} onClick={() => openEdit(c)} className="absolute rounded overflow-hidden cursor-pointer hover:brightness-95 transition-all mx-0.5" style={{ top, height: h, left: 0, right: 0, backgroundColor: bg, borderLeft: `3px solid ${rc}`, zIndex: 5 }}>
+                          <div key={c.id} onClick={() => openEdit(c)} className={`absolute rounded overflow-hidden cursor-pointer hover:brightness-95 transition-all mx-0.5 ${closure ? "opacity-30" : ""}`} style={{ top, height: h, left: 0, right: 0, backgroundColor: bg, borderLeft: `3px solid ${rc}`, zIndex: 5 }}>
                             <div className="p-1 h-full overflow-hidden flex flex-col gap-0">
                               {isVis("time") && <div className="text-[10px] font-semibold text-gray-600 leading-tight">{fmtTime(c.start_time ?? "")}–{fmtTime(c.end_time ?? "")}</div>}
                               {isVis("name") && <div className="text-[11px] font-medium text-gray-800 leading-tight line-clamp-2">{c.name}</div>}
@@ -913,15 +913,21 @@ ${(byDay[d] ?? [])
                         );
                       })}
 
-                      {/* Private sessions */}
+                      {/* Private sessions — purple, full opacity during closures */}
                       {dayPrivates.map(p => {
                         const sm = t2m(p.start_time ?? "09:00"), em = t2m(p.end_time ?? "10:00");
                         const top = ((sm - 480) / 30) * SH;
                         const h = Math.max(((em - sm) / 30) * SH, SH);
                         const tn = teachers.find(t => t.id === p.primary_teacher_id);
                         return (
-                          <div key={p.id} className="absolute rounded overflow-hidden mx-0.5" style={{ top, height: h, left: 0, right: 0, backgroundColor: "#F5F5F5", borderLeft: "2px dashed #999", zIndex: 4 }}>
-                            <div className="p-1 text-[10px] text-gray-500"><span className="font-semibold">Private</span>{tn && <> · {tn.name}</>}</div>
+                          <div key={p.id} className="absolute rounded overflow-hidden mx-0.5" style={{ top, height: h, left: 0, right: 0, backgroundColor: "#F3E8FF", borderLeft: "3px solid #A855F7", zIndex: 6 }}>
+                            <div className="p-1 h-full overflow-hidden">
+                              <div className="flex items-center gap-1">
+                                <span className="text-[9px] font-semibold uppercase tracking-wide bg-purple-100 text-purple-600 rounded px-1">Private</span>
+                              </div>
+                              <div className="text-[10px] text-purple-700 leading-tight mt-0.5">{fmtTime(p.start_time)}–{fmtTime(p.end_time)}</div>
+                              {tn && <div className="text-[10px] text-purple-500 truncate">{tn.name}</div>}
+                            </div>
                           </div>
                         );
                       })}
