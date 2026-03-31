@@ -81,6 +81,7 @@ export function DisciplinesManager({
   }
 
   async function saveEdit(id: string) {
+    console.log("saveEdit called", { id, editName, editIconId });
     if (!editName.trim()) return;
     setSaving(true);
     const supabase = createAdminClient();
@@ -93,17 +94,23 @@ export function DisciplinesManager({
       })
       .eq("id", id);
 
-    if (!error) {
-      setItems(
-        items.map((i) =>
-          i.id === id
-            ? { ...i, name: editName.trim(), description: editDesc.trim() || null, icon_id: editIconId }
-            : i
-        )
-      );
-      setEditingId(null);
-      flash("Saved");
+    if (error) {
+      console.error("saveEdit error:", error);
+      alert(`Save failed: ${error.message}`);
+      setSaving(false);
+      return;
     }
+
+
+    setItems(
+      items.map((i) =>
+        i.id === id
+          ? { ...i, name: editName.trim(), description: editDesc.trim() || null, icon_id: editIconId }
+          : i
+      )
+    );
+    setEditingId(null);
+    flash("Saved");
     setSaving(false);
   }
 
