@@ -16,7 +16,7 @@ export default async function AdminLayout({
 
   const supabase = await createClient();
   const [{ data: settings }, { data: moduleRows }, { data: tenant }] = await Promise.all([
-    supabase.from("studio_settings").select("logo_url").limit(1).single(),
+    supabase.from("studio_settings").select("logo_url, logo_dark_url, studio_name").limit(1).single(),
     supabase
       .from("platform_modules")
       .select(
@@ -25,7 +25,7 @@ export default async function AdminLayout({
       .order("sort_order"),
     supabase.from("tenants").select("angelina_enabled").eq("slug", "bam").single(),
   ]);
-  const logoUrl = settings?.logo_url;
+  const logoUrl = settings?.logo_dark_url ?? settings?.logo_url;
   const angelinaEnabled = tenant?.angelina_enabled ?? true;
   const userEmail = session.user.email;
 
@@ -50,16 +50,19 @@ export default async function AdminLayout({
           <div className="flex h-14 items-center justify-between px-4 lg:px-6">
             <a
               href="/admin/dashboard"
-              className="flex items-center gap-2.5 font-heading text-lg font-semibold text-charcoal"
+              className="flex items-center gap-2.5"
             >
-              {logoUrl && (
+              {logoUrl ? (
                 <img
                   src={logoUrl}
-                  alt="Studio logo"
+                  alt={settings?.studio_name ?? "Studio"}
                   className="h-8 w-auto object-contain"
                 />
+              ) : (
+                <span className="font-heading text-lg font-semibold text-charcoal">
+                  {settings?.studio_name ?? "Studio Admin"}
+                </span>
               )}
-              Studio Admin
             </a>
             <div className="flex items-center gap-3">
               <span className="hidden sm:block text-sm text-slate">

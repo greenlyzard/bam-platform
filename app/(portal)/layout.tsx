@@ -1,4 +1,4 @@
-import Image from "next/image";
+import type { Metadata } from "next";
 import { PortalNav } from "@/components/layouts/portal-nav";
 import { PortalUserMenu } from "@/components/layouts/portal-user-menu";
 import { AngelinaChat } from "@/components/angelina/AngelinaChat";
@@ -7,6 +7,22 @@ import { RoleProvider } from "@/context/RoleContext";
 import { requireRole } from "@/lib/auth/requireRole";
 import { getStudioSettings } from "@/lib/queries/studio-settings";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const supabase = createAdminClient();
+  const { data } = await supabase
+    .from("studio_settings")
+    .select("favicon_url, studio_name")
+    .single();
+
+  return {
+    title: data?.studio_name ?? "Ballet Academy and Movement",
+    icons: data?.favicon_url
+      ? { icon: data.favicon_url, shortcut: data.favicon_url }
+      : undefined,
+  };
+}
 
 export default async function PortalLayout({
   children,
@@ -35,16 +51,18 @@ export default async function PortalLayout({
         <header className="sticky top-0 z-40 border-b border-silver bg-white/80 backdrop-blur-sm">
           <div className="flex h-14 items-center justify-between px-4 max-w-5xl mx-auto">
             <a href="/portal/dashboard" className="flex items-center gap-2.5">
-              <Image
-                src="/images/studio-logo.png"
-                alt={studioName}
-                width={32}
-                height={32}
-                className="h-8 w-8"
-              />
-              <span className="font-heading text-lg font-semibold text-charcoal">
-                {studioName}
-              </span>
+              {(settings?.logo_dark_url || settings?.logo_url) ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={settings.logo_dark_url ?? settings.logo_url}
+                  alt={studioName}
+                  className="h-8 w-auto object-contain"
+                />
+              ) : (
+                <span className="font-heading text-lg font-semibold text-charcoal">
+                  {studioName}
+                </span>
+              )}
             </a>
             <div className="flex items-center gap-3">
               <span className="hidden sm:block text-sm text-slate">

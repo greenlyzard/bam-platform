@@ -257,6 +257,7 @@ export default async function TeachDashboardPage() {
           <QuickAction href="/teach/attendance" icon="●" label="Attendance" />
           <QuickAction href="/teach/hours" icon="◷" label="Log Hours" />
           <QuickAction href="/teach/privates" icon="◇" label="Privates" />
+          <QuickAction href="/teach/schedule" icon="▦" label="My Calendar" />
           <QuickAction href="/teach/messages" icon="✉" label="Messages" />
         </div>
       </section>

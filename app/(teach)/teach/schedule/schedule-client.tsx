@@ -49,9 +49,32 @@ function isSameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
-export function ScheduleClient({ classes }: { classes: ClassItem[] }) {
+export function ScheduleClient({ classes, userId }: { classes: ClassItem[]; userId: string }) {
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [weekOffset, setWeekOffset] = useState(0);
+  const [showCalSub, setShowCalSub] = useState(false);
+  const [calSubData, setCalSubData] = useState<{
+    feedUrl: string;
+    googleUrl: string;
+    outlookUrl: string;
+  } | null>(null);
+  const [calSubLoading, setCalSubLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  async function handleSubscribe() {
+    if (calSubData) {
+      setShowCalSub(true);
+      return;
+    }
+    setCalSubLoading(true);
+    const res = await fetch("/api/cal/subscribe", { method: "POST" });
+    if (res.ok) {
+      const data = await res.json();
+      setCalSubData(data);
+      setShowCalSub(true);
+    }
+    setCalSubLoading(false);
+  }
 
   const today = new Date();
   const todayDow = today.getDay();
@@ -82,6 +105,15 @@ export function ScheduleClient({ classes }: { classes: ClassItem[] }) {
           <p className="mt-1 text-sm text-slate">
             {weekLabel} &middot; {totalClasses} class{totalClasses !== 1 ? "es" : ""}
           </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleSubscribe}
+            disabled={calSubLoading}
+            className="h-9 rounded-lg border border-silver bg-white px-3 text-xs font-medium text-slate hover:text-charcoal hover:border-lavender transition-colors inline-flex items-center gap-1.5"
+          >
+            {calSubLoading ? "Loading..." : "Subscribe to Calendar"}
+          </button>
         </div>
         <div className="hidden md:flex items-center gap-1 rounded-lg border border-silver p-0.5">
           <button
@@ -229,6 +261,59 @@ export function ScheduleClient({ classes }: { classes: ClassItem[] }) {
           </div>
         )
       ) : null}
+
+      {/* Calendar Subscribe Modal */}
+      {showCalSub && calSubData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setShowCalSub(false)} />
+          <div className="relative bg-white rounded-2xl shadow-xl max-w-sm w-full mx-4 p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-heading font-semibold text-charcoal">Subscribe to My Schedule</h3>
+              <button onClick={() => setShowCalSub(false)} className="text-slate hover:text-charcoal text-lg">✕</button>
+            </div>
+            <p className="text-sm text-mist">
+              Your classes will automatically sync to your calendar app.
+            </p>
+            <div className="space-y-2">
+              <a
+                href={calSubData.googleUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 w-full px-4 py-2.5 border border-silver rounded-lg hover:bg-cloud/50 text-sm text-charcoal transition-colors"
+              >
+                <span>&#128197;</span> Add to Google Calendar
+              </a>
+              <a
+                href={calSubData.feedUrl}
+                className="flex items-center gap-2 w-full px-4 py-2.5 border border-silver rounded-lg hover:bg-cloud/50 text-sm text-charcoal transition-colors"
+              >
+                <span>&#127822;</span> Add to Apple Calendar
+              </a>
+              <a
+                href={calSubData.outlookUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 w-full px-4 py-2.5 border border-silver rounded-lg hover:bg-cloud/50 text-sm text-charcoal transition-colors"
+              >
+                <span>&#128231;</span> Add to Outlook
+              </a>
+            </div>
+            <div className="mt-2 p-2 bg-cloud/50 rounded-lg text-xs text-mist break-all flex items-start gap-2">
+              <span className="flex-1">{calSubData.feedUrl}</span>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(calSubData.feedUrl);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+                className="text-lavender hover:text-lavender-dark shrink-0"
+              >
+                {copied ? "Copied!" : "Copy"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

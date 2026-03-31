@@ -15,9 +15,7 @@ export default async function TeacherSchedulePage() {
   const classIds = (assignments ?? []).map((a) => a.class_id);
 
   if (classIds.length === 0) {
-    return (
-      <ScheduleClient classes={[]} />
-    );
+    return <ScheduleClient classes={[]} userId={user.id} />;
   }
 
   // Fetch class details
@@ -51,5 +49,5 @@ export default async function TeacherSchedulePage() {
     capacity: c.max_enrollment ?? c.max_students ?? 10,
   }));
 
-  return <ScheduleClient classes={mapped} />;
+  return <ScheduleClient classes={mapped} userId={user.id} />;
 }

@@ -1,9 +1,26 @@
+import type { Metadata } from "next";
 import { TeachNav } from "@/components/layouts/teach-nav";
 import { AvatarDropdown } from "@/components/layouts/avatar-dropdown";
 import { AngelinaChat } from "@/components/angelina/AngelinaChat";
 import { RoleProvider } from "@/context/RoleContext";
 import { requireRole } from "@/lib/auth/requireRole";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const supabase = createAdminClient();
+  const { data } = await supabase
+    .from("studio_settings")
+    .select("favicon_url, studio_name")
+    .single();
+
+  return {
+    title: data?.studio_name ?? "Ballet Academy and Movement",
+    icons: data?.favicon_url
+      ? { icon: data.favicon_url, shortcut: data.favicon_url }
+      : undefined,
+  };
+}
 
 export default async function TeachLayout({
   children,
@@ -14,12 +31,13 @@ export default async function TeachLayout({
   const { role, full_name, avatar_url } = session.profile;
 
   const supabase = await createClient();
-  const { data: tenant } = await supabase
-    .from("tenants")
-    .select("angelina_enabled")
-    .eq("slug", "bam")
-    .single();
+  const adminClient = createAdminClient();
+  const [{ data: tenant }, { data: studioSettings }] = await Promise.all([
+    supabase.from("tenants").select("angelina_enabled").eq("slug", "bam").single(),
+    adminClient.from("studio_settings").select("logo_dark_url, logo_url, studio_name").single(),
+  ]);
   const angelinaEnabled = tenant?.angelina_enabled ?? true;
+  const teachLogoUrl = studioSettings?.logo_dark_url ?? studioSettings?.logo_url;
 
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
@@ -33,11 +51,18 @@ export default async function TeachLayout({
         {/* Top header */}
         <header className="sticky top-0 z-40 border-b border-silver bg-white/80 backdrop-blur-sm">
           <div className="flex h-14 items-center justify-between px-4 max-w-6xl mx-auto">
-            <a
-              href="/teach/dashboard"
-              className="font-heading text-lg font-semibold text-charcoal"
-            >
-              Teacher Portal
+            <a href="/teach/dashboard" className="flex items-center gap-2">
+              {teachLogoUrl ? (
+                <img
+                  src={teachLogoUrl}
+                  alt={studioSettings?.studio_name ?? "Studio"}
+                  className="h-8 w-auto object-contain"
+                />
+              ) : (
+                <span className="font-heading text-lg font-semibold text-charcoal">
+                  {studioSettings?.studio_name ?? "Teacher Portal"}
+                </span>
+              )}
             </a>
             <div className="flex items-center gap-3">
               <span className="hidden sm:block text-sm text-slate">{today}</span>
