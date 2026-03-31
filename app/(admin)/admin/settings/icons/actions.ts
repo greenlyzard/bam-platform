@@ -131,28 +131,27 @@ export async function toggleIconActive(formData: FormData) {
 // ---------------------------------------------------------------------------
 // 4. Upload Icon to Storage
 // ---------------------------------------------------------------------------
-export async function uploadIconToStorage(formData: FormData) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
-
+export async function uploadIconToStorage(formData: FormData): Promise<{ url: string | null; slug: string | null; error?: string }> {
   const file = formData.get("file") as File;
-  if (!file) return { error: "No file" };
-  if (file.size > 512 * 1024) return { error: "File too large (max 512KB)" };
+  if (!file) return { url: null, slug: null, error: "No file" };
+  if (file.size > 2 * 1024 * 1024) return { url: null, slug: null, error: "File too large (max 2MB)" };
 
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "png";
-  if (!["png", "svg", "webp"].includes(ext)) return { error: "Only PNG, SVG, WebP allowed" };
+  if (!["png", "svg", "webp", "jpg", "jpeg"].includes(ext)) return { url: null, slug: null, error: "Only PNG, JPG, SVG, WebP allowed" };
+
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const admin = createAdminClient();
 
   const slug = file.name.replace(/\.[^.]+$/, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   const path = `icons/${slug}.${ext}`;
 
-  const { error: uploadError } = await supabase.storage
-    .from("avatars") // reuse avatars bucket since it's the only one that exists
+  const { error: uploadError } = await admin.storage
+    .from("avatars")
     .upload(path, file, { upsert: true, contentType: file.type });
 
-  if (uploadError) return { error: uploadError.message };
+  if (uploadError) return { url: null, slug: null, error: uploadError.message };
 
-  const { data: { publicUrl } } = supabase.storage.from("avatars").getPublicUrl(path);
+  const { data: { publicUrl } } = admin.storage.from("avatars").getPublicUrl(path);
 
   return { url: publicUrl, slug };
 }

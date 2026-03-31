@@ -42,6 +42,7 @@ export function IconsClient({ icons: initialIcons, tenantId }: { icons: Icon[]; 
   const [uploadMode, setUploadMode] = useState(false);
   const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
@@ -239,28 +240,40 @@ export function IconsClient({ icons: initialIcons, tenantId }: { icons: Icon[]; 
                     <img src={icon.icon_url} alt={icon.name} className="w-16 h-16 rounded-full object-cover" />
                   ) : (
                     <label className="cursor-pointer flex flex-col items-center gap-1 text-center">
-                      <span className="text-lg font-medium text-lavender">{icon.name.charAt(0).toUpperCase()}</span>
-                      <span className="text-[9px] text-mist">Upload</span>
+                      {uploadingId === icon.id ? (
+                        <span className="text-[10px] text-mist animate-pulse">Uploading...</span>
+                      ) : (
+                        <>
+                          <span className="text-lg font-medium text-lavender">{icon.name.charAt(0).toUpperCase()}</span>
+                          <span className="text-[9px] text-mist">Upload</span>
+                        </>
+                      )}
                       <input
                         type="file"
                         accept=".png,.jpg,.jpeg,.svg,.webp"
                         className="hidden"
+                        disabled={uploadingId === icon.id}
                         onChange={async (e) => {
                           const file = e.target.files?.[0];
                           if (!file) return;
+                          setUploadingId(icon.id);
                           const fd = new FormData();
                           fd.set("file", file);
                           const res = await uploadIconToStorage(fd);
-                          if (!res.error && res.url) {
-                            const ufd = new FormData();
-                            ufd.set("id", icon.id);
-                            ufd.set("name", icon.name);
-                            ufd.set("category", icon.category);
-                            ufd.set("icon_url", res.url);
-                            ufd.set("website_url", icon.website_url ?? "");
-                            await updateIcon(ufd);
-                            setIcons(p => p.map(i => i.id === icon.id ? { ...i, icon_url: res.url! } : i));
+                          if (res.error || !res.url) {
+                            alert(`Upload failed: ${res.error ?? "Unknown error"}`);
+                            setUploadingId(null);
+                            return;
                           }
+                          const ufd = new FormData();
+                          ufd.set("id", icon.id);
+                          ufd.set("name", icon.name);
+                          ufd.set("category", icon.category);
+                          ufd.set("icon_url", res.url);
+                          ufd.set("website_url", icon.website_url ?? "");
+                          await updateIcon(ufd);
+                          setIcons(p => p.map(i => i.id === icon.id ? { ...i, icon_url: res.url! } : i));
+                          setUploadingId(null);
                         }}
                       />
                     </label>
