@@ -369,10 +369,6 @@ export async function createPrivateSession(formData: FormData) {
   const tenantId = formData.get("tenant_id") as string;
   if (!tenantId) return { error: "Missing tenant" };
 
-  // TODO: Check studio_closures for sessionDate and warn user before booking on a closed day
-  // const { data: closure } = await supabase.from("studio_closures").select("reason").eq("closed_date", sessionDate).eq("tenant_id", tenantId).maybeSingle();
-  // if (closure) return { error: `Studio is closed on this date: ${closure.reason}`, closureWarning: true };
-
   // Parse fields
   const sessionType = (formData.get("session_type") as string) || "solo";
   const sessionDate = formData.get("session_date") as string;

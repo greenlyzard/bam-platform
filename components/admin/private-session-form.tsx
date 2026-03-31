@@ -236,6 +236,26 @@ export function PrivateSessionForm({
       fd.set("parent_visible_notes", parentVisibleNotes);
       fd.set("booking_source", defaultTeacherId ? "teacher" : "admin");
 
+      // Check if selected date is a studio closure
+      try {
+        const closureRes = await fetch(`/api/admin/studio-settings/closures?date=${date}`);
+        if (closureRes.ok) {
+          const { closure } = await closureRes.json();
+          if (closure) {
+            const confirmed = window.confirm(
+              `⚠️ The studio is closed on this date (${closure.reason}). ` +
+              `Are you sure you want to schedule a private lesson?`
+            );
+            if (!confirmed) {
+              setLoading(false);
+              return;
+            }
+          }
+        }
+      } catch {
+        // Closure check failed — proceed anyway
+      }
+
       const result = await createPrivateSession(fd);
       if (result?.error) {
         setError(result.error);
