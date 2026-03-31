@@ -13,6 +13,8 @@ interface Student {
   id: string;
   first_name: string;
   last_name: string;
+  family_id?: string | null;
+  is_adult?: boolean;
 }
 
 interface Teacher {
@@ -135,7 +137,7 @@ export function PrivateSessionForm({
     (async () => {
       const { data: studentRows } = await supabase
         .from("students")
-        .select("id, first_name, last_name")
+        .select("id, first_name, last_name, family_id, is_adult")
         .eq("is_active", true)
         .order("last_name");
       if (studentRows) setStudents(studentRows);
@@ -195,7 +197,9 @@ export function PrivateSessionForm({
 
   const studentName = (id: string) => {
     const s = students.find((x) => x.id === id);
-    return s ? `${s.first_name} ${s.last_name}` : id;
+    if (!s) return id;
+    const label = `${s.first_name} ${s.last_name}`;
+    return s.is_adult || !s.family_id ? `${label} (Adult)` : label;
   };
 
   // Submit
@@ -383,6 +387,7 @@ export function PrivateSessionForm({
                     }`}
                   >
                     {s.first_name} {s.last_name}
+                    {(s.is_adult || !s.family_id) && <span className="text-xs text-mist ml-1">(Adult)</span>}
                     {studentIds.includes(s.id) && " \u2713"}
                   </button>
                 ))}
