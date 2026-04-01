@@ -278,6 +278,7 @@ export function EnrollmentWizard({ classes }: { classes: ClassInfo[] }) {
   const [childExperience, setChildExperience] = useState("");
   const [childDisciplines, setChildDisciplines] = useState<string[]>([]);
   const [childDays, setChildDays] = useState<number[]>([]);
+  const [showAssessmentPath, setShowAssessmentPath] = useState(false);
 
   // Multi-child branch
   const [children, setChildren] = useState<ChildData[]>([]);
@@ -871,7 +872,17 @@ export function EnrollmentWizard({ classes }: { classes: ClassInfo[] }) {
                 type="button"
                 onClick={() => {
                   setChildExperience(opt.value);
-                  setStep("child_disciplines");
+                  if (
+                    childAge !== null &&
+                    childAge >= 8 &&
+                    (opt.value === "yes_other" || opt.value === "yes_bam")
+                  ) {
+                    setShowAssessmentPath(true);
+                    setStep("child_disciplines");
+                  } else {
+                    setShowAssessmentPath(false);
+                    setStep("child_disciplines");
+                  }
                 }}
                 className={`w-full rounded-xl border-2 p-4 text-left transition-colors ${
                   childExperience === opt.value
@@ -889,8 +900,69 @@ export function EnrollmentWizard({ classes }: { classes: ClassInfo[] }) {
         </div>
       )}
 
+      {/* ─── Assessment path for experienced dancers ─── */}
+      {step === "child_disciplines" && showAssessmentPath && (
+        <div className="space-y-6">
+          <div className="text-center py-4 space-y-5">
+            <h2 className="font-heading text-2xl font-semibold text-charcoal">
+              Your Dancer Sounds Amazing
+            </h2>
+            <p className="text-sm text-mist max-w-md mx-auto">
+              For experienced dancers, we recommend a personal placement assessment
+              with one of our directors. This ensures your dancer is placed in exactly
+              the right class for their level and goals.
+            </p>
+            <div className="bg-lavender/5 rounded-2xl p-5 max-w-sm mx-auto text-left space-y-3">
+              <p className="text-sm font-medium text-charcoal">
+                Schedule a placement assessment with:
+              </p>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-lavender/20 flex items-center justify-center text-lavender font-semibold">
+                  A
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-charcoal">Amanda Cobb</div>
+                  <div className="text-xs text-mist">Founder &amp; Artistic Director</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-lavender/20 flex items-center justify-center text-lavender font-semibold">
+                  C
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-charcoal">Cara Matchett</div>
+                  <div className="text-xs text-mist">Director</div>
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <a
+                href="sms:9492290846?body=Hi! I'd like to schedule a placement assessment for my dancer."
+                className="px-6 py-3 bg-lavender text-white rounded-full text-sm font-medium hover:opacity-90 transition-colors"
+              >
+                Text to Schedule
+              </a>
+              <a
+                href="tel:9492290846"
+                className="px-6 py-3 border border-lavender text-lavender rounded-full text-sm font-medium hover:bg-lavender/5 transition-colors"
+              >
+                Call Us
+              </a>
+            </div>
+            <button
+              onClick={() => setShowAssessmentPath(false)}
+              className="text-sm text-mist underline underline-offset-2"
+            >
+              I&apos;d still like to browse classes
+            </button>
+          </div>
+
+          <BackButton onClick={goBack} />
+        </div>
+      )}
+
       {/* ─── Child: Disciplines ──────────────────── */}
-      {step === "child_disciplines" && (
+      {step === "child_disciplines" && !showAssessmentPath && (
         <div className="space-y-6">
           <div className="text-center">
             <h2 className="font-heading text-2xl font-semibold text-charcoal">
