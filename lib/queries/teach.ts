@@ -1,6 +1,21 @@
 import { createClient } from "@/lib/supabase/server";
 
 /**
+ * Get all class IDs assigned to the current teacher,
+ * via both the legacy classes.teacher_id and the class_teachers junction table.
+ */
+async function getTeacherClassIds(supabase: Awaited<ReturnType<typeof createClient>>, userId: string): Promise<string[]> {
+  const [{ data: legacyClasses }, { data: junctionRows }] = await Promise.all([
+    supabase.from("classes").select("id").eq("teacher_id", userId).eq("is_active", true),
+    supabase.from("class_teachers").select("class_id").eq("teacher_id", userId),
+  ]);
+  const ids = new Set<string>();
+  for (const c of legacyClasses ?? []) ids.add(c.id);
+  for (const ct of junctionRows ?? []) ids.add(ct.class_id);
+  return [...ids];
+}
+
+/**
  * Fetch classes assigned to the current teacher.
  */
 export async function getMyClasses() {
@@ -11,10 +26,13 @@ export async function getMyClasses() {
 
   if (!user) return [];
 
+  const classIds = await getTeacherClassIds(supabase, user.id);
+  if (classIds.length === 0) return [];
+
   const { data, error } = await supabase
     .from("classes")
     .select("*")
-    .eq("teacher_id", user.id)
+    .in("id", classIds)
     .eq("is_active", true)
     .order("day_of_week")
     .order("start_time");
@@ -29,6 +47,7 @@ export async function getMyClasses() {
 
 /**
  * Fetch today's classes for the teacher.
+ * Checks both day_of_week (legacy) and days_of_week (array) columns.
  */
 export async function getTodaysClasses() {
   const supabase = await createClient();
@@ -38,14 +57,16 @@ export async function getTodaysClasses() {
 
   if (!user) return [];
 
-  const today = new Date().getDay(); // 0=Sun, 6=Sat
+  const todayDow = new Date().getDay(); // 0=Sun, 6=Sat
+  const classIds = await getTeacherClassIds(supabase, user.id);
+  if (classIds.length === 0) return [];
 
   const { data, error } = await supabase
     .from("classes")
     .select("*")
-    .eq("teacher_id", user.id)
+    .in("id", classIds)
     .eq("is_active", true)
-    .eq("day_of_week", today)
+    .or(`day_of_week.eq.${todayDow},days_of_week.cs.{${todayDow}}`)
     .order("start_time");
 
   if (error) {
@@ -180,16 +201,8 @@ export async function getMyStudentCount() {
 
   if (!user) return 0;
 
-  // Get teacher's class IDs
-  const { data: classes } = await supabase
-    .from("classes")
-    .select("id")
-    .eq("teacher_id", user.id)
-    .eq("is_active", true);
-
-  if (!classes?.length) return 0;
-
-  const classIds = classes.map((c) => c.id);
+  const classIds = await getTeacherClassIds(supabase, user.id);
+  if (classIds.length === 0) return 0;
 
   const { count, error } = await supabase
     .from("enrollments")

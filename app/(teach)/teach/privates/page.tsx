@@ -39,6 +39,6 @@ export default async function TeacherPrivatesPage() {
   }
 
   return (
-    <TeacherPrivatesClient sessions={rows} studentMap={studentMap} />
+    <TeacherPrivatesClient sessions={rows} studentMap={studentMap} teacherId={user.id} />
   );
 }

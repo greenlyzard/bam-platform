@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { confirmPrivateSession, declinePrivateSession } from "./actions";
 
@@ -31,6 +32,7 @@ interface Session {
 interface Props {
   sessions: Session[];
   studentMap: Record<string, string>;
+  teacherId: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -243,12 +245,17 @@ function SessionGroup({
 // Main
 // ---------------------------------------------------------------------------
 
-export function TeacherPrivatesClient({ sessions, studentMap }: Props) {
+export function TeacherPrivatesClient({ sessions, studentMap, teacherId }: Props) {
   const [showForm, setShowForm] = useState(false);
+  const searchParams = useSearchParams();
   const { today, thisWeek, upcoming, past } = groupSessions(sessions);
 
   // Derive tenantId from first session (teacher always belongs to one tenant)
   const tenantId = sessions[0]?.tenant_id ?? "";
+
+  useEffect(() => {
+    if (searchParams.get("book") === "1") setShowForm(true);
+  }, [searchParams]);
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6">
@@ -272,6 +279,7 @@ export function TeacherPrivatesClient({ sessions, studentMap }: Props) {
       {showForm && tenantId && (
         <PrivateSessionFormLazy
           tenantId={tenantId}
+          defaultTeacherId={teacherId}
           onClose={() => setShowForm(false)}
           onCreated={() => {
             setShowForm(false);
@@ -286,6 +294,7 @@ export function TeacherPrivatesClient({ sessions, studentMap }: Props) {
 // Lazy-load the form to keep initial bundle small
 function PrivateSessionFormLazy(props: {
   tenantId: string;
+  defaultTeacherId?: string;
   onClose: () => void;
   onCreated: () => void;
 }) {
