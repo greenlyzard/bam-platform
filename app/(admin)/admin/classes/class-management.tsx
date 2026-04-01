@@ -234,6 +234,26 @@ function formatTime(time: string): string {
   return `${displayHour}:${m} ${ampm}`;
 }
 
+function isThisWeek(dateStr: string): boolean {
+  const now = new Date();
+  const day = now.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  const mon = new Date(now);
+  mon.setDate(now.getDate() + diff);
+  mon.setHours(0, 0, 0, 0);
+  const sun = new Date(mon);
+  sun.setDate(mon.getDate() + 6);
+  sun.setHours(23, 59, 59, 999);
+  const d = new Date(dateStr + "T12:00:00");
+  return d >= mon && d <= sun;
+}
+
+function isThisMonth(dateStr: string): boolean {
+  const now = new Date();
+  const d = new Date(dateStr + "T12:00:00");
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+}
+
 // ── Main Component ───────────────────────────────────────
 export function ClassManagement({
   classes: initialClasses,
@@ -273,7 +293,7 @@ export function ClassManagement({
   roomMap?: Record<string, string>;
   locationMap?: Record<string, string>;
   activeRooms?: Array<{ id: string; name: string; color_hex: string | null }>;
-  privateSessionsRaw?: Array<{ id: string; session_date: string; start_time: string; end_time: string; status: string; studio: string | null; primary_teacher_id: string | null; student_ids: string[]; notes: string | null }>;
+  privateSessionsRaw?: Array<{ id: string; session_date: string; start_time: string; end_time: string; status: string; studio: string | null; primary_teacher_id: string | null; student_ids: string[]; notes: string | null; billing_status: string | null; session_rate: number | null }>;
   studioClosures?: Array<{ id: string; closed_date: string; reason: string | null }>;
   classColorPalette?: string[];
   availableLevels?: string[];
@@ -325,6 +345,15 @@ export function ClassManagement({
     const mon = new Date(now); mon.setDate(now.getDate() + diff); mon.setHours(0,0,0,0); return mon;
   });
   const [calRoomFilter, setCalRoomFilter] = useState("all");
+
+  const [showPrivates, setShowPrivates] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("bam-schedule-show-privates") === "true";
+  });
+  const [showRehearsals, setShowRehearsals] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("bam-schedule-show-rehearsals") === "true";
+  });
 
   const activeFilterCount = [filterSeason, filterTeacher, filterLevel, filterDiscipline, filterDay, filterType, filterStatus].filter(Boolean).length;
 
@@ -907,7 +936,10 @@ ${(byDay[d] ?? [])
                         const calDiscId = c.discipline_ids?.[0];
                         const calDisc = calDiscId ? disciplines.find((d) => d.id === calDiscId) : disciplines.find((d) => d.name === c.discipline);
                         return (
-                          <div key={c.id} onClick={() => openEdit(c)} className={`absolute rounded overflow-hidden cursor-pointer hover:brightness-95 transition-all mx-0.5 ${closure ? "opacity-30" : ""}`} style={{ top, height: h, left: 0, right: 0, backgroundColor: bg, borderLeft: `3px solid ${rc}`, zIndex: 5 }}>
+                          <div key={c.id} onClick={() => openEdit(c)} className={`absolute rounded overflow-hidden cursor-pointer hover:brightness-95 transition-all mx-0.5 ${closure ? "opacity-30" : !showRehearsals && c.is_rehearsal ? "opacity-30" : ""}`} style={{ top, height: h, left: 0, right: 0, backgroundColor: c.is_rehearsal ? "#FEF3C7" : bg, borderLeft: `3px solid ${c.is_rehearsal ? "#F59E0B" : rc}`, zIndex: 5 }}>
+                            {c.is_rehearsal && (
+                              <div className="absolute top-0.5 left-1 text-[8px] font-bold uppercase tracking-wide text-amber-600 bg-amber-100 rounded px-1">Rehearsal</div>
+                            )}
                             {calDisc?.icon_url && (
                               // eslint-disable-next-line @next/next/no-img-element
                               <img src={calDisc.icon_url} alt={calDisc.name} className="absolute top-1 right-1 w-5 h-5 rounded-full object-cover opacity-80" />
@@ -1139,17 +1171,21 @@ ${(byDay[d] ?? [])
                     const roomColor = c.room ? roomColorMap.get(c.room) || "#9C8BBF" : "#ccc";
                     const dimmed = calRoomFilter !== "all" && c.room !== calRoomFilter;
 
+                    const rehearsalDimmed = !showRehearsals && c.is_rehearsal;
                     return (
                       <button
                         key={c.id}
                         onClick={() => openEdit(c)}
                         className="absolute left-1 right-1 rounded text-left overflow-hidden z-20 hover:ring-2 hover:ring-lavender/40 transition-shadow"
                         style={{
-                          top, height, backgroundColor: bgColor, borderLeft: `3px solid ${roomColor}`,
-                          opacity: dimmed ? 0.3 : 1, padding: "2px 4px",
+                          top, height,
+                          backgroundColor: c.is_rehearsal ? "#FEF3C7" : bgColor,
+                          borderLeft: `3px solid ${c.is_rehearsal ? "#F59E0B" : roomColor}`,
+                          opacity: dimmed || rehearsalDimmed ? 0.3 : 1, padding: "2px 4px",
                         }}
                       >
                         <div className="text-[10px] leading-tight text-charcoal space-y-px">
+                          {c.is_rehearsal && <div className="text-[8px] font-bold uppercase tracking-wide text-amber-600">Rehearsal</div>}
                           {isFieldVisible("time") && <div className="font-semibold">{formatTimeShort(c.start_time!)}{c.end_time ? `–${formatTimeShort(c.end_time)}` : ""}</div>}
                           {isFieldVisible("name") && <div className="font-semibold truncate">{c.name}</div>}
                           {isFieldVisible("teacher") && <div className="truncate text-slate">{getTeacherNames(c.id, c.legacyTeacherName)}</div>}
@@ -1208,7 +1244,7 @@ ${(byDay[d] ?? [])
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-heading font-semibold text-charcoal">
-            Classes
+            Schedule
           </h1>
           <p className="mt-1 text-sm text-slate">
             {classes.filter((c) => c.is_active).length} active ·{" "}
@@ -1266,6 +1302,41 @@ ${(byDay[d] ?? [])
             )}
         />
       </div>
+
+      {/* Privates KPIs */}
+      {showPrivates && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-purple-50 rounded-xl border border-purple-100">
+          <div className="text-center">
+            <p className="text-2xl font-heading font-semibold text-purple-600">
+              {privateSessionsRaw.filter((p) => isThisWeek(p.session_date)).length}
+            </p>
+            <p className="mt-1 text-xs text-slate">Privates This Week</p>
+          </div>
+          <div className="text-center">
+            <p className="text-2xl font-heading font-semibold text-purple-600">
+              {privateSessionsRaw.filter((p) => p.billing_status === "pending").length}
+            </p>
+            <p className="mt-1 text-xs text-slate">Pending Billing</p>
+          </div>
+          <div className="text-center">
+            <p className="text-2xl font-heading font-semibold text-purple-600">
+              {privateSessionsRaw.filter((p) => isThisMonth(p.session_date)).length}
+            </p>
+            <p className="mt-1 text-xs text-slate">This Month</p>
+          </div>
+          <div className="text-center">
+            <p className="text-2xl font-heading font-semibold text-purple-600">
+              {(() => {
+                const withRate = privateSessionsRaw.filter((p) => p.session_rate != null);
+                if (withRate.length === 0) return "$0";
+                const avg = withRate.reduce((s, p) => s + (p.session_rate ?? 0), 0) / withRate.length;
+                return `$${Math.round(avg)}`;
+              })()}
+            </p>
+            <p className="mt-1 text-xs text-slate">Avg Revenue/Session</p>
+          </div>
+        </div>
+      )}
 
       {/* Search + Filters */}
       <div className="rounded-xl border border-silver bg-white p-4 space-y-3">
@@ -1356,6 +1427,39 @@ ${(byDay[d] ?? [])
             </div>
           </div>
         )}
+        {/* Event type toggles */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-mist">Show:</span>
+          <button
+            onClick={() => {
+              const next = !showPrivates;
+              setShowPrivates(next);
+              localStorage.setItem("bam-schedule-show-privates", String(next));
+            }}
+            className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${
+              showPrivates
+                ? "bg-purple-100 border-purple-300 text-purple-700"
+                : "border-gray-200 text-mist hover:border-gray-300"
+            }`}
+          >
+            Privates
+          </button>
+          <button
+            onClick={() => {
+              const next = !showRehearsals;
+              setShowRehearsals(next);
+              localStorage.setItem("bam-schedule-show-rehearsals", String(next));
+            }}
+            className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${
+              showRehearsals
+                ? "bg-amber-100 border-amber-300 text-amber-700"
+                : "border-gray-200 text-mist hover:border-gray-300"
+            }`}
+          >
+            Rehearsals
+          </button>
+        </div>
+
         <div className="flex items-center justify-between">
           <p className="text-xs text-mist">{filtered.length} classes shown</p>
           {/* Columns popover */}

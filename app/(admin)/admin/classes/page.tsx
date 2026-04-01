@@ -152,7 +152,7 @@ export default async function ClassesPage({
   // Fetch private sessions and studio closures for calendar view
   const { data: privateSessionsRaw } = await supabase
     .from("private_sessions")
-    .select("id, session_date, start_time, end_time, status, studio, primary_teacher_id, student_ids, session_notes")
+    .select("id, session_date, start_time, end_time, status, studio, primary_teacher_id, student_ids, session_notes, billing_status, session_rate")
     .neq("status", "cancelled");
 
   const { data: studioClosureRows } = await supabase
@@ -232,7 +232,7 @@ export default async function ClassesPage({
       roomMap={roomMap}
       locationMap={locationMap}
       activeRooms={(roomRows ?? []).map(r => ({ id: r.id, name: r.name, color_hex: (r as any).color_hex ?? null }))}
-      privateSessionsRaw={(privateSessionsRaw ?? []).map((p: any) => ({ id: p.id, session_date: p.session_date, start_time: p.start_time, end_time: p.end_time, status: p.status, studio: p.studio, primary_teacher_id: p.primary_teacher_id, student_ids: p.student_ids ?? [], notes: p.session_notes }))}
+      privateSessionsRaw={(privateSessionsRaw ?? []).map((p: any) => ({ id: p.id, session_date: p.session_date, start_time: p.start_time, end_time: p.end_time, status: p.status, studio: p.studio, primary_teacher_id: p.primary_teacher_id, student_ids: p.student_ids ?? [], notes: p.session_notes, billing_status: p.billing_status ?? null, session_rate: p.session_rate ?? null }))}
       studioClosures={(studioClosureRows ?? []).map((c: any) => ({ id: c.id, closed_date: c.closed_date, reason: c.reason }))}
       classColorPalette={classColorPalette}
       initialEditClassId={editClass ?? null}
