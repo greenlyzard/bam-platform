@@ -278,6 +278,7 @@ export function ClassManagement({
   isTeacher = false,
   myClassIds = [],
   tenantId,
+  canViewRevenue = false,
 }: {
   classes: ClassRecord[];
   classTeachers: ClassTeacher[];
@@ -301,6 +302,7 @@ export function ClassManagement({
   isTeacher?: boolean;
   myClassIds?: string[];
   tenantId: string;
+  canViewRevenue?: boolean;
 }) {
   const [classes, setClasses] = useState(initialClasses);
   const [classTeachersData, setClassTeachersData] = useState(initialClassTeachers);
@@ -1305,36 +1307,40 @@ ${(byDay[d] ?? [])
 
       {/* Privates KPIs */}
       {showPrivates && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-purple-50 rounded-xl border border-purple-100">
+        <div className={`grid grid-cols-2 ${canViewRevenue ? "sm:grid-cols-4" : "sm:grid-cols-3"} gap-3 p-4 bg-purple-50 rounded-xl border border-purple-100`}>
           <div className="text-center">
             <p className="text-2xl font-heading font-semibold text-purple-600">
               {privateSessionsRaw.filter((p) => isThisWeek(p.session_date)).length}
             </p>
             <p className="mt-1 text-xs text-slate">Privates This Week</p>
           </div>
-          <div className="text-center">
-            <p className="text-2xl font-heading font-semibold text-purple-600">
-              {privateSessionsRaw.filter((p) => p.billing_status === "pending").length}
-            </p>
-            <p className="mt-1 text-xs text-slate">Pending Billing</p>
-          </div>
+          {canViewRevenue && (
+            <div className="text-center">
+              <p className="text-2xl font-heading font-semibold text-purple-600">
+                {privateSessionsRaw.filter((p) => p.billing_status === "pending").length}
+              </p>
+              <p className="mt-1 text-xs text-slate">Pending Billing</p>
+            </div>
+          )}
           <div className="text-center">
             <p className="text-2xl font-heading font-semibold text-purple-600">
               {privateSessionsRaw.filter((p) => isThisMonth(p.session_date)).length}
             </p>
             <p className="mt-1 text-xs text-slate">This Month</p>
           </div>
-          <div className="text-center">
-            <p className="text-2xl font-heading font-semibold text-purple-600">
-              {(() => {
-                const withRate = privateSessionsRaw.filter((p) => p.session_rate != null);
-                if (withRate.length === 0) return "$0";
-                const avg = withRate.reduce((s, p) => s + (p.session_rate ?? 0), 0) / withRate.length;
-                return `$${Math.round(avg)}`;
-              })()}
-            </p>
-            <p className="mt-1 text-xs text-slate">Avg Revenue/Session</p>
-          </div>
+          {canViewRevenue && (
+            <div className="text-center">
+              <p className="text-2xl font-heading font-semibold text-purple-600">
+                {(() => {
+                  const withRate = privateSessionsRaw.filter((p) => p.session_rate != null);
+                  if (withRate.length === 0) return "$0";
+                  const avg = withRate.reduce((s, p) => s + (p.session_rate ?? 0), 0) / withRate.length;
+                  return `$${Math.round(avg)}`;
+                })()}
+              </p>
+              <p className="mt-1 text-xs text-slate">Avg Revenue/Session</p>
+            </div>
+          )}
         </div>
       )}
 

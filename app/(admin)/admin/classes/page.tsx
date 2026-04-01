@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/lib/auth/guards";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { canViewPayRates } from "@/lib/rbac/permissions";
 import { ClassManagement } from "./class-management";
 
 export default async function ClassesPage({
@@ -240,6 +241,7 @@ export default async function ClassesPage({
       isTeacher={!!teacherRole}
       myClassIds={myClassIds}
       tenantId={user.tenantId!}
+      canViewRevenue={await canViewPayRates(user.id)}
     />
   );
 }
