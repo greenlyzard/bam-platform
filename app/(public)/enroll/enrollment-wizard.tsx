@@ -201,11 +201,12 @@ function getAdultRecommendations(
     (i) => !["pilates", "gyrotonic", "not_sure"].includes(i)
   );
 
-  // Only return adult/teen classes: level "open" with age_min >= 14
-  // This excludes children's classes (petite, beginner, intermediate, etc.)
-  // and kids open-level classes like Pop-Up Hip Hop (age_min=5)
+  // Return adult/teen classes: open-level (age_min >= 14) plus
+  // intermediate/advanced classes accessible to teens (age_min >= 11)
   let matches = classes.filter((cls) => {
-    return cls.level === "open" && cls.ageMin !== null && cls.ageMin >= 14;
+    if (cls.level === "open" && cls.ageMin !== null && cls.ageMin >= 14) return true;
+    if (["intermediate", "advanced", "beginner"].includes(cls.level) && cls.ageMin !== null && cls.ageMin >= 11 && (cls.ageMax === null || cls.ageMax >= 14)) return true;
+    return false;
   });
 
   // When only pilates/gyrotonic selected, return zero dance classes
@@ -1152,17 +1153,69 @@ export function EnrollmentWizard({ classes }: { classes: ClassInfo[] }) {
                 </div>
               )}
 
-              {group.classes.length === 0 && !group.pilatesGyroInterest && (
-                <div className="rounded-xl border border-silver bg-white p-6 text-center">
-                  <p className="text-sm text-slate mb-4">
-                    We don&apos;t currently have a class matching your criteria,
-                    but we&apos;d love to hear from you.
-                  </p>
-                  <p className="text-sm text-charcoal font-medium">
-                    Call us at (949) 229-0846 or email dance@bamsocal.com
-                  </p>
-                </div>
-              )}
+              {group.classes.length === 0 && !group.pilatesGyroInterest && (() => {
+                const age = enrolleeType === "child" ? childAge : enrolleeType === "multiple" ? (children[gi]?.age ?? null) : null;
+                const nearbyClasses = age !== null
+                  ? classes.filter((c) => {
+                      if (c.ageMin !== null && age < c.ageMin - 2) return false;
+                      if (c.ageMax !== null && age > c.ageMax + 2) return false;
+                      return true;
+                    }).slice(0, 4)
+                  : [];
+
+                return (
+                  <div className="text-center py-6 space-y-4">
+                    <h3 className="font-heading text-xl text-charcoal">
+                      Let&apos;s Find the Right Class
+                    </h3>
+                    <p className="text-sm text-mist max-w-sm mx-auto">
+                      We have classes for dancers of all ages and levels.
+                      Our team would love to personally recommend the perfect fit for your dancer.
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+                      <a
+                        href="tel:9492290846"
+                        className="px-6 py-3 bg-lavender text-white rounded-full text-sm font-medium hover:bg-lavender-dark transition-colors"
+                      >
+                        Call Us: (949) 229-0846
+                      </a>
+                      <a
+                        href="mailto:dance@bamsocal.com"
+                        className="px-6 py-3 border border-lavender text-lavender rounded-full text-sm font-medium hover:bg-lavender/5 transition-colors"
+                      >
+                        Email Us
+                      </a>
+                      <a
+                        href="/enroll/classes"
+                        className="px-6 py-3 border border-gray-200 text-charcoal rounded-full text-sm font-medium hover:bg-gray-50 transition-colors"
+                      >
+                        Browse All Classes
+                      </a>
+                    </div>
+                    {nearbyClasses.length > 0 && (
+                      <div className="pt-4 space-y-2">
+                        <p className="text-xs text-mist uppercase tracking-wide font-medium">
+                          Other classes near this age
+                        </p>
+                        <div className="grid gap-2 sm:grid-cols-2 max-w-lg mx-auto text-left">
+                          {nearbyClasses.map((cls) => (
+                            <div key={cls.id} className="rounded-lg border border-silver bg-white p-3">
+                              <p className="text-sm font-medium text-charcoal">{cls.name}</p>
+                              <p className="text-xs text-mist">
+                                {cls.ageMin && `Ages ${cls.ageMin}\u2013${cls.ageMax ?? "up"}`}
+                                {cls.teacherName && ` \u00b7 ${cls.teacherName}`}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <p className="text-xs text-mist pt-2">
+                      Not sure where to start? We offer a free trial class for new students.
+                    </p>
+                  </div>
+                );
+              })()}
 
               {group.classes.map((cls) => (
                 <div
