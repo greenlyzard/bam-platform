@@ -153,3 +153,55 @@ app/(admin)/admin/schedule/
 6. Full component extraction (future cleanup)
 
 Save the file and confirm it was created.
+## Event Types & Toggles
+
+### Toggle Pills (in filter bar)
+Each toggle is a pill button that shows/hides that event type.
+Default state: Classes ON, everything else OFF.
+Persisted to localStorage as 'bam-schedule-toggles'.
+
+| Toggle | Color | Source Table | Key Column |
+|--------|-------|-------------|------------|
+| Classes | level color / color_hex | classes | day_of_week |
+| Privates | Purple #A855F7 | private_sessions | session_date |
+| Rehearsals | Amber #F59E0B | rehearsals | rehearsal_date |
+| Performances | Rose #F43F5E | productions (type=performance) | performance_date |
+| Competitions | Blue #3B82F6 | productions (type=competition) | performance_date |
+| Trials | Green #22C55E | classes (trial_eligible=true) | day_of_week |
+| Closures | Red #EF4444 | studio_closures | closed_date |
+
+### KPI Stats Bar
+When a toggle is ON, add its KPIs to the stats bar:
+
+Classes (always):
+- Active Classes | Total Enrolled | At Capacity | Open Spots
+
+Privates (when ON):
+- Privates This Week | Pending Billing | This Month | Revenue MTD
+
+Rehearsals (when ON):
+- Rehearsals This Week | Productions Active
+
+Performances (when ON):
+- Upcoming Performances | Days Until Next
+
+Competitions (when ON):
+- Upcoming Competitions | Days Until Next
+
+### Calendar Visual Treatment
+- Rehearsals: Amber left border, light amber background
+- Performances: Rose left border, light rose background  
+- Competitions: Blue left border, light blue background, 
+  can span full day (all-day block at top of day column)
+- Trials: Green badge on class block ("TRIAL")
+- Privates: Purple dashed border (already implemented)
+
+### Schema Notes
+- productions and rehearsals have no tenant_id — 
+  filter by joining to production_dances → classes → tenant
+- Competitions can block entire days — render as all-day 
+  banner similar to studio_closures
+- Trial classes are not a separate table — they are classes 
+  with trial_eligible = true, shown with a TRIAL badge
+
+Save the file.
