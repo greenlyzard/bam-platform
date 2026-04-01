@@ -807,11 +807,11 @@ ${(byDay[d] ?? [])
     return (
       <div className="space-y-3 print-calendar">
         {/* Controls */}
-        <div className="flex items-center justify-between flex-wrap gap-2 print:hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 print:hidden">
           <div className="flex items-center gap-2">
             <button onClick={() => { const d = new Date(calWeekStart); d.setDate(d.getDate() - 7); setCalWeekStart(d); }} className="px-2 py-1 text-sm border border-silver rounded hover:bg-cloud">←</button>
             <button onClick={() => { const n = new Date(); const day = n.getDay(); const diff = day === 0 ? -6 : 1 - day; const m = new Date(n); m.setDate(n.getDate() + diff); m.setHours(0,0,0,0); setCalWeekStart(m); }} className="px-3 py-1 text-sm border border-silver rounded hover:bg-cloud">Today</button>
-            <span className="text-sm font-medium text-charcoal">Week of {calWeekStart.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+            <span className="text-sm font-medium text-charcoal truncate">Week of {calWeekStart.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
             <button onClick={() => { const d = new Date(calWeekStart); d.setDate(d.getDate() + 7); setCalWeekStart(d); }} className="px-2 py-1 text-sm border border-silver rounded hover:bg-cloud">→</button>
           </div>
           <div className="flex items-center gap-2">
@@ -839,7 +839,7 @@ ${(byDay[d] ?? [])
         </div>
 
         {/* Room legend */}
-        <div className="flex flex-wrap gap-2 print:hidden">
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 print:hidden">
           {activeRooms.map(r => (
             <span key={r.id} className="inline-flex items-center gap-1.5 text-xs text-charcoal px-2 py-1 rounded-full border border-silver/50">
               <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: r.color_hex ?? "#9C8BBF" }} />
@@ -1329,7 +1329,7 @@ ${(byDay[d] ?? [])
             <p className="mt-1 text-xs text-slate">This Month</p>
           </div>
           {canViewRevenue && (
-            <div className="text-center">
+            <div className="text-center hidden sm:block">
               <p className="text-2xl font-heading font-semibold text-purple-600">
                 {(() => {
                   const withRate = privateSessionsRaw.filter((p) => p.session_rate != null);
@@ -1467,9 +1467,9 @@ ${(byDay[d] ?? [])
         </div>
 
         <div className="flex items-center justify-between">
-          <p className="text-xs text-mist">{filtered.length} classes shown</p>
+          <p className="text-xs text-mist hidden sm:block">{filtered.length} classes shown</p>
           {/* Columns popover */}
-          <div ref={columnsPopoverRef} className="relative">
+          <div ref={columnsPopoverRef} className="relative hidden sm:block">
             <button
               onClick={() => setColumnsPopoverOpen(!columnsPopoverOpen)}
               className="h-8 rounded-lg border border-silver bg-white hover:bg-cloud text-xs font-medium text-slate px-3 transition-colors inline-flex items-center gap-1.5"
