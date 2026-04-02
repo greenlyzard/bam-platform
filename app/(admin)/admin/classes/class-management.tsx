@@ -884,6 +884,17 @@ ${(byDay[d] ?? [])
                     <div className={`text-xs font-semibold ${isToday ? "text-lavender" : "text-charcoal"}`}>{day.toLocaleDateString("en-US", { weekday: "short" })}</div>
                     <div className={`text-sm ${isToday ? "text-lavender font-bold" : "text-slate"}`}>{day.toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>
                     {closure && <div className="text-[10px] bg-error/10 text-error rounded px-1 mt-0.5 truncate mx-1">{closure.reason ?? "Closed"}</div>}
+                    {closure && (
+                      <div className="flex items-center justify-center gap-2 mt-0.5">
+                        <span className="text-[10px] text-error/60">Studio Closed</span>
+                        <button
+                          onClick={() => setShowClosedClasses(prev => !prev)}
+                          className="text-[10px] text-error/60 underline underline-offset-2 hover:text-error transition-colors"
+                        >
+                          {showClosedClasses ? "Hide classes" : "Show classes"}
+                        </button>
+                      </div>
+                    )}
                     {productions.filter(p => p.performance_date === toLocalDateStr(day) && (
                       (showPerformances && p.production_type !== "competition") ||
                       (showCompetitions && p.production_type === "competition")
@@ -951,32 +962,8 @@ ${(byDay[d] ?? [])
 
                   return (
                     <div key={`overlay-${toLocalDateStr(day)}-${room.id}`} className="absolute top-0" style={{ left: colLeft, width: RW, height: slots.length * SH }}>
-                      {/* Closure overlay */}
-                      {closure && (
-                        <div className="absolute inset-0 bg-error/5 z-[3]">
-                          {!showClosedClasses && roomIdx === 0 && (
-                            <div className="absolute inset-x-0 top-4 flex flex-col items-center gap-1 z-[4]">
-                              <span className="text-[10px] text-error font-medium">Studio Closed</span>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); setShowClosedClasses(true); }}
-                                className="text-[10px] text-error/70 hover:text-error underline underline-offset-2"
-                              >
-                                Show classes
-                              </button>
-                            </div>
-                          )}
-                          {showClosedClasses && roomIdx === 0 && (
-                            <div className="absolute inset-x-0 bottom-2 flex justify-center z-[4]">
-                              <button
-                                onClick={(e) => { e.stopPropagation(); setShowClosedClasses(false); }}
-                                className="text-[10px] text-error/70 hover:text-error underline underline-offset-2"
-                              >
-                                Hide classes
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )}
+                      {/* Closure overlay — tint only, text moved to day header */}
+                      {closure && <div className="absolute inset-0 bg-error/5 z-[3]" />}
 
                       {/* Class events — hidden on closed days unless toggled */}
                       {dayClasses.map(c => {
