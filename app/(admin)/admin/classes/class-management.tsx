@@ -102,6 +102,8 @@ export interface SeasonOption {
 export interface ProductionOption {
   id: string;
   name: string;
+  production_type?: string | null;
+  performance_date?: string | null;
 }
 
 export interface ClosureRecord {
@@ -361,6 +363,14 @@ export function ClassManagement({
     return localStorage.getItem("bam-schedule-show-rehearsals") === "true";
   });
   const [showClosedClasses, setShowClosedClasses] = useState(false);
+  const [showPerformances, setShowPerformances] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("bam-schedule-show-performances") === "true";
+  });
+  const [showCompetitions, setShowCompetitions] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("bam-schedule-show-competitions") === "true";
+  });
 
   const activeFilterCount = [filterSeason, filterTeacher, filterLevel, filterDiscipline, filterDay, filterType, filterStatus].filter(Boolean).length;
 
@@ -873,7 +883,19 @@ ${(byDay[d] ?? [])
                   <div key={toLocalDateStr(day)} className={`text-center py-2 border-r border-silver ${isToday ? "bg-lavender/10" : ""}`} style={{ width: roomCount * RW }}>
                     <div className={`text-xs font-semibold ${isToday ? "text-lavender" : "text-charcoal"}`}>{day.toLocaleDateString("en-US", { weekday: "short" })}</div>
                     <div className={`text-sm ${isToday ? "text-lavender font-bold" : "text-slate"}`}>{day.toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>
-                    {closure && <div className="text-[10px] bg-error/10 text-error rounded px-1 mt-0.5 truncate mx-1">🚫 {closure.reason ?? "Closed"}</div>}
+                    {closure && <div className="text-[10px] bg-error/10 text-error rounded px-1 mt-0.5 truncate mx-1">{closure.reason ?? "Closed"}</div>}
+                    {productions.filter(p => p.performance_date === toLocalDateStr(day) && (
+                      (showPerformances && p.production_type !== "competition") ||
+                      (showCompetitions && p.production_type === "competition")
+                    )).map(prod => (
+                      <div key={prod.id} className={`text-[10px] px-1 mt-0.5 rounded font-medium truncate mx-1 ${
+                        prod.production_type === "competition"
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-rose-100 text-rose-700"
+                      }`}>
+                        {prod.name}
+                      </div>
+                    ))}
                   </div>
                 );
               })}
@@ -1167,6 +1189,18 @@ ${(byDay[d] ?? [])
                   <div className="text-xs font-semibold text-mist">{["Mon","Tue","Wed","Thu","Fri","Sat"][i]}</div>
                   <div className={`text-sm font-semibold ${isToday ? "text-lavender" : "text-charcoal"}`}>{wd.getDate()}</div>
                   {isClosed && <span className="inline-block mt-0.5 text-[10px] bg-red-100 text-red-600 rounded px-1">{closureReasonMap.get(dateStr) || "Closed"}</span>}
+                  {productions.filter(p => p.performance_date === dateStr && (
+                    (showPerformances && p.production_type !== "competition") ||
+                    (showCompetitions && p.production_type === "competition")
+                  )).map(prod => (
+                    <span key={prod.id} className={`inline-block mt-0.5 text-[10px] rounded px-1 font-medium ${
+                      prod.production_type === "competition"
+                        ? "bg-blue-100 text-blue-700"
+                        : "bg-rose-100 text-rose-700"
+                    }`}>
+                      {prod.name}
+                    </span>
+                  ))}
                 </div>
               );
             })}
@@ -1519,6 +1553,34 @@ ${(byDay[d] ?? [])
             }`}
           >
             Closed Days
+          </button>
+          <button
+            onClick={() => {
+              const next = !showPerformances;
+              setShowPerformances(next);
+              localStorage.setItem("bam-schedule-show-performances", String(next));
+            }}
+            className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${
+              showPerformances
+                ? "bg-rose-100 border-rose-300 text-rose-700"
+                : "border-gray-200 text-mist hover:border-gray-300"
+            }`}
+          >
+            Performances
+          </button>
+          <button
+            onClick={() => {
+              const next = !showCompetitions;
+              setShowCompetitions(next);
+              localStorage.setItem("bam-schedule-show-competitions", String(next));
+            }}
+            className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${
+              showCompetitions
+                ? "bg-blue-100 border-blue-300 text-blue-700"
+                : "border-gray-200 text-mist hover:border-gray-300"
+            }`}
+          >
+            Competitions
           </button>
         </div>
 

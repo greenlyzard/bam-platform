@@ -106,10 +106,10 @@ export default async function ClassesPage({
     .eq("tenant_id", user.tenantId!)
     .order("created_at", { ascending: false });
 
-  // Fetch productions
+  // Fetch productions (with event details for calendar overlay)
   const { data: productions } = await supabase
     .from("productions")
-    .select("id, name")
+    .select("id, name, production_type, performance_date")
     .order("created_at", { ascending: false });
 
   // Fetch studio closures (tenant-scoped)
