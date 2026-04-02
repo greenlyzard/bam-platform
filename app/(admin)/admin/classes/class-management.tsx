@@ -234,6 +234,10 @@ function formatTime(time: string): string {
   return `${displayHour}:${m} ${ampm}`;
 }
 
+function toLocalDateStr(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
 function isThisWeek(dateStr: string): boolean {
   const now = new Date();
   const day = now.getDay();
@@ -356,6 +360,7 @@ export function ClassManagement({
     if (typeof window === "undefined") return false;
     return localStorage.getItem("bam-schedule-show-rehearsals") === "true";
   });
+  const [showClosedClasses, setShowClosedClasses] = useState(false);
 
   const activeFilterCount = [filterSeason, filterTeacher, filterLevel, filterDiscipline, filterDay, filterType, filterStatus].filter(Boolean).length;
 
@@ -863,9 +868,9 @@ ${(byDay[d] ?? [])
               <div className="shrink-0 sticky left-0 z-30 bg-white border-r border-silver" style={{ width: TW }} />
               {weekDays.map(day => {
                 const isToday = day.toDateString() === today;
-                const closure = studioClosures.find(c => c.closed_date === day.toISOString().split("T")[0]);
+                const closure = studioClosures.find(c => c.closed_date === toLocalDateStr(day));
                 return (
-                  <div key={day.toISOString()} className={`text-center py-2 border-r border-silver ${isToday ? "bg-lavender/10" : ""}`} style={{ width: roomCount * RW }}>
+                  <div key={toLocalDateStr(day)} className={`text-center py-2 border-r border-silver ${isToday ? "bg-lavender/10" : ""}`} style={{ width: roomCount * RW }}>
                     <div className={`text-xs font-semibold ${isToday ? "text-lavender" : "text-charcoal"}`}>{day.toLocaleDateString("en-US", { weekday: "short" })}</div>
                     <div className={`text-sm ${isToday ? "text-lavender font-bold" : "text-slate"}`}>{day.toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>
                     {closure && <div className="text-[10px] bg-error/10 text-error rounded px-1 mt-0.5 truncate mx-1">🚫 {closure.reason ?? "Closed"}</div>}
@@ -878,9 +883,9 @@ ${(byDay[d] ?? [])
             <div className="flex sticky top-[52px] z-20 bg-white border-b border-silver">
               <div className="shrink-0 sticky left-0 z-30 bg-white border-r border-silver" style={{ width: TW }} />
               {weekDays.map(day => (
-                <div key={`rh-${day.toISOString()}`} className="flex border-r border-silver">
+                <div key={`rh-${toLocalDateStr(day)}`} className="flex border-r border-silver">
                   {visibleRooms.map(room => (
-                    <div key={`${day.toISOString()}-${room.id}`} className="text-center py-1 border-r border-silver/50 last:border-r-0" style={{ width: RW, borderBottom: `2px solid ${room.color_hex ?? "#9C8BBF"}`, backgroundColor: `${room.color_hex ?? "#9C8BBF"}15` }}>
+                    <div key={`${toLocalDateStr(day)}-${room.id}`} className="text-center py-1 border-r border-silver/50 last:border-r-0" style={{ width: RW, borderBottom: `2px solid ${room.color_hex ?? "#9C8BBF"}`, backgroundColor: `${room.color_hex ?? "#9C8BBF"}15` }}>
                       <div className="flex items-center justify-center gap-1">
                         <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: room.color_hex ?? "#9C8BBF" }} />
                         <span className="text-[10px] font-medium text-charcoal truncate">{room.name}</span>
@@ -899,9 +904,9 @@ ${(byDay[d] ?? [])
                     {slot.endsWith(":00") && <span className="text-[10px] text-mist">{fmtTime(slot)}</span>}
                   </div>
                   {weekDays.map(day => (
-                    <div key={`${slot}-${day.toISOString()}`} className="flex border-r border-silver/20">
+                    <div key={`${slot}-${toLocalDateStr(day)}`} className="flex border-r border-silver/20">
                       {visibleRooms.map(room => (
-                        <div key={`${slot}-${day.toISOString()}-${room.id}`} className="border-r border-silver/10 last:border-r-0" style={{ width: RW }} />
+                        <div key={`${slot}-${toLocalDateStr(day)}-${room.id}`} className="border-r border-silver/10 last:border-r-0" style={{ width: RW }} />
                       ))}
                     </div>
                   ))}
@@ -911,7 +916,7 @@ ${(byDay[d] ?? [])
               {/* EVENT OVERLAYS — absolutely positioned per day×room column */}
               {weekDays.map((day, dayIdx) => {
                 const dayOfWeek = day.getDay();
-                const dateStr = day.toISOString().split("T")[0];
+                const dateStr = toLocalDateStr(day);
                 const closure = studioClosures.find(c => c.closed_date === dateStr);
 
                 return visibleRooms.map((room, roomIdx) => {
@@ -923,35 +928,76 @@ ${(byDay[d] ?? [])
                   const dayPrivates = (privateSessionsRaw ?? []).filter(p => p.session_date === dateStr && p.studio === room.name);
 
                   return (
-                    <div key={`overlay-${day.toISOString()}-${room.id}`} className="absolute top-0" style={{ left: colLeft, width: RW, height: slots.length * SH }}>
+                    <div key={`overlay-${toLocalDateStr(day)}-${room.id}`} className="absolute top-0" style={{ left: colLeft, width: RW, height: slots.length * SH }}>
                       {/* Closure overlay */}
-                      {closure && <div className="absolute inset-0 bg-error/5 z-[3]" />}
+                      {closure && (
+                        <div className="absolute inset-0 bg-error/5 z-[3]">
+                          {!showClosedClasses && roomIdx === 0 && (
+                            <div className="absolute inset-x-0 top-4 flex flex-col items-center gap-1 z-[4]">
+                              <span className="text-[10px] text-error font-medium">Studio Closed</span>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setShowClosedClasses(true); }}
+                                className="text-[10px] text-error/70 hover:text-error underline underline-offset-2"
+                              >
+                                Show classes
+                              </button>
+                            </div>
+                          )}
+                          {showClosedClasses && roomIdx === 0 && (
+                            <div className="absolute inset-x-0 bottom-2 flex justify-center z-[4]">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setShowClosedClasses(false); }}
+                                className="text-[10px] text-error/70 hover:text-error underline underline-offset-2"
+                              >
+                                Hide classes
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
 
-                      {/* Class events — dimmed during closures */}
+                      {/* Class events — hidden on closed days unless toggled */}
                       {dayClasses.map(c => {
+                        if (closure && !showClosedClasses) return null;
                         const sm = t2m(c.start_time ?? "09:00"), em = t2m(c.end_time ?? "10:00");
                         const top = ((sm - 480) / 30) * SH;
                         const h = Math.max(((em - sm) / 30) * SH, SH);
+                        const isCompact = h < 60;
+                        const isMedium = h >= 60 && h < 90;
                         const bg = (c as any).color_hex || lvlColor(c.levels ?? []);
                         const rc = room.color_hex ?? "#9C8BBF";
                         const tn = getTeacherNames(c.id, c.legacyTeacherName);
                         const calDiscId = c.discipline_ids?.[0];
                         const calDisc = calDiscId ? disciplines.find((d) => d.id === calDiscId) : disciplines.find((d) => d.name === c.discipline);
                         return (
-                          <div key={c.id} onClick={() => openEdit(c)} className={`absolute rounded overflow-hidden cursor-pointer hover:brightness-95 transition-all mx-0.5 ${closure ? "opacity-30" : !showRehearsals && c.is_rehearsal ? "opacity-30" : ""}`} style={{ top, height: h, left: 0, right: 0, backgroundColor: c.is_rehearsal ? "#FEF3C7" : bg, borderLeft: `3px solid ${c.is_rehearsal ? "#F59E0B" : rc}`, zIndex: 5 }}>
-                            {c.is_rehearsal && (
+                          <div key={c.id} onClick={() => openEdit(c)} className={`absolute rounded overflow-hidden cursor-pointer hover:brightness-95 transition-all mx-0.5 ${closure && showClosedClasses ? "opacity-30" : !showRehearsals && c.is_rehearsal ? "opacity-30" : ""}`} style={{ top, height: h, left: 0, right: 0, backgroundColor: c.is_rehearsal ? "#FEF3C7" : bg, borderLeft: `3px solid ${c.is_rehearsal ? "#F59E0B" : rc}`, zIndex: 5 }}>
+                            {c.is_rehearsal && !isCompact && (
                               <div className="absolute top-0.5 left-1 text-[8px] font-bold uppercase tracking-wide text-amber-600 bg-amber-100 rounded px-1">Rehearsal</div>
                             )}
-                            {calDisc?.icon_url && (
+                            {calDisc?.icon_url && !isCompact && (
                               // eslint-disable-next-line @next/next/no-img-element
                               <img src={calDisc.icon_url} alt={calDisc.name} className="absolute top-1 right-1 w-5 h-5 rounded-full object-cover opacity-80" />
                             )}
                             <div className="p-1 h-full overflow-hidden flex flex-col gap-0">
-                              {isVis("time") && <div className="text-[10px] font-semibold text-gray-600 leading-tight">{fmtTime(c.start_time ?? "")}–{fmtTime(c.end_time ?? "")}</div>}
-                              {isVis("name") && <div className="text-[11px] font-medium text-gray-800 leading-tight line-clamp-2 pr-5">{c.name}</div>}
-                              {isVis("teacher") && tn && tn !== "—" && <div className="text-[10px] text-gray-500 leading-tight truncate">{tn}</div>}
-                              {isVis("levels") && (c.levels ?? []).length > 0 && <div className="text-[9px] text-gray-500 truncate">{(c.levels ?? []).join(", ")}</div>}
-                              {isVis("enrolled") && <div className="text-[9px] text-gray-500">{c.enrolledCount ?? 0}/{c.max_enrollment ?? "—"}</div>}
+                              {isCompact ? (
+                                <div className="text-[10px] font-medium text-gray-800 leading-tight truncate">
+                                  {fmtTime(c.start_time ?? "")} {c.name}
+                                </div>
+                              ) : isMedium ? (
+                                <>
+                                  {isVis("time") && <div className="text-[10px] font-semibold text-gray-600 leading-tight">{fmtTime(c.start_time ?? "")}–{fmtTime(c.end_time ?? "")}</div>}
+                                  {isVis("name") && <div className="text-[11px] font-medium text-gray-800 leading-tight truncate pr-5">{c.name}</div>}
+                                  {isVis("teacher") && tn && tn !== "—" && <div className="text-[10px] text-gray-500 leading-tight truncate">{tn}</div>}
+                                </>
+                              ) : (
+                                <>
+                                  {isVis("time") && <div className="text-[10px] font-semibold text-gray-600 leading-tight">{fmtTime(c.start_time ?? "")}–{fmtTime(c.end_time ?? "")}</div>}
+                                  {isVis("name") && <div className="text-[11px] font-medium text-gray-800 leading-tight line-clamp-2 pr-5">{c.name}</div>}
+                                  {isVis("teacher") && tn && tn !== "—" && <div className="text-[10px] text-gray-500 leading-tight truncate">{tn}</div>}
+                                  {isVis("levels") && (c.levels ?? []).length > 0 && <div className="text-[9px] text-gray-500 truncate">{(c.levels ?? []).join(", ")}</div>}
+                                  {isVis("enrolled") && <div className="text-[9px] text-gray-500">{c.enrolledCount ?? 0}/{c.max_enrollment ?? "—"}</div>}
+                                </>
+                              )}
                             </div>
                           </div>
                         );
@@ -1023,7 +1069,7 @@ ${(byDay[d] ?? [])
       return d;
     });
     const timeSlots = Array.from({ length: 27 }, (_, i) => 480 + i * 30); // 8:00-21:00
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = toLocalDateStr(new Date());
 
     // Build closure set
     const closedDates = new Set(studioClosures.map((sc) => sc.closed_date));
@@ -1113,7 +1159,7 @@ ${(byDay[d] ?? [])
             {/* Day headers */}
             <div className="border-b border-silver p-2" />
             {weekDays.map((wd, i) => {
-              const dateStr = wd.toISOString().slice(0, 10);
+              const dateStr = toLocalDateStr(wd);
               const isToday = dateStr === todayStr;
               const isClosed = closedDates.has(dateStr);
               return (
@@ -1139,7 +1185,7 @@ ${(byDay[d] ?? [])
               })}
             </div>
             {weekDays.map((wd, dayIdx) => {
-              const dateStr = wd.toISOString().slice(0, 10);
+              const dateStr = toLocalDateStr(wd);
               const dow = wd.getDay();
               const isClosed = closedDates.has(dateStr);
 
@@ -1463,6 +1509,16 @@ ${(byDay[d] ?? [])
             }`}
           >
             Rehearsals
+          </button>
+          <button
+            onClick={() => setShowClosedClasses(!showClosedClasses)}
+            className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${
+              showClosedClasses
+                ? "bg-red-100 border-red-300 text-red-700"
+                : "border-gray-200 text-mist hover:border-gray-300"
+            }`}
+          >
+            Closed Days
           </button>
         </div>
 
