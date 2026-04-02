@@ -19,7 +19,8 @@ export async function requireRole(
     redirect("/login");
   }
 
-  if (!allowed.includes(session.profile.role)) {
+  const hasRole = session.profile.roles.some((r) => allowed.includes(r));
+  if (!hasRole && !allowed.includes(session.profile.role)) {
     redirect("/unauthorized");
   }
 

@@ -30,7 +30,7 @@ export default async function PortalLayout({
   children: React.ReactNode;
 }) {
   const [session, settings] = await Promise.all([
-    requireRole(["super_admin", "admin", "parent"]),
+    requireRole(["super_admin", "admin", "parent", "teacher"]),
     getStudioSettings(),
   ]);
   const { role, full_name, avatar_url } = session.profile;

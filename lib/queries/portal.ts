@@ -1,7 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 
 /**
- * Fetch the current parent's children (students).
+ * Fetch the current user's students via:
+ * 1. Primary parent (students.parent_id)
+ * 2. Guardian with portal_access (student_guardians)
+ * Deduplicates by student id.
  */
 export async function getMyStudents() {
   const supabase = await createClient();
@@ -11,42 +14,57 @@ export async function getMyStudents() {
 
   if (!user) return [];
 
-  const { data, error } = await supabase
+  // Path 1: Primary parent
+  const { data: primaryStudents } = await supabase
     .from("students")
     .select("*")
     .eq("parent_id", user.id)
-    .eq("active", true)
-    .order("first_name");
+    .eq("active", true);
 
-  if (error) {
-    console.error("[portal:getMyStudents]", error);
-    return [];
+  // Path 2: Guardian with portal_access
+  let guardianStudents: typeof primaryStudents = [];
+  try {
+    const { data: guardianLinks } = await supabase
+      .from("student_guardians")
+      .select("student_id")
+      .eq("profile_id", user.id)
+      .eq("portal_access", true);
+
+    const guardianStudentIds = (guardianLinks ?? []).map((g) => g.student_id);
+    if (guardianStudentIds.length > 0) {
+      const { data } = await supabase
+        .from("students")
+        .select("*")
+        .in("id", guardianStudentIds)
+        .eq("active", true);
+      guardianStudents = data ?? [];
+    }
+  } catch {
+    // student_guardians may not exist yet
   }
 
-  return data ?? [];
+  // Merge and deduplicate
+  const all = [...(primaryStudents ?? []), ...(guardianStudents ?? [])];
+  const seen = new Set<string>();
+  return all
+    .filter((s) => {
+      if (seen.has(s.id)) return false;
+      seen.add(s.id);
+      return true;
+    })
+    .sort((a, b) => (a.first_name ?? "").localeCompare(b.first_name ?? ""));
 }
 
 /**
- * Fetch enrollments for a parent's children, with class details.
+ * Fetch enrollments for all of the current user's students
+ * (via parent_id + student_guardians), with class details.
  */
 export async function getMyEnrollments() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return [];
-
-  // Get student IDs first
-  const { data: students } = await supabase
-    .from("students")
-    .select("id")
-    .eq("parent_id", user.id)
-    .eq("active", true);
-
-  if (!students?.length) return [];
-
+  const students = await getMyStudents();
   const studentIds = students.map((s) => s.id);
+  if (!studentIds.length) return [];
+
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("enrollments")
@@ -74,24 +92,14 @@ export async function getMyEnrollments() {
 }
 
 /**
- * Fetch recent attendance for a parent's children.
+ * Fetch recent attendance for the current user's students.
  */
 export async function getRecentAttendance(limit = 10) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return [];
-
-  const { data: students } = await supabase
-    .from("students")
-    .select("id")
-    .eq("parent_id", user.id);
-
-  if (!students?.length) return [];
-
+  const students = await getMyStudents();
   const studentIds = students.map((s) => s.id);
+  if (!studentIds.length) return [];
+
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("attendance")
@@ -210,7 +218,9 @@ export async function getStudentContacts(studentId: string) {
 }
 
 /**
- * Get the family record for the current user (parent).
+ * Get the family record for the current user.
+ * Checks primary_contact_id first, then falls back to
+ * finding family via student_guardians → student → family_id.
  */
 export async function getMyFamily() {
   const supabase = await createClient();
@@ -220,13 +230,63 @@ export async function getMyFamily() {
 
   if (!user) return null;
 
-  const { data } = await supabase
+  // Path 1: Primary contact
+  const { data: primaryFamily } = await supabase
     .from("families")
     .select("*")
     .eq("primary_contact_id", user.id)
-    .single();
+    .maybeSingle();
 
-  return data ?? null;
+  if (primaryFamily) return primaryFamily;
+
+  // Path 2: Find family via students where parent_id matches
+  const { data: ownStudent } = await supabase
+    .from("students")
+    .select("family_id")
+    .eq("parent_id", user.id)
+    .not("family_id", "is", null)
+    .limit(1)
+    .maybeSingle();
+
+  if (ownStudent?.family_id) {
+    const { data } = await supabase
+      .from("families")
+      .select("*")
+      .eq("id", ownStudent.family_id)
+      .single();
+    if (data) return data;
+  }
+
+  // Path 3: Guardian path via student_guardians
+  try {
+    const { data: guardianLinks } = await supabase
+      .from("student_guardians")
+      .select("student_id")
+      .eq("profile_id", user.id)
+      .eq("portal_access", true)
+      .limit(1);
+
+    if (guardianLinks?.length) {
+      const { data: student } = await supabase
+        .from("students")
+        .select("family_id")
+        .eq("id", guardianLinks[0].student_id)
+        .single();
+
+      if (student?.family_id) {
+        const { data } = await supabase
+          .from("families")
+          .select("*")
+          .eq("id", student.family_id)
+          .single();
+        return data ?? null;
+      }
+    }
+  } catch {
+    // student_guardians may not exist yet
+  }
+
+  return null;
 }
 
 /**
@@ -249,7 +309,8 @@ export async function getUpcomingSessionsForStudents(studentIds: string[]) {
 
   const classIds = [...new Set(enrollments.map((e) => e.class_id))];
 
-  const today = new Date().toISOString().split("T")[0];
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
   const { data: sessions, error } = await supabase
     .from("class_sessions")
@@ -295,24 +356,14 @@ export async function getUpcomingSessionsForStudents(studentIds: string[]) {
 }
 
 /**
- * Fetch badges earned by a parent's children.
+ * Fetch badges earned by the current user's students.
  */
 export async function getMyStudentBadges() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return [];
-
-  const { data: students } = await supabase
-    .from("students")
-    .select("id")
-    .eq("parent_id", user.id);
-
-  if (!students?.length) return [];
-
+  const students = await getMyStudents();
   const studentIds = students.map((s) => s.id);
+  if (!studentIds.length) return [];
+
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("student_badges")

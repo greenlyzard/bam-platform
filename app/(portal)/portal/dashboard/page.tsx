@@ -22,6 +22,15 @@ export default async function DashboardPage() {
   const hasStudents = students.length > 0;
   const hasEnrollments = enrollments.length > 0;
 
+  // Detect if user is an adult student (self-enrolled, age 18+)
+  const isSelfStudent = students.length === 1 && students[0].parent_id === user.id && (() => {
+    const dob = students[0].date_of_birth;
+    if (!dob) return false;
+    const birth = new Date(dob + "T12:00:00");
+    const age = Math.floor((Date.now() - birth.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+    return age >= 16;
+  })();
+
   // Check if family has active booking approvals for private self-booking
   let canBookPrivate = false;
   try {
@@ -91,19 +100,19 @@ export default async function DashboardPage() {
       {!hasStudents && (
         <EmptyState
           icon="♡"
-          title="Add your first dancer"
-          description="Get started by adding your child's profile. You'll be able to browse classes and enroll from there."
+          title="Get started"
+          description="Add a dancer profile to browse classes and enroll."
           actionLabel="+ Add a Dancer"
           actionHref="/portal/children"
         />
       )}
 
-      {/* My Dancers (quick view) */}
+      {/* My Dancers / My Profile (quick view) */}
       {hasStudents && (
         <section>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-heading font-semibold text-charcoal">
-              My Dancers
+              {isSelfStudent ? "My Classes" : "My Dancers"}
             </h2>
             <a
               href="/portal/children"
@@ -133,7 +142,7 @@ export default async function DashboardPage() {
       {hasStudents && (
         <section>
           <h2 className="text-lg font-heading font-semibold text-charcoal mb-3">
-            Enrolled Classes
+            {isSelfStudent ? "Your Classes" : "Enrolled Classes"}
           </h2>
           {hasEnrollments ? (
             <div className="grid gap-3 sm:grid-cols-2">
