@@ -119,21 +119,37 @@ export default async function DashboardPage() {
       )}
 
       {/* Upcoming events */}
-      {((upcomingClosures && upcomingClosures.length > 0) || (upcomingProductions && upcomingProductions.length > 0)) && (
+      {(() => {
+        const groupedClosures = (upcomingClosures ?? []).reduce<Array<{ reason: string; dates: string[] }>>((acc, closure) => {
+          const r = closure.reason ?? "Closed";
+          const existing = acc.find((g) => g.reason === r);
+          if (existing) { existing.dates.push(closure.closed_date); } else { acc.push({ reason: r, dates: [closure.closed_date] }); }
+          return acc;
+        }, []);
+        function formatDateRange(dates: string[]) {
+          if (dates.length === 1) return new Date(dates[0] + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+          const sorted = [...dates].sort();
+          const first = new Date(sorted[0] + "T12:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric" });
+          const last = new Date(sorted[sorted.length - 1] + "T12:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric" });
+          return `${first} \u2013 ${last}`;
+        }
+        const hasEvents = groupedClosures.length > 0 || (upcomingProductions && upcomingProductions.length > 0);
+        if (!hasEvents) return null;
+        return (
         <section>
           <h2 className="text-lg font-heading font-semibold text-charcoal mb-3">
             Upcoming
           </h2>
           <div className="space-y-2">
-            {(upcomingClosures ?? []).map((closure) => (
-              <div key={closure.id} className="flex items-center gap-3 p-3 rounded-xl bg-red-50 border border-red-100">
+            {groupedClosures.map((group, i) => (
+              <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-red-50 border border-red-100">
                 <span className="text-red-500 shrink-0">&#x1F6AB;</span>
                 <div>
                   <div className="text-sm font-medium text-charcoal">
-                    Studio Closed{closure.reason ? ` \u2014 ${closure.reason}` : ""}
+                    Studio Closed &mdash; {group.reason}
                   </div>
                   <div className="text-xs text-mist">
-                    {new Date(closure.closed_date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+                    {formatDateRange(group.dates)}
                   </div>
                 </div>
               </div>
@@ -152,7 +168,8 @@ export default async function DashboardPage() {
             ))}
           </div>
         </section>
-      )}
+        );
+      })()}
 
       {/* No students yet — onboarding */}
       {!hasStudents && (
