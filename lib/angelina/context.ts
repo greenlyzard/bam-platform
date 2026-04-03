@@ -19,10 +19,9 @@ export async function buildAngelinaContext(
   tenantId?: string
 ): Promise<AngelinaContext> {
   const supabase = await createClient();
-  const today = new Date().toISOString().split("T")[0];
-  const dayOfWeek = new Date().toLocaleDateString("en-US", {
-    weekday: "long",
-  });
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const dayOfWeek = now.toLocaleDateString("en-US", { weekday: "long" });
 
   switch (role) {
     case "public":
@@ -214,14 +213,39 @@ async function buildParentContext(
     ? [profile.first_name, profile.last_name].filter(Boolean).join(" ")
     : "Parent";
 
-  // Get children
-  const { data: children } = await supabase
+  // Get children (primary parent + guardian links)
+  const { data: primaryChildren } = await supabase
     .from("students")
     .select("id, first_name, last_name, date_of_birth, current_level, age_group, medical_notes")
     .eq("parent_id", userId)
     .eq("active", true);
 
-  const studentIds = (children ?? []).map((c) => c.id);
+  let guardianChildren: typeof primaryChildren = [];
+  try {
+    const { data: guardianLinks } = await supabase
+      .from("student_guardians")
+      .select("student_id")
+      .eq("profile_id", userId)
+      .eq("portal_access", true);
+    const guardianIds = (guardianLinks ?? []).map((g) => g.student_id);
+    if (guardianIds.length > 0) {
+      const { data } = await supabase
+        .from("students")
+        .select("id, first_name, last_name, date_of_birth, current_level, age_group, medical_notes")
+        .in("id", guardianIds)
+        .eq("active", true);
+      guardianChildren = data ?? [];
+    }
+  } catch { /* student_guardians may not exist */ }
+
+  const seen = new Set<string>();
+  const children = [...(primaryChildren ?? []), ...(guardianChildren ?? [])].filter((c) => {
+    if (seen.has(c.id)) return false;
+    seen.add(c.id);
+    return true;
+  });
+
+  const studentIds = children.map((c) => c.id);
 
   // Get enrollments with class details
   let enrollmentLines: string[] = [];

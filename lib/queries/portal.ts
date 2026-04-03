@@ -389,3 +389,93 @@ export async function getMyStudentBadges() {
 
   return data ?? [];
 }
+
+/**
+ * Generate smart recommendations for a parent's students.
+ */
+export interface StudentRecommendation {
+  studentId: string;
+  studentName: string;
+  type: "trial" | "add_class" | "private";
+  title: string;
+  description: string;
+  classId?: string;
+  className?: string;
+  priority: number;
+}
+
+export async function getStudentRecommendations(
+  students: Array<{ id: string; first_name: string; date_of_birth: string | null; current_level: string | null }>,
+  enrollments: Array<{ student_id: string; class_id: string }>
+): Promise<StudentRecommendation[]> {
+  if (students.length === 0) return [];
+
+  const supabase = await createClient();
+
+  const { data: allClasses } = await supabase
+    .from("classes")
+    .select("id, name, age_min, age_max, trial_eligible, discipline, max_enrollment, enrolled_count")
+    .eq("is_active", true)
+    .eq("is_hidden", false);
+
+  const enrolledClassIds = new Set(enrollments.map((e) => e.class_id));
+
+  const recommendations: StudentRecommendation[] = [];
+
+  for (const student of students) {
+    const age = student.date_of_birth
+      ? Math.floor((Date.now() - new Date(student.date_of_birth + "T12:00:00").getTime()) / (365.25 * 24 * 60 * 60 * 1000))
+      : null;
+    const studentEnrollments = enrollments.filter((e) => e.student_id === student.id);
+    const enrolledCount = studentEnrollments.length;
+
+    const ageMatches = (allClasses ?? []).filter((c) => {
+      if (enrolledClassIds.has(c.id)) return false;
+      if (c.max_enrollment && c.enrolled_count >= c.max_enrollment) return false;
+      if (age === null) return true;
+      if (c.age_min !== null && age < c.age_min - 1) return false;
+      if (c.age_max !== null && age > c.age_max + 1) return false;
+      return true;
+    });
+
+    if (enrolledCount === 0) {
+      const trialClasses = ageMatches.filter((c) => c.trial_eligible);
+      if (trialClasses.length > 0) {
+        recommendations.push({
+          studentId: student.id,
+          studentName: student.first_name,
+          type: "trial",
+          title: `Book a free trial for ${student.first_name}`,
+          description: `${student.first_name} isn't enrolled yet. Try a free trial class to find the perfect fit.`,
+          classId: trialClasses[0].id,
+          className: trialClasses[0].name,
+          priority: 1,
+        });
+      }
+    }
+
+    if (enrolledCount === 1 && ageMatches.length > 0) {
+      recommendations.push({
+        studentId: student.id,
+        studentName: student.first_name,
+        type: "add_class",
+        title: `Add another class for ${student.first_name}`,
+        description: "Students who take 2+ classes progress faster and build stronger friendships at the studio.",
+        priority: 2,
+      });
+    }
+
+    if (enrolledCount >= 1 && age !== null && age >= 6) {
+      recommendations.push({
+        studentId: student.id,
+        studentName: student.first_name,
+        type: "private",
+        title: `Private lesson for ${student.first_name}`,
+        description: "One-on-one coaching accelerates technique and builds confidence.",
+        priority: 3,
+      });
+    }
+  }
+
+  return recommendations.sort((a, b) => a.priority - b.priority).slice(0, 3);
+}

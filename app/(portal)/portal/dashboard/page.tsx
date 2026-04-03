@@ -1,5 +1,5 @@
 import { requireParent } from "@/lib/auth/guards";
-import { getMyStudents, getMyEnrollments, getMyStudentBadges, getMyFamily } from "@/lib/queries/portal";
+import { getMyStudents, getMyEnrollments, getMyStudentBadges, getMyFamily, getStudentRecommendations } from "@/lib/queries/portal";
 import { getStudioSettings } from "@/lib/queries/studio-settings";
 import { createClient } from "@/lib/supabase/server";
 import { ClassCard } from "@/components/bam/ClassCard";
@@ -43,6 +43,12 @@ export default async function DashboardPage() {
 
   const hasStudents = students.length > 0;
   const hasEnrollments = enrollments.length > 0;
+
+  // Smart recommendations
+  const recommendations = await getStudentRecommendations(
+    students.map((s: any) => ({ id: s.id, first_name: s.first_name, date_of_birth: s.date_of_birth, current_level: s.current_level })),
+    enrollments.map((e: any) => ({ student_id: e.student_id, class_id: e.class_id }))
+  );
 
   // Detect if user is an adult student (self-enrolled, age 18+)
   const isSelfStudent = students.length === 1 && students[0].parent_id === user.id && (() => {
@@ -170,6 +176,50 @@ export default async function DashboardPage() {
         </section>
         );
       })()}
+
+      {/* Recommendations */}
+      {recommendations.length > 0 && (
+        <section>
+          <div className="flex items-center gap-2 mb-3">
+            <h2 className="text-lg font-heading font-semibold text-charcoal">
+              Recommended
+            </h2>
+            <span className="text-xs bg-lavender/10 text-lavender px-2 py-0.5 rounded-full">
+              Angelina suggests
+            </span>
+          </div>
+          <div className="space-y-2">
+            {recommendations.map((rec, i) => (
+              <div key={i} className="p-4 rounded-xl bg-lavender/5 border border-lavender/20 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="text-sm font-medium text-charcoal">{rec.title}</div>
+                    <div className="text-xs text-mist mt-0.5">{rec.description}</div>
+                  </div>
+                  <span className="text-lg shrink-0">
+                    {rec.type === "trial" ? "\u{1F3AF}" : rec.type === "private" ? "\u2B50" : "\u2795"}
+                  </span>
+                </div>
+                {rec.type === "trial" && rec.classId && (
+                  <Link href={`/enroll?class=${rec.classId}`} className="inline-block text-xs text-lavender underline underline-offset-2">
+                    Book free trial &rarr;
+                  </Link>
+                )}
+                {rec.type === "add_class" && (
+                  <Link href="/portal/enrollment" className="inline-block text-xs text-lavender underline underline-offset-2">
+                    Browse classes &rarr;
+                  </Link>
+                )}
+                {rec.type === "private" && (
+                  <Link href="/portal/book-private" className="inline-block text-xs text-lavender underline underline-offset-2">
+                    Learn more &rarr;
+                  </Link>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* No students yet — onboarding */}
       {!hasStudents && (
