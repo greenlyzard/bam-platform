@@ -88,7 +88,7 @@ export default async function DashboardPage() {
         <div className="rounded-xl border border-lavender/20 bg-lavender/5 p-4 flex items-center justify-between flex-wrap gap-3">
           <div>
             <p className="text-sm font-semibold text-charcoal">Secure your spot for next season!</p>
-            <p className="text-xs text-slate mt-0.5">Re-enrollment is now open. Keep your dancer&apos;s schedule.</p>
+            <p className="text-xs text-slate mt-0.5">Re-enrollment is now open. Keep your student&apos;s schedule.</p>
           </div>
           <Link href="/portal/enroll" className="h-9 rounded-lg bg-lavender hover:bg-lavender-dark text-white text-sm font-semibold px-4 transition-colors inline-flex items-center">
             Re-Enroll Now
@@ -101,18 +101,18 @@ export default async function DashboardPage() {
         <EmptyState
           icon="♡"
           title="Get started"
-          description="Add a dancer profile to browse classes and enroll."
-          actionLabel="+ Add a Dancer"
+          description="Add a student profile to browse classes and enroll."
+          actionLabel="+ Add a Student"
           actionHref="/portal/children"
         />
       )}
 
-      {/* My Dancers / My Profile (quick view) */}
+      {/* My Students (quick view) */}
       {hasStudents && (
         <section>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-heading font-semibold text-charcoal">
-              {isSelfStudent ? "My Classes" : "My Dancers"}
+              {isSelfStudent ? "My Classes" : "My Students"}
             </h2>
             <a
               href="/portal/children"
@@ -189,7 +189,7 @@ export default async function DashboardPage() {
             <EmptyState
               icon="▦"
               title="No classes yet"
-              description="Browse our class catalog to find the right fit for your dancer."
+              description="Browse our class catalog to find the right fit."
               actionLabel="Browse Classes"
               actionHref="/portal/schedule"
             />
