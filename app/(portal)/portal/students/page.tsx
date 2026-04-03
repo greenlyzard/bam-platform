@@ -7,7 +7,7 @@ import {
 } from "@/lib/queries/portal";
 import { DancerCard } from "@/components/bam/DancerCard";
 import { EmptyState } from "@/components/bam/empty-state";
-import { AddDancerForm } from "./add-dancer-form";
+import { AddDancerForm } from "./add-student-form";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 

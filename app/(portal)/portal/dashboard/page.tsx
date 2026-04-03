@@ -103,7 +103,7 @@ export default async function DashboardPage() {
           title="Get started"
           description="Add a student profile to browse classes and enroll."
           actionLabel="+ Add a Student"
-          actionHref="/portal/children"
+          actionHref="/portal/students"
         />
       )}
 
@@ -115,7 +115,7 @@ export default async function DashboardPage() {
               {isSelfStudent ? "My Classes" : "My Students"}
             </h2>
             <a
-              href="/portal/children"
+              href="/portal/students"
               className="text-sm text-lavender hover:text-lavender-dark font-medium"
             >
               View all

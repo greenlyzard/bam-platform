@@ -33,7 +33,7 @@ export function AddDancerForm() {
       >
         <span className="text-2xl text-mist group-hover:text-lavender">+</span>
         <p className="mt-1 text-sm font-medium text-slate group-hover:text-lavender-dark">
-          Add a Dancer
+          Add a Student
         </p>
       </button>
     );
@@ -42,7 +42,7 @@ export function AddDancerForm() {
   return (
     <div className="rounded-xl border border-silver bg-white p-6">
       <h3 className="font-heading text-lg font-semibold text-charcoal mb-4">
-        Add a New Dancer
+        Add a New Student
       </h3>
 
       {error && (
@@ -196,7 +196,7 @@ export function AddDancerForm() {
             disabled={loading}
             className="h-11 rounded-lg bg-lavender hover:bg-lavender-dark text-white font-semibold text-sm px-6 transition-colors disabled:opacity-50"
           >
-            {loading ? "Adding..." : "Add Dancer"}
+            {loading ? "Adding..." : "Add Student"}
           </button>
           <button
             type="button"

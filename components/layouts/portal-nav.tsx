@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 
 const navItems = [
   { label: "My Dashboard", href: "/portal/dashboard", icon: "⌂" },
-  { label: "My Students", href: "/portal/children", icon: "♡" },
+  { label: "My Students", href: "/portal/students", icon: "♡" },
   { label: "Schedule", href: "/portal/schedule", icon: "▦" },
   { label: "Enrollment", href: "/portal/enrollment", icon: "◈" },
   { label: "Rehearsals", href: "/portal/rehearsals", icon: "♪" },
@@ -16,7 +16,7 @@ const navItems = [
 
 const mobileItems = [
   { label: "Home", href: "/portal/dashboard", icon: "⌂" },
-  { label: "Students", href: "/portal/children", icon: "♡" },
+  { label: "Students", href: "/portal/students", icon: "♡" },
   { label: "Schedule", href: "/portal/schedule", icon: "▦" },
   { label: "Billing", href: "/portal/billing", icon: "✦" },
   { label: "More", href: "/portal/enrollment", icon: "⋯" },

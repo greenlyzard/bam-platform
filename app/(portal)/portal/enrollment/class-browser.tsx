@@ -166,7 +166,7 @@ export function ClassBrowser({
           <div className="rounded-lg bg-[#D4A843]/10 border border-[#D4A843]/20 px-4 py-3 text-sm text-[#D4A843]">
             Please{" "}
             <a
-              href="/portal/children"
+              href="/portal/students"
               className="underline font-medium"
             >
               add a dancer

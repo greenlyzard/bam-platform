@@ -9,9 +9,9 @@ const nextConfig: NextConfig = {
         permanent: true,
       },
       {
-        source: "/portal/students",
-        destination: "/portal/children",
-        permanent: false,
+        source: "/portal/children",
+        destination: "/portal/students",
+        permanent: true,
       },
     ];
   },
