@@ -17,6 +17,8 @@ interface StudioSettings {
   logo_dark_url: string | null;
   favicon_url: string | null;
   app_icon_url: string | null;
+  student_term_singular: string | null;
+  student_term_plural: string | null;
 }
 
 interface Location {
@@ -69,6 +71,8 @@ function IdentitySection({ settings }: { settings: StudioSettings | null }) {
   const [logoLightUrl, setLogoLightUrl] = useState(settings?.logo_light_url ?? settings?.logo_url ?? "");
   const [logoDarkUrl, setLogoDarkUrl] = useState(settings?.logo_dark_url ?? "");
   const [faviconUrl, setFaviconUrl] = useState(settings?.favicon_url ?? "");
+  const [studentTermSingular, setStudentTermSingular] = useState(settings?.student_term_singular ?? "Student");
+  const [studentTermPlural, setStudentTermPlural] = useState(settings?.student_term_plural ?? "Students");
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState<string | null>(null);
   const [toast, setToast] = useState("");
@@ -99,6 +103,8 @@ function IdentitySection({ settings }: { settings: StudioSettings | null }) {
       logo_light_url: logoLightUrl || null,
       logo_dark_url: logoDarkUrl || null,
       favicon_url: faviconUrl || null,
+      student_term_singular: studentTermSingular || "Student",
+      student_term_plural: studentTermPlural || "Students",
     });
     setSaving(false);
     if (result.success) {
@@ -165,6 +171,41 @@ function IdentitySection({ settings }: { settings: StudioSettings | null }) {
 
           previewClassName="w-8 h-8 object-contain"
         />
+
+        {/* Student terminology */}
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-charcoal">
+            What do you call your students?
+          </label>
+          <p className="text-xs text-mist">
+            Used throughout the platform and parent portal.
+          </p>
+          <div className="grid grid-cols-2 gap-3 max-w-md">
+            <div>
+              <label className="text-xs text-mist mb-1 block">Singular</label>
+              <input
+                type="text"
+                value={studentTermSingular}
+                onChange={(e) => setStudentTermSingular(e.target.value)}
+                placeholder="Student"
+                className="w-full h-11 rounded-lg border border-silver bg-white px-4 text-sm text-charcoal placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-mist mb-1 block">Plural</label>
+              <input
+                type="text"
+                value={studentTermPlural}
+                onChange={(e) => setStudentTermPlural(e.target.value)}
+                placeholder="Students"
+                className="w-full h-11 rounded-lg border border-silver bg-white px-4 text-sm text-charcoal placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
+              />
+            </div>
+          </div>
+          <p className="text-xs text-mist">
+            Examples: Student/Students, Dancer/Dancers, Athlete/Athletes, Member/Members
+          </p>
+        </div>
 
         <div className="flex items-center gap-3">
           <button

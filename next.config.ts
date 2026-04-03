@@ -8,6 +8,11 @@ const nextConfig: NextConfig = {
         destination: "/admin/classes",
         permanent: true,
       },
+      {
+        source: "/portal/students",
+        destination: "/portal/children",
+        permanent: false,
+      },
     ];
   },
   async headers() {

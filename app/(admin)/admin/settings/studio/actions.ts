@@ -10,6 +10,8 @@ export async function updateStudioIdentity(payload: {
   logo_light_url: string | null;
   logo_dark_url: string | null;
   favicon_url: string | null;
+  student_term_singular?: string;
+  student_term_plural?: string;
 }): Promise<{ success: boolean; error?: string }> {
   const supabase = createAdminClient();
   const { error } = await supabase
@@ -19,6 +21,8 @@ export async function updateStudioIdentity(payload: {
       logo_light_url: payload.logo_light_url || null,
       logo_dark_url: payload.logo_dark_url || null,
       favicon_url: payload.favicon_url || null,
+      student_term_singular: payload.student_term_singular || "Student",
+      student_term_plural: payload.student_term_plural || "Students",
       updated_at: new Date().toISOString(),
     })
     .eq("id", STUDIO_SETTINGS_ID);

@@ -84,10 +84,10 @@ export default async function ChildrenPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-heading font-semibold text-charcoal">
-            My Dancers
+            My Students
           </h1>
           <p className="mt-1 text-sm text-slate">
-            Manage your children&apos;s profiles and enrollments.
+            Manage profiles and enrollments.
           </p>
         </div>
       </div>
@@ -95,8 +95,8 @@ export default async function ChildrenPage() {
       {students.length === 0 ? (
         <EmptyState
           icon="♡"
-          title="No dancers yet"
-          description="Add your child to start browsing classes and tracking their progress."
+          title="No students yet"
+          description="Add a student to start browsing classes and tracking progress."
         />
       ) : (
         <div className="space-y-6">
