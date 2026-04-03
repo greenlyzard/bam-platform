@@ -19,6 +19,28 @@ export default async function DashboardPage() {
   ]);
   const studioName = settings?.studio_name ?? "Ballet Academy & Movement";
 
+  // Upcoming events
+  const supabase = await createClient();
+  const nowDate = new Date();
+  const todayStr = `${nowDate.getFullYear()}-${String(nowDate.getMonth() + 1).padStart(2, "0")}-${String(nowDate.getDate()).padStart(2, "0")}`;
+
+  const [{ data: upcomingProductions }, { data: upcomingClosures }] = await Promise.all([
+    supabase
+      .from("productions")
+      .select("id, name, production_type, performance_date, start_time, venue_name")
+      .not("performance_date", "is", null)
+      .gte("performance_date", todayStr)
+      .order("performance_date")
+      .limit(5),
+    supabase
+      .from("studio_closures")
+      .select("id, closed_date, reason")
+      .eq("tenant_id", user.tenantId!)
+      .gte("closed_date", todayStr)
+      .order("closed_date")
+      .limit(3),
+  ]);
+
   const hasStudents = students.length > 0;
   const hasEnrollments = enrollments.length > 0;
 
@@ -94,6 +116,42 @@ export default async function DashboardPage() {
             Re-Enroll Now
           </Link>
         </div>
+      )}
+
+      {/* Upcoming events */}
+      {((upcomingClosures && upcomingClosures.length > 0) || (upcomingProductions && upcomingProductions.length > 0)) && (
+        <section>
+          <h2 className="text-lg font-heading font-semibold text-charcoal mb-3">
+            Upcoming
+          </h2>
+          <div className="space-y-2">
+            {(upcomingClosures ?? []).map((closure) => (
+              <div key={closure.id} className="flex items-center gap-3 p-3 rounded-xl bg-red-50 border border-red-100">
+                <span className="text-red-500 shrink-0">&#x1F6AB;</span>
+                <div>
+                  <div className="text-sm font-medium text-charcoal">
+                    Studio Closed{closure.reason ? ` \u2014 ${closure.reason}` : ""}
+                  </div>
+                  <div className="text-xs text-mist">
+                    {new Date(closure.closed_date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+                  </div>
+                </div>
+              </div>
+            ))}
+            {(upcomingProductions ?? []).map((prod) => (
+              <div key={prod.id} className={`flex items-center gap-3 p-3 rounded-xl ${prod.production_type === "competition" ? "bg-blue-50 border border-blue-100" : "bg-rose-50 border border-rose-100"}`}>
+                <span className="shrink-0">{prod.production_type === "competition" ? "\u{1F3C6}" : "\u{1F3AD}"}</span>
+                <div>
+                  <div className="text-sm font-medium text-charcoal">{prod.name}</div>
+                  <div className="text-xs text-mist">
+                    {new Date(prod.performance_date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+                    {prod.venue_name ? ` \u00b7 ${prod.venue_name}` : ""}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
       )}
 
       {/* No students yet — onboarding */}

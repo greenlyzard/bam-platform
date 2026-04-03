@@ -1,20 +1,15 @@
 import { requireParent } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
+import { getMyStudents } from "@/lib/queries/portal";
 import { PortalScheduleView } from "./schedule-view";
 
 export default async function PortalSchedulePage() {
   const user = await requireParent();
   const supabase = await createClient();
 
-  // Get students
-  const { data: students } = await supabase
-    .from("students")
-    .select("id, first_name, last_name, date_of_birth, current_level")
-    .eq("parent_id", user.id)
-    .eq("active", true)
-    .order("first_name");
-
-  const studentIds = (students ?? []).map((s) => s.id);
+  // Get students (includes guardian-linked students)
+  const students = await getMyStudents();
+  const studentIds = students.map((s) => s.id);
 
   // Get active enrollments with class info
   let enrollments: Array<{
@@ -55,10 +50,11 @@ export default async function PortalSchedulePage() {
 
   // Get upcoming schedule instances for enrolled classes (next 30 days)
   const enrolledClassIds = [...new Set(enrollments.map((e) => e.class_id))];
-  const today = new Date().toISOString().split("T")[0];
-  const future = new Date();
+  const nowDate = new Date();
+  const today = `${nowDate.getFullYear()}-${String(nowDate.getMonth() + 1).padStart(2, "0")}-${String(nowDate.getDate()).padStart(2, "0")}`;
+  const future = new Date(nowDate);
   future.setDate(future.getDate() + 30);
-  const futureStr = future.toISOString().split("T")[0];
+  const futureStr = `${future.getFullYear()}-${String(future.getMonth() + 1).padStart(2, "0")}-${String(future.getDate()).padStart(2, "0")}`;
 
   let instances: Array<{
     id: string;
