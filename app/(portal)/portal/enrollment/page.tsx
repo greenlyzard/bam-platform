@@ -5,8 +5,13 @@ import { ClassBrowser } from "./class-browser";
 
 export const metadata = { title: "Browse Classes" };
 
-export default async function EnrollmentPage() {
+export default async function EnrollmentPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ studentId?: string; type?: string }>;
+}) {
   await requireParent();
+  const { studentId, type } = await searchParams;
   const [classes, students] = await Promise.all([
     getClassCatalog(),
     getMyStudents(),
@@ -19,7 +24,7 @@ export default async function EnrollmentPage() {
           Browse Classes
         </h1>
         <p className="mt-1 text-sm text-slate">
-          Find the right class for your dancer and request enrollment or a trial.
+          Find the right class for your student and request enrollment or a trial.
         </p>
       </div>
 
@@ -32,6 +37,8 @@ export default async function EnrollmentPage() {
           date_of_birth: s.date_of_birth,
           trial_used: s.trial_used ?? false,
         }))}
+        initialStudentId={studentId}
+        initialType={type as "trial" | undefined}
       />
     </div>
   );

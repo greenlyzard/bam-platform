@@ -65,12 +65,16 @@ function calculateAge(dob: string): number {
 export function ClassBrowser({
   classes,
   students,
+  initialStudentId,
+  initialType,
 }: {
   classes: ClassInfo[];
   students: StudentInfo[];
+  initialStudentId?: string;
+  initialType?: "trial";
 }) {
   const [selectedStudent, setSelectedStudent] = useState<string>(
-    students[0]?.id ?? ""
+    (initialStudentId && students.some((s) => s.id === initialStudentId) ? initialStudentId : students[0]?.id) ?? ""
   );
   const [styleFilter, setStyleFilter] = useState<string>("");
   const [dayFilter, setDayFilter] = useState<string>("");

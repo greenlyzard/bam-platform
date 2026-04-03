@@ -200,19 +200,19 @@ export default async function DashboardPage() {
                     {rec.type === "trial" ? "\u{1F3AF}" : rec.type === "private" ? "\u2B50" : "\u2795"}
                   </span>
                 </div>
-                {rec.type === "trial" && rec.classId && (
-                  <Link href={`/enroll?class=${rec.classId}`} className="inline-block text-xs text-lavender underline underline-offset-2">
+                {rec.type === "trial" && (
+                  <Link href={`/portal/enrollment?studentId=${rec.studentId}&type=trial`} className="inline-block text-xs text-lavender underline underline-offset-2">
                     Book free trial &rarr;
                   </Link>
                 )}
                 {rec.type === "add_class" && (
-                  <Link href="/portal/enrollment" className="inline-block text-xs text-lavender underline underline-offset-2">
+                  <Link href={`/portal/enrollment?studentId=${rec.studentId}`} className="inline-block text-xs text-lavender underline underline-offset-2">
                     Browse classes &rarr;
                   </Link>
                 )}
                 {rec.type === "private" && (
-                  <Link href="/portal/book-private" className="inline-block text-xs text-lavender underline underline-offset-2">
-                    Learn more &rarr;
+                  <Link href="/portal/privates" className="inline-block text-xs text-lavender underline underline-offset-2">
+                    Book a private &rarr;
                   </Link>
                 )}
               </div>
