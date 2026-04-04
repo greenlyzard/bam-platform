@@ -73,8 +73,9 @@ export function ClassBrowser({
   initialStudentId?: string;
   initialType?: "trial";
 }) {
+  const cleanInitialId = initialStudentId?.trim();
   const [selectedStudent, setSelectedStudent] = useState<string>(
-    (initialStudentId && students.some((s) => s.id === initialStudentId) ? initialStudentId : students[0]?.id) ?? ""
+    (cleanInitialId && students.some((s) => s.id === cleanInitialId) ? cleanInitialId : students[0]?.id) ?? ""
   );
   const [styleFilter, setStyleFilter] = useState<string>("");
   const [dayFilter, setDayFilter] = useState<string>("");
@@ -119,7 +120,7 @@ export function ClassBrowser({
     if (!selectedStudent) {
       setMessage({
         type: "error",
-        text: "Please select a dancer first.",
+        text: "Please select a student first.",
       });
       return;
     }
@@ -173,7 +174,7 @@ export function ClassBrowser({
               href="/portal/students"
               className="underline font-medium"
             >
-              add a dancer
+              add a student
             </a>{" "}
             first before browsing classes.
           </div>

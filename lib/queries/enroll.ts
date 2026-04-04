@@ -18,6 +18,9 @@ export async function getClassCatalog(filters?: {
     `
     )
     .eq("is_active", true)
+    .eq("is_hidden", false)
+    .eq("is_rehearsal", false)
+    .eq("is_performance", false)
     .order("day_of_week")
     .order("start_time");
 
