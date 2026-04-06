@@ -93,8 +93,9 @@ interface Permission {
 // Constants
 // ---------------------------------------------------------------------------
 const LEVELS = [
-  "Petites", "Level 1", "Level 2A", "Level 2B", "Level 2B+", "Level 2C",
-  "Level 3A", "Level 3B", "Level 3C", "Level 4A", "Level 4B", "Level 4C",
+  "Petites", "Level 1", "Level 2", "Level 2A", "Level 2B", "Level 2B+",
+  "Level 2C", "Level 2C+", "Level 3A", "Level 3B", "Level 3C",
+  "Level 4", "Level 4A", "Level 4B", "Level 4C", "Adult/Teen",
 ];
 
 const EVAL_TYPES = [

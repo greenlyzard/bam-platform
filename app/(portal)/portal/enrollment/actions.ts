@@ -27,6 +27,9 @@ export async function requestEnrollment(formData: FormData) {
     requestType: formData.get("requestType"),
   });
 
+  console.log("[enroll] raw formData:", { studentId: formData.get("studentId"), classId: formData.get("classId"), requestType: formData.get("requestType") });
+  console.log("[enroll] parse result:", parsed.success, parsed.success ? null : parsed.error?.issues);
+
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
@@ -34,11 +37,13 @@ export async function requestEnrollment(formData: FormData) {
   // Verify student exists (admin client bypasses RLS)
   const supabaseAdmin = createAdminClient();
 
-  const { data: student } = await supabaseAdmin
+  const { data: student, error: studentErr } = await supabaseAdmin
     .from("students")
     .select("id, first_name, last_name, parent_id, family_id, trial_used")
     .eq("id", parsed.data.studentId)
     .single();
+
+  console.log("[enroll] student lookup:", { studentId: parsed.data.studentId, found: !!student, parent_id: student?.parent_id, err: studentErr?.message });
 
   if (!student) {
     return { error: "Student not found." };
