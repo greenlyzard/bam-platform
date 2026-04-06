@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -30,16 +31,21 @@ export async function requestEnrollment(formData: FormData) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  // Verify parent owns the student
-  const { data: student } = await supabase
+  // Verify student exists (admin client bypasses RLS)
+  const supabaseAdmin = createAdminClient();
+
+  const { data: student, error: studentErr } = await supabaseAdmin
     .from("students")
     .select("id, first_name, last_name, parent_id, family_id, trial_used")
     .eq("id", parsed.data.studentId)
     .single();
 
-  console.log("ENROLL ACTION - user.id:", user.id);
-  console.log("ENROLL ACTION - studentId:", parsed.data.studentId);
-  console.log("ENROLL ACTION - student found:", !!student, "parent_id:", student?.parent_id);
+  console.log("[enrollment:debug]", {
+    userId: user.id,
+    studentId: parsed.data.studentId,
+    student: student ? { id: student.id, parent_id: student.parent_id } : null,
+    error: studentErr?.message,
+  });
 
   if (!student) {
     return { error: "Student not found." };
@@ -47,7 +53,7 @@ export async function requestEnrollment(formData: FormData) {
 
   // Check ownership — parent_id OR guardian via student_guardians
   if (student.parent_id !== user.id) {
-    const { data: guardianLink } = await supabase
+    const { data: guardianLink } = await supabaseAdmin
       .from("student_guardians")
       .select("id")
       .eq("student_id", student.id)
@@ -56,12 +62,12 @@ export async function requestEnrollment(formData: FormData) {
       .maybeSingle();
 
     if (!guardianLink) {
-      return { error: "Student not found." };
+      return { error: "Not authorized." };
     }
   }
 
   // Get class details
-  const { data: cls } = await supabase
+  const { data: cls } = await supabaseAdmin
     .from("classes")
     .select("id, name, simple_name, max_enrollment, enrollment_count")
     .eq("id", parsed.data.classId)
@@ -70,7 +76,7 @@ export async function requestEnrollment(formData: FormData) {
   if (!cls) return { error: "Class not found." };
 
   // Check if already enrolled or request pending
-  const { data: existing } = await supabase
+  const { data: existing } = await supabaseAdmin
     .from("enrollments")
     .select("id, status")
     .eq("student_id", parsed.data.studentId)
@@ -83,7 +89,7 @@ export async function requestEnrollment(formData: FormData) {
   }
 
   // Check for existing open task
-  const { data: existingTask } = await supabase
+  const { data: existingTask } = await supabaseAdmin
     .from("admin_tasks")
     .select("id")
     .eq("related_student_id", parsed.data.studentId)
@@ -105,7 +111,7 @@ export async function requestEnrollment(formData: FormData) {
   }
 
   // Get tenant
-  const { data: tenant } = await supabase
+  const { data: tenant } = await supabaseAdmin
     .from("tenants")
     .select("id")
     .eq("slug", "bam")
@@ -118,7 +124,7 @@ export async function requestEnrollment(formData: FormData) {
   const isTrial = parsed.data.requestType === "trial_request";
 
   // Create admin task
-  const { error } = await supabase.from("admin_tasks").insert({
+  const { error } = await supabaseAdmin.from("admin_tasks").insert({
     tenant_id: tenant.id,
     task_type: parsed.data.requestType,
     title: isTrial
