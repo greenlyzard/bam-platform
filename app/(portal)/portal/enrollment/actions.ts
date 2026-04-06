@@ -37,8 +37,23 @@ export async function requestEnrollment(formData: FormData) {
     .eq("id", parsed.data.studentId)
     .single();
 
-  if (!student || student.parent_id !== user.id) {
+  if (!student) {
     return { error: "Student not found." };
+  }
+
+  // Check ownership — parent_id OR guardian via student_guardians
+  if (student.parent_id !== user.id) {
+    const { data: guardianLink } = await supabase
+      .from("student_guardians")
+      .select("id")
+      .eq("student_id", student.id)
+      .eq("profile_id", user.id)
+      .eq("portal_access", true)
+      .maybeSingle();
+
+    if (!guardianLink) {
+      return { error: "Student not found." };
+    }
   }
 
   // Get class details
