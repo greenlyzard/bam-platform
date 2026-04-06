@@ -29,6 +29,7 @@ interface StudentInfo {
   last_name: string;
   date_of_birth: string;
   trial_used: boolean;
+  current_level: string | null;
 }
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -60,6 +61,12 @@ function calculateAge(dob: string): number {
   const m = today.getMonth() - d.getMonth();
   if (m < 0 || (m === 0 && today.getDate() < d.getDate())) age--;
   return age;
+}
+
+function requiresAssessment(cls: ClassInfo): boolean {
+  const level = (cls.level ?? "").toLowerCase();
+  const name = cls.name.toLowerCase();
+  return level === "advanced" || name.includes("pointe") || name.includes("company");
 }
 
 export function ClassBrowser({
@@ -109,6 +116,8 @@ export function ClassBrowser({
       (cls) => cls.dayOfWeek === parseInt(dayFilter, 10)
     );
   }
+
+  const isPlaced = !!(student?.current_level && student.current_level.trim() !== "");
 
   // Get unique styles for filter
   const availableStyles = [...new Set(classes.map((c) => c.style))].sort();
@@ -227,6 +236,33 @@ export function ClassBrowser({
         </div>
       )}
 
+      {/* Unplaced student banner */}
+      {student && !isPlaced && (
+        <div className="p-4 rounded-xl bg-lavender/5 border border-lavender/20">
+          <div className="flex items-start gap-3">
+            <span className="text-xl shrink-0">B</span>
+            <div>
+              <div className="font-medium text-charcoal text-sm">
+                New students start with a placement assessment
+              </div>
+              <div className="text-xs text-mist mt-1">
+                A complimentary assessment with one of our directors ensures {student.first_name} is placed in the perfect class for their level and goals. You can still browse and request classes below.
+              </div>
+              <div className="flex gap-2 mt-3">
+                <a href="sms:9492290846?body=Hi! I'd like to schedule a placement assessment."
+                   className="text-xs px-3 py-1.5 bg-lavender text-white rounded-full hover:opacity-90 transition-colors">
+                  Text to Schedule
+                </a>
+                <a href="tel:9492290846"
+                   className="text-xs px-3 py-1.5 border border-lavender text-lavender rounded-full hover:bg-lavender/5 transition-colors">
+                  Call Us
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Results count */}
       <p className="text-xs text-mist">
         {filtered.length} {filtered.length === 1 ? "class" : "classes"}{" "}
@@ -303,13 +339,19 @@ export function ClassBrowser({
                 </p>
               )}
 
+              {requiresAssessment(cls) && !isPlaced && (
+                <div className="rounded-lg bg-gold/10 border border-gold/20 px-3 py-2 text-xs text-gold-dark">
+                  Assessment required — contact us to schedule a placement before enrolling.
+                </div>
+              )}
+
               {students.length > 0 && (
                 <div className="flex gap-2 pt-1">
                   <button
                     onClick={() =>
                       handleRequest(cls.id, "enrollment_request")
                     }
-                    disabled={submitting !== null}
+                    disabled={submitting !== null || (requiresAssessment(cls) && !isPlaced)}
                     className="flex-1 h-9 rounded-lg bg-lavender hover:bg-lavender-dark text-white text-sm font-semibold transition-colors disabled:opacity-50"
                   >
                     {submitting === `${cls.id}-enrollment_request`
@@ -318,7 +360,7 @@ export function ClassBrowser({
                         ? "Join Waitlist"
                         : "Request Enrollment"}
                   </button>
-                  {!student?.trial_used && (
+                  {!student?.trial_used && !(requiresAssessment(cls) && !isPlaced) && (
                     <button
                       onClick={() =>
                         handleRequest(cls.id, "trial_request")

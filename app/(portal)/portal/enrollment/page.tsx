@@ -36,6 +36,7 @@ export default async function EnrollmentPage({
           last_name: s.last_name,
           date_of_birth: s.date_of_birth,
           trial_used: s.trial_used ?? false,
+          current_level: s.current_level ?? null,
         }))}
         initialStudentId={studentId}
         initialType={type as "trial" | undefined}
