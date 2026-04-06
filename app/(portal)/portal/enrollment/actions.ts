@@ -37,6 +37,10 @@ export async function requestEnrollment(formData: FormData) {
     .eq("id", parsed.data.studentId)
     .single();
 
+  console.log("ENROLL ACTION - user.id:", user.id);
+  console.log("ENROLL ACTION - studentId:", parsed.data.studentId);
+  console.log("ENROLL ACTION - student found:", !!student, "parent_id:", student?.parent_id);
+
   if (!student) {
     return { error: "Student not found." };
   }
