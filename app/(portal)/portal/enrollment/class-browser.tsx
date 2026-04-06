@@ -63,6 +63,13 @@ function calculateAge(dob: string): number {
   return age;
 }
 
+const ADMIN_ASSIGNED_LEVELS = [
+  "Petites", "Level 1", "Level 2", "Level 2A", "Level 2B",
+  "Level 2B+", "Level 2C", "Level 2C+", "Level 3A",
+  "Level 3B", "Level 3C", "Level 4", "Level 4A", "Level 4B",
+  "Level 4C", "Adult/Teen",
+];
+
 function requiresAssessment(cls: ClassInfo): boolean {
   const level = (cls.level ?? "").toLowerCase();
   const name = cls.name.toLowerCase();
@@ -120,7 +127,7 @@ export function ClassBrowser({
     );
   }
 
-  const isPlaced = !!(student?.current_level && student.current_level.trim() !== "");
+  const isPlaced = student?.current_level != null && ADMIN_ASSIGNED_LEVELS.includes(student.current_level);
 
   // Get unique styles for filter
   const availableStyles = [...new Set(classes.map((c) => c.style))].sort();
