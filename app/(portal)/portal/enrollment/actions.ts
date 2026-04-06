@@ -34,18 +34,11 @@ export async function requestEnrollment(formData: FormData) {
   // Verify student exists (admin client bypasses RLS)
   const supabaseAdmin = createAdminClient();
 
-  const { data: student, error: studentErr } = await supabaseAdmin
+  const { data: student } = await supabaseAdmin
     .from("students")
     .select("id, first_name, last_name, parent_id, family_id, trial_used")
     .eq("id", parsed.data.studentId)
     .single();
-
-  console.log("[enrollment:debug]", {
-    userId: user.id,
-    studentId: parsed.data.studentId,
-    student: student ? { id: student.id, parent_id: student.parent_id } : null,
-    error: studentErr?.message,
-  });
 
   if (!student) {
     return { error: "Student not found." };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { SimpleSelect } from "@/components/ui/select";
 import { requestEnrollment } from "./actions";
 
@@ -91,6 +91,9 @@ export function ClassBrowser({
     type: "success" | "error";
     text: string;
   } | null>(null);
+
+  useEffect(() => { setMessage(null); }, []);
+  useEffect(() => { setMessage(null); }, [selectedStudent]);
 
   const student = students.find((s) => s.id === selectedStudent);
   const studentAge = student ? calculateAge(student.date_of_birth) : null;
