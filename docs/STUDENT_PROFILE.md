@@ -27,6 +27,7 @@ The student profile is the emotional heart of the parent experience. It surfaces
 | Master Classes | External master classes, workshops attended | Admin |
 | School Credentials | Exam results, certifications, school affiliations | Admin |
 | Team Placements | Company, competitive team, program assignments | Admin |
+| **Health & Medical** | **Allergies, conditions, emergency contacts, insurance, consent** | **Admin; parent can self-serve update** |
 | Evaluations | Teacher/admin notes and formal evaluations | Admin only |
 | Upcoming Schedule | Next classes, rehearsals, performances | Auto from schedule |
 | Photo Gallery | Linked Google Photos album(s) | Admin pastes URL |
@@ -85,7 +86,83 @@ The student profile is the emotional heart of the parent experience. It surfaces
 
 ---
 
-## 6. Highlight Reel Section
+## 6. Health & Medical Records ← NEW (from DMP gap analysis)
+
+This section is a structured, secure record of each student's health and safety information. It is **admin-only** and **parent-editable** but never visible to teachers (per the contact firewall in COMMUNICATIONS_AND_STAFF_VISIBILITY.md). Exception: a teacher can see **allergen flags only** (not full medical detail) when taking class attendance — this is the minimum necessary for student safety.
+
+### Why This Exists
+BAM teaches children as young as 3 years old. The studio has a duty-of-care obligation to maintain structured health records for every minor student. Free-text `medical_notes` on the `students` table is insufficient for a studio approaching licensable SaaS.
+
+### Data Captured
+
+| Field | Type | Notes |
+|---|---|---|
+| allergies | text[] | Array of known allergens (e.g. ["peanuts", "bee stings"]) |
+| allergy_severity | text | 'mild' / 'moderate' / 'severe / epipen required' |
+| medical_conditions | text | Free text — chronic conditions, relevant diagnoses |
+| current_medications | text | Medications that may affect class participation |
+| physician_name | text | Primary care provider |
+| physician_phone | text | |
+| insurance_carrier | text | Health insurance provider name |
+| insurance_policy_number | text | For emergency billing reference |
+| emergency_contact_name | text | Override for class-day emergencies (may differ from guardian) |
+| emergency_contact_phone | text | |
+| emergency_contact_relationship | text | |
+| photo_consent | boolean | Parent has consented to photography/video |
+| media_release | boolean | Parent has consented to media use in marketing |
+| physical_limitations | text | Injuries, restricted movements, modifications needed |
+| last_updated_at | timestamptz | |
+| last_updated_by | uuid | Admin or parent user ID |
+
+### Database Schema
+
+```sql
+CREATE TABLE IF NOT EXISTS student_health_records (
+  id                          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id                   uuid NOT NULL REFERENCES tenants(id),
+  student_id                  uuid NOT NULL UNIQUE REFERENCES students(id) ON DELETE CASCADE,
+  allergies                   text[] DEFAULT '{}',
+  allergy_severity            text CHECK (allergy_severity IN ('mild','moderate','severe')),
+  medical_conditions          text,
+  current_medications         text,
+  physician_name              text,
+  physician_phone             text,
+  insurance_carrier           text,
+  insurance_policy_number     text,
+  emergency_contact_name      text,
+  emergency_contact_phone     text,
+  emergency_contact_relationship text,
+  photo_consent               boolean NOT NULL DEFAULT false,
+  media_release               boolean NOT NULL DEFAULT false,
+  physical_limitations        text,
+  last_updated_at             timestamptz DEFAULT now(),
+  last_updated_by             uuid REFERENCES profiles(id),
+  created_at                  timestamptz DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_health_records_tenant  ON student_health_records(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_health_records_student ON student_health_records(student_id);
+```
+
+### RLS
+- Admin / Super Admin: full CRUD
+- Parent (own child via `student_guardians` link): SELECT + UPDATE only — never DELETE
+- Teacher: SELECT on `allergies` column ONLY, scoped to students in their classes
+- Student: no access
+
+### UI Location
+- Admin: `/admin/students/[id]/health` — dedicated tab in admin student profile
+- Parent portal: `/portal/students/[id]/health` — dedicated "Health Info" tab, simplified form
+- Teacher view: allergen badge only on attendance roster (e.g. 🥜 peanut allergy) — no other health detail
+
+### Alert Surface
+- If `allergy_severity = 'severe'` → red badge on student's attendance roster row for the teacher
+- Admin dashboard: students with no health record on file shown in a "Incomplete Profiles" widget
+- Enrollment can optionally be gated on health record completion (tenant setting: `require_health_record_for_enrollment`, default false)
+
+---
+
+## 7. Highlight Reel Section
 
 - Auto-populated from the media monetization module (PERFORMANCE_MEDIA_AND_MONETIZATION.md)
 - Shows all purchased highlight reels and performance videos for this student
@@ -96,7 +173,7 @@ The student profile is the emotional heart of the parent experience. It surfaces
 
 ---
 
-## 7. Photo Gallery
+## 8. Photo Gallery
 
 ### Google Photos Integration
 - Admin pastes a Google Photos shared album URL per student
@@ -114,7 +191,7 @@ The student profile is the emotional heart of the parent experience. It surfaces
 
 ---
 
-## 8. Evaluations
+## 9. Evaluations
 
 ### Who Can Write
 - Studio Admin only — teachers cannot write evaluations directly
@@ -137,7 +214,7 @@ The student profile is the emotional heart of the parent experience. It surfaces
 
 ---
 
-## 9. Shareable Public Profile
+## 10. Shareable Public Profile
 
 ### Concept
 Parent generates a shareable link for a specific relative (grandparent, aunt, etc.). Each relative gets their own customized view based on what the parent has permitted them to see.
@@ -153,7 +230,7 @@ Parent generates a shareable link for a specific relative (grandparent, aunt, et
   - Highlight reel (purchased videos)
   - Competition results
   - Upcoming schedule
-- Documents, waivers, and evaluations are NEVER shareable — always private
+- Documents, waivers, **health records**, and evaluations are NEVER shareable — always private
 - Each relative gets a unique shareable URL
 - Share links stay active until parent manually revokes them — no automatic expiry
 
@@ -164,7 +241,7 @@ Parent generates a shareable link for a specific relative (grandparent, aunt, et
 - Falls back to token URL if no vanity URL set
 - Vanity URL redirects to the same permission-filtered view
 
-### Schema (new tables)
+### Schema (existing tables)
 ```
 student_profile_relatives
   id, student_id, tenant_id, name, relationship, email, share_token,
@@ -178,7 +255,7 @@ student_profile_share_permissions
 
 ---
 
-## 10. Documents & Waivers Section
+## 11. Documents & Waivers Section
 
 - Auto-populated from the documents module (waivers, enrollment agreements, policies)
 - Shows document name, date signed, and a "View" link
@@ -188,7 +265,7 @@ student_profile_share_permissions
 
 ---
 
-## 11. Student Self-Edit (Age 16+)
+## 12. Student Self-Edit (Age 16+)
 
 - Students aged 16 and above can:
   - Upload their own headshot
@@ -199,7 +276,7 @@ student_profile_share_permissions
 
 ---
 
-## 12. Visual Design Principles
+## 13. Visual Design Principles
 
 - Profile feels like a sports trading card meets a digital yearbook
 - Large headshot hero section with gradient overlay
@@ -213,10 +290,10 @@ student_profile_share_permissions
 
 ---
 
-## 13. Admin Profile Management
+## 14. Admin Profile Management
 
 ### Admin View (at /admin/students/[id]/profile)
-- All sections visible including private evaluations
+- All sections visible including private evaluations and full health records
 - Edit controls per section
 - Upload headshot
 - Add/edit bio, master classes, credentials, team placements
@@ -224,13 +301,14 @@ student_profile_share_permissions
 - Set level and progress percentage
 - Add evaluation (parents notified automatically)
 - Paste Google Photos album URLs
+- View and edit health records (full access)
 - View sharing settings (which relatives have access, what they can see)
 - Set/edit vanity URL slug
 - Preview public profile as a specific relative
 
 ---
 
-## 14. Decisions Log
+## 15. Decisions Log
 
 | # | Decision |
 |---|----------|
@@ -245,5 +323,9 @@ student_profile_share_permissions
 | 9 | Sharing: custom per-relative permissions — parent controls what each relative sees |
 | 10 | Share links: active until parent revokes — no automatic expiry |
 | 11 | Vanity URLs: yes — format: portal.bamsocal.com/dancer/[slug] |
-| 12 | Documents/waivers: never shareable with relatives |
+| 12 | Documents/waivers and health records: never shareable with relatives |
 | 13 | Gamification: both levels (progress bar) and badges (badge wall + upcoming row) |
+| 14 | **Health records: structured `student_health_records` table — replaces free-text `medical_notes`** |
+| 15 | **Teacher allergy visibility: allergen badge on roster only — no other health detail** |
+| 16 | **Parent can self-update health record via portal — admin approval not required** |
+| 17 | **Health record completeness tracked — admin notified of incomplete profiles** |
