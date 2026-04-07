@@ -40,8 +40,6 @@ Each action item has:
 | Build Laguna Niguel SEO landing page | Claude Code | Fully autonomous | Day 7-9 |
 | Build Dana Point SEO landing page | Claude Code | Fully autonomous | Day 9-11 |
 
-**Claude can do autonomously:** All content writing, schema markup, FAQ generation, keyword mapping for each city page.
-
 ---
 
 ## Sprint 2: Parent Portal MVP (30-60 Days)
@@ -50,6 +48,7 @@ Each action item has:
 |------|-------|-----------|----------|
 | Parent auth flow (magic link login) | Claude Code | Fully autonomous | Week 5 |
 | Student profile creation | Claude Code | Fully autonomous | Week 5 |
+| **Student health records form (parent self-serve)** | Claude Code | Fully autonomous | Week 5 |
 | Class enrollment flow | Claude Code | Fully autonomous | Week 6 |
 | Class schedule view | Claude Code | Fully autonomous | Week 6 |
 | Payment history view (Stripe integration) | Claude Code | Fully autonomous | Week 7 |
@@ -64,10 +63,12 @@ Each action item has:
 |------|-------|-----------|----------|
 | Teacher auth + class assignment | Claude Code | Fully autonomous | Week 9 |
 | Attendance tracking UI | Claude Code | Fully autonomous | Week 9 |
-| Student roster with photos + notes | Claude Code | Fully autonomous | Week 10 |
+| **Session progress notes on attendance records** | Claude Code | Fully autonomous | Week 9 |
+| Student roster with photos, allergen flags, notes | Claude Code | Fully autonomous | Week 10 |
 | Basic streaming integration (Cloudflare) | Claude Code | Fully autonomous | Week 10-11 |
 | Family access streaming permissions | Claude Code | Fully autonomous | Week 11 |
 | Parent messaging from teacher portal | Claude Code | Fully autonomous | Week 12 |
+| **Staff Resource Library — seed folders + upload UI** | Claude Code | Fully autonomous | Week 12 |
 
 ---
 
@@ -81,6 +82,50 @@ Each action item has:
 | Constellation progress visualization | Claude Code | Fully autonomous | Week 15-16 |
 | Parent LMS view (progress, milestones) | Claude Code | Fully autonomous | Week 16 |
 | Age-gated content routing | Claude Code | Fully autonomous | Week 16 |
+
+---
+
+## Backlog — DMP Competitive Gap Items (Prioritized)
+
+These items were identified via competitive analysis of Dance Master Pro (April 2026). They are not on the current sprint plan but should be scheduled once core modules are stable.
+
+### P0 — Safety & Liability (Schedule Immediately)
+
+| Task | Priority | Owner | Notes |
+|---|---|---|---|
+| Student health records module (`student_health_records` table + admin UI + parent portal form) | **P0** | Claude Code | Schema in STUDENT_PROFILE.md. Allergen badge on teacher roster. Enrollment gate option. |
+
+---
+
+### P1 — Revenue Protection (Schedule After Core Portal is Live)
+
+| Task | Priority | Owner | Notes |
+|---|---|---|---|
+| Angelina `retention_risk_scan` cron + dashboard card | P1 | Claude Code | Schema in ANGELINA_SPEC_V2.md. Nightly at 2am. Requires attendance + enrollment data to be populated first. |
+| Formal PDF invoice generation per tuition payment | P1 | Claude Code | FSA/HSA reimbursement support for target demographic. Triggered per payment. Stored in Supabase Storage. Linked from parent portal. |
+| Angelina `payment_followup_composer` skill | P1 | Claude Code | Dependent on tuition/auto-pay module (see STUDIO_PRO_COMPARISON.md Phase 1). Draft BAM-voiced messages for late payments. |
+
+---
+
+### P2 — Operational Excellence (Schedule for Phase 2)
+
+| Task | Priority | Owner | Notes |
+|---|---|---|---|
+| Choreography & Production Manager — catalog layer | P2 | Claude Code | Master choreography library independent of productions. Media attachments. Links to existing `production_dances`. See MODULES.md Module 10. |
+| Staff Resource Library module | P2 | Claude Code | Folder-based doc library for teachers. Schema in MODULES.md Module 11. Seed BAM default folders on deploy. |
+| Session progress notes + `progress_flag` on attendance records | P2 | Claude Code | Teacher adds optional note per student per class. Surfaces on student profile + parent portal. See ATTENDANCE.md. |
+| Angelina `class_performance_digest` cron + dashboard card | P2 | Claude Code | Weekly Sunday job. Fill rate + attendance rate health scoring per class. Schema in ANGELINA_SPEC_V2.md. |
+
+---
+
+### P3 — Nice to Have (Phase 3 / SaaS)
+
+| Task | Priority | Owner | Notes |
+|---|---|---|---|
+| Lobby display / digital signage route (`/display/schedule`) | P3 | Claude Code | No auth. Auto-refresh. Kiosk mode. See MODULES.md Module 12. 1–2 hour build. |
+| Competition entry manager | P3 | Claude Code | Structured registration flow for competition organizer data export. See COMPETITIVE_DANCEMASTERPRO.md. |
+| Concierge import wizard (Studio Pro / Excel import) | P3 | Claude Code | White-label SaaS prerequisite. See SAAS.md. Students won't re-enter years of data manually. |
+| Dancer ID / membership card | P3 | Derek | Low priority for California. Medium priority for white-label SaaS markets. |
 
 ---
 
@@ -107,7 +152,6 @@ Each action item has:
 - Monitor and flag any Google/Yelp reviews that need response
 - Generate monthly competitive intelligence report
 - Draft parent newsletter content
-- Create FAQ content for new pages
 - Generate class descriptions for new programs
 - Write teacher job postings when needed
 
@@ -115,80 +159,12 @@ Each action item has:
 
 ## Klaviyo Sequences to Build
 
-### Sequence 1: New Lead Welcome
-- Trigger: Form submission or chatbot inquiry
-- Email 1 (Immediate): Welcome + about BAM + Amanda's story
-- Email 2 (Day 2): Class recommendation based on child age
-- Email 3 (Day 4): What makes BAM different (credentials, class size, Nutcracker)
-- Email 4 (Day 7): Trial class CTA + social proof (intensive acceptances)
-- Email 5 (Day 14): "We saved you a spot" urgency + easy booking link
-- Email 6 (Day 21): Parent testimonial + limited availability reminder
-
-**Claude can write all 6 emails autonomously.**
-
-### Sequence 2: Post-Trial Class
-- Trigger: Trial class attended (Studio Pro webhook)
-- Email 1 (Same day): "We loved meeting [child's name] today"
-- Email 2 (Day 2): Class placement recommendation + enrollment link
-- Email 3 (Day 5): What the first month looks like
-- Email 4 (Day 10): One last follow-up before spot is released
-
+### Sequence 1: New Lead Welcome (6 emails over 21 days)
+### Sequence 2: Post-Trial Class (4 emails)
 ### Sequence 3: Re-Enrollment (Season Change)
-- Trigger: 30 days before new season
-- Email 1: Early enrollment opens for existing families
-- Email 2: New classes/programs for next season
-- Email 3: Final enrollment deadline
+### Sequence 4: Nutcracker Hype (5 emails)
 
-### Sequence 4: Nutcracker Hype
-- Trigger: 90 days before performance
-- Email 1: Audition announcement
-- Email 2: Role assignments
-- Email 3: Ticket sales open
-- Email 4: Performance week logistics
-- Email 5: Streaming ticket sales (for remote family)
-
----
-
-## Content Calendar (Claude Generates Weekly)
-
-### Instagram (4x/week)
-| Day | Content Type | Example |
-|-----|-------------|---------|
-| Monday | Technique tip | "Why turnout starts from the hip, not the foot" |
-| Wednesday | Student moment | Beautiful arabesque in class (with consent) |
-| Friday | Behind the scenes | Nutcracker rehearsal prep |
-| Sunday | Parent education | "Benefits of ballet for 4-year-olds" |
-
-### TikTok (3x/week)
-| Day | Content Type | Format |
-|-----|-------------|--------|
-| Tuesday | Amanda teaching tip | 30-60 sec, talking to camera |
-| Thursday | Student transformation | Before/after level progression |
-| Saturday | Performance highlight | Nutcracker or showcase clip |
-
-### Blog/SEO (2x/month)
-- "When Should My Child Start Ballet?" — high search volume
-- "Benefits of Ballet for Toddlers" — parent education
-- "How Small Class Sizes Change Ballet Training" — differentiator
-- "What Makes Classical Ballet Different from Recreational Dance" — positioning
-- "Preparing Your Child for a Ballet Intensive" — high-intent audience
-
----
-
-## Referral Program
-
-**Design:**
-- Enrolled parent refers a new family
-- New family completes trial + enrolls
-- Referring family gets: 1 month free tuition credit
-- New family gets: First month 15% off
-
-**Platform tracks:**
-- Referral source at enrollment
-- Credit issued automatically
-- Admin can override/adjust
-
-**Claude builds:** referral tracking module, automated credit application
+**Claude can write all sequences autonomously.**
 
 ---
 
@@ -209,25 +185,16 @@ When 4+ thresholds are met → Admin dashboard shows "Expansion Ready" alert.
 
 ---
 
-## AI Autonomous Tasks (No Direction Needed)
+## Competitive Research Pipeline
 
-These Claude should do proactively:
+Per the research methodology established in April 2026, these platforms should be analyzed next (same format as COMPETITIVE_DANCEMASTERPRO.md):
 
-### Weekly
-- Generate 20 social media captions for the coming week
-- Research any new competitor studio openings in South OC
-- Check for broken links or outdated content on BAM website
-- Review and flag any unanswered Google/Yelp reviews
+| Platform | URL | Priority | Status |
+|---|---|---|---|
+| Jackrabbit Dance | jackrabbittech.com | High | Not started |
+| The Studio Director | thinkeric.com | High | Not started |
+| Pike13 | pike13.com | Medium | Not started |
+| iClassPro | iclasspro.com | Medium | Not started |
+| Mindbody | mindbodyonline.com | Low | Not started |
 
-### Monthly
-- Full competitive intelligence update (all 11 competitors)
-- SEO keyword ranking report for all landing pages
-- Suggest 2 new blog post topics based on current search trends
-- Draft parent newsletter for the month
-- Generate next month's Klaviyo email content
-
-### Seasonally
-- Pre-Nutcracker: Generate all marketing copy, email sequences, social content
-- Pre-spring showcase: Same as above
-- Enrollment season: Generate urgency campaigns, waitlist communications
-- Summer intensive season: Generate audition prep content for LMS
+For each: fetch homepage, AI features page, pricing page. Output as `COMPETITIVE_[NAME].md` in docs/ directory. Cross-reference against BAM Platform feature set and add new gaps to this ACTION_PLAN backlog.
