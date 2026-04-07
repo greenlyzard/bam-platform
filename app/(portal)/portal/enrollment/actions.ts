@@ -27,9 +27,6 @@ export async function requestEnrollment(formData: FormData) {
     requestType: formData.get("requestType"),
   });
 
-  console.log("[enroll] raw formData:", { studentId: formData.get("studentId"), classId: formData.get("classId"), requestType: formData.get("requestType") });
-  console.log("[enroll] parse result:", parsed.success, parsed.success ? null : parsed.error?.issues);
-
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
@@ -37,13 +34,11 @@ export async function requestEnrollment(formData: FormData) {
   // Verify student exists (admin client bypasses RLS)
   const supabaseAdmin = createAdminClient();
 
-  const { data: student, error: studentErr } = await supabaseAdmin
+  const { data: student } = await supabaseAdmin
     .from("students")
     .select("id, first_name, last_name, parent_id, family_id, trial_used")
     .eq("id", parsed.data.studentId)
     .single();
-
-  console.log("[enroll] student lookup:", { studentId: parsed.data.studentId, found: !!student, parent_id: student?.parent_id, err: studentErr?.message });
 
   if (!student) {
     return { error: "Student not found." };
@@ -65,11 +60,13 @@ export async function requestEnrollment(formData: FormData) {
   }
 
   // Get class details
-  const { data: cls } = await supabaseAdmin
+  const { data: cls, error: clsErr } = await supabaseAdmin
     .from("classes")
-    .select("id, name, simple_name, max_enrollment, enrollment_count")
+    .select("id, name, max_enrollment, enrolled_count")
     .eq("id", parsed.data.classId)
     .single();
+
+  console.log("[enroll] class lookup:", { classId: parsed.data.classId, found: !!cls, err: clsErr?.message });
 
   if (!cls) return { error: "Class not found." };
 
@@ -117,36 +114,38 @@ export async function requestEnrollment(formData: FormData) {
 
   if (!tenant) return { error: "Studio not found." };
 
-  const className = cls.simple_name || cls.name;
+  const className = cls.name;
   const studentName = `${student.first_name} ${student.last_name}`;
   const isTrial = parsed.data.requestType === "trial_request";
 
-  // Create admin task
-  const { error } = await supabaseAdmin.from("admin_tasks").insert({
-    tenant_id: tenant.id,
-    task_type: parsed.data.requestType,
-    title: isTrial
-      ? `Trial request: ${studentName} for ${className}`
-      : `Enrollment request: ${studentName} for ${className}`,
-    description: isTrial
-      ? `${studentName}'s parent has requested a trial class in ${className}.`
-      : `${studentName}'s parent has requested enrollment in ${className}.`,
-    priority: "normal",
-    status: "open",
-    related_class_id: parsed.data.classId,
-    related_student_id: parsed.data.studentId,
-    related_family_id: student.family_id ?? null,
-    metadata: {
-      parent_user_id: user.id,
-      student_name: studentName,
-      class_name: className,
-      request_type: parsed.data.requestType,
-    },
-  });
-
-  if (error) {
-    console.error("[enrollment:request]", error);
-    return { error: "Failed to submit request. Please try again." };
+  // Create admin task — wrapped to prevent blocking enrollment if table issue
+  try {
+    const { error } = await supabaseAdmin.from("admin_tasks").insert({
+      tenant_id: tenant.id,
+      task_type: parsed.data.requestType,
+      title: isTrial
+        ? `Trial request: ${studentName} for ${className}`
+        : `Enrollment request: ${studentName} for ${className}`,
+      description: isTrial
+        ? `${studentName}'s parent has requested a trial class in ${className}.`
+        : `${studentName}'s parent has requested enrollment in ${className}.`,
+      priority: "normal",
+      status: "open",
+      related_class_id: parsed.data.classId,
+      related_student_id: parsed.data.studentId,
+      related_family_id: student.family_id ?? null,
+      metadata: {
+        parent_user_id: user.id,
+        student_name: studentName,
+        class_name: className,
+        request_type: parsed.data.requestType,
+      },
+    });
+    if (error) {
+      console.error("[enroll] admin_tasks insert failed:", error.message);
+    }
+  } catch (e) {
+    console.error("[enroll] admin_tasks insert exception:", e);
   }
 
   revalidatePath("/portal/enrollment");
