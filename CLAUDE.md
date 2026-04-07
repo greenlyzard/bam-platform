@@ -307,5 +307,27 @@ Full strategy: `docs/marketing/local-seo-strategy.md`
 
 ---
 
+## Schema Verification (Mandatory Before Any DB Work)
+
+Before writing ANY Supabase query or migration:
+1. Read /types/database.types.ts — auto-generated from live DB, single source of truth
+2. Every column you use MUST appear in this file exactly as spelled. If it's not there, it does not exist in the live DB.
+3. After any migration push (done by Derek in Regular Terminal), regenerate types:
+   Regular Terminal: supabase gen types typescript --project-id niabwaofqsirfsktyyff > types/database.types.ts
+4. Then verify: npx tsc --noEmit (must be clean before writing new code)
+5. Run the schema check script: bash docs/skills/bam-schema-sync/scripts/schema-check.sh
+
+Supabase project ID: niabwaofqsirfsktyyff
+Types file: /types/database.types.ts
+Key tables reference: /docs/skills/bam-schema-sync/references/key-tables.md
+
+Known column name traps from past bugs:
+- students: use active (not is_active), no full_name column
+- profile_roles: FK column is user_id (not profile_id)
+- classes: no tenant_id column directly
+- profiles: no full_name column — use first_name + last_name
+
+---
+
 *Last updated: March 2026*
 *Update whenever a major decision is made, a module ships, a table is added, or strategy shifts.*
