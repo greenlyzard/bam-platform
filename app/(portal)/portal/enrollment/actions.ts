@@ -2,11 +2,9 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sendRawEmail } from "@/lib/email/send";
 import { revalidatePath } from "next/cache";
-import { Resend } from "resend";
 import { z } from "zod";
-
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 const requestSchema = z.object({
   studentId: z.string().uuid(),
@@ -153,11 +151,10 @@ export async function requestEnrollment(formData: FormData) {
 
   // Email notification to studio
   try {
-    await resend.emails.send({
-      from: "Ballet Academy and Movement <noreply@send.bamsocal.com>",
-      to: ["dance@bamsocal.com"],
+    await sendRawEmail({
+      to: "dance@bamsocal.com",
       subject: `New ${isTrial ? "Trial" : "Enrollment"} Request — ${studentName}`,
-      html: `
+      bodyHtml: `
         <h2>New ${isTrial ? "Trial Class" : "Enrollment"} Request</h2>
         <p><strong>Student:</strong> ${studentName}</p>
         <p><strong>Class:</strong> ${className}</p>
