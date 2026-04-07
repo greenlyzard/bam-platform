@@ -13,6 +13,9 @@
 | 7 | Studio Shop | `/shop` | Parents, Admin |
 | 8 | Expansion Intelligence | `/admin/expansion` | Super Admin |
 | 9 | BAM Learning Studio (LMS) | `/learn` | Students, Teachers, Parents |
+| 10 | **Choreography & Production Manager** | `/admin/productions` | Admin, Super Admin |
+| 11 | **Staff Resource Library** | `/admin/resources/library` | Admin, Teachers |
+| 12 | **Lobby Display / Digital Signage** | `/display/schedule` | Public (kiosk) |
 
 ---
 
@@ -30,6 +33,7 @@
 - **Performance Hub** — Nutcracker/recital dates, role assignments, rehearsal schedules
 - **Trial Class Booking** — self-serve trial class scheduling for new families
 - **Photo Consent & Waivers** — digital signature, stored in Supabase
+- **Health & Medical** — parent can update student health record (allergies, emergency contacts, insurance)
 
 ### UX Rules
 - Mobile-first — most parents check on phone
@@ -45,14 +49,15 @@
 
 ### Features
 - **My Classes** — daily/weekly schedule view
-- **Class Roster** — student photos, age, level, medical notes, attendance history
-- **Attendance Tracker** — one-tap mark present/absent/late per student
+- **Class Roster** — student photos, age, level, allergen flags, attendance history
+- **Attendance Tracker** — one-tap mark present/absent/late per student; optional session progress note
 - **Student Notes** — private notes per student (not visible to parents unless shared)
 - **Progress Updates** — record skill assessments, award badges
 - **Content Upload** — upload short-form video content for LMS feed
-- **Live Stream Controls** — start/stop live feed for class (see Module 9)
+- **Live Stream Controls** — start/stop live feed for class
 - **Communication** — message individual parents or broadcast to class
 - **Curriculum Guide** — level-by-level skill checklist and teaching notes
+- **Staff Resource Library** — access studio syllabi, policy docs, teaching materials
 
 ### Live Stream Controls (GameChanger-style)
 - Toggle ON/OFF per class session
@@ -74,10 +79,11 @@
 - **Class Management** — create/edit classes, assign teachers, set capacity
 - **Student Directory** — searchable student database
 - **Teacher Management** — teacher profiles, schedule, certifications
-- **Lead Pipeline** — inquiry tracking, trial class conversions (see Module 5)
+- **Lead Pipeline** — inquiry tracking, trial class conversions
 - **Communication Center** — broadcast emails/SMS via Klaviyo
 - **Mandated Reporter Log** — incident reporting workflow, compliance tracking
 - **Studio Shop Control** — activate/deactivate shop, manage inventory
+- **Angelina Intelligence Cards** — retention risk alerts, class performance digest, resource recommendations
 
 ### Key Metrics Cards (top of dashboard)
 - Total active students
@@ -86,6 +92,8 @@
 - Revenue this month vs last month
 - Leads this week
 - Trial class conversion rate
+- **Students at retention risk (count with link)**
+- **Health records incomplete (count with link)**
 
 ---
 
@@ -105,15 +113,6 @@
 San Clemente, Laguna Niguel, Laguna Hills, Dana Point, Ladera Ranch,
 Mission Viejo, San Juan Capistrano, Rancho Santa Margarita, Rancho Mission Viejo
 
-### Page Structure (every landing page)
-1. Hero — city-specific headline
-2. Why Ballet Academy and Movement
-3. Programs (Ballet first, then Jazz, Contemporary, Musical Theatre)
-4. About Amanda Cobb
-5. Testimonials
-6. FAQ (schema-marked)
-7. Trial Class CTA
-
 ---
 
 ## Module 5: Lead Capture + Nurture
@@ -124,27 +123,9 @@ Mission Viejo, San Juan Capistrano, Rancho Santa Margarita, Rancho Mission Viejo
 1. Visitor arrives (Google, Yelp, social, referral)
 2. Engages with chatbot or trial class signup
 3. Email captured → Klaviyo sequence triggered
-4. Auto-sequence:
-   - Email 1 (immediate): Welcome + about BAM + trial class info
-   - Email 2 (Day 2): Class recommendation based on child's age
-   - Email 3 (Day 4): Amanda's story + studio differentiators
-   - Email 4 (Day 7): Trial class reminder + easy booking link
-   - Email 5 (Day 14): Parent testimonial + urgency (limited spots)
+4. Auto-sequence: 6-email lead nurture over 21 days
 5. Trial class attended → Admin notified
 6. Post-trial: enrollment flow triggered
-
-### CRM Integration
-- Leads sync to Klaviyo via API
-- Lead source tracked (Google, Yelp, referral, social, organic)
-- Trial class bookings sync to Studio Pro (GoStudioPro)
-- Conversion tracked: Lead → Trial → Enrolled
-
-### Chatbot Behavior
-- Friendly, warm, refined tone
-- Asks: child's age, interest (ballet/jazz/all), location
-- Returns: class recommendation + trial class booking link
-- Escalates to human for complex questions
-- Never says "I'm an AI" unless directly asked
 
 ---
 
@@ -153,31 +134,7 @@ Mission Viejo, San Juan Capistrano, Rancho Santa Margarita, Rancho Mission Viejo
 **Purpose:** Instantly match any child to the right class without staff intervention.
 
 ### Logic
-```
-Input: child age (required) + dance experience (optional) + goals (optional)
-
-Age 2-3    → Mommy & Me Ballet (if offered) or Pre-Ballet
-Age 3-4    → Pre-Ballet
-Age 4-5    → Pre-Ballet or Primary Ballet
-Age 5-6    → Primary Ballet
-Age 6-8    → Ballet Level 1 (or assessment recommended)
-Age 8-10   → Ballet Level 1-2 (assessment recommended)
-Age 10-12  → Assessment required for Level 2+
-```
-
-### Output
-- Recommended class name + description
-- Teacher name + photo
-- Schedule (day/time)
-- Spots available / waitlist status
-- "Book a Trial Class" CTA
-- Option to speak with Amanda for assessment
-
-### Rules
-- Always recommend assessment for age 8+
-- If class is full → show waitlist option
-- Show 1 primary recommendation + 1 alternative
-- Never recommend a class that is full as primary option
+Age-based placement + experience qualifier → 1 primary + 1 alternative recommendation. Always recommends assessment for age 8+. See ENROLLMENT_QUIZ_SPEC.md.
 
 ---
 
@@ -185,69 +142,24 @@ Age 10-12  → Assessment required for Level 2+
 
 **Purpose:** White-label POS for studio retail, Nutcracker merchandise, recital flowers, apparel.
 
-### White-Label Config
-Each event/season gets its own shop configuration:
-- Custom shop name (e.g., "Sugar Plum Shop" for Nutcracker)
-- Custom logo upload
-- Custom primary/secondary colors
-- Activate/deactivate per season
-- Admin can run multiple configs, only one active at a time
-
 ### Features
-- **Product Catalog** — merchandise, concessions, flowers, apparel
-- **Inventory Tracking** — real-time stock levels
-- **POS Interface** — tablet-optimized for in-person sales at performances
-- **Cart + Checkout** — cash, card, Zelle, Venmo
-- **Tax Calculation** — California sales tax (9.25% in San Clemente)
-- **Order History** — per-event sales reporting
-- **Vendor Payments** — record outgoing payments (Zelle/Venmo) per vendor
-
-### Performance Mode
-- Full-screen simplified UI for lobby sales
-- Large touch targets
-- No login required for cashier (PIN access)
+- Per-event shop configuration (custom name/logo/colors)
+- Product catalog with inventory tracking
+- Tablet-optimized POS for in-person lobby sales
+- Stripe checkout for online orders
+- Order history and reporting
 
 ---
 
 ## Module 8: Expansion Intelligence
 
-**Purpose:** Data-driven decision making for opening Location #2.
+**Purpose:** Data-driven decision making for opening Ballet Academy and Movement Location #2.
 
-### Readiness Indicators
-Track these metrics; alert when expansion threshold is met:
-- Enrollment capacity ≥ 90% for 3+ consecutive months
-- Active waitlist ≥ 15 students
-- Revenue target met (internal threshold set by Amanda)
-- Brand search volume growing in target cities
-
-### Market Research
-For each candidate city track:
-- Population + family/child demographic data
-- Median household income
-- Competitor studio count + ratings
-- Available commercial real estate (manual input)
-- Drive time from San Clemente
-
-### Target Expansion Markets (priority order)
-1. Ladera Ranch
-2. Rancho Mission Viejo
-3. San Juan Capistrano
-4. Laguna Niguel
-
-### Competitor Intelligence
-Track for each competitor:
-- Programs offered
-- Price per month (estimated)
-- Google/Yelp rating
-- Number of reviews
-- Marketing style (competition, recreational, classical)
-- Teacher names (for recruitment)
-- Last updated date
-
-### Competitors to Monitor
-Variant, Pave, San Clemente Dance Academy, Capistrano Academy of Dance,
-South Coast Conservatory, Southland Ballet Academy, Moxie, On Deck,
-Pacific Ballet Conservatory, Tutu School, Bonjour Ballet
+### Features
+- Readiness score tracking across 4 indicators
+- Target market demographics (Ladera Ranch, Rancho Mission Viejo, San Juan Capistrano)
+- Competitor studio directory with threat level
+- Studio capacity and waitlist live tracking
 
 ---
 
@@ -255,133 +167,192 @@ Pacific Ballet Conservatory, Tutu School, Bonjour Ballet
 
 **Purpose:** The differentiator. A dance-specific learning platform with three distinct interfaces.
 
----
-
-### Student Interface (Ages 3–12)
-
-**Design Philosophy:** TikTok-meets-ballet. Swipe-up vertical video feed. Gamified progress. Age-appropriate UX.
-
-#### Age 3–5 (Pre-Ballet / Primary)
-- Giant colorful buttons, minimal text
-- Video-first: animated instructor explains movement
-- Sticker rewards for watching/completing
-- Parent co-view encouraged
-- Simple: "Watch" → "Try It" → "I Did It!" flow
-
-#### Age 6–9 (Level 1–2)
-- Swipe-up video feed (TikTok style)
-- Short clips: 15–90 seconds
-- Skill categories: Barre, Centre, Jumps, Turns, Stretching, Musicality
-- Heart/bookmark videos
-- Progress bar per skill area
-- Badge notifications on achievement
-
-#### Age 10–12 (Level 3+)
-- More text, technique breakdowns
-- Slow-motion replay option
-- Peer progress (can see classmates' badges, not scores)
-- Personal goal setting
-- Audition prep content for intensive programs (ABT, Royal Ballet, Stuttgart)
-
-#### Gamification System
-**Badges (examples):**
-- First Day Dancer — attended first class
-- Arabesque Achiever — teacher awards when mastered
-- Nutcracker Debut — performed in Nutcracker
-- Level Up — completed level and promoted
-- Perfect Attendance — monthly
-- Sugar Plum — principal role in Nutcracker
-- Swan — principal role in spring showcase
-- Pointe Ready — cleared for pointe work
-- Competition Star — competed at approved competition
-- Intensive Accepted — accepted to summer intensive
-
-**Progress Visualization:**
-- Star constellation fills in as skills are mastered (not a boring progress bar)
-- Each level = a different constellation (Orion for Level 1, etc.)
-- Animated when new badge earned
-- No negative feedback in UI — only encouragement
-
----
+### Student Interface
+TikTok-style swipe feed, age-gated content, gamified badges, constellation progress visualization.
 
 ### Parent Interface
-
-**Purpose:** Stay connected to their child's progress without overwhelming them.
-
-#### Features
-- **This Week's Focus** — what skill their child is working on
-- **Teacher Notes** — shared notes from teacher (curated, positive)
-- **Milestone Alerts** — push notification when badge is earned
-- **Upcoming Performances** — roles, rehearsal schedule, costume info
-- **Practice Encouragement** — "Sofia has a new exercise to try this week!"
-- **Progress Report** — monthly summary of skills developing
-- **Content Recommendations** — "Watch this with your dancer tonight"
-- **Live Stream Notifications** — alert when teacher starts live stream
-
-**Tone:** Warm parent-to-parent feel. Never clinical. Never report-card-like.
-
----
+This Week's Focus, teacher notes, milestone push alerts, performance hub, content recommendations.
 
 ### Teacher Interface
-
-**Purpose:** Manage content delivery and student progress tracking.
-
-#### Features
-- **Content Management** — upload videos, assign to age/level groups
-- **Feed Curation** — drag-and-drop order content in student feeds
-- **Live Stream** — start/stop live class stream (see Live Streaming below)
-- **Badge Awarding** — one-tap award badge to student with optional note
-- **Skill Assessment** — rate student on 5-point scale per skill area
-- **Class Analytics** — who watched what, completion rates, engagement
-- **Bulk Actions** — award same badge to multiple students at once
-- **Parent Messaging** — send note to parent directly from student profile
+Content management, feed curation, live streaming, badge awarding, skill assessment, class analytics.
 
 ---
 
-## Live Streaming (all modules)
+## Module 10: Choreography & Production Manager ← NEW
 
-**Provider:** Cloudflare Stream (or Mux) — do not use YouTube/Zoom for class streams
+**Priority:** HIGH — especially for Nutcracker and Spring Showcase seasons.
 
-### Stream Types
+**Purpose:** Unified catalog linking choreography pieces → cast → rehearsals → media. Solves the Nutcracker production management pain point that currently lives in spreadsheets and email.
 
-| Type | Access | Paid? |
-|------|--------|-------|
-| Class Stream | Enrolled students' parents only | No |
-| Performance Stream | Purchased ticket OR family of performer | Optional |
-| Workshop | Registered participants | Yes |
-| Open Demo | Public | No |
+**Route:** `/admin/productions` (extends existing productions module)
 
-### Teacher Flow
-1. Teacher opens Teacher Portal
-2. Taps "Go Live" on today's class
-3. Selects stream type (class or performance)
-4. Stream starts — enrolled parents notified immediately
-5. Red LIVE indicator visible to all authorized viewers
-6. Tap "End Stream" → recording auto-saved to class session
-7. Recording available to parent within 24 hours
+### What This Adds Beyond Current `productions` Table
 
-### Parent Flow
-1. Push notification: "Ms. Amanda is live in Pre-Ballet right now!"
-2. Tap → lands in stream view (no login friction if already authenticated)
-3. View-only — no chat for class streams (reduce distraction)
-4. Performance streams: purchase ticket → immediate access
+The existing schema has `productions`, `dances`, `production_dances`, `casting`, and `rehearsals`. What's missing is the **choreography catalog layer** — a way to manage dance pieces independently of any specific production, with media attached.
 
-### Paid Performance Streaming
-- Stripe integration for ticket sales
-- Price set per performance ($15–$25 suggested)
-- Grandparent/family access links (purchaser can share with X devices)
-- Recording available for 30 days post-performance
-- Revenue split tracking (studio keeps 100% by default)
+### New Capabilities
+
+**Choreography Catalog (`/admin/choreography`)**
+- Master library of all choreographed pieces the studio owns
+- Per piece: title, discipline, choreographer, level, duration, music file URL, notes
+- Version history — if a piece is revived in a new production, create a new version vs. re-using the same
+- Media attachments: reference video (Cloudflare Stream), music file, PDF score, blocking notes
+- Not tied to a specific production — reusable across years
+
+**Enhanced Production Management**
+- Pull pieces from the choreography catalog into a production
+- Per production-dance: music cut (competitions need shorter versions), costume notes, stage blocking
+- Role assignment per student per piece with alternate tracking
+- Rehearsal scheduling tied directly to each piece
+- Media attachment per piece per production (can differ from catalog entry)
+
+**Teacher AI Assist (Angelina)**
+- "Angelina, add this Google Drive link to Sylvia Act 2 music" → attaches to the piece
+- "Angelina, note that company girls need black skirts for Sylvia" → costume note on piece
+- "Angelina, what's the casting for Waltz of the Snowflakes?" → reads from casting table
+
+### Database Additions
+
+```sql
+-- Choreography catalog (reusable pieces, independent of productions)
+CREATE TABLE IF NOT EXISTS choreography_catalog (
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id           uuid NOT NULL REFERENCES tenants(id),
+  title               text NOT NULL,
+  discipline          text NOT NULL,
+  choreographer_id    uuid REFERENCES profiles(id),
+  level_tags          text[] DEFAULT '{}',     -- e.g. ['Level 3B', 'Company']
+  duration_seconds    integer,
+  reference_video_url text,                    -- Cloudflare Stream URL
+  music_title         text,
+  music_artist        text,
+  music_file_url      text,
+  score_pdf_url       text,
+  blocking_notes      text,
+  is_active           boolean DEFAULT true,
+  created_at          timestamptz DEFAULT now(),
+  updated_at          timestamptz DEFAULT now()
+);
+
+-- Media attachments on production-specific pieces
+-- (extends existing production_dances with richer media)
+ALTER TABLE production_dances
+  ADD COLUMN IF NOT EXISTS reference_video_url text,
+  ADD COLUMN IF NOT EXISTS score_pdf_url       text,
+  ADD COLUMN IF NOT EXISTS blocking_notes      text,
+  ADD COLUMN IF NOT EXISTS catalog_id          uuid REFERENCES choreography_catalog(id);
+```
+
+### UI Pages
+- `/admin/choreography` — catalog list with search/filter by discipline, level, choreographer
+- `/admin/choreography/[id]` — piece detail with media player, cast history, production history
+- `/admin/productions/[id]/choreography` — link pieces from catalog to this production
+
+---
+
+## Module 11: Staff Resource Library ← NEW
+
+**Priority:** MEDIUM — critical for teacher onboarding consistency as studio scales.
+
+**Purpose:** Internal document library for teachers and staff. Stores syllabi, technique progression guides, teaching notes, dress code documents, teacher handbook, mandated reporter training materials, music playlists. Replaces ad-hoc Google Drive sharing.
+
+**Route:** `/admin/resources/library` (admin management), `/teach/library` (teacher read access)
+
+### Features
+- **Folder organization** by course, program, or topic
+- **Permission controls** per folder (some materials are admin-only, others are all-staff)
+- **Document types** supported: PDF, Google Drive link, YouTube/Vimeo link, plain text notes
+- **Version tracking** — when a document is updated, old version is retained
+- **Multi-device access** — teachers access from phone, tablet, or desktop during class prep
+- **Search** — full-text search across document titles and descriptions
+
+### Database Schema
+
+```sql
+CREATE TABLE IF NOT EXISTS staff_library_folders (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id       uuid NOT NULL REFERENCES tenants(id),
+  name            text NOT NULL,
+  description     text,
+  parent_folder_id uuid REFERENCES staff_library_folders(id),
+  access_level    text NOT NULL DEFAULT 'all_staff'
+    CHECK (access_level IN ('all_staff', 'admin_only', 'lead_teachers_only')),
+  sort_order      integer DEFAULT 0,
+  created_at      timestamptz DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS staff_library_documents (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id       uuid NOT NULL REFERENCES tenants(id),
+  folder_id       uuid REFERENCES staff_library_folders(id),
+  title           text NOT NULL,
+  description     text,
+  document_type   text NOT NULL CHECK (document_type IN ('pdf','google_drive','video_link','text_note','music_link')),
+  file_url        text,              -- Supabase Storage path or external URL
+  file_size_bytes integer,
+  version         integer DEFAULT 1,
+  is_active       boolean DEFAULT true,
+  uploaded_by     uuid REFERENCES profiles(id),
+  created_at      timestamptz DEFAULT now(),
+  updated_at      timestamptz DEFAULT now()
+);
+```
+
+### Access Rules
+- Admin/Super Admin: full CRUD on all folders and documents
+- Lead Teachers: read access to `all_staff` and `lead_teachers_only` folders
+- All Teachers: read access to `all_staff` folders only
+- Parents/Students: no access
+
+### Seed Folders for BAM
+On provisioning, create these default folders:
+- Studio Policies
+- Curriculum Guides (sub-folders per level)
+- Teaching Resources
+- Music Library
+- Mandated Reporter Training
+- Performance Materials
+
+---
+
+## Module 12: Lobby Display / Digital Signage ← NEW
+
+**Priority:** LOW-MEDIUM — lightweight, professional touch for Phase 2.
+
+**Purpose:** A read-only, auto-refreshing schedule display designed to run on a tablet or monitor mounted in the studio lobby. Shows today's and tomorrow's classes with room assignments and teacher names.
+
+**Route:** `/display/schedule` — no authentication required, public but not linked from nav
+
+### Features
+- Auto-refreshes every 5 minutes
+- Shows: current time, today's remaining classes, tomorrow's preview
+- Each class block: class name, time range, room, teacher name, enrolled count (optional)
+- Studio closures shown as full-day banners
+- Brand colors (lavender) with elegant typography
+- Kiosk mode: no browser chrome, no scroll bar, designed for `?kiosk=true` URL param
+- Tenant-scoped: `/display/schedule?tenant=[slug]` for future multi-tenant use
+
+### Implementation Notes
+- Lightweight server component — no auth, minimal JS
+- Data fetched from public `schedule_embeds` table (new embed type: `lobby_display`)
+- OR direct from `schedule_instances` with tenant scoping via a public read policy
+- CSS: full-screen, large font, high contrast for readability at 6–10 feet
+- Brightness: designed for always-on display (dark background option for OLED screens)
+
+### URL Examples
+- `portal.balletacademyandmovement.com/display/schedule` — BAM lobby display
+- `portal.balletacademyandmovement.com/display/schedule?kiosk=true` — kiosk mode (hides browser UI)
+- `portal.balletacademyandmovement.com/display/schedule?room=studio-a` — single room view
 
 ---
 
 ## Technical Notes Across All Modules
 
-- All routes protected by Supabase Auth + RLS
+- All routes protected by Supabase Auth + RLS (except `/display/schedule` which is public read-only)
 - Role-based access control enforced server-side (middleware)
 - Mobile-first responsive design (parent/student interfaces)
 - Desktop-optimized for admin/teacher interfaces
-- Real-time updates via Supabase Realtime for attendance, live status
+- Real-time updates via Supabase Realtime for attendance, live status, notifications
 - Email via Resend (transactional) + Klaviyo (marketing)
 - All video content stored in Cloudflare Stream (not Supabase Storage)
 - Images/documents in Supabase Storage
