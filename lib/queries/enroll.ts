@@ -73,6 +73,7 @@ export async function getClassCatalog(filters?: {
       isFull: activeCount >= (cls.max_students as number),
       monthlyTuitionCents: (cls.monthly_tuition_cents as number | null) ?? null,
       registrationFeeCents: (cls.registration_fee_cents as number | null) ?? null,
+      trialEligible: (cls.trial_eligible as boolean | null) ?? false,
     };
   });
 }

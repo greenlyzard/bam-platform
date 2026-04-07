@@ -21,6 +21,7 @@ interface ClassInfo {
   activeCount: number;
   spotsRemaining: number;
   isFull: boolean;
+  trialEligible: boolean;
 }
 
 interface StudentInfo {
@@ -370,7 +371,7 @@ export function ClassBrowser({
                         ? "Join Waitlist"
                         : "Request Enrollment"}
                   </button>
-                  {!student?.trial_used && !(requiresAssessment(cls) && !isPlaced) && (
+                  {cls.trialEligible && !student?.trial_used && !(requiresAssessment(cls) && !isPlaced) && (
                     <button
                       onClick={() =>
                         handleRequest(cls.id, "trial_request")
