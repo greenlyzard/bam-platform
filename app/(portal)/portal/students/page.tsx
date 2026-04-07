@@ -128,7 +128,7 @@ export default async function ChildrenPage() {
                           id: string;
                           name: string;
                           style: string;
-                          level: string;
+                          levels: string[] | null;
                           day_of_week: number;
                           start_time: string;
                           end_time: string;
@@ -191,9 +191,8 @@ export default async function ChildrenPage() {
                         ) as {
                           id: string;
                           name: string;
-                          simple_name: string | null;
                           style: string;
-                          level: string;
+                          levels: string[] | null;
                         } | null;
 
                         return (
@@ -203,7 +202,7 @@ export default async function ChildrenPage() {
                           >
                             <div className="min-w-0">
                               <p className="text-sm font-medium text-charcoal truncate">
-                                {cls?.simple_name || cls?.name || "Class"}
+                                {cls?.name || "Class"}
                               </p>
                               <p className="text-xs text-mist">
                                 {formatDate(session.session_date)}{" "}

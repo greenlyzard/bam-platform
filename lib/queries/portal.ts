@@ -76,7 +76,7 @@ export async function getMyEnrollments() {
       student_id,
       students (id, first_name, last_name),
       class_id,
-      classes (id, name, style, level, day_of_week, start_time, end_time, room, teacher_id)
+      classes (id, name, style, levels, day_of_week, start_time, end_time, room, teacher_id)
     `
     )
     .in("student_id", studentIds)
@@ -155,7 +155,7 @@ export async function getStudentDetail(studentId: string) {
       enrollment_type,
       enrolled_at,
       class_id,
-      classes (id, name, simple_name, style, level, day_of_week, start_time, end_time, room)
+      classes (id, name, style, levels, day_of_week, start_time, end_time, room)
     `
     )
     .eq("student_id", studentId)
@@ -324,7 +324,7 @@ export async function getUpcomingSessionsForStudents(studentIds: string[]) {
       room,
       status,
       is_cancelled,
-      classes (id, name, simple_name, style, level)
+      classes (id, name, style, levels)
     `
     )
     .in("class_id", classIds)

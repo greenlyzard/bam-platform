@@ -3,7 +3,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
+import { Resend } from "resend";
 import { z } from "zod";
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const requestSchema = z.object({
   studentId: z.string().uuid(),
@@ -148,11 +151,31 @@ export async function requestEnrollment(formData: FormData) {
     console.error("[enroll] admin_tasks insert exception:", e);
   }
 
+  // Email notification to studio
+  try {
+    await resend.emails.send({
+      from: "Ballet Academy and Movement <noreply@send.bamsocal.com>",
+      to: ["dance@bamsocal.com"],
+      subject: `New ${isTrial ? "Trial" : "Enrollment"} Request — ${studentName}`,
+      html: `
+        <h2>New ${isTrial ? "Trial Class" : "Enrollment"} Request</h2>
+        <p><strong>Student:</strong> ${studentName}</p>
+        <p><strong>Class:</strong> ${className}</p>
+        <p><strong>Request Type:</strong> ${isTrial ? "Free Trial" : "Full Enrollment"}</p>
+        <p><strong>Parent:</strong> ${user.email}</p>
+        <p>Please log in to the admin portal to review and schedule this request.</p>
+        <a href="https://portal.balletacademyandmovement.com/admin">View in Admin Portal &rarr;</a>
+      `,
+    });
+  } catch (emailErr) {
+    console.error("[enroll] email notification failed:", emailErr);
+  }
+
   revalidatePath("/portal/enrollment");
   return {
     success: true,
     message: isTrial
-      ? `Trial request submitted for ${studentName} in ${className}. The studio will contact you to confirm.`
-      : `Enrollment request submitted for ${studentName} in ${className}. The studio will review and confirm your spot.`,
+      ? `Trial requested for ${className}! We'll contact you within 24 hours to confirm your trial class date. Check your email for confirmation.`
+      : `Enrollment requested for ${className}! Our team will review and confirm your enrollment shortly.`,
   };
 }

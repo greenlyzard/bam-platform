@@ -287,7 +287,7 @@ export default async function DashboardPage() {
                   id: string;
                   name: string;
                   style: string;
-                  level: string;
+                  levels: string[] | null;
                   day_of_week: number | null;
                   start_time: string | null;
                   end_time: string | null;
@@ -295,11 +295,12 @@ export default async function DashboardPage() {
                 } | null;
 
                 if (!classData) return null;
+                const classDataForCard = { ...classData, level: (classData.levels?.[0] ?? "") };
 
                 return (
                   <ClassCard
                     key={enrollment.id}
-                    classData={classData}
+                    classData={classDataForCard}
                     studentName={
                       student
                         ? `${student.first_name} ${student.last_name}`
