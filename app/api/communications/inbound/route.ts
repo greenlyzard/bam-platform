@@ -113,14 +113,45 @@ export async function POST(req: NextRequest) {
     }
     const tenantIdLocal = tenant.id;
 
-    // Check if sender is already known (existing lead/family/profile)
+    // Step 1 — Check contact_channels first (covers primary + alias emails)
+    let channelProfileId: string | null = null;
+    let channelFamilyId: string | null = null;
+    try {
+      const { data: channelMatch } = await supabase
+        .from("contact_channels")
+        .select("profile_id")
+        .eq("value", senderEmail)
+        .eq("channel_type", "email")
+        .eq("tenant_id", tenantIdLocal)
+        .is("removed_at", null)
+        .limit(1)
+        .maybeSingle();
+      if (channelMatch?.profile_id) {
+        channelProfileId = channelMatch.profile_id;
+        // Find the family this profile belongs to (via students.parent_id)
+        const { data: studentRow } = await supabase
+          .from("students")
+          .select("family_id")
+          .eq("parent_id", channelProfileId)
+          .not("family_id", "is", null)
+          .limit(1)
+          .maybeSingle();
+        if (studentRow?.family_id) channelFamilyId = studentRow.family_id;
+      }
+    } catch (e) {
+      console.error("[inbound] contact_channels lookup failed:", e);
+    }
+
+    // Step 2 — Fall back to direct lead/family/profile email matches
     const [{ data: existingLead }, { data: existingFamily }, { data: existingProfile }] = await Promise.all([
       supabase.from("leads").select("id").eq("email", senderEmail).eq("tenant_id", tenantIdLocal).limit(1).maybeSingle(),
       supabase.from("families").select("id").eq("billing_email", senderEmail).eq("tenant_id", tenantIdLocal).limit(1).maybeSingle(),
-      supabase.from("profiles").select("id").eq("email", senderEmail).limit(1).maybeSingle(),
+      channelProfileId
+        ? Promise.resolve({ data: { id: channelProfileId } })
+        : supabase.from("profiles").select("id").eq("email", senderEmail).limit(1).maybeSingle(),
     ]);
 
-    const knownSender = !!(existingLead || existingFamily || existingProfile);
+    const knownSender = !!(channelProfileId || existingLead || existingFamily || existingProfile);
 
     // SPAM: store silently, no notifications
     if (classification.label === "spam") {
@@ -188,8 +219,8 @@ export async function POST(req: NextRequest) {
       newLeadId = createdLead?.id ?? null;
     }
 
-    // Create or get a thread for this sender
-    const threadFamilyId = existingFamily?.id ?? null;
+    // Create or get a thread for this sender — prefer family from contact_channels lookup
+    const threadFamilyId = channelFamilyId ?? existingFamily?.id ?? null;
     const threadLeadId = newLeadId ?? existingLead?.id ?? null;
 
     const { data: thread, error: threadErr } = await supabase

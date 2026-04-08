@@ -212,6 +212,7 @@ export async function matchPhoneToProfile(
       .eq("value", phoneE164)
       .eq("tenant_id", tenantId)
       .in("channel_type", ["sms", "phone"])
+      .is("removed_at", null)
       .limit(1)
       .maybeSingle();
     return data?.profile_id ?? null;
