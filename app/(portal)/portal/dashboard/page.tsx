@@ -24,6 +24,23 @@ export default async function DashboardPage() {
   const nowDate = new Date();
   const todayStr = `${nowDate.getFullYear()}-${String(nowDate.getMonth() + 1).padStart(2, "0")}-${String(nowDate.getDate()).padStart(2, "0")}`;
 
+  // Outstanding documents (to-do count)
+  const familyIdsForDocs = Array.from(new Set(students.map((s: any) => s.family_id).filter(Boolean) as string[]));
+  let pendingDocsCount = 0;
+  let pendingDocsList: Array<{ id: string; title: string; document_type: string }> = [];
+  if (familyIdsForDocs.length > 0) {
+    const { data: pendingDocs } = await supabase
+      .from("family_documents")
+      .select("id, title, document_type")
+      .in("family_id", familyIdsForDocs)
+      .eq("visible_to_parent", true)
+      .eq("status", "pending")
+      .order("created_at", { ascending: true })
+      .limit(5);
+    pendingDocsList = pendingDocs ?? [];
+    pendingDocsCount = pendingDocsList.length;
+  }
+
   const [{ data: upcomingProductions }, { data: upcomingClosures }] = await Promise.all([
     supabase
       .from("productions")
@@ -110,6 +127,27 @@ export default async function DashboardPage() {
           + Add a Class
         </Link>
       </div>
+
+      {/* Action Required: Documents */}
+      {pendingDocsCount > 0 && (
+        <Link href="/portal/documents" className="block rounded-xl border border-amber-200 bg-amber-50 p-4 hover:bg-amber-100/60 transition-colors">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-charcoal">
+                Action Required ({pendingDocsCount})
+              </p>
+              <ul className="mt-2 space-y-1">
+                {pendingDocsList.slice(0, 3).map((d) => (
+                  <li key={d.id} className="text-xs text-amber-800">
+                    {d.title}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <span className="text-xs text-lavender font-semibold">View All →</span>
+          </div>
+        </Link>
+      )}
 
       {/* Re-Enrollment Banner — show seasonally */}
       {hasStudents && (
