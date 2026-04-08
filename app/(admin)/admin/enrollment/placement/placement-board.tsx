@@ -175,7 +175,36 @@ export function PlacementBoard({
       if (res.ok) startTransition(() => router.refresh());
     } finally {
       setBusy(false);
+      setTimeout(() => setToast(null), 4000);
+    }
+  }
+
+  async function scheduleRelease() {
+    if (!seasonId) return;
+    const input = window.prompt("Schedule release for (YYYY-MM-DD HH:MM, local time):");
+    if (!input) return;
+    const scheduledFor = new Date(input);
+    if (isNaN(scheduledFor.getTime())) {
+      setToast("Invalid date/time");
       setTimeout(() => setToast(null), 3000);
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/admin/placements/release`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          season_id: seasonId,
+          action: "schedule",
+          scheduled_for: scheduledFor.toISOString(),
+        }),
+      });
+      const data = await res.json();
+      setToast(data.message ?? (res.ok ? "Scheduled" : "Failed"));
+    } finally {
+      setBusy(false);
+      setTimeout(() => setToast(null), 4000);
     }
   }
 
@@ -221,10 +250,17 @@ export function PlacementBoard({
           </button>
           <button
             disabled={busy || !seasonId}
+            onClick={scheduleRelease}
+            className="h-9 rounded-lg border border-lavender text-lavender bg-white hover:bg-lavender/5 text-sm font-medium px-4 disabled:opacity-50"
+          >
+            Schedule Release
+          </button>
+          <button
+            disabled={busy || !seasonId}
             onClick={releaseAll}
             className="h-9 rounded-lg bg-lavender hover:bg-lavender-dark text-white text-sm font-semibold px-4 disabled:opacity-50"
           >
-            Release All
+            Release Now
           </button>
         </div>
       </div>
