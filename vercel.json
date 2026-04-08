@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/late-pickup-check",
       "schedule": "*/15 * * * 1-6"
+    },
+    {
+      "path": "/api/cron/process-scheduled-releases",
+      "schedule": "*/15 * * * *"
     }
   ]
 }
