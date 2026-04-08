@@ -13,6 +13,7 @@ import {
   type DragStartEvent,
   DragOverlay,
 } from "@dnd-kit/core";
+import { SimpleSelect } from "@/components/ui/select";
 
 interface Lead {
   id: string;
@@ -214,6 +215,18 @@ function LeadDetailDrawer({
   const [overrideStage, setOverrideStage] = useState("");
   const [overrideNote, setOverrideNote] = useState("");
 
+  // Edit name state
+  const [editingName, setEditingName] = useState(false);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+
+  // Action panels
+  const [actionPanel, setActionPanel] = useState<"trial" | "delete" | null>(null);
+  const [trialDate, setTrialDate] = useState("");
+  const [trialClassId, setTrialClassId] = useState("");
+  const [classOptions, setClassOptions] = useState<Array<{ value: string; label: string }>>([]);
+  const [deleteReason, setDeleteReason] = useState("");
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -224,10 +237,134 @@ function LeadDetailDrawer({
         setLead(data.lead);
         setHistory(data.history ?? []);
         setOverrideStage(data.lead?.pipeline_stage ?? "");
+        setFirstName(data.lead?.first_name ?? "");
+        setLastName(data.lead?.last_name ?? "");
       })
       .finally(() => !cancelled && setLoading(false));
     return () => { cancelled = true; };
   }, [leadId]);
+
+  async function refetchLead() {
+    const detail = await fetch(`/api/admin/leads/${leadId}`).then((r) => r.json());
+    setLead(detail.lead);
+    setHistory(detail.history ?? []);
+    setFirstName(detail.lead?.first_name ?? "");
+    setLastName(detail.lead?.last_name ?? "");
+  }
+
+  async function loadClassesIfNeeded() {
+    if (classOptions.length > 0) return;
+    try {
+      const res = await fetch(`/api/admin/classes`);
+      if (res.ok) {
+        const data = await res.json();
+        const list = (data.classes ?? data ?? []) as Array<{ id: string; name: string }>;
+        setClassOptions(list.map((c) => ({ value: c.id, label: c.name })));
+      }
+    } catch (e) {
+      console.error("[lead-drawer] failed to load classes", e);
+    }
+  }
+
+  async function saveName() {
+    if (!lead) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/admin/leads/${lead.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ first_name: firstName, last_name: lastName }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error ?? "Failed to save");
+        return;
+      }
+      setEditingName(false);
+      await refetchLead();
+      onStageChanged();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function bookTrial() {
+    if (!lead || !trialDate) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/admin/leads/${lead.id}/schedule-trial`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trial_date: trialDate, class_id: trialClassId || undefined }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error ?? "Failed to book trial");
+        return;
+      }
+      setActionPanel(null);
+      setTrialDate("");
+      setTrialClassId("");
+      await refetchLead();
+      onStageChanged();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function createStudent() {
+    if (!lead) return;
+    if (!confirm("Create student record from this lead?")) return;
+    setBusy(true);
+    try {
+      const dob = window.prompt("Student date of birth (YYYY-MM-DD):");
+      if (!dob) { setBusy(false); return; }
+      const res = await fetch(`/api/admin/leads/${lead.id}/convert-to-student`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date_of_birth: dob }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error ?? "Failed to create student");
+        return;
+      }
+      alert("Student created");
+      await refetchLead();
+      onStageChanged();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteLead() {
+    if (!lead || !deleteReason) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/admin/leads/${lead.id}/stage`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stage: "lost", note: `Reason: ${deleteReason}` }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error ?? "Failed");
+        return;
+      }
+      // Also save reason to placement_notes
+      await fetch(`/api/admin/leads/${lead.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ placement_notes: `Removed: ${deleteReason}` }),
+      });
+      setActionPanel(null);
+      setDeleteReason("");
+      await refetchLead();
+      onStageChanged();
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function moveStage() {
     if (!overrideStage || !lead) return;
@@ -265,18 +402,133 @@ function LeadDetailDrawer({
       <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
       <div className="fixed right-0 top-0 h-full w-[480px] max-w-full bg-white z-50 shadow-2xl flex flex-col">
         <div className="px-5 py-4 border-b border-silver flex items-start justify-between">
-          <div>
-            <h2 className="font-heading text-xl font-semibold text-charcoal" style={{ fontFamily: "'Cormorant Garamond', serif" }}>
-              {loading ? "Loading…" : childName}
-              {age && <span className="text-mist text-sm ml-2">age {age}</span>}
-            </h2>
-            {interest && <p className="mt-1 text-sm text-slate">{interest}</p>}
+          <div className="flex-1">
+            {editingName ? (
+              <div className="flex gap-2 items-center">
+                <input
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  placeholder="First name"
+                  className="h-9 rounded-md border border-silver px-3 text-sm focus:outline-none focus:border-lavender focus:ring-2 focus:ring-lavender/20"
+                />
+                <input
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  placeholder="Last name"
+                  className="h-9 rounded-md border border-silver px-3 text-sm focus:outline-none focus:border-lavender focus:ring-2 focus:ring-lavender/20"
+                />
+                <button
+                  disabled={busy}
+                  onClick={saveName}
+                  className="h-9 rounded-md text-xs font-semibold text-white px-3 disabled:opacity-50"
+                  style={{ backgroundColor: "#9C8BBF" }}
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => { setEditingName(false); setFirstName(lead?.first_name ?? ""); setLastName(lead?.last_name ?? ""); }}
+                  className="h-9 rounded-md text-xs text-slate hover:bg-cloud px-2"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <h2
+                onClick={() => !loading && setEditingName(true)}
+                className="font-heading text-xl font-semibold text-charcoal cursor-pointer hover:text-lavender transition-colors"
+                style={{ fontFamily: "'Cormorant Garamond', serif" }}
+                title="Click to edit"
+              >
+                {loading ? "Loading…" : (childName || "Unknown")}
+                {age && <span className="text-mist text-sm ml-2">age {age}</span>}
+              </h2>
+            )}
+            {interest && !editingName && <p className="mt-1 text-sm text-slate">{interest}</p>}
           </div>
-          <button onClick={onClose} className="text-mist hover:text-charcoal text-2xl leading-none">×</button>
+          <button onClick={onClose} className="text-mist hover:text-charcoal text-2xl leading-none ml-2">×</button>
         </div>
 
         {lead && (
           <div className="flex-1 overflow-y-auto p-5 space-y-5">
+            {/* Quick action toolbar */}
+            <div className="flex flex-wrap gap-2">
+              <button
+                disabled={busy}
+                onClick={() => { setActionPanel(actionPanel === "trial" ? null : "trial"); loadClassesIfNeeded(); }}
+                className="h-9 rounded-md text-xs font-semibold text-white px-3 disabled:opacity-50"
+                style={{ backgroundColor: "#9C8BBF" }}
+              >
+                Book Trial
+              </button>
+              <button
+                disabled={busy}
+                onClick={createStudent}
+                className="h-9 rounded-md text-xs font-semibold border border-lavender text-lavender bg-white hover:bg-lavender/5 px-3 disabled:opacity-50"
+              >
+                Create Student
+              </button>
+              <button
+                disabled={busy}
+                onClick={() => setActionPanel(actionPanel === "delete" ? null : "delete")}
+                className="h-9 rounded-md text-xs font-semibold border border-red-300 text-red-600 bg-white hover:bg-red-50 px-3 disabled:opacity-50"
+              >
+                Delete Lead
+              </button>
+            </div>
+
+            {actionPanel === "trial" && (
+              <div className="rounded-lg border border-lavender/30 bg-lavender/5 p-3 space-y-2">
+                <div className="text-xs text-mist uppercase tracking-wide">Book Trial</div>
+                <input
+                  type="date"
+                  value={trialDate}
+                  onChange={(e) => setTrialDate(e.target.value)}
+                  className="w-full h-9 rounded-md border border-silver bg-white px-3 text-sm focus:outline-none focus:border-lavender focus:ring-2 focus:ring-lavender/20"
+                />
+                <SimpleSelect
+                  value={trialClassId}
+                  onValueChange={setTrialClassId}
+                  options={classOptions}
+                  placeholder="Select a class (optional)"
+                  className="w-full"
+                />
+                <button
+                  disabled={busy || !trialDate}
+                  onClick={bookTrial}
+                  className="h-9 w-full rounded-md text-xs font-semibold text-white disabled:opacity-50"
+                  style={{ backgroundColor: "#9C8BBF" }}
+                >
+                  Confirm Trial
+                </button>
+              </div>
+            )}
+
+            {actionPanel === "delete" && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3 space-y-2">
+                <div className="text-xs text-red-700 font-semibold">Delete this lead?</div>
+                <SimpleSelect
+                  value={deleteReason}
+                  onValueChange={setDeleteReason}
+                  options={[
+                    { value: "Duplicate", label: "Duplicate" },
+                    { value: "Spam", label: "Spam" },
+                    { value: "Wrong number", label: "Wrong number" },
+                    { value: "Not interested", label: "Not interested" },
+                    { value: "Other", label: "Other" },
+                  ]}
+                  placeholder="Select a reason"
+                  className="w-full"
+                />
+                <button
+                  disabled={busy || !deleteReason}
+                  onClick={deleteLead}
+                  className="h-9 w-full rounded-md text-xs font-semibold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
+                >
+                  Confirm — Mark as Lost
+                </button>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <div className="text-xs text-mist uppercase tracking-wide">Stage</div>
@@ -344,17 +596,19 @@ function LeadDetailDrawer({
 
             <div className="border-t border-silver pt-5">
               <div className="text-xs text-mist uppercase tracking-wide mb-2">Move to stage</div>
-              <select
-                value={overrideStage}
-                onChange={(e) => setOverrideStage(e.target.value)}
-                className="w-full h-9 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal mb-2"
-              >
-                {STAGES.map((s) => (
-                  <option key={s.key} value={s.key}>{s.label}</option>
-                ))}
-                <option value="waitlisted">Waitlisted</option>
-                <option value="lost">Lost</option>
-              </select>
+              <div className="mb-2">
+                <SimpleSelect
+                  value={overrideStage}
+                  onValueChange={setOverrideStage}
+                  options={[
+                    ...STAGES.map((s) => ({ value: s.key, label: s.label })),
+                    { value: "waitlisted", label: "Waitlisted" },
+                    { value: "lost", label: "Lost" },
+                  ]}
+                  placeholder="Select stage"
+                  className="w-full"
+                />
+              </div>
               <textarea
                 value={overrideNote}
                 onChange={(e) => setOverrideNote(e.target.value)}

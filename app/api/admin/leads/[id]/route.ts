@@ -20,3 +20,26 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   return NextResponse.json({ lead, history: history ?? [] });
 }
+
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  await requireAdmin();
+  const { id } = await params;
+  const body = await req.json().catch(() => ({}));
+
+  const allowed: Record<string, unknown> = {};
+  for (const key of [
+    "first_name", "last_name", "email", "phone",
+    "notes", "source", "placement_notes",
+  ]) {
+    if (key in body) allowed[key] = body[key];
+  }
+  allowed.updated_at = new Date().toISOString();
+
+  const supabase = createAdminClient();
+  const { error } = await supabase.from("leads").update(allowed).eq("id", id);
+  if (error) {
+    console.error("[admin:leads:patch]", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  return NextResponse.json({ success: true });
+}
