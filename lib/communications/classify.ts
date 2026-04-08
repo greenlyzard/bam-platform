@@ -20,6 +20,8 @@ const SYSTEM_PROMPT = `You are a classifier for Ballet Academy and Movement, a c
 - spam: Unsolicited marketing, sales pitches, SEO offers, bulk email, automated system notifications from non-studio software.
 - review: Genuinely ambiguous — could be real, needs human eyes.
 
+When in doubt between inquiry and spam, always choose inquiry. Only classify as spam if it is clearly marketing, SEO pitches, or automated bulk email. A message from any real person asking about dance, classes, children, or the studio is always inquiry regardless of their email domain.
+
 Also detect special types:
 - absence: Parent notifying of a student absence
 - cancellation: Parent wanting to cancel enrollment or leave the studio
