@@ -1551,10 +1551,13 @@ export type Database = {
         Row: {
           body_html: string | null
           body_text: string | null
+          classifier_label: string | null
+          classifier_signals: Json | null
           created_at: string
           direction: string
           id: string
           in_reply_to: string | null
+          is_spam: boolean | null
           matched: boolean
           message_id_header: string | null
           sender_email: string | null
@@ -1568,10 +1571,13 @@ export type Database = {
         Insert: {
           body_html?: string | null
           body_text?: string | null
+          classifier_label?: string | null
+          classifier_signals?: Json | null
           created_at?: string
           direction: string
           id?: string
           in_reply_to?: string | null
+          is_spam?: boolean | null
           matched?: boolean
           message_id_header?: string | null
           sender_email?: string | null
@@ -1585,10 +1591,13 @@ export type Database = {
         Update: {
           body_html?: string | null
           body_text?: string | null
+          classifier_label?: string | null
+          classifier_signals?: Json | null
           created_at?: string
           direction?: string
           id?: string
           in_reply_to?: string | null
+          is_spam?: boolean | null
           matched?: boolean
           message_id_header?: string | null
           sender_email?: string | null
@@ -3013,6 +3022,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      lead_stage_history: {
+        Row: {
+          created_at: string
+          from_stage: string | null
+          id: string
+          lead_id: string
+          moved_by: string
+          moved_by_name: string | null
+          note: string | null
+          tenant_id: string
+          to_stage: string
+        }
+        Insert: {
+          created_at?: string
+          from_stage?: string | null
+          id?: string
+          lead_id: string
+          moved_by: string
+          moved_by_name?: string | null
+          note?: string | null
+          tenant_id: string
+          to_stage: string
+        }
+        Update: {
+          created_at?: string
+          from_stage?: string | null
+          id?: string
+          lead_id?: string
+          moved_by?: string
+          moved_by_name?: string | null
+          note?: string | null
+          tenant_id?: string
+          to_stage?: string
+        }
+        Relationships: []
       }
       leads: {
         Row: {
