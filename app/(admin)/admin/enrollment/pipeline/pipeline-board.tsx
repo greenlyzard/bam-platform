@@ -165,19 +165,23 @@ function StageColumn({
   const { setNodeRef, isOver } = useDroppable({ id: stage.key });
 
   return (
-    <div
-      className="w-[280px] shrink-0 rounded-xl overflow-hidden flex flex-col"
-      style={{ backgroundColor: "#FAF7F2", border: "1px solid #E8E0D8" }}
-    >
-      <div className="px-4 py-2.5 flex items-center justify-between" style={{ backgroundColor: "#9C8BBF" }}>
+    <div className="w-[280px] shrink-0 bg-white rounded-lg shadow-sm flex flex-col overflow-hidden">
+      <div
+        className="px-4 py-3 flex items-center justify-between rounded-t-lg"
+        style={{ backgroundColor: "#9C8BBF" }}
+      >
         <h2 className="text-xs font-semibold text-white uppercase tracking-wider">{stage.label}</h2>
-        <span className="text-[11px] font-semibold text-lavender bg-white rounded-full min-w-[22px] h-[22px] inline-flex items-center justify-center px-2">
+        <span
+          className="text-[11px] font-semibold rounded-full min-w-[22px] h-[22px] inline-flex items-center justify-center px-2 bg-white"
+          style={{ color: "#9C8BBF" }}
+        >
           {leads.length}
         </span>
       </div>
       <div
         ref={setNodeRef}
-        className={`flex-1 p-3 space-y-2.5 min-h-[120px] transition-colors ${isOver ? "bg-lavender/5" : ""}`}
+        className={`flex-1 p-3 space-y-2.5 overflow-y-auto transition-colors ${isOver ? "bg-lavender/5" : ""}`}
+        style={{ minHeight: 400 }}
       >
         {leads.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 gap-2">
@@ -504,18 +508,16 @@ export function PipelineBoard({
       </div>
 
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div className="overflow-x-auto pipeline-scroll">
-          <div className="flex gap-4 pb-6" style={{ minWidth: STAGES.length * 296 }}>
-            {STAGES.map((stage) => (
-              <StageColumn
-                key={stage.key}
-                stage={stage}
-                leads={leads.filter((l) => l.pipeline_stage === stage.key)}
-                onCardClick={(lead) => setDrawerLeadId(lead.id)}
-                onAction={() => {}}
-              />
-            ))}
-          </div>
+        <div className="flex flex-row gap-4 overflow-x-auto pb-4 pipeline-scroll">
+          {STAGES.map((stage) => (
+            <StageColumn
+              key={stage.key}
+              stage={stage}
+              leads={leads.filter((l) => l.pipeline_stage === stage.key)}
+              onCardClick={(lead) => setDrawerLeadId(lead.id)}
+              onAction={() => {}}
+            />
+          ))}
         </div>
         <DragOverlay>
           {activeLead && (
