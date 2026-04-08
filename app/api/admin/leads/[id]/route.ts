@@ -29,7 +29,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const allowed: Record<string, unknown> = {};
   for (const key of [
     "first_name", "last_name", "email", "phone",
-    "notes", "source", "placement_notes",
+    "notes", "source", "placement_notes", "intake_form_data",
   ]) {
     if (key in body) allowed[key] = body[key];
   }

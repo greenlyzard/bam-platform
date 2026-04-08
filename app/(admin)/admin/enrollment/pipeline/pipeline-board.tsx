@@ -212,20 +212,33 @@ function LeadDetailDrawer({
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+
+  // Editable header fields
+  const [profileType, setProfileType] = useState<"parent" | "adult_student" | "guardian">("parent");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+
+  // Stage override
   const [overrideStage, setOverrideStage] = useState("");
   const [overrideNote, setOverrideNote] = useState("");
 
-  // Edit name state
-  const [editingName, setEditingName] = useState(false);
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-
-  // Action panels
-  const [actionPanel, setActionPanel] = useState<"trial" | "delete" | null>(null);
+  // Inline action panels
+  const [actionPanel, setActionPanel] = useState<"trial" | "create_student" | "delete" | null>(null);
   const [trialDate, setTrialDate] = useState("");
   const [trialClassId, setTrialClassId] = useState("");
+  const [trialNote, setTrialNote] = useState("");
   const [classOptions, setClassOptions] = useState<Array<{ value: string; label: string }>>([]);
+  const [studentDob, setStudentDob] = useState("");
   const [deleteReason, setDeleteReason] = useState("");
+
+  // Toast (in-app notification, no native alert)
+  const [toast, setToast] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  function showToast(type: "success" | "error", text: string) {
+    setToast({ type, text });
+    setTimeout(() => setToast(null), 3500);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -239,6 +252,11 @@ function LeadDetailDrawer({
         setOverrideStage(data.lead?.pipeline_stage ?? "");
         setFirstName(data.lead?.first_name ?? "");
         setLastName(data.lead?.last_name ?? "");
+        setEmail(data.lead?.email ?? "");
+        setPhone(data.lead?.phone ?? "");
+        const intake = (data.lead?.intake_form_data ?? {}) as Record<string, unknown>;
+        const pt = (intake.profile_type as string | undefined) ?? "parent";
+        if (pt === "adult_student" || pt === "guardian" || pt === "parent") setProfileType(pt);
       })
       .finally(() => !cancelled && setLoading(false));
     return () => { cancelled = true; };
@@ -248,8 +266,6 @@ function LeadDetailDrawer({
     const detail = await fetch(`/api/admin/leads/${leadId}`).then((r) => r.json());
     setLead(detail.lead);
     setHistory(detail.history ?? []);
-    setFirstName(detail.lead?.first_name ?? "");
-    setLastName(detail.lead?.last_name ?? "");
   }
 
   async function loadClassesIfNeeded() {
@@ -266,21 +282,28 @@ function LeadDetailDrawer({
     }
   }
 
-  async function saveName() {
+  async function saveHeader() {
     if (!lead) return;
     setBusy(true);
     try {
+      const intake = { ...((lead.intake_form_data ?? {}) as Record<string, unknown>), profile_type: profileType };
       const res = await fetch(`/api/admin/leads/${lead.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ first_name: firstName, last_name: lastName }),
+        body: JSON.stringify({
+          first_name: firstName,
+          last_name: lastName,
+          email: email || null,
+          phone: phone || null,
+          intake_form_data: intake,
+        }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        alert(data.error ?? "Failed to save");
+        showToast("error", data.error ?? "Failed to save");
         return;
       }
-      setEditingName(false);
+      showToast("success", "Saved");
       await refetchLead();
       onStageChanged();
     } finally {
@@ -295,16 +318,22 @@ function LeadDetailDrawer({
       const res = await fetch(`/api/admin/leads/${lead.id}/schedule-trial`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ trial_date: trialDate, class_id: trialClassId || undefined }),
+        body: JSON.stringify({
+          trial_date: trialDate,
+          class_id: trialClassId || undefined,
+          note: trialNote || undefined,
+        }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        alert(data.error ?? "Failed to book trial");
+        showToast("error", data.error ?? "Failed to book trial");
         return;
       }
       setActionPanel(null);
       setTrialDate("");
       setTrialClassId("");
+      setTrialNote("");
+      showToast("success", "Trial booked");
       await refetchLead();
       onStageChanged();
     } finally {
@@ -313,23 +342,22 @@ function LeadDetailDrawer({
   }
 
   async function createStudent() {
-    if (!lead) return;
-    if (!confirm("Create student record from this lead?")) return;
+    if (!lead || !studentDob) return;
     setBusy(true);
     try {
-      const dob = window.prompt("Student date of birth (YYYY-MM-DD):");
-      if (!dob) { setBusy(false); return; }
       const res = await fetch(`/api/admin/leads/${lead.id}/convert-to-student`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date_of_birth: dob }),
+        body: JSON.stringify({ date_of_birth: studentDob }),
       });
       const data = await res.json();
       if (!res.ok) {
-        alert(data.error ?? "Failed to create student");
+        showToast("error", data.error ?? "Failed to create student");
         return;
       }
-      alert("Student created");
+      setActionPanel(null);
+      setStudentDob("");
+      showToast("success", "Student created");
       await refetchLead();
       onStageChanged();
     } finally {
@@ -348,10 +376,9 @@ function LeadDetailDrawer({
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        alert(data.error ?? "Failed");
+        showToast("error", data.error ?? "Failed");
         return;
       }
-      // Also save reason to placement_notes
       await fetch(`/api/admin/leads/${lead.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -359,6 +386,7 @@ function LeadDetailDrawer({
       });
       setActionPanel(null);
       setDeleteReason("");
+      showToast("success", "Lead marked as lost");
       await refetchLead();
       onStageChanged();
     } finally {
@@ -377,226 +405,285 @@ function LeadDetailDrawer({
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        alert(data.error ?? "Failed to move stage");
+        showToast("error", data.error ?? "Failed to move stage");
         return;
       }
       setOverrideNote("");
-      // Refetch
-      const detail = await fetch(`/api/admin/leads/${lead.id}`).then((r) => r.json());
-      setLead(detail.lead);
-      setHistory(detail.history ?? []);
+      showToast("success", "Stage updated");
+      await refetchLead();
       onStageChanged();
     } finally {
       setBusy(false);
     }
   }
 
-  const childName = lead ? getChildName(lead) : "";
-  const age = lead ? getChildAge(lead) : null;
-  const interest = lead ? getClassInterest(lead) : null;
-  const guardian = lead ? getGuardianName(lead) : "";
   const intake = (lead?.intake_form_data ?? {}) as Record<string, unknown>;
+
+  // ── Mobile-first input/button styles ──
+  const inputCls = "w-full h-12 rounded-md border border-silver bg-white px-3 text-base text-charcoal focus:outline-none focus:border-lavender focus:ring-2 focus:ring-lavender/20";
+  const labelCls = "block text-xs font-semibold uppercase tracking-wide mb-1";
+  const labelStyle = { color: "#9C8BBF" };
+  const btnPrimary = "h-12 w-full rounded-md text-base font-semibold text-white disabled:opacity-50 transition-colors";
+  const btnPrimaryStyle = { backgroundColor: "#9C8BBF" };
+  const btnGhost = "h-12 w-full rounded-md text-base font-semibold border border-lavender text-lavender bg-white hover:bg-lavender/5 disabled:opacity-50 transition-colors";
+  const btnDanger = "h-12 w-full rounded-md text-base font-semibold border border-red-300 text-red-600 bg-white hover:bg-red-50 disabled:opacity-50 transition-colors";
 
   return (
     <>
       <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
-      <div className="fixed right-0 top-0 h-full w-[480px] max-w-full bg-white z-50 shadow-2xl flex flex-col">
-        <div className="px-5 py-4 border-b border-silver flex items-start justify-between">
-          <div className="flex-1">
-            {editingName ? (
-              <div className="flex gap-2 items-center">
-                <input
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  placeholder="First name"
-                  className="h-9 rounded-md border border-silver px-3 text-sm focus:outline-none focus:border-lavender focus:ring-2 focus:ring-lavender/20"
-                />
-                <input
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  placeholder="Last name"
-                  className="h-9 rounded-md border border-silver px-3 text-sm focus:outline-none focus:border-lavender focus:ring-2 focus:ring-lavender/20"
-                />
-                <button
-                  disabled={busy}
-                  onClick={saveName}
-                  className="h-9 rounded-md text-xs font-semibold text-white px-3 disabled:opacity-50"
-                  style={{ backgroundColor: "#9C8BBF" }}
-                >
-                  Save
-                </button>
-                <button
-                  onClick={() => { setEditingName(false); setFirstName(lead?.first_name ?? ""); setLastName(lead?.last_name ?? ""); }}
-                  className="h-9 rounded-md text-xs text-slate hover:bg-cloud px-2"
-                >
-                  Cancel
-                </button>
-              </div>
-            ) : (
-              <h2
-                onClick={() => !loading && setEditingName(true)}
-                className="font-heading text-xl font-semibold text-charcoal cursor-pointer hover:text-lavender transition-colors"
-                style={{ fontFamily: "'Cormorant Garamond', serif" }}
-                title="Click to edit"
-              >
-                {loading ? "Loading…" : (childName || "Unknown")}
-                {age && <span className="text-mist text-sm ml-2">age {age}</span>}
-              </h2>
-            )}
-            {interest && !editingName && <p className="mt-1 text-sm text-slate">{interest}</p>}
-          </div>
-          <button onClick={onClose} className="text-mist hover:text-charcoal text-2xl leading-none ml-2">×</button>
+      <div className="fixed right-0 top-0 h-full w-full md:w-[480px] max-w-full bg-cream z-50 shadow-2xl flex flex-col" style={{ backgroundColor: "#FAF7F2" }}>
+        {/* Sticky header */}
+        <div className="px-4 py-3 border-b border-silver bg-white flex items-center justify-between shrink-0">
+          <h2 className="font-heading text-lg font-semibold text-charcoal" style={{ fontFamily: "'Cormorant Garamond', serif" }}>
+            Lead Details
+          </h2>
+          <button
+            onClick={onClose}
+            className="w-10 h-10 rounded-full hover:bg-cloud text-mist hover:text-charcoal text-2xl leading-none flex items-center justify-center"
+          >
+            ×
+          </button>
         </div>
 
-        {lead && (
-          <div className="flex-1 overflow-y-auto p-5 space-y-5">
-            {/* Quick action toolbar */}
-            <div className="flex flex-wrap gap-2">
+        {toast && (
+          <div className={`mx-4 mt-3 px-3 py-2 rounded-md text-sm ${toast.type === "success" ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
+            {toast.text}
+          </div>
+        )}
+
+        {loading && <div className="p-6 text-center text-mist">Loading…</div>}
+
+        {!loading && lead && (
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {/* ── Editable header card ── */}
+            <div className="bg-white rounded-xl border border-silver p-4 space-y-3 shadow-sm">
+              <div>
+                <div className={labelCls} style={labelStyle}>Profile Type</div>
+                <div className="flex gap-2 flex-wrap">
+                  {[
+                    { v: "parent", l: "Parent" },
+                    { v: "adult_student", l: "Adult Student" },
+                    { v: "guardian", l: "Guardian" },
+                  ].map((p) => {
+                    const active = profileType === p.v;
+                    return (
+                      <button
+                        key={p.v}
+                        onClick={() => setProfileType(p.v as typeof profileType)}
+                        className="h-10 px-4 rounded-full text-sm font-medium border transition-colors"
+                        style={
+                          active
+                            ? { backgroundColor: "#9C8BBF", color: "white", borderColor: "#9C8BBF" }
+                            : { backgroundColor: "white", color: "#6B5A99", borderColor: "#E8E0D8" }
+                        }
+                      >
+                        {p.l}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls} style={labelStyle}>First Name</label>
+                  <input
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    placeholder="First name"
+                    className={inputCls}
+                    style={{ fontSize: "16px" }}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls} style={labelStyle}>Last Name</label>
+                  <input
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    placeholder="Last name"
+                    className={inputCls}
+                    style={{ fontSize: "16px" }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className={labelCls} style={labelStyle}>Email</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="email@example.com"
+                  className={inputCls}
+                  style={{ fontSize: "16px" }}
+                />
+              </div>
+
+              <div>
+                <label className={labelCls} style={labelStyle}>Phone</label>
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="(555) 555-5555"
+                  className={inputCls}
+                  style={{ fontSize: "16px" }}
+                />
+              </div>
+
+              <button
+                disabled={busy}
+                onClick={saveHeader}
+                className={btnPrimary}
+                style={btnPrimaryStyle}
+              >
+                Save Changes
+              </button>
+            </div>
+
+            {/* ── Quick actions ── */}
+            <div className="space-y-2">
               <button
                 disabled={busy}
                 onClick={() => { setActionPanel(actionPanel === "trial" ? null : "trial"); loadClassesIfNeeded(); }}
-                className="h-9 rounded-md text-xs font-semibold text-white px-3 disabled:opacity-50"
-                style={{ backgroundColor: "#9C8BBF" }}
+                className={btnPrimary}
+                style={btnPrimaryStyle}
               >
                 Book Trial
               </button>
+
+              {actionPanel === "trial" && (
+                <div className="bg-white rounded-xl border border-lavender/40 p-4 space-y-3 shadow-sm">
+                  <div>
+                    <label className={labelCls} style={labelStyle}>Trial Date</label>
+                    <input
+                      type="date"
+                      value={trialDate}
+                      onChange={(e) => setTrialDate(e.target.value)}
+                      className={inputCls}
+                      style={{ fontSize: "16px" }}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls} style={labelStyle}>Class</label>
+                    <SimpleSelect
+                      value={trialClassId}
+                      onValueChange={setTrialClassId}
+                      options={classOptions}
+                      placeholder="Select a class (optional)"
+                      className="w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls} style={labelStyle}>Note (optional)</label>
+                    <textarea
+                      value={trialNote}
+                      onChange={(e) => setTrialNote(e.target.value)}
+                      rows={2}
+                      className="w-full rounded-md border border-silver px-3 py-2 text-base text-charcoal focus:outline-none focus:border-lavender focus:ring-2 focus:ring-lavender/20"
+                      style={{ fontSize: "16px" }}
+                    />
+                  </div>
+                  <button
+                    disabled={busy || !trialDate}
+                    onClick={bookTrial}
+                    className={btnPrimary}
+                    style={btnPrimaryStyle}
+                  >
+                    Confirm Trial
+                  </button>
+                </div>
+              )}
+
               <button
                 disabled={busy}
-                onClick={createStudent}
-                className="h-9 rounded-md text-xs font-semibold border border-lavender text-lavender bg-white hover:bg-lavender/5 px-3 disabled:opacity-50"
+                onClick={() => { setActionPanel(actionPanel === "create_student" ? null : "create_student"); }}
+                className={btnGhost}
               >
                 Create Student
               </button>
+
+              {actionPanel === "create_student" && (
+                <div className="bg-white rounded-xl border border-lavender/40 p-4 space-y-3 shadow-sm">
+                  <div className="text-sm text-charcoal">
+                    Create student record for <strong>{firstName || "—"} {lastName || ""}</strong>?
+                  </div>
+                  <div>
+                    <label className={labelCls} style={labelStyle}>Date of Birth</label>
+                    <input
+                      type="date"
+                      value={studentDob}
+                      onChange={(e) => setStudentDob(e.target.value)}
+                      className={inputCls}
+                      style={{ fontSize: "16px" }}
+                    />
+                  </div>
+                  <button
+                    disabled={busy || !studentDob}
+                    onClick={createStudent}
+                    className={btnPrimary}
+                    style={btnPrimaryStyle}
+                  >
+                    Create Student
+                  </button>
+                </div>
+              )}
+
               <button
                 disabled={busy}
                 onClick={() => setActionPanel(actionPanel === "delete" ? null : "delete")}
-                className="h-9 rounded-md text-xs font-semibold border border-red-300 text-red-600 bg-white hover:bg-red-50 px-3 disabled:opacity-50"
+                className={btnDanger}
               >
                 Delete Lead
               </button>
+
+              {actionPanel === "delete" && (
+                <div className="bg-red-50 rounded-xl border border-red-200 p-4 space-y-3 shadow-sm">
+                  <div className="text-sm font-semibold text-red-700">
+                    Why are you removing this lead?
+                  </div>
+                  <SimpleSelect
+                    value={deleteReason}
+                    onValueChange={setDeleteReason}
+                    options={[
+                      { value: "Duplicate", label: "Duplicate" },
+                      { value: "Spam", label: "Spam" },
+                      { value: "Wrong number", label: "Wrong number" },
+                      { value: "Not interested", label: "Not interested" },
+                      { value: "Other", label: "Other" },
+                    ]}
+                    placeholder="Select a reason"
+                    className="w-full"
+                  />
+                  <button
+                    disabled={busy || !deleteReason}
+                    onClick={deleteLead}
+                    className="h-12 w-full rounded-md text-base font-semibold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 transition-colors"
+                  >
+                    Confirm Delete
+                  </button>
+                </div>
+              )}
             </div>
 
-            {actionPanel === "trial" && (
-              <div className="rounded-lg border border-lavender/30 bg-lavender/5 p-3 space-y-2">
-                <div className="text-xs text-mist uppercase tracking-wide">Book Trial</div>
-                <input
-                  type="date"
-                  value={trialDate}
-                  onChange={(e) => setTrialDate(e.target.value)}
-                  className="w-full h-9 rounded-md border border-silver bg-white px-3 text-sm focus:outline-none focus:border-lavender focus:ring-2 focus:ring-lavender/20"
-                />
-                <SimpleSelect
-                  value={trialClassId}
-                  onValueChange={setTrialClassId}
-                  options={classOptions}
-                  placeholder="Select a class (optional)"
-                  className="w-full"
-                />
-                <button
-                  disabled={busy || !trialDate}
-                  onClick={bookTrial}
-                  className="h-9 w-full rounded-md text-xs font-semibold text-white disabled:opacity-50"
-                  style={{ backgroundColor: "#9C8BBF" }}
-                >
-                  Confirm Trial
-                </button>
-              </div>
-            )}
-
-            {actionPanel === "delete" && (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-3 space-y-2">
-                <div className="text-xs text-red-700 font-semibold">Delete this lead?</div>
-                <SimpleSelect
-                  value={deleteReason}
-                  onValueChange={setDeleteReason}
-                  options={[
-                    { value: "Duplicate", label: "Duplicate" },
-                    { value: "Spam", label: "Spam" },
-                    { value: "Wrong number", label: "Wrong number" },
-                    { value: "Not interested", label: "Not interested" },
-                    { value: "Other", label: "Other" },
-                  ]}
-                  placeholder="Select a reason"
-                  className="w-full"
-                />
-                <button
-                  disabled={busy || !deleteReason}
-                  onClick={deleteLead}
-                  className="h-9 w-full rounded-md text-xs font-semibold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
-                >
-                  Confirm — Mark as Lost
-                </button>
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <div className="text-xs text-mist uppercase tracking-wide">Stage</div>
-                <div className="mt-1">
-                  <span className="inline-block text-xs px-2 py-1 rounded-full text-white" style={{ backgroundColor: "#9C8BBF" }}>
+            {/* ── Stage section ── */}
+            <div className="bg-white rounded-xl border border-silver p-4 space-y-3 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className={labelCls} style={labelStyle}>Current Stage</div>
+                  <span className="inline-block text-sm px-3 py-1 rounded-full text-white mt-1" style={{ backgroundColor: "#9C8BBF" }}>
                     {STAGE_LABEL[lead.pipeline_stage] ?? lead.pipeline_stage}
                   </span>
                 </div>
-              </div>
-              <div>
-                <div className="text-xs text-mist uppercase tracking-wide">Days in stage</div>
-                <div className="mt-1 text-sm font-semibold text-charcoal">
-                  {lead.daysInStage} {lead.daysInStage === 1 ? "day" : "days"}
+                <div className="text-right">
+                  <div className={labelCls} style={labelStyle}>In Stage</div>
+                  <div className="text-base font-semibold text-charcoal mt-1">
+                    {lead.daysInStage} {lead.daysInStage === 1 ? "day" : "days"}
+                  </div>
                 </div>
               </div>
-            </div>
-
-            <div>
-              <div className="text-xs text-mist uppercase tracking-wide">Guardian</div>
-              <div className="mt-1 text-sm text-charcoal">{guardian || "—"}</div>
-              {lead.email && (
-                <a href={`mailto:${lead.email}`} className="text-xs text-lavender hover:underline block">
-                  {lead.email}
-                </a>
-              )}
-              {lead.phone && (
-                <a href={`tel:${lead.phone}`} className="text-xs text-lavender hover:underline block">
-                  {lead.phone}
-                </a>
-              )}
-            </div>
-
-            <div>
-              <div className="text-xs text-mist uppercase tracking-wide">Source</div>
-              <div className="mt-1">
-                <span className={`inline-block text-[11px] px-2 py-1 rounded-full font-medium ${SOURCE_COLORS[lead.source ?? "other"]}`}>
-                  {lead.source ?? "other"}
-                </span>
-              </div>
-            </div>
-
-            {Boolean(intake.experience_level || intake.preferred_days || intake.disciplines) && (
               <div>
-                <div className="text-xs text-mist uppercase tracking-wide mb-1">Intake</div>
-                <div className="space-y-1 text-xs text-charcoal">
-                  {intake.experience_level !== undefined && (
-                    <div><span className="text-mist">Experience:</span> {String(intake.experience_level)}</div>
-                  )}
-                  {intake.preferred_days !== undefined && (
-                    <div><span className="text-mist">Preferred days:</span> {Array.isArray(intake.preferred_days) ? (intake.preferred_days as unknown[]).join(", ") : String(intake.preferred_days)}</div>
-                  )}
-                  {intake.disciplines !== undefined && (
-                    <div><span className="text-mist">Disciplines:</span> {Array.isArray(intake.disciplines) ? (intake.disciplines as unknown[]).join(", ") : String(intake.disciplines)}</div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {lead.notes && (
-              <div>
-                <div className="text-xs text-mist uppercase tracking-wide">Notes</div>
-                <div className="mt-1 text-sm text-charcoal whitespace-pre-wrap">{lead.notes}</div>
-              </div>
-            )}
-
-            <div className="border-t border-silver pt-5">
-              <div className="text-xs text-mist uppercase tracking-wide mb-2">Move to stage</div>
-              <div className="mb-2">
+                <label className={labelCls} style={labelStyle}>Move to Stage</label>
                 <SimpleSelect
                   value={overrideStage}
                   onValueChange={setOverrideStage}
@@ -609,40 +696,77 @@ function LeadDetailDrawer({
                   className="w-full"
                 />
               </div>
-              <textarea
-                value={overrideNote}
-                onChange={(e) => setOverrideNote(e.target.value)}
-                placeholder="Optional note (visible in audit trail)"
-                rows={2}
-                className="w-full rounded-lg border border-silver px-3 py-2 text-sm text-charcoal mb-2"
-              />
+              <div>
+                <label className={labelCls} style={labelStyle}>Note (optional)</label>
+                <textarea
+                  value={overrideNote}
+                  onChange={(e) => setOverrideNote(e.target.value)}
+                  placeholder="Visible in audit trail"
+                  rows={2}
+                  className="w-full rounded-md border border-silver px-3 py-2 text-base text-charcoal focus:outline-none focus:border-lavender focus:ring-2 focus:ring-lavender/20"
+                  style={{ fontSize: "16px" }}
+                />
+              </div>
               <button
                 disabled={busy || overrideStage === lead.pipeline_stage}
                 onClick={moveStage}
-                className="h-9 w-full rounded-md text-sm font-semibold text-white disabled:opacity-50"
-                style={{ backgroundColor: "#9C8BBF" }}
+                className={btnPrimary}
+                style={btnPrimaryStyle}
               >
                 Move Stage
               </button>
             </div>
 
-            <div className="border-t border-silver pt-5">
-              <div className="text-xs text-mist uppercase tracking-wide mb-2">Stage History</div>
+            {/* ── Source / intake / notes ── */}
+            <div className="bg-white rounded-xl border border-silver p-4 space-y-3 shadow-sm">
+              <div>
+                <div className={labelCls} style={labelStyle}>Source</div>
+                <span className={`inline-block text-xs px-2 py-1 rounded-full font-medium ${SOURCE_COLORS[lead.source ?? "other"]}`}>
+                  {lead.source ?? "other"}
+                </span>
+              </div>
+              {Boolean(intake.experience_level || intake.preferred_days || intake.disciplines) && (
+                <div>
+                  <div className={labelCls} style={labelStyle}>Intake</div>
+                  <div className="space-y-1 text-sm text-charcoal">
+                    {intake.experience_level !== undefined && (
+                      <div><span className="text-mist">Experience:</span> {String(intake.experience_level)}</div>
+                    )}
+                    {intake.preferred_days !== undefined && (
+                      <div><span className="text-mist">Preferred days:</span> {Array.isArray(intake.preferred_days) ? (intake.preferred_days as unknown[]).join(", ") : String(intake.preferred_days)}</div>
+                    )}
+                    {intake.disciplines !== undefined && (
+                      <div><span className="text-mist">Disciplines:</span> {Array.isArray(intake.disciplines) ? (intake.disciplines as unknown[]).join(", ") : String(intake.disciplines)}</div>
+                    )}
+                  </div>
+                </div>
+              )}
+              {lead.notes && (
+                <div>
+                  <div className={labelCls} style={labelStyle}>Notes</div>
+                  <div className="text-sm text-charcoal whitespace-pre-wrap">{lead.notes}</div>
+                </div>
+              )}
+            </div>
+
+            {/* ── Stage history ── */}
+            <div className="bg-white rounded-xl border border-silver p-4 space-y-2 shadow-sm">
+              <div className={labelCls} style={labelStyle}>Stage History</div>
               {history.length === 0 ? (
-                <div className="text-xs text-mist italic">No stage changes yet.</div>
+                <div className="text-sm text-mist italic">No stage changes yet.</div>
               ) : (
-                <ul className="space-y-2">
+                <ul className="space-y-3">
                   {history.map((h) => (
-                    <li key={h.id} className="text-xs text-charcoal">
+                    <li key={h.id} className="text-sm text-charcoal">
                       <div>
                         Moved to <strong>{STAGE_LABEL[h.to_stage] ?? h.to_stage}</strong>
                         {h.moved_by_name && <> by {h.moved_by_name}</>}
                       </div>
-                      <div className="text-mist">
+                      <div className="text-xs text-mist">
                         {formatDateTime(h.created_at)}
                         {h.from_stage && <> · from {STAGE_LABEL[h.from_stage] ?? h.from_stage}</>}
                       </div>
-                      {h.note && <div className="text-slate italic mt-1">"{h.note}"</div>}
+                      {h.note && <div className="text-xs text-slate italic mt-1">&quot;{h.note}&quot;</div>}
                     </li>
                   ))}
                 </ul>
