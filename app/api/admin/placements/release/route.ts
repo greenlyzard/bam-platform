@@ -80,26 +80,28 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: updateErr.message }, { status: 500 });
   }
 
-  // Fetch student → parent mapping
+  // Fetch student → parent/family mapping
   const { data: students } = await supabase
     .from("students")
     .select("id, first_name, parent_id, family_id")
     .in("id", studentIds);
 
   // Group students by parent_id
-  const byParent = new Map<string, { studentNames: string[]; studentIds: string[] }>();
+  const byParent = new Map<string, { studentNames: string[]; studentIds: string[]; familyId: string | null }>();
   for (const s of students ?? []) {
     if (!s.parent_id) continue;
     if (!byParent.has(s.parent_id)) {
-      byParent.set(s.parent_id, { studentNames: [], studentIds: [] });
+      byParent.set(s.parent_id, { studentNames: [], studentIds: [], familyId: s.family_id });
     }
     const entry = byParent.get(s.parent_id)!;
     entry.studentNames.push(s.first_name);
     entry.studentIds.push(s.id);
+    if (!entry.familyId && s.family_id) entry.familyId = s.family_id;
   }
 
-  // Fetch parent profile emails
   const parentIds = Array.from(byParent.keys());
+
+  // Fetch parent profiles
   const { data: parents } = parentIds.length
     ? await supabase
         .from("profiles")
@@ -109,6 +111,21 @@ export async function POST(req: Request) {
   const parentMap = new Map<string, { email: string | null; first_name: string | null }>();
   for (const p of parents ?? []) {
     parentMap.set(p.id, { email: p.email, first_name: p.first_name });
+  }
+
+  // Fetch family billing emails (preferred over profile email)
+  const familyIds = Array.from(
+    new Set(Array.from(byParent.values()).map((e) => e.familyId).filter(Boolean) as string[])
+  );
+  const { data: families } = familyIds.length
+    ? await supabase
+        .from("families")
+        .select("id, billing_email")
+        .in("id", familyIds)
+    : { data: [] };
+  const familyEmailMap = new Map<string, string | null>();
+  for (const f of families ?? []) {
+    familyEmailMap.set(f.id, f.billing_email);
   }
 
   // Build push notifications
@@ -132,18 +149,21 @@ export async function POST(req: Request) {
     }
   }
 
-  // Send emails to parents
+  // Send emails to parents — prefer family billing_email, fall back to profile email
   let emailsSent = 0;
   for (const parentId of parentIds) {
     const parent = parentMap.get(parentId);
-    if (!parent?.email) continue;
     const entry = byParent.get(parentId)!;
+    const billingEmail = entry.familyId ? familyEmailMap.get(entry.familyId) ?? null : null;
+    const toEmail = billingEmail ?? parent?.email ?? null;
+    if (!toEmail) continue;
+
     const namesStr = entry.studentNames.join(" and ");
-    const greeting = parent.first_name ? `Hi ${parent.first_name},` : "Hi there,";
+    const greeting = parent?.first_name ? `Hi ${parent.first_name},` : "Hi there,";
 
     try {
       await sendRawEmail({
-        to: parent.email,
+        to: toEmail,
         subject: `Your ${seasonName} classes are ready to review`,
         bodyHtml: `
           <p>${greeting}</p>
