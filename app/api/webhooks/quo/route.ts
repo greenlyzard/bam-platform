@@ -7,6 +7,7 @@ import {
   handleStart,
 } from "@/lib/contact-channels";
 import { getSMSAdapter } from "@/lib/sms/adapter";
+import { classifyMessage } from "@/lib/communications/classify";
 
 const DEFAULT_TENANT_ID =
   process.env.BAM_TENANT_ID ?? "84d98f72-c82f-414f-8b17-172b802f6993";
@@ -141,19 +142,45 @@ export async function POST(req: NextRequest) {
     }
 
     // -----------------------------------------------------------------------
-    // 4. Unmatched numbers → insert into unmatched_sms
+    // 4. Classify and handle unmatched senders
     // -----------------------------------------------------------------------
+    const classification = classifyMessage("", messageBody, "", "");
+
     if (!profileId) {
-      console.warn(`[quo:webhook] Unmatched phone ${fromPhone}: ${messageBody}`);
+      // SPAM: store silently with is_spam=true (per COMMUNICATIONS_TRIAGE.md)
+      // INQUIRY (unknown sender): auto-create lead
+      // REVIEW: store in unmatched_sms for admin triage
+      console.warn(`[quo:webhook] Unmatched phone ${fromPhone} [${classification.label}]: ${messageBody}`);
+
+      if (classification.label === "inquiry") {
+        try {
+          await supabase.from("leads").insert({
+            tenant_id: tenantId,
+            first_name: "SMS",
+            last_name: fromPhone,
+            phone: fromPhone,
+            source: "sms",
+            pipeline_stage: "inquiry",
+            status: "new",
+            notes: messageBody.slice(0, 500),
+            intake_form_data: { classifier_signals: classification.signals },
+          });
+        } catch (e) {
+          console.error("[quo:webhook] Failed to auto-create lead:", e);
+        }
+      }
+
       try {
         await supabase.from("unmatched_sms").insert({
           phone_number: fromPhone,
           body: messageBody,
           received_at: timestamp,
           tenant_id: tenantId,
+          classifier_label: classification.label,
+          is_spam: classification.label === "spam",
         });
       } catch {
-        // Table may not exist yet
+        // Table may not exist yet, or columns not yet added
       }
     }
   } catch (e) {

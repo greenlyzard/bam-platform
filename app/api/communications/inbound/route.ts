@@ -6,6 +6,7 @@ import {
   getOrCreateThread,
   appendMessage,
 } from "@/lib/communications/thread";
+import { classifyMessage } from "@/lib/communications/classify";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
@@ -92,12 +93,154 @@ export async function POST(req: NextRequest) {
     if (threadToken) break;
   }
 
-  if (!threadToken) {
-    console.warn("[inbound] No thread token found in to addresses:", toAddresses);
-    return NextResponse.json({ error: "No thread token" }, { status: 400 });
-  }
-
   const supabase = getServiceClient();
+
+  // ── First-contact path: no thread token in To addresses ──
+  // Run classifier and either auto-create a lead (inquiry),
+  // store as unmatched (review), or store silently (spam).
+  if (!threadToken) {
+    const classification = classifyMessage(subject, textBody || htmlBody, senderEmail, senderName);
+
+    // Get default tenant
+    const { data: tenant } = await supabase
+      .from("tenants")
+      .select("id")
+      .limit(1)
+      .single();
+    if (!tenant) {
+      return NextResponse.json({ ok: true });
+    }
+    const tenantIdLocal = tenant.id;
+
+    // Check if sender is already known (existing lead/family/profile)
+    const [{ data: existingLead }, { data: existingFamily }, { data: existingProfile }] = await Promise.all([
+      supabase.from("leads").select("id").eq("email", senderEmail).eq("tenant_id", tenantIdLocal).limit(1).maybeSingle(),
+      supabase.from("families").select("id").eq("billing_email", senderEmail).eq("tenant_id", tenantIdLocal).limit(1).maybeSingle(),
+      supabase.from("profiles").select("id").eq("email", senderEmail).limit(1).maybeSingle(),
+    ]);
+
+    const knownSender = !!(existingLead || existingFamily || existingProfile);
+
+    // SPAM: store silently, no notifications
+    if (classification.label === "spam") {
+      const { data: spamThread } = await supabase
+        .from("communication_threads")
+        .insert({
+          tenant_id: tenantIdLocal,
+          contact_name: senderName,
+          contact_email: senderEmail,
+          subject: subject || null,
+          state: "open",
+        })
+        .select("id")
+        .single();
+
+      if (spamThread) {
+        await appendMessage({
+          tenantId: tenantIdLocal,
+          threadId: spamThread.id,
+          direction: "inbound",
+          senderId: null,
+          senderName,
+          senderEmail,
+          subject: subject || null,
+          bodyHtml: htmlBody || null,
+          bodyText: textBody || null,
+          matched: false,
+        });
+        await supabase
+          .from("communication_messages")
+          .update({
+            is_spam: true,
+            classifier_label: classification.label,
+            classifier_signals: classification.signals,
+          })
+          .eq("thread_id", spamThread.id);
+      }
+      return NextResponse.json({ ok: true, classification: "spam" });
+    }
+
+    // INQUIRY (unknown sender): auto-create lead
+    let newLeadId: string | null = existingLead?.id ?? null;
+    if (classification.label === "inquiry" && !knownSender) {
+      const nameParts = senderName.trim().split(/\s+/);
+      const firstName = nameParts[0] || "Unknown";
+      const lastName = nameParts.slice(1).join(" ") || null;
+      const { data: createdLead } = await supabase
+        .from("leads")
+        .insert({
+          tenant_id: tenantIdLocal,
+          first_name: firstName,
+          last_name: lastName,
+          email: senderEmail,
+          source: "email",
+          pipeline_stage: "inquiry",
+          status: "new",
+          notes: (textBody || htmlBody || "").slice(0, 500),
+          intake_form_data: { classifier_signals: classification.signals },
+        })
+        .select("id")
+        .single();
+      newLeadId = createdLead?.id ?? null;
+    }
+
+    // Create or get a thread for this sender
+    const threadFamilyId = existingFamily?.id ?? null;
+    const threadLeadId = newLeadId ?? existingLead?.id ?? null;
+
+    const { data: thread } = await supabase
+      .from("communication_threads")
+      .insert({
+        tenant_id: tenantIdLocal,
+        contact_name: senderName,
+        contact_email: senderEmail,
+        subject: subject || null,
+        state: "open",
+        family_id: threadFamilyId,
+        lead_id: threadLeadId,
+        unread_count: 1,
+        message_count: 1,
+        last_message_at: new Date().toISOString(),
+      })
+      .select("id")
+      .single();
+
+    if (thread) {
+      await appendMessage({
+        tenantId: tenantIdLocal,
+        threadId: thread.id,
+        direction: "inbound",
+        senderId: existingProfile?.id ?? null,
+        senderName,
+        senderEmail,
+        subject: subject || null,
+        bodyHtml: htmlBody || null,
+        bodyText: textBody || null,
+        matched: knownSender || classification.label === "inquiry",
+      });
+
+      // Tag the message with classifier metadata
+      await supabase
+        .from("communication_messages")
+        .update({
+          classifier_label: classification.label,
+          classifier_signals: classification.signals,
+        })
+        .eq("thread_id", thread.id);
+    }
+
+    // Notify admin if inquiry created a lead
+    if (newLeadId) {
+      console.log(`[inbound] Auto-created lead ${newLeadId} for ${senderEmail}`);
+    }
+
+    return NextResponse.json({
+      ok: true,
+      classification: classification.label,
+      lead_id: newLeadId,
+      thread_id: thread?.id ?? null,
+    });
+  }
 
   // Get default tenant
   const { data: tenant } = await supabase
