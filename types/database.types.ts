@@ -2382,6 +2382,60 @@ export type Database = {
           },
         ]
       }
+      evaluation_requests: {
+        Row: {
+          assigned_teacher_id: string | null
+          completed_at: string | null
+          created_at: string | null
+          experience_description: string | null
+          id: string
+          lead_id: string | null
+          placement_notes: string | null
+          recommended_level: string | null
+          request_type: string
+          requested_by: string | null
+          scheduled_at: string | null
+          status: string
+          student_id: string | null
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_teacher_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          experience_description?: string | null
+          id?: string
+          lead_id?: string | null
+          placement_notes?: string | null
+          recommended_level?: string | null
+          request_type?: string
+          requested_by?: string | null
+          scheduled_at?: string | null
+          status?: string
+          student_id?: string | null
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_teacher_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          experience_description?: string | null
+          id?: string
+          lead_id?: string | null
+          placement_notes?: string | null
+          recommended_level?: string | null
+          request_type?: string
+          requested_by?: string | null
+          scheduled_at?: string | null
+          status?: string
+          student_id?: string | null
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       evaluation_template_questions: {
         Row: {
           hint_text: string | null
@@ -2785,42 +2839,69 @@ export type Database = {
       }
       leads: {
         Row: {
+          assigned_teacher_id: string | null
+          communication_thread_id: string | null
           created_at: string
           email: string | null
+          evaluation_completed_at: string | null
+          evaluation_scheduled_at: string | null
           family_id: string | null
           first_name: string
           id: string
+          intake_form_data: Json | null
           last_name: string | null
           notes: string | null
           phone: string | null
+          pipeline_stage: string
+          placement_notes: string | null
+          recommended_class_ids: string[] | null
+          returning_student_id: string | null
           source: string | null
           status: string
           tenant_id: string
           updated_at: string
         }
         Insert: {
+          assigned_teacher_id?: string | null
+          communication_thread_id?: string | null
           created_at?: string
           email?: string | null
+          evaluation_completed_at?: string | null
+          evaluation_scheduled_at?: string | null
           family_id?: string | null
           first_name: string
           id?: string
+          intake_form_data?: Json | null
           last_name?: string | null
           notes?: string | null
           phone?: string | null
+          pipeline_stage?: string
+          placement_notes?: string | null
+          recommended_class_ids?: string[] | null
+          returning_student_id?: string | null
           source?: string | null
           status?: string
           tenant_id: string
           updated_at?: string
         }
         Update: {
+          assigned_teacher_id?: string | null
+          communication_thread_id?: string | null
           created_at?: string
           email?: string | null
+          evaluation_completed_at?: string | null
+          evaluation_scheduled_at?: string | null
           family_id?: string | null
           first_name?: string
           id?: string
+          intake_form_data?: Json | null
           last_name?: string | null
           notes?: string | null
           phone?: string | null
+          pipeline_stage?: string
+          placement_notes?: string | null
+          recommended_class_ids?: string[] | null
+          returning_student_id?: string | null
           source?: string | null
           status?: string
           tenant_id?: string
@@ -8161,6 +8242,7 @@ export type Database = {
           created_at: string
           enrollment_id: string | null
           id: string
+          lead_id: string | null
           outcome: string
           student_id: string
           tenant_id: string
@@ -8171,6 +8253,7 @@ export type Database = {
           created_at?: string
           enrollment_id?: string | null
           id?: string
+          lead_id?: string | null
           outcome?: string
           student_id: string
           tenant_id: string
@@ -8181,6 +8264,7 @@ export type Database = {
           created_at?: string
           enrollment_id?: string | null
           id?: string
+          lead_id?: string | null
           outcome?: string
           student_id?: string
           tenant_id?: string
