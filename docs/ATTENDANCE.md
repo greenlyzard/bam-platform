@@ -23,7 +23,6 @@ This spec covers:
 - Rehearsal attendance (production rehearsals)
 - Private lesson attendance
 - Attendance UI for teachers and admins
-- **Session progress notes per student per class** ← NEW
 - Parent attendance history view
 - Attendance analytics
 - Overpayment alert system (cross-reference with timesheets)
@@ -31,7 +30,7 @@ This spec covers:
 
 This spec does **not** cover:
 - Waitlist management (covered in Registration spec)
-- Makeup class scheduling (covered in MAKEUP_POLICY.md)
+- Makeup class scheduling (future scope)
 - Automated billing adjustments for absences (future scope)
 
 ---
@@ -97,16 +96,7 @@ CREATE TABLE attendance_records (
     CONSTRAINT valid_status CHECK (status IN ('present','absent','excused','late','makeup','trial')),
   checked_in_at   TIMESTAMPTZ,   -- timestamp when marked present
   checked_in_by   UUID REFERENCES user_profiles(id), -- teacher or admin who took attendance
-
-  -- Session Progress Notes ← NEW (from DMP gap analysis)
-  session_notes   TEXT,          -- Teacher's optional note for this student this session
-                                 -- e.g. "Working on arabesque alignment — significant improvement"
-  progress_flag   TEXT CHECK (progress_flag IN ('needs_attention','ready_to_advance','achieving','none') OR progress_flag IS NULL),
-                                 -- Quick flag the teacher can set per student per session
-  notes_visible_to_parent BOOLEAN NOT NULL DEFAULT false,
-                                 -- Teacher controls whether this note surfaces in parent portal
-  notes           TEXT,          -- Legacy field — general attendance note (admin-facing only)
-
+  notes           TEXT,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
 
@@ -116,75 +106,11 @@ CREATE TABLE attendance_records (
 CREATE INDEX idx_attendance_session  ON attendance_records(session_id);
 CREATE INDEX idx_attendance_student  ON attendance_records(student_id);
 CREATE INDEX idx_attendance_status   ON attendance_records(status);
-CREATE INDEX idx_attendance_flag     ON attendance_records(progress_flag) WHERE progress_flag IS NOT NULL;
 ```
 
 ---
 
-## 6. Session Progress Notes ← NEW
-
-**Purpose:** Teachers can add a brief optional note per student per class session. This creates a longitudinal progress record beyond simple present/absent tracking — surfacing meaningful context on student profiles and in parent communications.
-
-**Design Philosophy:** Notes are optional and fast. Taking attendance should not slow down a teacher. The progress note is a one-tap flag plus an optional text field — not a formal evaluation.
-
-### Teacher UX — Adding a Progress Note
-
-On the attendance sheet, each student row has:
-- Status tap buttons (Present / Late / Excused / Absent) — unchanged
-- **"+ Note"** expandable field below the student name — only visible when tapped
-- Optional text area: "Session note (optional)"
-- Optional progress flag dropdown: "Flag this student" → None / Needs Attention / Achieving / Ready to Advance
-- Optional toggle: "Share with parent" (default: off)
-
-Teachers can add a note regardless of attendance status (e.g., "Absent — but wanted to note she's been working on this at home per her mom's message").
-
-### Progress Flag Definitions
-
-| Flag | Color | Meaning |
-|---|---|---|
-| `needs_attention` | Amber | Student is struggling — teacher wants admin aware |
-| `achieving` | Green | Particularly strong session — worth acknowledging |
-| `ready_to_advance` | Lavender | Teacher recommends level advancement review |
-| `none` | — | No flag (default) |
-
-`needs_attention` flags are visible to admins immediately in the student directory. `ready_to_advance` flags trigger an in-app notification to admin: "Ms. Lauryn has flagged Sofia as ready for level advancement review."
-
-### Visibility Rules
-
-| Viewer | What They See |
-|---|---|
-| Teacher (own students) | Full session note + flag |
-| Admin / Super Admin | Full session note + flag for all students |
-| Parent | Only notes where `notes_visible_to_parent = true` |
-| Student | Same as parent (their own sessions only) |
-| Other Teachers | Never — isolated per teacher |
-
-### Parent Portal Surface
-
-When `notes_visible_to_parent = true`, the note appears on the student profile under "Recent Class Notes":
-
-```
-Tuesday, April 8 — Pre-Ballet with Ms. Amanda
-"Beautiful focus today — Sofia held her arabesque for a full 5 counts. 
- Keep encouraging practice at home."
-```
-
-Notes are shown chronologically (newest first), limited to the last 10 visible notes in the portal. Older notes remain in history but paginated.
-
-### Admin Surface
-
-Admins see ALL session notes on the student profile under a dedicated "Session Notes" tab, including non-parent-visible notes. This creates a complete longitudinal record for:
-- Level placement decisions
-- Parent communication context
-- Teacher performance review
-
-### Student Directory — Flag Alerts
-
-The student directory in `/admin/students` shows a `needs_attention` badge on any student who has received that flag in the last 14 days. Admin can click to see which teacher flagged them and the note context.
-
----
-
-## 7. Teacher — Taking Attendance
+## 6. Teacher — Taking Attendance
 
 ### Entry Point
 
@@ -216,10 +142,9 @@ Clicking "Take Attendance" opens the attendance sheet for that session:
 - Each student row:
   - Avatar / initials
   - Student name
-  - **Allergen badge** if `allergy_severity = 'severe'` (🥜 etc.) — from `student_health_records`
   - Current status badge (defaults to `absent` until marked)
   - Quick tap buttons: ✓ Present | Late | Excused | Absent
-  - **"+ Note" expandable** — session_notes + progress_flag + notes_visible_to_parent toggle
+  - Notes field (expandable)
 - **"Mark All Present"** button at top (one-tap for full classes)
 - **Save** button — saves current state, can return and edit until locked
 
@@ -238,7 +163,7 @@ When a session is opened for attendance:
 
 ---
 
-## 8. Admin — Attendance Management
+## 7. Admin — Attendance Management
 
 ### `/admin/attendance` — Overview Page
 
@@ -246,16 +171,15 @@ Filters:
 - Date range (default: current week)
 - Class / Teacher / Student
 - Status filter
-- **Progress flag filter** (needs_attention / ready_to_advance)
 
 Views:
-- **By Session** — list of sessions with attendance summary (e.g. "12/15 present") + note count
-- **By Student** — list of students with attendance rate + flag badges
+- **By Session** — list of sessions with attendance summary (e.g. "12/15 present")
+- **By Student** — list of students with attendance rate
 - **By Class** — class-level attendance rates
 
 ### Session Detail
 
-Clicking a session shows the full attendance sheet with all student statuses and session notes. Admin can edit any record regardless of lock status.
+Clicking a session shows the full attendance sheet with all student statuses. Admin can edit any record regardless of lock status.
 
 ### Attendance Rate Indicators
 
@@ -266,42 +190,109 @@ Color coded:
 
 ---
 
-## 9. Parent — Attendance History
+## 8. Parent — Attendance History
 
 On the parent portal, the student profile page includes an **"Attendance"** tab:
 
 - List of all sessions for enrolled classes
 - Date, class name, status badge
-- **Session note** (when teacher marked `notes_visible_to_parent = true`)
+- Notes (if any)
 - Attendance rate: "Your child has attended 18 of 20 sessions (90%)"
 
-Parents can see status and visible notes but cannot edit.
+Parents can see status but cannot edit.
 
 ---
 
-## 10. Overpayment Alert System
+## 9. Overpayment Alert System
 
 This is the cross-reference engine between timesheets and attendance. It runs as a background check when a timesheet entry is submitted or when an admin runs payroll.
 
 ### Alert Types
 
 **Alert Type 1 — Session Not Found**
-Triggered when a teacher logs hours for a class but no session record exists for that teacher + class + date. Severity: ⚠️ Warning.
+
+Triggered when:
+- A teacher logs hours for a class on a specific date
+- No session record exists for that teacher + class + date combination
+
+Message: "No scheduled session found for [Class Name] on [Date]. Verify this class was held."
+
+Severity: ⚠️ Warning
+
+---
 
 **Alert Type 2 — Session Cancelled**
-Triggered when teacher logs hours but session is marked `cancelled`. Severity: 🔴 Flag.
+
+Triggered when:
+- A teacher logs hours for a class
+- The session record for that date has `status = 'cancelled'`
+
+Message: "[Class Name] on [Date] was marked as cancelled. Teacher logged [N] hours. Please verify."
+
+Severity: 🔴 Flag — requires admin review before approving timesheet entry
+
+---
 
 **Alert Type 3 — Zero Attendance**
-Triggered when teacher logs hours but 0 students marked present. Severity: ⚠️ Warning.
+
+Triggered when:
+- A teacher logs hours for a class
+- The session has 0 students marked present (all absent or no attendance taken)
+
+Message: "No students were marked present for [Class Name] on [Date]. Teacher logged [N] hours. Was this class held?"
+
+Severity: ⚠️ Warning
+
+---
 
 **Alert Type 4 — Private Lesson — Student Absent**
-Triggered when teacher logs Private hours but named student has `absent` status. Severity: 🔴 Flag.
+
+Triggered when:
+- A teacher logs Private hours and names a student
+- That student has an `absent` attendance record for a private session on that date
+
+Message: "[Student Name] was marked absent for their private lesson on [Date]. Teacher logged [N] hours."
+
+Severity: 🔴 Flag
+
+---
 
 **Alert Type 5 — Hours Exceed Session Duration**
-Triggered when logged hours exceed the scheduled session length. Severity: ⚠️ Warning.
+
+Triggered when:
+- A teacher logs more hours than the scheduled session length
+- e.g. logs 2.0 hours for a 45-minute class
+
+Message: "Teacher logged [N] hours for [Class Name] on [Date]. Scheduled duration is [N] minutes. Please verify."
+
+Severity: ⚠️ Warning
+
+---
 
 **Alert Type 6 — Duplicate Entry**
-Triggered when two timesheet entries exist for same class + date. Severity: 🔴 Flag — blocks submission.
+
+Triggered when:
+- A teacher submits two timesheet entries for the same class on the same date
+
+Message: "Duplicate entry detected: [Class Name] appears twice on [Date]."
+
+Severity: 🔴 Flag — blocks submission until resolved
+
+---
+
+### Alert Display
+
+Alerts appear:
+1. **Inline on the timesheet entry** — a yellow or red banner below the flagged entry row
+2. **On the payroll report** — flagged entries are highlighted with a tooltip explaining the alert
+3. **On the admin timesheets overview** — a "Needs Review" count badge
+
+Admins can:
+- **Override** — mark the alert as reviewed and approve anyway (with a required note explaining why)
+- **Return to teacher** — send the entry back to the teacher with a message
+- **Delete the entry** — if it was clearly erroneous
+
+---
 
 ### Alert Storage
 
@@ -320,71 +311,85 @@ CREATE TABLE timesheet_alerts (
   resolution_note     TEXT,
   created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE INDEX idx_alerts_entry  ON timesheet_alerts(timesheet_entry_id);
+CREATE INDEX idx_alerts_tenant ON timesheet_alerts(tenant_id);
 ```
 
 ---
 
-## 11. Session Auto-Generation
+## 10. Session Auto-Generation
 
-Daily cron at 12:00 AM Monday creates session records for the coming week from active class schedules.
+Sessions are generated automatically each week from the class schedule. A daily cron job (Vercel Cron) runs at 12:00 AM Monday and creates session records for the coming week.
 
 ```
-/api/cron/generate-sessions  (schedule: 0 0 * * 1)
+/api/cron/generate-sessions
 ```
+
+Logic:
+1. For each active class with a recurring schedule
+2. Calculate next occurrence dates for the coming 7 days
+3. Insert session records if they don't already exist
+4. Skip cancelled classes or classes outside their date range
+
+Cron schedule: `0 0 * * 1` (every Monday at midnight)
 
 ---
 
-## 12. Analytics
+## 11. Analytics
 
 ### Studio-Level (Admin Dashboard)
+
 - Overall attendance rate this month
 - Classes with lowest attendance (bottom 5)
 - Students with most absences (flagged for outreach)
-- **Students flagged `needs_attention` in last 14 days**
-- **Students flagged `ready_to_advance` pending admin review**
+- Busiest vs slowest days of the week
 
 ### Teacher-Level
-- Attendance rate per class
-- Classes where attendance was never taken
+
+- Attendance rate per class per teacher
+- Classes where attendance was never taken (flag)
 
 ### Student-Level
+
 - Per-student attendance rate per class
-- Trend over time
-- **Progress note history (longitudinal view)**
+- Trend over time (improving / declining)
+- Students at risk of losing spot if studio has attendance policies
 
 ---
 
-## 13. API Routes
+## 12. API Routes
 
 | Method | Route | Description | Auth |
 |---|---|---|---|
-| GET | `/api/attendance/sessions` | List sessions | Teacher+ |
+| GET | `/api/attendance/sessions` | List sessions (filterable) | Teacher+ |
 | GET | `/api/attendance/sessions/[id]` | Get session with attendance records | Teacher+ |
 | POST | `/api/attendance/sessions/[id]/records` | Submit attendance for a session | Teacher+ |
-| PATCH | `/api/attendance/records/[id]` | Update a single record (status + note + flag) | Admin+ or Teacher if unlocked |
+| PATCH | `/api/attendance/records/[id]` | Update a single attendance record | Admin+ (or Teacher if unlocked) |
 | GET | `/api/attendance/students/[id]` | Get attendance history for a student | Admin+ / Parent (own child) |
-| GET | `/api/attendance/students/[id]/notes` | Get session notes for a student | Admin+ |
-| GET | `/api/attendance/flags?type=needs_attention` | Get all flagged students | Admin+ |
 | GET | `/api/cron/generate-sessions` | Auto-generate upcoming sessions | Cron secret |
 
 ---
 
-## 14. Build Notes for Claude Code
+## 13. Build Notes for Claude Code
 
-Reference these files first:
+When building this module, reference these files first:
+
 ```
-docs/ATTENDANCE.md             ← this file
-docs/ROLES_AND_PERMISSIONS.md
-docs/SCHEDULING_AND_LMS.md
-docs/STUDENT_PROFILE.md        ← for health records / allergen badge integration
+docs/claude/ATTENDANCE.md             ← this file
+docs/claude/ROLES_AND_PERMISSIONS.md
+docs/claude/SCHEDULING_AND_LMS.md
 CLAUDE.md
 ```
 
 Build order:
-1. Migration — update `attendance_records` with `session_notes`, `progress_flag`, `notes_visible_to_parent` columns
-2. Teacher attendance UI — add "+ Note" expandable + allergen badge
-3. Admin attendance overview — add flag filter + needs_attention badges
-4. Parent attendance history tab — render visible notes
-5. Student directory — needs_attention badge + ready_to_advance notification
-6. Session auto-generation cron job
-7. Overpayment alert engine + `timesheet_alerts` table
+1. Migration — `sessions` and `attendance_records` tables
+2. Session auto-generation cron job
+3. Teacher attendance UI — today's sessions list + attendance sheet
+4. Admin attendance overview page
+5. Parent attendance history tab on student profile
+6. Overpayment alert engine + `timesheet_alerts` table
+7. Alert display on timesheet entries and payroll report
+8. Analytics cards on admin dashboard
+
+**Dependency note:** The overpayment alert system (Parts 6–7) requires both this module and the timesheet module to be fully built and populated with real data. Do not build the alert engine until session records and timesheet entries both exist.
