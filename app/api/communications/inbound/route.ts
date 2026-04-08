@@ -31,17 +31,6 @@ function sanitizeHtml(html: string): string {
     .replace(/\son\w+\s*=\s*[^\s>]*/gi, "");
 }
 
-/**
- * Extract email from "Name <email@example.com>" or plain email format.
- */
-function parseEmailAddress(raw: string): { name: string; email: string } {
-  const match = raw.match(/^(.+?)\s*<([^>]+)>$/);
-  if (match) {
-    return { name: match[1].trim(), email: match[2].trim().toLowerCase() };
-  }
-  return { name: raw.trim(), email: raw.trim().toLowerCase() };
-}
-
 export async function POST(req: NextRequest) {
   const webhookSecret = process.env.RESEND_WEBHOOK_SECRET;
   const rawBody = await req.text();
@@ -70,17 +59,31 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const toAddresses: string[] = Array.isArray(payload.to)
-    ? payload.to
-    : typeof payload.to === "string"
-    ? [payload.to]
+  // Resend webhook events wrap the email data in a "data" object.
+  // Support both shapes (payload.data.* and flat payload.*) for compat.
+  const data = (payload.data as Record<string, unknown> | undefined) ?? payload;
+
+  const toAddresses: string[] = Array.isArray(data.to)
+    ? (data.to as string[])
+    : typeof data.to === "string"
+    ? [data.to as string]
     : [];
 
-  const fromRaw = (payload.from as string) ?? "";
-  const { name: senderName, email: senderEmail } = parseEmailAddress(fromRaw);
-  const subject = (payload.subject as string) ?? "";
-  const htmlBody = sanitizeHtml((payload.html as string) ?? "");
-  const textBody = (payload.text as string) ?? "";
+  const fromRaw = (data.from as string) ?? "";
+
+  // Resend's "from" can be either "Name <email@example.com>" or just "email@example.com"
+  const fromMatch = fromRaw.match(/^(?:(.*?)\s)?<?([^>]+)>?$/);
+  const senderName = (fromMatch?.[1] ?? "").trim().replace(/^"|"$/g, "");
+  const senderEmail = (fromMatch?.[2] ?? "").trim().toLowerCase();
+
+  const subject = (data.subject as string) ?? "";
+  const htmlBody = sanitizeHtml((data.html as string) ?? "");
+  const textBody = (data.text as string) ?? "";
+
+  if (!senderEmail) {
+    console.warn("[inbound] Could not parse sender email from:", fromRaw);
+    return NextResponse.json({ ok: true, error: "missing sender" });
+  }
 
   // Find thread token from the to address
   let threadToken: string | null = null;
@@ -123,6 +126,9 @@ export async function POST(req: NextRequest) {
         .from("communication_threads")
         .insert({
           tenant_id: tenantIdLocal,
+          thread_token: crypto.randomUUID(),
+          channel: "email",
+          thread_type: "inquiry",
           contact_name: senderName,
           contact_email: senderEmail,
           subject: subject || null,
@@ -184,10 +190,13 @@ export async function POST(req: NextRequest) {
     const threadFamilyId = existingFamily?.id ?? null;
     const threadLeadId = newLeadId ?? existingLead?.id ?? null;
 
-    const { data: thread } = await supabase
+    const { data: thread, error: threadErr } = await supabase
       .from("communication_threads")
       .insert({
         tenant_id: tenantIdLocal,
+        thread_token: crypto.randomUUID(),
+        channel: "email",
+        thread_type: "inquiry",
         contact_name: senderName,
         contact_email: senderEmail,
         subject: subject || null,
@@ -200,6 +209,10 @@ export async function POST(req: NextRequest) {
       })
       .select("id")
       .single();
+
+    if (threadErr) {
+      console.error("[inbound] Failed to create thread:", threadErr);
+    }
 
     if (thread) {
       await appendMessage({
