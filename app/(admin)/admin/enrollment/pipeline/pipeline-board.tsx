@@ -180,8 +180,7 @@ function StageColumn({
       </div>
       <div
         ref={setNodeRef}
-        className={`flex-1 p-3 space-y-2.5 overflow-y-auto transition-colors ${isOver ? "bg-lavender/5" : ""}`}
-        style={{ minHeight: 400 }}
+        className={`flex-1 p-3 space-y-2.5 overflow-y-auto min-h-[500px] transition-colors ${isOver ? "bg-lavender/5" : ""}`}
       >
         {leads.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 gap-2">
@@ -508,7 +507,7 @@ export function PipelineBoard({
       </div>
 
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div className="flex flex-row gap-4 overflow-x-auto pb-4 pipeline-scroll">
+        <div className="flex flex-row items-stretch gap-4 overflow-x-auto pb-4 pipeline-scroll">
           {STAGES.map((stage) => (
             <StageColumn
               key={stage.key}
