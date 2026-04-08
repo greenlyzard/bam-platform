@@ -154,27 +154,28 @@ export function PipelineBoard({
 
   function renderQuickAction(lead: Lead) {
     const disabled = busyId === lead.id || isPending;
-    const btn = "h-7 rounded text-[11px] font-medium px-2 transition-colors disabled:opacity-50";
-    const primary = `${btn} bg-lavender text-white hover:bg-lavender-dark`;
-    const ghost = `${btn} border border-silver text-slate hover:bg-cloud`;
+    const btn = "h-7 w-full rounded-md text-[11px] font-semibold px-2 transition-colors disabled:opacity-50";
+    const primary = `${btn} text-white hover:opacity-90`;
+    const ghost = `${btn} border border-lavender/40 text-lavender hover:bg-lavender/5`;
+    const primaryStyle = { backgroundColor: "#9C8BBF" };
 
     switch (lead.pipeline_stage) {
       case "inquiry":
         return (
-          <button disabled={disabled} onClick={() => moveStage(lead.id, "trial_requested")} className={primary}>
+          <button disabled={disabled} onClick={() => moveStage(lead.id, "trial_requested")} className={primary} style={primaryStyle}>
             Follow Up
           </button>
         );
       case "trial_requested":
         return (
-          <button disabled={disabled} onClick={() => scheduleTrial(lead.id)} className={primary}>
+          <button disabled={disabled} onClick={() => scheduleTrial(lead.id)} className={primary} style={primaryStyle}>
             Schedule Trial
           </button>
         );
       case "trial_scheduled":
         return (
           <div className="flex gap-1">
-            <button disabled={disabled} onClick={() => markTrial(lead.id, "attended")} className={primary}>
+            <button disabled={disabled} onClick={() => markTrial(lead.id, "attended")} className={primary} style={primaryStyle}>
               Mark Attended
             </button>
             <button disabled={disabled} onClick={() => markTrial(lead.id, "no_show")} className={ghost}>
@@ -185,7 +186,7 @@ export function PipelineBoard({
       case "trial_attended":
         return (
           <div className="flex gap-1">
-            <button disabled={disabled} onClick={() => moveStage(lead.id, "placement_recommended")} className={primary}>
+            <button disabled={disabled} onClick={() => moveStage(lead.id, "placement_recommended")} className={primary} style={primaryStyle}>
               Recommend Classes
             </button>
             <button disabled={disabled} onClick={() => moveStage(lead.id, "evaluation_requested")} className={ghost}>
@@ -195,25 +196,25 @@ export function PipelineBoard({
         );
       case "evaluation_requested":
         return (
-          <button disabled={disabled} onClick={() => moveStage(lead.id, "evaluation_scheduled")} className={primary}>
+          <button disabled={disabled} onClick={() => moveStage(lead.id, "evaluation_scheduled")} className={primary} style={primaryStyle}>
             Schedule Evaluation
           </button>
         );
       case "evaluation_scheduled":
         return (
-          <button disabled={disabled} onClick={() => moveStage(lead.id, "placement_recommended")} className={primary}>
+          <button disabled={disabled} onClick={() => moveStage(lead.id, "placement_recommended")} className={primary} style={primaryStyle}>
             Complete Evaluation
           </button>
         );
       case "placement_recommended":
         return (
-          <button disabled={disabled} onClick={() => moveStage(lead.id, "contract_pending")} className={primary}>
+          <button disabled={disabled} onClick={() => moveStage(lead.id, "contract_pending")} className={primary} style={primaryStyle}>
             View Cart
           </button>
         );
       case "contract_pending":
         return (
-          <button disabled={disabled} onClick={() => moveStage(lead.id, "enrolled")} className={primary}>
+          <button disabled={disabled} onClick={() => moveStage(lead.id, "enrolled")} className={primary} style={primaryStyle}>
             Send Reminder
           </button>
         );
@@ -223,17 +224,19 @@ export function PipelineBoard({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+    <div className="space-y-6">
+      <div className="flex items-end justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-heading font-semibold text-charcoal">Enrollment Pipeline</h1>
-          <p className="mt-1 text-sm text-slate">{leads.length} active leads</p>
+          <h1 className="font-heading text-3xl font-semibold text-charcoal" style={{ fontFamily: "'Cormorant Garamond', serif" }}>
+            Enrollment Pipeline
+          </h1>
+          <p className="mt-1 text-sm text-mist">{leads.length} active leads</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <select
             value={source}
             onChange={(e) => { setSource(e.target.value); applyFilters(e.target.value, urgency); }}
-            className="h-9 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal"
+            className="h-9 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:outline-none focus:ring-2 focus:ring-lavender/30"
           >
             <option value="">All Sources</option>
             <option value="website">Website</option>
@@ -246,7 +249,7 @@ export function PipelineBoard({
           <select
             value={urgency}
             onChange={(e) => { setUrgency(e.target.value); applyFilters(source, e.target.value); }}
-            className="h-9 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal"
+            className="h-9 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:outline-none focus:ring-2 focus:ring-lavender/30"
           >
             <option value="">All Urgency</option>
             <option value="3">Overdue 3+ days</option>
@@ -255,19 +258,31 @@ export function PipelineBoard({
         </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <div className="flex gap-3 pb-4" style={{ minWidth: STAGES.length * 280 }}>
+      <div className="overflow-x-auto pipeline-scroll">
+        <div className="flex gap-4 pb-6" style={{ minWidth: STAGES.length * 296 }}>
           {STAGES.map((stage) => {
             const stageLeads = leads.filter((l) => l.pipeline_stage === stage.key);
             return (
-              <div key={stage.key} className="w-[270px] shrink-0 bg-cloud/40 rounded-xl p-3 space-y-2">
-                <div className="flex items-center justify-between px-1">
-                  <h2 className="text-xs font-semibold text-charcoal uppercase tracking-wide">{stage.label}</h2>
-                  <span className="text-xs text-mist">{stageLeads.length}</span>
+              <div
+                key={stage.key}
+                className="w-[280px] shrink-0 rounded-xl overflow-hidden flex flex-col"
+                style={{ backgroundColor: "#FAF7F2", border: "1px solid #E8E0D8" }}
+              >
+                <div
+                  className="px-4 py-2.5 flex items-center justify-between"
+                  style={{ backgroundColor: "#9C8BBF" }}
+                >
+                  <h2 className="text-xs font-semibold text-white uppercase tracking-wider">{stage.label}</h2>
+                  <span className="text-[11px] font-semibold text-lavender bg-white rounded-full min-w-[22px] h-[22px] inline-flex items-center justify-center px-2">
+                    {stageLeads.length}
+                  </span>
                 </div>
-                <div className="space-y-2">
+                <div className="flex-1 p-3 space-y-2.5">
                   {stageLeads.length === 0 ? (
-                    <div className="text-xs text-mist text-center py-4">No leads</div>
+                    <div className="flex flex-col items-center justify-center py-8 gap-2">
+                      <span className="text-3xl opacity-40">&#x1FA70;</span>
+                      <span className="text-xs italic text-mist">No leads</span>
+                    </div>
                   ) : (
                     stageLeads.map((lead) => {
                       const childName = getChildName(lead);
@@ -275,20 +290,23 @@ export function PipelineBoard({
                       const guardian = getGuardianName(lead);
                       const interest = getClassInterest(lead);
                       const sourceCls = SOURCE_COLORS[lead.source ?? "other"] ?? SOURCE_COLORS.other;
+                      const urgent7 = lead.daysInStage >= 7;
+                      const urgent3 = lead.daysInStage >= 3 && lead.daysInStage < 7;
                       return (
                         <div
                           key={lead.id}
-                          className={`bg-white rounded-lg p-3 shadow-sm space-y-2 ${urgencyBorder(lead.daysInStage)}`}
+                          className={`bg-white rounded-lg p-3 space-y-2 transition-shadow hover:shadow-md ${urgencyBorder(lead.daysInStage)}`}
+                          style={{ boxShadow: "0 1px 3px rgba(107, 90, 153, 0.08)" }}
                         >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <div className="text-sm font-medium text-charcoal truncate">
-                                {childName}{age ? ` (age ${age})` : ""}
-                              </div>
-                              {guardian && guardian !== childName && (
-                                <div className="text-xs text-mist truncate">Guardian: {guardian}</div>
-                              )}
+                          <div>
+                            <div className="text-sm font-semibold text-charcoal truncate">
+                              {childName}{age ? ` · age ${age}` : ""}
                             </div>
+                            {guardian && guardian !== childName && (
+                              <div className="text-[11px] text-gray-500 truncate mt-0.5">
+                                {guardian}
+                              </div>
+                            )}
                           </div>
                           {interest && (
                             <div className="text-xs text-slate line-clamp-2">{interest}</div>
@@ -297,8 +315,8 @@ export function PipelineBoard({
                             <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${sourceCls}`}>
                               {lead.source ?? "other"}
                             </span>
-                            <span className={`text-[10px] ${lead.daysInStage >= 7 ? "text-red-600 font-semibold" : lead.daysInStage >= 3 ? "text-amber-600 font-semibold" : "text-mist"}`}>
-                              {lead.daysInStage}d
+                            <span className={`text-[11px] font-semibold ${urgent7 ? "text-red-600" : urgent3 ? "text-amber-600" : "text-mist"}`}>
+                              {lead.daysInStage} {lead.daysInStage === 1 ? "day" : "days"}
                             </span>
                           </div>
                           <div className="pt-1">{renderQuickAction(lead)}</div>
@@ -312,6 +330,18 @@ export function PipelineBoard({
           })}
         </div>
       </div>
+
+      <style jsx global>{`
+        .pipeline-scroll::-webkit-scrollbar {
+          height: 0px;
+          background: transparent;
+        }
+        .pipeline-scroll {
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+          scroll-behavior: smooth;
+        }
+      `}</style>
     </div>
   );
 }
