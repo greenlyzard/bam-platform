@@ -6589,6 +6589,8 @@ export type Database = {
           logo_dark_url: string | null
           logo_light_url: string | null
           logo_url: string | null
+          student_term_plural: string | null
+          student_term_singular: string | null
           studio_name: string
           theme_preset: string
           updated_at: string
@@ -6604,6 +6606,8 @@ export type Database = {
           logo_dark_url?: string | null
           logo_light_url?: string | null
           logo_url?: string | null
+          student_term_plural?: string | null
+          student_term_singular?: string | null
           studio_name?: string
           theme_preset?: string
           updated_at?: string
@@ -6619,6 +6623,8 @@ export type Database = {
           logo_dark_url?: string | null
           logo_light_url?: string | null
           logo_url?: string | null
+          student_term_plural?: string | null
+          student_term_singular?: string | null
           studio_name?: string
           theme_preset?: string
           updated_at?: string
