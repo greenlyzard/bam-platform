@@ -1,14 +1,82 @@
 /**
- * Classify an inbound message as inquiry, review, or spam.
- * Per docs/COMMUNICATIONS_TRIAGE.md Section 2.
+ * AI-powered classifier for inbound communications.
+ * Uses Claude Haiku for fast/cheap classification.
+ * Falls back to a keyword-based heuristic if the API call fails.
  */
+
+import Anthropic from "@anthropic-ai/sdk";
 
 export type ClassifierLabel = "inquiry" | "review" | "spam";
 
 export interface ClassifierResult {
   label: ClassifierLabel;
   signals: string[];
+  special_type: string | null;
+  confidence: number;
 }
+
+const SYSTEM_PROMPT = `You are a classifier for Ballet Academy and Movement, a classical ballet studio in San Clemente, CA. Classify inbound emails into one of three categories:
+- inquiry: A real person interested in classes, enrollment, trials, pricing, schedules, teachers, performances, absences, or anything studio-related. Err on the side of inquiry when unsure.
+- spam: Unsolicited marketing, sales pitches, SEO offers, bulk email, automated system notifications from non-studio software.
+- review: Genuinely ambiguous — could be real, needs human eyes.
+
+Also detect special types:
+- absence: Parent notifying of a student absence
+- cancellation: Parent wanting to cancel enrollment or leave the studio
+- retention_risk: Dissatisfaction, complaint, or any hint of leaving
+
+Respond with JSON only, no markdown:
+{ "label": "inquiry"|"review"|"spam", "signals": string[], "special_type": "absence"|"cancellation"|"retention_risk"|null, "confidence": number }`;
+
+export async function classifyMessage(
+  subject: string,
+  body: string,
+  senderEmail: string,
+  senderName: string
+): Promise<ClassifierResult> {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return fallbackClassify(subject, body, senderEmail, senderName);
+  }
+
+  try {
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+    const userMessage = `Subject: ${subject}\nFrom: ${senderName} <${senderEmail}>\nBody: ${body.slice(0, 2000)}`;
+
+    const response = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 200,
+      system: SYSTEM_PROMPT,
+      messages: [{ role: "user", content: userMessage }],
+    });
+
+    const textBlock = response.content.find((b) => b.type === "text");
+    if (!textBlock || textBlock.type !== "text") {
+      throw new Error("No text response from Claude");
+    }
+
+    // Strip any accidental code fence wrapping
+    const raw = textBlock.text.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+    const parsed = JSON.parse(raw);
+
+    const label: ClassifierLabel =
+      parsed.label === "inquiry" || parsed.label === "spam" || parsed.label === "review"
+        ? parsed.label
+        : "review";
+
+    return {
+      label,
+      signals: Array.isArray(parsed.signals) ? parsed.signals.map(String) : [],
+      special_type: typeof parsed.special_type === "string" ? parsed.special_type : null,
+      confidence: typeof parsed.confidence === "number" ? parsed.confidence : 0.5,
+    };
+  } catch (e) {
+    console.error("[classify] AI classification failed, using fallback:", e);
+    return fallbackClassify(subject, body, senderEmail, senderName);
+  }
+}
+
+// ── Fallback heuristic classifier (used when Anthropic API is unavailable) ──
 
 const INQUIRY_KEYWORDS = [
   "class", "ballet", "dance", "teacher", "enrollment", "registration",
@@ -26,44 +94,28 @@ const BULK_SENDER_DOMAINS = [
   "campaign-archive.com", "mailerlite.com", "mailgun.org",
 ];
 
-const NOREPLY_PATTERNS = [
-  "noreply", "no-reply", "donotreply", "do-not-reply", "bounce", "mailer-daemon",
-];
+const NOREPLY_PATTERNS = ["noreply", "no-reply", "donotreply", "do-not-reply", "bounce", "mailer-daemon"];
 
 function lower(s: string | null | undefined): string {
   return (s ?? "").toLowerCase();
 }
-
 function countLinks(body: string): number {
   const matches = body.match(/https?:\/\/[^\s)]+/gi);
   return matches ? matches.length : 0;
 }
-
 function isRealName(name: string): boolean {
   const n = lower(name);
   if (!n.trim()) return false;
-  for (const p of NOREPLY_PATTERNS) {
-    if (n.includes(p)) return false;
-  }
-  // Heuristic: real names have at least one space and no @ symbol
+  for (const p of NOREPLY_PATTERNS) if (n.includes(p)) return false;
   if (n.includes("@")) return false;
   return n.trim().split(/\s+/).length >= 1;
 }
-
 function senderDomain(email: string): string {
   const idx = email.indexOf("@");
   return idx >= 0 ? email.slice(idx + 1).toLowerCase() : "";
 }
 
-function mentionsChildOrAge(body: string): boolean {
-  // child name reference or age reference
-  if (/\b(my (son|daughter|child|kid)|her name is|his name is)\b/i.test(body)) return true;
-  if (/\b(\d{1,2})\s*(year|yr|yo|years old)\b/i.test(body)) return true;
-  if (/\bage\s*\d{1,2}\b/i.test(body)) return true;
-  return false;
-}
-
-export function classifyMessage(
+function fallbackClassify(
   subject: string,
   body: string,
   senderEmail: string,
@@ -74,63 +126,32 @@ export function classifyMessage(
   const fullText = `${subjLower} ${bodyLower}`;
   const signals: string[] = [];
 
-  // ── Inquiry signals ──
   let inquirySignals = 0;
   for (const kw of INQUIRY_KEYWORDS) {
     if (fullText.includes(kw)) {
       signals.push(`inquiry:keyword:${kw}`);
       inquirySignals++;
-      break; // one keyword is enough; just record first
-    }
-  }
-  if (isRealName(senderName)) {
-    signals.push("inquiry:real_name");
-    inquirySignals++;
-  }
-  if (mentionsChildOrAge(body)) {
-    signals.push("inquiry:child_or_age");
-    inquirySignals++;
-  }
-  if (body.includes("?")) {
-    signals.push("inquiry:question_mark");
-    inquirySignals++;
-  }
-
-  // ── Spam signals ──
-  let spamSignals = 0;
-  for (const kw of SPAM_SUBJECT_KEYWORDS) {
-    if (subjLower.includes(kw)) {
-      signals.push(`spam:subject:${kw}`);
-      spamSignals++;
       break;
     }
   }
+  if (isRealName(senderName)) { signals.push("inquiry:real_name"); inquirySignals++; }
+  if (body.includes("?")) { signals.push("inquiry:question_mark"); inquirySignals++; }
+
+  let spamSignals = 0;
+  for (const kw of SPAM_SUBJECT_KEYWORDS) {
+    if (subjLower.includes(kw)) { signals.push(`spam:subject:${kw}`); spamSignals++; break; }
+  }
   const domain = senderDomain(senderEmail);
   if (BULK_SENDER_DOMAINS.some((d) => domain.endsWith(d))) {
-    signals.push(`spam:bulk_sender:${domain}`);
-    spamSignals++;
+    signals.push(`spam:bulk_sender:${domain}`); spamSignals++;
   }
-  if (countLinks(body) > 3) {
-    signals.push("spam:many_links");
-    spamSignals++;
-  }
+  if (countLinks(body) > 3) { signals.push("spam:many_links"); spamSignals++; }
   const localPart = senderEmail.split("@")[0]?.toLowerCase() ?? "";
-  if (NOREPLY_PATTERNS.some((p) => localPart.includes(p))) {
-    signals.push("spam:noreply_sender");
-    spamSignals++;
-  }
-  if (body.length > 2000 && !body.includes("?") && !isRealName(senderName)) {
-    signals.push("spam:long_no_question_no_name");
-    spamSignals++;
-  }
-  // SMS-style: short body + link
-  if (body.trim().split(/\s+/).length < 5 && countLinks(body) > 0) {
-    signals.push("spam:short_with_link");
-    spamSignals++;
-  }
+  if (NOREPLY_PATTERNS.some((p) => localPart.includes(p))) { signals.push("spam:noreply_sender"); spamSignals++; }
 
-  // ── Decision ──
-  if (spamSignals >= 2) return { label: "spam", signals };
-  if (inquirySignals >= 1) return { label: "inquiry", signals };
-  return { label: "review", signals };
+  let label: ClassifierLabel = "review";
+  if (spamSignals >= 2) label = "spam";
+  else if (inquirySignals >= 1) label = "inquiry";
+
+  return { label, signals, special_type: null, confidence: 0.5 };
 }

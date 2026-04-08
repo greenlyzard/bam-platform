@@ -98,7 +98,9 @@ export async function POST(req: NextRequest) {
   // Run classifier and either auto-create a lead (inquiry),
   // store as unmatched (review), or store silently (spam).
   if (!threadToken) {
-    const classification = classifyMessage(subject, textBody || htmlBody, senderEmail, senderName);
+    const classification = await classifyMessage(subject, textBody || htmlBody, senderEmail, senderName);
+    const isHighPriority =
+      classification.special_type === "cancellation" || classification.special_type === "retention_risk";
 
     // Get default tenant
     const { data: tenant } = await supabase
@@ -201,6 +203,7 @@ export async function POST(req: NextRequest) {
         contact_email: senderEmail,
         subject: subject || null,
         state: "open",
+        priority: isHighPriority ? "high" : "normal",
         family_id: threadFamilyId,
         lead_id: threadLeadId,
         unread_count: 1,
@@ -243,9 +246,45 @@ export async function POST(req: NextRequest) {
       console.log(`[inbound] Auto-created lead ${newLeadId} for ${senderEmail}`);
     }
 
+    // High-priority alert for cancellation / retention_risk — notify all admins immediately
+    if (isHighPriority) {
+      try {
+        const { data: admins } = await supabase
+          .from("profile_roles")
+          .select("user_id")
+          .in("role", ["admin", "super_admin"])
+          .eq("is_active", true);
+
+        const adminIds = Array.from(new Set((admins ?? []).map((r) => r.user_id).filter(Boolean) as string[]));
+
+        if (adminIds.length > 0) {
+          const title =
+            classification.special_type === "cancellation"
+              ? "URGENT: Possible cancellation"
+              : "URGENT: Retention risk";
+          const notifications = adminIds.map((id) => ({
+            tenant_id: tenantIdLocal,
+            recipient_id: id,
+            notification_type: classification.special_type,
+            title,
+            body: `From ${senderName || senderEmail}: ${(textBody || htmlBody).slice(0, 200)}`,
+            metadata: {
+              thread_id: thread?.id ?? null,
+              lead_id: newLeadId,
+              special_type: classification.special_type,
+            },
+          }));
+          await supabase.from("notifications").insert(notifications);
+        }
+      } catch (e) {
+        console.error("[inbound] Failed to send high-priority notifications:", e);
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       classification: classification.label,
+      special_type: classification.special_type,
       lead_id: newLeadId,
       thread_id: thread?.id ?? null,
     });

@@ -144,7 +144,7 @@ export async function POST(req: NextRequest) {
     // -----------------------------------------------------------------------
     // 4. Classify and handle unmatched senders
     // -----------------------------------------------------------------------
-    const classification = classifyMessage("", messageBody, "", "");
+    const classification = await classifyMessage("", messageBody, "", "");
 
     if (!profileId) {
       // SPAM: store silently with is_spam=true (per COMMUNICATIONS_TRIAGE.md)
