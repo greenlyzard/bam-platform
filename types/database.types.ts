@@ -548,6 +548,51 @@ export type Database = {
           },
         ]
       }
+      bundle_configs: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          discount_type: string
+          discount_value: number | null
+          id: string
+          is_active: boolean | null
+          is_unlimited: boolean | null
+          name: string
+          sort_order: number | null
+          tenant_id: string
+          trigger_type: string
+          trigger_value: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          discount_type: string
+          discount_value?: number | null
+          id?: string
+          is_active?: boolean | null
+          is_unlimited?: boolean | null
+          name: string
+          sort_order?: number | null
+          tenant_id: string
+          trigger_type: string
+          trigger_value?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          discount_type?: string
+          discount_value?: number | null
+          id?: string
+          is_active?: boolean | null
+          is_unlimited?: boolean | null
+          name?: string
+          sort_order?: number | null
+          tenant_id?: string
+          trigger_type?: string
+          trigger_value?: number | null
+        }
+        Relationships: []
+      }
       calendar_subscriptions: {
         Row: {
           created_at: string
@@ -2246,6 +2291,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      enrollment_recommendations: {
+        Row: {
+          bundle_config_id: string | null
+          class_id: string | null
+          created_at: string | null
+          id: string
+          recommendation_type: string
+          responded_at: string | null
+          responded_by: string | null
+          snoozed_until: string | null
+          status: string
+          student_id: string
+          tenant_id: string
+        }
+        Insert: {
+          bundle_config_id?: string | null
+          class_id?: string | null
+          created_at?: string | null
+          id?: string
+          recommendation_type: string
+          responded_at?: string | null
+          responded_by?: string | null
+          snoozed_until?: string | null
+          status?: string
+          student_id: string
+          tenant_id: string
+        }
+        Update: {
+          bundle_config_id?: string | null
+          class_id?: string | null
+          created_at?: string | null
+          id?: string
+          recommendation_type?: string
+          responded_at?: string | null
+          responded_by?: string | null
+          snoozed_until?: string | null
+          status?: string
+          student_id?: string
+          tenant_id?: string
+        }
+        Relationships: []
       }
       enrollments: {
         Row: {
@@ -5185,6 +5272,93 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      season_placement_releases: {
+        Row: {
+          created_at: string | null
+          executed_at: string | null
+          families_notified: number | null
+          id: string
+          released_by: string | null
+          scheduled_for: string | null
+          season_id: string
+          students_placed: number | null
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          executed_at?: string | null
+          families_notified?: number | null
+          id?: string
+          released_by?: string | null
+          scheduled_for?: string | null
+          season_id: string
+          students_placed?: number | null
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string | null
+          executed_at?: string | null
+          families_notified?: number | null
+          id?: string
+          released_by?: string | null
+          scheduled_for?: string | null
+          season_id?: string
+          students_placed?: number | null
+          tenant_id?: string
+        }
+        Relationships: []
+      }
+      season_placements: {
+        Row: {
+          class_id: string
+          created_at: string | null
+          id: string
+          placed_by: string | null
+          placement_notes: string | null
+          placement_type: string
+          released_at: string | null
+          responded_at: string | null
+          response_notes: string | null
+          season_id: string
+          status: string
+          student_id: string
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          class_id: string
+          created_at?: string | null
+          id?: string
+          placed_by?: string | null
+          placement_notes?: string | null
+          placement_type?: string
+          released_at?: string | null
+          responded_at?: string | null
+          response_notes?: string | null
+          season_id: string
+          status?: string
+          student_id: string
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          class_id?: string
+          created_at?: string | null
+          id?: string
+          placed_by?: string | null
+          placement_notes?: string | null
+          placement_type?: string
+          released_at?: string | null
+          responded_at?: string | null
+          response_notes?: string | null
+          season_id?: string
+          status?: string
+          student_id?: string
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       seasons: {
         Row: {
