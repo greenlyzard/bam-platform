@@ -2874,6 +2874,96 @@ export type Database = {
           },
         ]
       }
+      family_documents: {
+        Row: {
+          admin_notes: string | null
+          contract_template_id: string | null
+          created_at: string | null
+          description: string | null
+          document_type: string
+          enrollment_id: string | null
+          expires_at: string | null
+          expiry_reminder_sent_at: string | null
+          external_url: string | null
+          family_id: string | null
+          file_size_bytes: number | null
+          file_url: string | null
+          id: string
+          requires_signature: boolean | null
+          season_id: string | null
+          signature_data: string | null
+          signed_at: string | null
+          signed_by: string | null
+          status: string
+          student_id: string | null
+          tenant_id: string
+          title: string
+          updated_at: string | null
+          uploaded_by: string | null
+          uploaded_on_behalf: boolean | null
+          visible_to_parent: boolean
+          visible_to_student: boolean
+        }
+        Insert: {
+          admin_notes?: string | null
+          contract_template_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          document_type: string
+          enrollment_id?: string | null
+          expires_at?: string | null
+          expiry_reminder_sent_at?: string | null
+          external_url?: string | null
+          family_id?: string | null
+          file_size_bytes?: number | null
+          file_url?: string | null
+          id?: string
+          requires_signature?: boolean | null
+          season_id?: string | null
+          signature_data?: string | null
+          signed_at?: string | null
+          signed_by?: string | null
+          status?: string
+          student_id?: string | null
+          tenant_id: string
+          title: string
+          updated_at?: string | null
+          uploaded_by?: string | null
+          uploaded_on_behalf?: boolean | null
+          visible_to_parent?: boolean
+          visible_to_student?: boolean
+        }
+        Update: {
+          admin_notes?: string | null
+          contract_template_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          document_type?: string
+          enrollment_id?: string | null
+          expires_at?: string | null
+          expiry_reminder_sent_at?: string | null
+          external_url?: string | null
+          family_id?: string | null
+          file_size_bytes?: number | null
+          file_url?: string | null
+          id?: string
+          requires_signature?: boolean | null
+          season_id?: string | null
+          signature_data?: string | null
+          signed_at?: string | null
+          signed_by?: string | null
+          status?: string
+          student_id?: string | null
+          tenant_id?: string
+          title?: string
+          updated_at?: string | null
+          uploaded_by?: string | null
+          uploaded_on_behalf?: boolean | null
+          visible_to_parent?: boolean
+          visible_to_student?: boolean
+        }
+        Relationships: []
+      }
       icon_library: {
         Row: {
           category: string
