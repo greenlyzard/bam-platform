@@ -22,9 +22,6 @@ ALTER TABLE leads
   ADD COLUMN IF NOT EXISTS placement_notes text,
   ADD COLUMN IF NOT EXISTS recommended_class_ids uuid[] DEFAULT '{}',
   ADD COLUMN IF NOT EXISTS returning_student_id uuid,
-  ADD COLUMN IF NOT EXISTS days_in_stage integer GENERATED ALWAYS AS (
-    EXTRACT(DAY FROM (now() - updated_at))::integer
-  ) STORED,
   ADD COLUMN IF NOT EXISTS communication_thread_id uuid;
 
 -- ============================================================
