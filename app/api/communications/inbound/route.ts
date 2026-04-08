@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
-import { createHmac } from "crypto";
+import { Webhook } from "svix";
 import {
   extractThreadToken,
   getOrCreateThread,
@@ -17,18 +17,7 @@ function getServiceClient() {
   });
 }
 
-/**
- * Verify Resend webhook signature.
- */
-function verifySignature(
-  payload: string,
-  signature: string | null,
-  secret: string
-): boolean {
-  if (!signature) return false;
-  const expected = createHmac("sha256", secret).update(payload).digest("hex");
-  return signature === expected;
-}
+// Resend webhook signatures use svix (svix-id, svix-timestamp, svix-signature headers).
 
 /**
  * Sanitize HTML — strip script tags, iframes, and on* event attributes.
@@ -57,10 +46,17 @@ export async function POST(req: NextRequest) {
   const webhookSecret = process.env.RESEND_WEBHOOK_SECRET;
   const rawBody = await req.text();
 
-  // Verify signature if secret is configured
+  // Verify svix signature if secret is configured
   if (webhookSecret) {
-    const signature = req.headers.get("resend-signature");
-    if (!verifySignature(rawBody, signature, webhookSecret)) {
+    try {
+      const wh = new Webhook(webhookSecret);
+      wh.verify(rawBody, {
+        "svix-id": req.headers.get("svix-id") ?? "",
+        "svix-timestamp": req.headers.get("svix-timestamp") ?? "",
+        "svix-signature": req.headers.get("svix-signature") ?? "",
+      });
+    } catch (e) {
+      console.error("[inbound] svix signature verification failed:", e);
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
   } else {
