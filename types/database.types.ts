@@ -1601,6 +1601,93 @@ export type Database = {
           },
         ]
       }
+      communication_group_members: {
+        Row: {
+          can_post: boolean | null
+          group_id: string
+          id: string
+          joined_at: string | null
+          notifications_enabled: boolean | null
+          role: string
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          can_post?: boolean | null
+          group_id: string
+          id?: string
+          joined_at?: string | null
+          notifications_enabled?: boolean | null
+          role?: string
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          can_post?: boolean | null
+          group_id?: string
+          id?: string
+          joined_at?: string | null
+          notifications_enabled?: boolean | null
+          role?: string
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      communication_groups: {
+        Row: {
+          chat_mode: string
+          class_id: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          group_type: string
+          id: string
+          is_active: boolean | null
+          name: string
+          private_session_id: string | null
+          production_id: string | null
+          quiet_hours_end: string | null
+          quiet_hours_start: string | null
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          chat_mode?: string
+          class_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          group_type: string
+          id?: string
+          is_active?: boolean | null
+          name: string
+          private_session_id?: string | null
+          production_id?: string | null
+          quiet_hours_end?: string | null
+          quiet_hours_start?: string | null
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          chat_mode?: string
+          class_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          group_type?: string
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          private_session_id?: string | null
+          production_id?: string | null
+          quiet_hours_end?: string | null
+          quiet_hours_start?: string | null
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       communication_messages: {
         Row: {
           body_html: string | null
@@ -3133,6 +3220,81 @@ export type Database = {
           uploaded_on_behalf?: boolean | null
           visible_to_parent?: boolean
           visible_to_student?: boolean
+        }
+        Relationships: []
+      }
+      group_post_reactions: {
+        Row: {
+          created_at: string | null
+          emoji: string
+          id: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          emoji: string
+          id?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          emoji?: string
+          id?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      group_posts: {
+        Row: {
+          author_id: string
+          content: string | null
+          created_at: string | null
+          group_id: string
+          id: string
+          is_auto_generated: boolean | null
+          is_pinned: boolean | null
+          metadata: Json | null
+          post_type: string
+          related_class_id: string | null
+          related_session_id: string | null
+          tenant_id: string
+          updated_at: string | null
+          view_count: number | null
+        }
+        Insert: {
+          author_id: string
+          content?: string | null
+          created_at?: string | null
+          group_id: string
+          id?: string
+          is_auto_generated?: boolean | null
+          is_pinned?: boolean | null
+          metadata?: Json | null
+          post_type: string
+          related_class_id?: string | null
+          related_session_id?: string | null
+          tenant_id: string
+          updated_at?: string | null
+          view_count?: number | null
+        }
+        Update: {
+          author_id?: string
+          content?: string | null
+          created_at?: string | null
+          group_id?: string
+          id?: string
+          is_auto_generated?: boolean | null
+          is_pinned?: boolean | null
+          metadata?: Json | null
+          post_type?: string
+          related_class_id?: string | null
+          related_session_id?: string | null
+          tenant_id?: string
+          updated_at?: string | null
+          view_count?: number | null
         }
         Relationships: []
       }
@@ -6768,6 +6930,7 @@ export type Database = {
           parent_id: string
           photo_consent: boolean | null
           preferred_name: string | null
+          privates_visible_in_group: boolean | null
           state: string | null
           student_type: string
           tenant_id: string | null
@@ -6803,6 +6966,7 @@ export type Database = {
           parent_id: string
           photo_consent?: boolean | null
           preferred_name?: string | null
+          privates_visible_in_group?: boolean | null
           state?: string | null
           student_type?: string
           tenant_id?: string | null
@@ -6838,6 +7002,7 @@ export type Database = {
           parent_id?: string
           photo_consent?: boolean | null
           preferred_name?: string | null
+          privates_visible_in_group?: boolean | null
           state?: string | null
           student_type?: string
           tenant_id?: string | null
