@@ -1862,6 +1862,115 @@ export type Database = {
         }
         Relationships: []
       }
+      contact_channels: {
+        Row: {
+          channel_type: string
+          created_at: string
+          email_opt_in: boolean | null
+          email_opt_source: string | null
+          email_opted_in_at: string | null
+          email_opted_out_at: string | null
+          id: string
+          is_primary: boolean
+          is_verified: boolean
+          klaviyo_subscriber_id: string | null
+          klaviyo_synced_at: string | null
+          label: string | null
+          profile_id: string
+          quo_contact_id: string | null
+          quo_synced_at: string | null
+          removed_at: string | null
+          removed_by: string | null
+          sms_opt_in: boolean | null
+          sms_opt_source: string | null
+          sms_opted_in_at: string | null
+          sms_opted_out_at: string | null
+          source: string
+          tenant_id: string
+          updated_at: string
+          value: string
+          verified_at: string | null
+        }
+        Insert: {
+          channel_type: string
+          created_at?: string
+          email_opt_in?: boolean | null
+          email_opt_source?: string | null
+          email_opted_in_at?: string | null
+          email_opted_out_at?: string | null
+          id?: string
+          is_primary?: boolean
+          is_verified?: boolean
+          klaviyo_subscriber_id?: string | null
+          klaviyo_synced_at?: string | null
+          label?: string | null
+          profile_id: string
+          quo_contact_id?: string | null
+          quo_synced_at?: string | null
+          removed_at?: string | null
+          removed_by?: string | null
+          sms_opt_in?: boolean | null
+          sms_opt_source?: string | null
+          sms_opted_in_at?: string | null
+          sms_opted_out_at?: string | null
+          source?: string
+          tenant_id: string
+          updated_at?: string
+          value: string
+          verified_at?: string | null
+        }
+        Update: {
+          channel_type?: string
+          created_at?: string
+          email_opt_in?: boolean | null
+          email_opt_source?: string | null
+          email_opted_in_at?: string | null
+          email_opted_out_at?: string | null
+          id?: string
+          is_primary?: boolean
+          is_verified?: boolean
+          klaviyo_subscriber_id?: string | null
+          klaviyo_synced_at?: string | null
+          label?: string | null
+          profile_id?: string
+          quo_contact_id?: string | null
+          quo_synced_at?: string | null
+          removed_at?: string | null
+          removed_by?: string | null
+          sms_opt_in?: boolean | null
+          sms_opt_source?: string | null
+          sms_opted_in_at?: string | null
+          sms_opted_out_at?: string | null
+          source?: string
+          tenant_id?: string
+          updated_at?: string
+          value?: string
+          verified_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_channels_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contact_channels_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "teacher_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contact_channels_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       credit_accounts: {
         Row: {
           balance: number
