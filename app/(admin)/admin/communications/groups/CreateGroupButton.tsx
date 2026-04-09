@@ -2,6 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const GROUP_TYPES = [
   { value: "class", label: "Class" },
@@ -108,34 +115,36 @@ export function CreateGroupButton() {
                 <label className="mb-1.5 block text-sm font-semibold text-charcoal">
                   Group Type
                 </label>
-                <select
-                  value={groupType}
-                  onChange={(e) => setGroupType(e.target.value)}
-                  className="h-12 w-full appearance-none rounded-md border border-silver bg-white px-3 text-base text-charcoal focus:border-lavender focus:outline-none focus:ring-2 focus:ring-lavender/20"
-                >
-                  {GROUP_TYPES.map((t) => (
-                    <option key={t.value} value={t.value}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
+                <Select value={groupType} onValueChange={setGroupType}>
+                  <SelectTrigger className="h-12 w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {GROUP_TYPES.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>
+                        {t.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
                 <label className="mb-1.5 block text-sm font-semibold text-charcoal">
                   Chat Mode
                 </label>
-                <select
-                  value={chatMode}
-                  onChange={(e) => setChatMode(e.target.value)}
-                  className="h-12 w-full appearance-none rounded-md border border-silver bg-white px-3 text-base text-charcoal focus:border-lavender focus:outline-none focus:ring-2 focus:ring-lavender/20"
-                >
-                  {CHAT_MODES.map((m) => (
-                    <option key={m.value} value={m.value}>
-                      {m.label}
-                    </option>
-                  ))}
-                </select>
+                <Select value={chatMode} onValueChange={setChatMode}>
+                  <SelectTrigger className="h-12 w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CHAT_MODES.map((m) => (
+                      <SelectItem key={m.value} value={m.value}>
+                        {m.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>

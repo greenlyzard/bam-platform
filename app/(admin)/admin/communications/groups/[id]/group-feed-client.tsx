@@ -2,6 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const REACTION_EMOJIS = ["👍", "❤️", "🎉", "👏"];
 
@@ -216,17 +223,18 @@ export function GroupFeedClient({ groupId, posts, chatMode }: Props) {
               className="w-full rounded-md border border-silver bg-white px-3 py-2 text-base text-charcoal placeholder:text-mist focus:border-lavender focus:outline-none focus:ring-2 focus:ring-lavender/20"
             />
             <div className="flex items-center justify-between gap-2">
-              <select
-                value={postType}
-                onChange={(e) => setPostType(e.target.value)}
-                className="h-10 appearance-none rounded-md border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:outline-none focus:ring-2 focus:ring-lavender/20"
-              >
-                {POST_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
+              <Select value={postType} onValueChange={setPostType}>
+                <SelectTrigger className="h-10 w-auto min-w-[160px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {POST_TYPES.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>
+                      {t.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <button
                 type="button"
                 onClick={submit}
