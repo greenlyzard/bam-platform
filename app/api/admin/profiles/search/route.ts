@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
 
   const { data: profiles } = await supabase
     .from("profiles")
-    .select("id, first_name, last_name, email, role")
+    .select("id, first_name, last_name, email, role, avatar_url")
     .or(orFilter)
     .limit(20);
 
@@ -37,6 +37,7 @@ export async function GET(req: NextRequest) {
         [p.first_name, p.last_name].filter(Boolean).join(" ") || p.email || "",
       email: teacherOnly ? null : p.email,
       role: p.role ?? "parent",
+      avatar_url: p.avatar_url ?? null,
     }));
 
   return NextResponse.json({ profiles: results });

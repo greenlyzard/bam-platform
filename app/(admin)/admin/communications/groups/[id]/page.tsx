@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth/guards";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { GroupFeedClient } from "./group-feed-client";
+import { MemberSidebar } from "./member-sidebar";
 
 const GROUP_TYPE_LABEL: Record<string, string> = {
   class: "Class",
@@ -172,49 +173,7 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
 
       {/* Member sidebar */}
       <aside className="w-full shrink-0 lg:w-72">
-        <div className="rounded-xl border border-silver bg-white p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-charcoal">Members</h2>
-            <button
-              type="button"
-              className="text-xs font-semibold text-lavender hover:text-lavender-dark"
-              disabled
-              title="Coming soon"
-            >
-              + Add
-            </button>
-          </div>
-          {memberList.length === 0 ? (
-            <p className="text-xs text-mist">No members yet.</p>
-          ) : (
-            <ul className="space-y-2">
-              {memberList.map((m) => {
-                const initials = m.name
-                  .split(" ")
-                  .map((n) => n[0])
-                  .join("")
-                  .slice(0, 2)
-                  .toUpperCase();
-                return (
-                  <li key={m.id} className="flex items-center gap-2">
-                    {m.avatar ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={m.avatar} alt="" className="h-8 w-8 rounded-full object-cover" />
-                    ) : (
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-lavender/10 text-xs font-semibold text-lavender-dark">
-                        {initials || "?"}
-                      </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-charcoal">{m.name}</p>
-                      <p className="text-[11px] text-mist">{m.role}</p>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
+        <MemberSidebar groupId={groupId} members={memberList} />
       </aside>
     </div>
   );
