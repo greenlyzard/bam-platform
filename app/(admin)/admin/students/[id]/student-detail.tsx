@@ -16,6 +16,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { US_STATES } from "@/lib/constants/us-states";
+import { PhotosTab } from "./photos-tab";
+import { DocumentsTab } from "./documents-tab";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -187,7 +189,7 @@ function googleCalendarUrl(row: ScheduleRow): string {
 
 // ── Component ────────────────────────────────────────────────
 
-type Tab = "profile" | "classes" | "schedule" | "tuition" | "contacts";
+type Tab = "profile" | "classes" | "schedule" | "tuition" | "contacts" | "photos" | "documents";
 
 export function StudentDetail({
   student,
@@ -419,6 +421,8 @@ export function StudentDetail({
     { key: "profile", label: "Profile" },
     { key: "classes", label: "Classes" },
     { key: "schedule", label: "Schedule" },
+    { key: "photos", label: "Photos" },
+    { key: "documents", label: "Documents" },
     { key: "tuition", label: "Tuition" },
     { key: "contacts", label: "Contacts" },
   ];
@@ -997,6 +1001,14 @@ export function StudentDetail({
           </div>
         </div>
       )}
+
+      {/* ── Tab: Photos ── */}
+      {tab === "photos" && (
+        <PhotosTab studentId={student.id} initialAvatarUrl={avatarUrl} />
+      )}
+
+      {/* ── Tab: Documents ── */}
+      {tab === "documents" && <DocumentsTab studentId={student.id} />}
     </div>
   );
 }
