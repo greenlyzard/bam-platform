@@ -14,6 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
+      absence_records: {
+        Row: {
+          absence_date: string
+          class_id: string | null
+          created_at: string | null
+          id: string
+          notified_admin_at: string | null
+          notified_teacher_at: string | null
+          override_by: string | null
+          override_note: string | null
+          parent_note: string | null
+          report_channel: string
+          reported_by: string | null
+          schedule_instance_id: string | null
+          status: string
+          student_id: string
+          tenant_id: string
+        }
+        Insert: {
+          absence_date: string
+          class_id?: string | null
+          created_at?: string | null
+          id?: string
+          notified_admin_at?: string | null
+          notified_teacher_at?: string | null
+          override_by?: string | null
+          override_note?: string | null
+          parent_note?: string | null
+          report_channel?: string
+          reported_by?: string | null
+          schedule_instance_id?: string | null
+          status?: string
+          student_id: string
+          tenant_id: string
+        }
+        Update: {
+          absence_date?: string
+          class_id?: string | null
+          created_at?: string | null
+          id?: string
+          notified_admin_at?: string | null
+          notified_teacher_at?: string | null
+          override_by?: string | null
+          override_note?: string | null
+          parent_note?: string | null
+          report_channel?: string
+          reported_by?: string | null
+          schedule_instance_id?: string | null
+          status?: string
+          student_id?: string
+          tenant_id?: string
+        }
+        Relationships: []
+      }
       angelina_admin_consultations: {
         Row: {
           admin_id: string
