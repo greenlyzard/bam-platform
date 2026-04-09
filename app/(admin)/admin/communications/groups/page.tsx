@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database.types";
 import { ChatModeToggle } from "./ChatModeToggle";
+import { CreateGroupButton } from "./CreateGroupButton";
 
 type GroupRow = Pick<
   Database["public"]["Tables"]["communication_groups"]["Row"],
@@ -99,6 +100,7 @@ export default async function CommunicationGroupsPage() {
             and last activity.
           </p>
         </div>
+        <CreateGroupButton />
       </div>
 
       <div className="overflow-hidden rounded-lg border border-silver bg-white">
