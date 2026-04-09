@@ -1,6 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Evaluation {
   id: string;
@@ -99,17 +106,18 @@ export function EvaluationsTab({ studentId }: { studentId: string }) {
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-xs font-semibold text-charcoal">Type</label>
-              <select
-                value={type}
-                onChange={(e) => setType(e.target.value)}
-                className="h-12 w-full appearance-none rounded-md border border-silver bg-white px-3 text-base text-charcoal focus:border-lavender focus:outline-none focus:ring-2 focus:ring-lavender/20"
-              >
-                {TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
+              <Select value={type} onValueChange={setType}>
+                <SelectTrigger className="h-12 w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TYPES.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>
+                      {t.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <label className="mb-1 block text-xs font-semibold text-charcoal">Title (optional)</label>
