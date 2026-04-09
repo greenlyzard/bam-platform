@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { randomUUID } from "crypto";
+import { autoAddToPrivatesGroup } from "@/lib/communications/auto-add-to-privates-group";
 
 // ---------------------------------------------------------------------------
 // Helpers (not exported)
@@ -473,6 +474,15 @@ export async function createPrivateSession(formData: FormData) {
     sessionRate,
     marketRate,
   );
+
+  // Auto-add parents + teacher to BAM PRIVATES group
+  for (const sid of studentIds) {
+    try {
+      await autoAddToPrivatesGroup(tenantId, sid, primaryTeacherId);
+    } catch (e) {
+      console.error("[privates:autoAddPrivates]", e);
+    }
+  }
 
   // -------------------------------------------------------------------------
   // Recurring instances (up to 12 future sessions)
