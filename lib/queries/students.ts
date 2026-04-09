@@ -91,7 +91,7 @@ export async function getStudentEnrollments(studentId: string) {
       enrolled_at,
       dropped_at,
       class_id,
-      classes (id, name, simple_name, day_of_week, start_time, end_time, room, teacher_id, fee_cents, level, style)
+      classes (id, name, day_of_week, start_time, end_time, room, teacher_id, fee_cents, level, style)
     `
     )
     .eq("student_id", studentId)
@@ -130,7 +130,7 @@ export async function getStudentEnrollments(studentId: string) {
     const cls = (Array.isArray(e.classes) ? e.classes[0] : e.classes) as {
       id: string;
       name: string;
-      simple_name: string | null;
+      simple_name?: string | null;
       day_of_week: number | null;
       start_time: string | null;
       end_time: string | null;
@@ -212,7 +212,7 @@ export async function getStudentSchedule(
     allClassIds.length > 0
       ? supabase
           .from("classes")
-          .select("id, name, simple_name")
+          .select("id, name")
           .in("id", allClassIds)
       : { data: [] },
     teacherIds.length > 0
@@ -228,7 +228,7 @@ export async function getStudentSchedule(
 
   const classMap: Record<string, string> = {};
   for (const c of classesRes.data ?? []) {
-    classMap[c.id] = c.simple_name || c.name;
+    classMap[c.id] = c.name;
   }
 
   const teacherMap: Record<string, string> = {};

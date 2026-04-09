@@ -55,7 +55,7 @@ export default async function AdminStudentProfilePage({
         .order("created_at"),
       supabase
         .from("enrollments")
-        .select("id, status, classes(name, simple_name)")
+        .select("id, status, classes(name)")
         .eq("student_id", studentId)
         .in("status", ["active", "trial"]),
     ]);
@@ -117,27 +117,52 @@ export default async function AdminStudentProfilePage({
   }> = [];
 
   if (activeSeason && student.current_level) {
+    // PostgREST has no FK relationship between season_curriculum →
+    // curriculum_skills → curriculum_categories in this DB. Fetch in 3 steps.
     const { data: scRows } = await supabase
       .from("season_curriculum")
-      .select(
-        `id, sort_order,
-         curriculum_skills (
-           id, name, description, badge_color_hex,
-           curriculum_categories ( id, name, sort_order )
-         )`
-      )
+      .select("id, sort_order, skill_id")
       .eq("season_id", activeSeason.id)
       .eq("level_tag", student.current_level)
       .order("sort_order");
 
-    for (const row of (scRows ?? []) as any[]) {
-      const skill = Array.isArray(row.curriculum_skills)
-        ? row.curriculum_skills[0]
-        : row.curriculum_skills;
+    const skillIds = (scRows ?? []).map((r) => r.skill_id).filter(Boolean) as string[];
+
+    const { data: skillsRows } = skillIds.length
+      ? await supabase
+          .from("curriculum_skills")
+          .select("id, name, description, badge_color_hex, category_id")
+          .in("id", skillIds)
+      : { data: [] };
+
+    const categoryIds = Array.from(
+      new Set((skillsRows ?? []).map((s) => s.category_id).filter(Boolean) as string[])
+    );
+
+    const { data: catsRows } = categoryIds.length
+      ? await supabase
+          .from("curriculum_categories")
+          .select("id, name, sort_order")
+          .in("id", categoryIds)
+      : { data: [] };
+
+    type SkillRow = {
+      id: string;
+      name: string;
+      description: string | null;
+      badge_color_hex: string | null;
+      category_id: string | null;
+    };
+    const skillMap = new Map<string, SkillRow>();
+    for (const s of (skillsRows ?? []) as SkillRow[]) skillMap.set(s.id, s);
+
+    const catMap = new Map<string, { id: string; name: string; sort_order: number | null }>();
+    for (const c of catsRows ?? []) catMap.set(c.id, c);
+
+    for (const row of scRows ?? []) {
+      const skill = row.skill_id ? skillMap.get(row.skill_id) : null;
       if (!skill) continue;
-      const cat = Array.isArray(skill.curriculum_categories)
-        ? skill.curriculum_categories[0]
-        : skill.curriculum_categories;
+      const cat = skill.category_id ? catMap.get(skill.category_id) : null;
       curriculumSkills.push({
         id: skill.id,
         name: skill.name,

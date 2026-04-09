@@ -59,7 +59,7 @@ interface EnrollmentRow {
   class: {
     id: string;
     name: string;
-    simple_name: string | null;
+    simple_name?: string | null;
     day_of_week: number | null;
     start_time: string | null;
     end_time: string | null;
