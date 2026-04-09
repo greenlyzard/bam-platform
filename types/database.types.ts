@@ -2203,6 +2203,78 @@ export type Database = {
           },
         ]
       }
+      curriculum_categories: {
+        Row: {
+          created_at: string | null
+          discipline: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          sort_order: number | null
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          discipline?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          sort_order?: number | null
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string | null
+          discipline?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          sort_order?: number | null
+          tenant_id?: string
+        }
+        Relationships: []
+      }
+      curriculum_skills: {
+        Row: {
+          assessment_criteria: string | null
+          badge_color_hex: string | null
+          badge_icon_url: string | null
+          category_id: string
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          skill_type: string
+          tenant_id: string
+        }
+        Insert: {
+          assessment_criteria?: string | null
+          badge_color_hex?: string | null
+          badge_icon_url?: string | null
+          category_id: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          skill_type?: string
+          tenant_id: string
+        }
+        Update: {
+          assessment_criteria?: string | null
+          badge_color_hex?: string | null
+          badge_icon_url?: string | null
+          category_id?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          skill_type?: string
+          tenant_id?: string
+        }
+        Relationships: []
+      }
       dance_curriculum: {
         Row: {
           created_at: string | null
@@ -5733,6 +5805,42 @@ export type Database = {
           },
         ]
       }
+      season_curriculum: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_primary: boolean | null
+          is_visible_to_parents: boolean | null
+          level_tag: string
+          season_id: string
+          skill_id: string
+          sort_order: number | null
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_primary?: boolean | null
+          is_visible_to_parents?: boolean | null
+          level_tag: string
+          season_id: string
+          skill_id: string
+          sort_order?: number | null
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_primary?: boolean | null
+          is_visible_to_parents?: boolean | null
+          level_tag?: string
+          season_id?: string
+          skill_id?: string
+          sort_order?: number | null
+          tenant_id?: string
+        }
+        Relationships: []
+      }
       season_placement_releases: {
         Row: {
           created_at: string | null
@@ -6815,6 +6923,63 @@ export type Database = {
           },
         ]
       }
+      student_opportunities: {
+        Row: {
+          action_label: string | null
+          action_url: string | null
+          converted_at: string | null
+          created_at: string | null
+          description: string | null
+          dismissed_at: string | null
+          dismissed_by: string | null
+          expires_at: string | null
+          id: string
+          metadata: Json | null
+          opportunity_type: string
+          snoozed_until: string | null
+          status: string
+          student_id: string
+          tenant_id: string
+          title: string
+        }
+        Insert: {
+          action_label?: string | null
+          action_url?: string | null
+          converted_at?: string | null
+          created_at?: string | null
+          description?: string | null
+          dismissed_at?: string | null
+          dismissed_by?: string | null
+          expires_at?: string | null
+          id?: string
+          metadata?: Json | null
+          opportunity_type: string
+          snoozed_until?: string | null
+          status?: string
+          student_id: string
+          tenant_id: string
+          title: string
+        }
+        Update: {
+          action_label?: string | null
+          action_url?: string | null
+          converted_at?: string | null
+          created_at?: string | null
+          description?: string | null
+          dismissed_at?: string | null
+          dismissed_by?: string | null
+          expires_at?: string | null
+          id?: string
+          metadata?: Json | null
+          opportunity_type?: string
+          snoozed_until?: string | null
+          status?: string
+          student_id?: string
+          tenant_id?: string
+          title?: string
+        }
+        Relationships: []
+      }
       student_profile_relatives: {
         Row: {
           created_at: string
@@ -6900,6 +7065,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      student_skill_records: {
+        Row: {
+          awarded_at: string | null
+          awarded_by: string | null
+          class_id: string | null
+          created_at: string | null
+          id: string
+          notes: string | null
+          rating: number | null
+          season_id: string | null
+          skill_id: string
+          status: string
+          student_id: string
+          tenant_id: string
+          updated_at: string | null
+          visible_to_parent: boolean | null
+        }
+        Insert: {
+          awarded_at?: string | null
+          awarded_by?: string | null
+          class_id?: string | null
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          rating?: number | null
+          season_id?: string | null
+          skill_id: string
+          status?: string
+          student_id: string
+          tenant_id: string
+          updated_at?: string | null
+          visible_to_parent?: boolean | null
+        }
+        Update: {
+          awarded_at?: string | null
+          awarded_by?: string | null
+          class_id?: string | null
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          rating?: number | null
+          season_id?: string | null
+          skill_id?: string
+          status?: string
+          student_id?: string
+          tenant_id?: string
+          updated_at?: string | null
+          visible_to_parent?: boolean | null
+        }
+        Relationships: []
       }
       students: {
         Row: {
@@ -8947,6 +9163,7 @@ export type Database = {
         Returns: boolean
       }
       is_front_desk: { Args: never; Returns: boolean }
+      is_member_of_group: { Args: { p_group_id: string }; Returns: boolean }
       is_schedule_approver: { Args: never; Returns: boolean }
       is_teacher: { Args: never; Returns: boolean }
       is_tenant_admin:
