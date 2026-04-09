@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { randomUUID } from "crypto";
 import { autoAddToPrivatesGroup } from "@/lib/communications/auto-add-to-privates-group";
+import { autoPostPrivateSession } from "@/lib/communications/auto-post-private-session";
 
 // ---------------------------------------------------------------------------
 // Helpers (not exported)
@@ -580,6 +581,34 @@ export async function createPrivateSession(formData: FormData) {
     }
   } catch {
     teacherLastInitial = "";
+  }
+
+  // Auto-post the session as an event in the BAM PRIVATES group feed
+  try {
+    let teacherFullName = "";
+    const { data: teacherFull } = await supabase
+      .from("profiles")
+      .select("first_name, last_name")
+      .eq("id", primaryTeacherId)
+      .single();
+    if (teacherFull) {
+      teacherFullName = [teacherFull.first_name, teacherFull.last_name]
+        .filter(Boolean)
+        .join(" ");
+    }
+    await autoPostPrivateSession({
+      tenantId,
+      authorId: user.id,
+      sessionId: session.id,
+      studentNames,
+      teacherName: teacherFullName,
+      sessionDate,
+      startTime,
+      endTime,
+      studio,
+    });
+  } catch (e) {
+    console.error("[privates:autoPostFeed]", e);
   }
 
   // Post to privates channel

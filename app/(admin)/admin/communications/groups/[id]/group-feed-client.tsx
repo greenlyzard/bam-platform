@@ -53,6 +53,12 @@ export function GroupFeedClient({ groupId, posts, chatMode }: Props) {
   const [postType, setPostType] = useState("announcement");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<"feed" | "calendar">("feed");
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const d = new Date();
+    return { year: d.getFullYear(), month: d.getMonth() };
+  });
+  const [selectedEvent, setSelectedEvent] = useState<Post | null>(null);
 
   async function submit() {
     if (!content.trim()) {
@@ -91,9 +97,65 @@ export function GroupFeedClient({ groupId, posts, chatMode }: Props) {
     }
   }
 
+  const eventPosts = posts.filter((p) => {
+    if (p.post_type !== "event") return false;
+    const m = p.metadata as { event_date?: string };
+    return !!m.event_date;
+  });
+
   return (
     <>
+      {/* Tab bar */}
+      <div className="mt-2 flex gap-1 border-b border-silver">
+        <button
+          type="button"
+          onClick={() => setTab("feed")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            tab === "feed"
+              ? "border-lavender text-lavender-dark"
+              : "border-transparent text-slate hover:text-charcoal"
+          }`}
+        >
+          Feed
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("calendar")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            tab === "calendar"
+              ? "border-lavender text-lavender-dark"
+              : "border-transparent text-slate hover:text-charcoal"
+          }`}
+        >
+          Calendar
+        </button>
+      </div>
+
+      {tab === "calendar" && (
+        <CalendarView
+          year={calendarMonth.year}
+          month={calendarMonth.month}
+          events={eventPosts}
+          onPrev={() =>
+            setCalendarMonth((m) => {
+              const d = new Date(m.year, m.month - 1, 1);
+              return { year: d.getFullYear(), month: d.getMonth() };
+            })
+          }
+          onNext={() =>
+            setCalendarMonth((m) => {
+              const d = new Date(m.year, m.month + 1, 1);
+              return { year: d.getFullYear(), month: d.getMonth() };
+            })
+          }
+          onSelect={setSelectedEvent}
+          selected={selectedEvent}
+          onClose={() => setSelectedEvent(null)}
+        />
+      )}
+
       {/* Feed */}
+      {tab === "feed" && (
       <div className="flex-1 space-y-4 overflow-y-auto py-4">
         {posts.length === 0 ? (
           <div className="rounded-xl border border-dashed border-silver bg-white/50 p-8 text-center">
@@ -206,6 +268,7 @@ export function GroupFeedClient({ groupId, posts, chatMode }: Props) {
           })
         )}
       </div>
+      )}
 
       {/* Compose */}
       <div className="sticky bottom-0 mt-2 border-t border-silver bg-cream/95 pt-4 backdrop-blur">
@@ -249,5 +312,165 @@ export function GroupFeedClient({ groupId, posts, chatMode }: Props) {
         )}
       </div>
     </>
+  );
+}
+
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+function CalendarView({
+  year,
+  month,
+  events,
+  onPrev,
+  onNext,
+  onSelect,
+  selected,
+  onClose,
+}: {
+  year: number;
+  month: number;
+  events: Post[];
+  onPrev: () => void;
+  onNext: () => void;
+  onSelect: (p: Post) => void;
+  selected: Post | null;
+  onClose: () => void;
+}) {
+  const firstDay = new Date(year, month, 1);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const startWeekday = firstDay.getDay();
+  const cells: (number | null)[] = [];
+  for (let i = 0; i < startWeekday; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const eventsByDay: Record<number, Post[]> = {};
+  for (const e of events) {
+    const m = e.metadata as { event_date?: string };
+    if (!m.event_date) continue;
+    const d = new Date(`${m.event_date}T00:00:00`);
+    if (d.getFullYear() !== year || d.getMonth() !== month) continue;
+    const day = d.getDate();
+    if (!eventsByDay[day]) eventsByDay[day] = [];
+    eventsByDay[day].push(e);
+  }
+
+  const today = new Date();
+  const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
+  const todayDay = isCurrentMonth ? today.getDate() : -1;
+
+  const selectedMeta = (selected?.metadata ?? {}) as {
+    event_date?: string;
+    start_time?: string;
+    end_time?: string;
+    location?: string;
+    teacher_name?: string;
+  };
+
+  return (
+    <div className="flex flex-col gap-4 py-4 lg:flex-row">
+      <div className="min-w-0 flex-1">
+        <div className="mb-3 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={onPrev}
+            className="rounded-md border border-silver px-3 py-1.5 text-sm text-slate hover:bg-cloud"
+          >
+            ← Prev
+          </button>
+          <h2 className="font-heading text-lg text-charcoal">
+            {MONTH_NAMES[month]} {year}
+          </h2>
+          <button
+            type="button"
+            onClick={onNext}
+            className="rounded-md border border-silver px-3 py-1.5 text-sm text-slate hover:bg-cloud"
+          >
+            Next →
+          </button>
+        </div>
+
+        <div className="grid grid-cols-7 gap-px overflow-hidden rounded-xl border border-silver bg-silver text-xs">
+          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+            <div key={d} className="bg-cloud px-2 py-1.5 text-center font-semibold text-slate">
+              {d}
+            </div>
+          ))}
+          {cells.map((day, i) => {
+            const dayEvents = day ? eventsByDay[day] ?? [] : [];
+            return (
+              <div
+                key={i}
+                className={`min-h-[88px] bg-white p-1.5 ${
+                  day === todayDay ? "ring-2 ring-inset ring-lavender" : ""
+                }`}
+              >
+                {day && (
+                  <>
+                    <div className="mb-1 text-right text-[11px] font-semibold text-slate">
+                      {day}
+                    </div>
+                    <div className="space-y-1">
+                      {dayEvents.slice(0, 3).map((e) => {
+                        const m = e.metadata as { start_time?: string };
+                        return (
+                          <button
+                            key={e.id}
+                            type="button"
+                            onClick={() => onSelect(e)}
+                            className="w-full truncate rounded bg-lavender/10 px-1.5 py-0.5 text-left text-[10px] font-medium text-lavender-dark hover:bg-lavender/20"
+                            title={e.content ?? ""}
+                          >
+                            {m.start_time ? `${m.start_time.slice(0, 5)} ` : ""}
+                            {e.content ?? "Event"}
+                          </button>
+                        );
+                      })}
+                      {dayEvents.length > 3 && (
+                        <p className="text-[10px] text-mist">+{dayEvents.length - 3} more</p>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {selected && (
+        <aside className="w-full shrink-0 rounded-xl border border-silver bg-white p-4 lg:w-72">
+          <div className="mb-3 flex items-start justify-between">
+            <h3 className="font-heading text-base text-charcoal">Event</h3>
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-xl leading-none text-slate hover:text-charcoal"
+              aria-label="Close"
+            >
+              ×
+            </button>
+          </div>
+          <p className="text-sm font-semibold text-charcoal">{selected.content}</p>
+          {selectedMeta.event_date && (
+            <p className="mt-2 text-xs text-slate">
+              {selectedMeta.event_date}
+              {selectedMeta.start_time ? ` · ${selectedMeta.start_time}` : ""}
+              {selectedMeta.end_time ? `–${selectedMeta.end_time}` : ""}
+            </p>
+          )}
+          {selectedMeta.location && (
+            <p className="mt-1 text-xs text-slate">{selectedMeta.location}</p>
+          )}
+          {selectedMeta.teacher_name && (
+            <p className="mt-1 text-xs text-slate">Teacher: {selectedMeta.teacher_name}</p>
+          )}
+          <p className="mt-3 text-[11px] text-mist">Posted by {selected.author_name}</p>
+        </aside>
+      )}
+    </div>
   );
 }
