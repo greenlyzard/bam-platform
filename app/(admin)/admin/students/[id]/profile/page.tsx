@@ -89,6 +89,75 @@ export default async function AdminStudentProfilePage({
     awardedByMap[p.id] = [p.first_name, p.last_name].filter(Boolean).join(" ");
   }
 
+  // ── Curriculum skills — active season for tenant ──
+  const { data: activeSeason } = await supabase
+    .from("seasons")
+    .select("id, name")
+    .eq("tenant_id", student.tenant_id)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  let curriculumSkills: Array<{
+    id: string;
+    name: string;
+    description: string | null;
+    badge_color_hex: string | null;
+    sort_order: number;
+    category_id: string;
+    category_name: string;
+    category_sort: number;
+  }> = [];
+  let skillRecords: Array<{
+    skill_id: string;
+    status: string;
+    rating: number | null;
+    awarded_at: string | null;
+  }> = [];
+
+  if (activeSeason && student.current_level) {
+    const { data: scRows } = await supabase
+      .from("season_curriculum")
+      .select(
+        `id, sort_order,
+         curriculum_skills (
+           id, name, description, badge_color_hex,
+           curriculum_categories ( id, name, sort_order )
+         )`
+      )
+      .eq("season_id", activeSeason.id)
+      .eq("level_tag", student.current_level)
+      .order("sort_order");
+
+    for (const row of (scRows ?? []) as any[]) {
+      const skill = Array.isArray(row.curriculum_skills)
+        ? row.curriculum_skills[0]
+        : row.curriculum_skills;
+      if (!skill) continue;
+      const cat = Array.isArray(skill.curriculum_categories)
+        ? skill.curriculum_categories[0]
+        : skill.curriculum_categories;
+      curriculumSkills.push({
+        id: skill.id,
+        name: skill.name,
+        description: skill.description ?? null,
+        badge_color_hex: skill.badge_color_hex ?? null,
+        sort_order: row.sort_order ?? 0,
+        category_id: cat?.id ?? "uncategorized",
+        category_name: cat?.name ?? "Uncategorized",
+        category_sort: cat?.sort_order ?? 0,
+      });
+    }
+
+    if (curriculumSkills.length > 0) {
+      const { data: recs } = await supabase
+        .from("student_skill_records")
+        .select("skill_id, status, rating, awarded_at")
+        .eq("student_id", studentId)
+        .eq("season_id", activeSeason.id);
+      skillRecords = recs ?? [];
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -113,6 +182,9 @@ export default async function AdminStudentProfilePage({
         relatives={relativesResult.data ?? []}
         permissions={permsData ?? []}
         tenantId={user.tenantId!}
+        activeSeason={activeSeason ?? null}
+        curriculumSkills={curriculumSkills}
+        skillRecords={skillRecords}
       />
     </div>
   );

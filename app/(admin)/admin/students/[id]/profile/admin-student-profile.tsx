@@ -16,6 +16,7 @@ import {
   createRelative,
   updateRelativeActive,
   updateSharePermission,
+  setStudentSkillStatus,
 } from "./actions";
 import { AddToClassModal } from "./add-to-class-modal";
 
@@ -87,6 +88,31 @@ interface Permission {
   relative_id: string;
   section_key: string;
   is_visible: boolean;
+}
+
+type SkillStatus = "not_started" | "in_progress" | "achieved" | "mastered";
+
+interface CurriculumSkill {
+  id: string;
+  name: string;
+  description: string | null;
+  badge_color_hex: string | null;
+  sort_order: number;
+  category_id: string;
+  category_name: string;
+  category_sort: number;
+}
+
+interface SkillRecord {
+  skill_id: string;
+  status: string; // narrowed at use site
+  rating: number | null;
+  awarded_at: string | null;
+}
+
+interface ActiveSeason {
+  id: string;
+  name: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -162,6 +188,9 @@ export function AdminStudentProfile({
   relatives: initialRelatives,
   permissions: initialPerms,
   tenantId,
+  activeSeason,
+  curriculumSkills,
+  skillRecords: initialSkillRecords,
 }: {
   student: Student;
   badges: BadgeAward[];
@@ -171,6 +200,9 @@ export function AdminStudentProfile({
   relatives: Relative[];
   permissions: Permission[];
   tenantId: string;
+  activeSeason: ActiveSeason | null;
+  curriculumSkills: CurriculumSkill[];
+  skillRecords: SkillRecord[];
 }) {
   // ── State ──
   const [student, setStudent] = useState(initialStudent);
@@ -200,6 +232,9 @@ export function AdminStudentProfile({
   const [badgeFormId, setBadgeFormId] = useState("");
   const [badgeFormNotes, setBadgeFormNotes] = useState("");
   const [confirmRevoke, setConfirmRevoke] = useState<string | null>(null);
+
+  // Skills (curriculum)
+  const [skillRecords, setSkillRecords] = useState<SkillRecord[]>(initialSkillRecords);
 
   // Evaluation
   const [showEvalForm, setShowEvalForm] = useState(false);
@@ -593,6 +628,28 @@ export function AdminStudentProfile({
         </div>
       </div>
 
+      {/* ── Section: Skills (curriculum-based) ── */}
+      <SkillsSection
+        student={student}
+        activeSeason={activeSeason}
+        curriculumSkills={curriculumSkills}
+        skillRecords={skillRecords}
+        tenantId={tenantId}
+        onChange={(skillId, status) => {
+          setSkillRecords((prev) => {
+            const next = prev.filter((r) => r.skill_id !== skillId);
+            const isAwarded = status === "achieved" || status === "mastered";
+            next.push({
+              skill_id: skillId,
+              status,
+              rating: null,
+              awarded_at: isAwarded ? new Date().toISOString() : null,
+            });
+            return next;
+          });
+        }}
+      />
+
       {/* ── Section 3: Badges ── */}
       <div className={cardCls}>
         <div className="flex items-center justify-between">
@@ -834,6 +891,241 @@ export function AdminStudentProfile({
           }}
         />
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SkillsSection — curriculum-based badge wall
+// ---------------------------------------------------------------------------
+const SKILL_STATUS_OPTIONS: { value: SkillStatus; label: string }[] = [
+  { value: "not_started", label: "Not started" },
+  { value: "in_progress", label: "In progress" },
+  { value: "achieved", label: "Achieved" },
+  { value: "mastered", label: "Mastered" },
+];
+
+function SkillsSection({
+  student,
+  activeSeason,
+  curriculumSkills,
+  skillRecords,
+  tenantId,
+  onChange,
+}: {
+  student: Student;
+  activeSeason: ActiveSeason | null;
+  curriculumSkills: CurriculumSkill[];
+  skillRecords: SkillRecord[];
+  tenantId: string;
+  onChange: (skillId: string, status: SkillStatus) => void;
+}) {
+  const [pendingSkillId, setPendingSkillId] = useState<string | null>(null);
+
+  // Empty states
+  if (!activeSeason) {
+    return (
+      <div className={cardCls}>
+        <h3 className={headingCls}>Skills</h3>
+        <p className="text-sm text-slate">
+          No active season set. Mark a season as active in{" "}
+          <span className="text-slate/70">Admin → Seasons</span>.
+        </p>
+      </div>
+    );
+  }
+
+  if (!student.current_level) {
+    return (
+      <div className={cardCls}>
+        <h3 className={headingCls}>Skills</h3>
+        <p className="text-sm text-slate">
+          Set this student&apos;s level in the Level section above to view
+          curriculum.
+        </p>
+      </div>
+    );
+  }
+
+  if (curriculumSkills.length === 0) {
+    return (
+      <div className={cardCls}>
+        <h3 className={headingCls}>Skills</h3>
+        <p className="text-sm text-slate">
+          No curriculum loaded for &ldquo;{student.current_level}&rdquo; in{" "}
+          {activeSeason.name}. Looking for level:{" "}
+          <code className="rounded bg-charcoal/5 px-1">
+            {student.current_level}
+          </code>
+          . If the level tag in your season curriculum is spelled differently,
+          fix it in Admin → Settings → Curriculum.
+        </p>
+      </div>
+    );
+  }
+
+  // Build status map
+  const statusMap = new Map<string, SkillStatus>();
+  const awardedAtMap = new Map<string, string | null>();
+  for (const r of skillRecords) {
+    const s = (
+      ["not_started", "in_progress", "achieved", "mastered"].includes(r.status)
+        ? r.status
+        : "not_started"
+    ) as SkillStatus;
+    statusMap.set(r.skill_id, s);
+    awardedAtMap.set(r.skill_id, r.awarded_at);
+  }
+
+  const bucketOf = (skillId: string): "achieved" | "in_progress" | "coming_up" => {
+    const s = statusMap.get(skillId) ?? "not_started";
+    if (s === "achieved" || s === "mastered") return "achieved";
+    if (s === "in_progress") return "in_progress";
+    return "coming_up";
+  };
+
+  // Counts
+  const achievedCount = curriculumSkills.filter(
+    (s) => bucketOf(s.id) === "achieved"
+  ).length;
+  const inProgressCount = curriculumSkills.filter(
+    (s) => bucketOf(s.id) === "in_progress"
+  ).length;
+  const totalCount = curriculumSkills.length;
+
+  // Group by category, preserving category sort then sort_order within
+  const byCategory = new Map<
+    string,
+    { name: string; sort: number; skills: CurriculumSkill[] }
+  >();
+  for (const s of curriculumSkills) {
+    const entry = byCategory.get(s.category_id);
+    if (entry) {
+      entry.skills.push(s);
+    } else {
+      byCategory.set(s.category_id, {
+        name: s.category_name,
+        sort: s.category_sort,
+        skills: [s],
+      });
+    }
+  }
+  const categories = Array.from(byCategory.values()).sort(
+    (a, b) => a.sort - b.sort || a.name.localeCompare(b.name)
+  );
+
+  function handleStatusChange(skill: CurriculumSkill, next: SkillStatus) {
+    setPendingSkillId(skill.id);
+    const fd = new FormData();
+    fd.set("studentId", student.id);
+    fd.set("skillId", skill.id);
+    fd.set("seasonId", activeSeason!.id);
+    fd.set("tenantId", tenantId);
+    fd.set("status", next);
+    setStudentSkillStatus(fd)
+      .then((res) => {
+        if (res?.error) {
+          alert(res.error);
+        } else {
+          onChange(skill.id, next);
+        }
+      })
+      .finally(() => setPendingSkillId(null));
+  }
+
+  return (
+    <div className={cardCls}>
+      <div className="flex items-center justify-between">
+        <h3 className={headingCls}>Skills</h3>
+        <span className="text-xs text-slate">
+          {activeSeason.name} · {student.current_level} · {achievedCount}/
+          {totalCount} achieved
+          {inProgressCount > 0 && ` · ${inProgressCount} in progress`}
+        </span>
+      </div>
+
+      <div className="space-y-5">
+        {categories.map((cat) => (
+          <div key={cat.name}>
+            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate">
+              {cat.name}
+            </h4>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+              {cat.skills
+                .sort((a, b) => a.sort_order - b.sort_order)
+                .map((skill) => {
+                  const bucket = bucketOf(skill.id);
+                  const status =
+                    statusMap.get(skill.id) ?? ("not_started" as SkillStatus);
+                  const awardedAt = awardedAtMap.get(skill.id);
+                  const color = skill.badge_color_hex || "#9C8BBF";
+                  const isPending = pendingSkillId === skill.id;
+                  return (
+                    <div
+                      key={skill.id}
+                      className="flex flex-col items-center rounded-lg border border-silver bg-white p-3 text-center"
+                    >
+                      <div
+                        className="mb-2 flex h-14 w-14 items-center justify-center rounded-full text-lg"
+                        style={
+                          bucket === "achieved"
+                            ? {
+                                backgroundColor: color,
+                                color: "#fff",
+                                boxShadow: `0 0 0 3px ${color}33`,
+                              }
+                            : bucket === "in_progress"
+                            ? {
+                                background: `conic-gradient(${color} 50%, #E5E5E5 50%)`,
+                                color: "#fff",
+                              }
+                            : {
+                                backgroundColor: "#F2F2F2",
+                                color: "#9CA3AF",
+                              }
+                        }
+                        aria-label={
+                          bucket === "achieved"
+                            ? "Achieved"
+                            : bucket === "in_progress"
+                            ? "In progress"
+                            : "Coming up"
+                        }
+                      >
+                        {bucket === "achieved" ? "✓" : bucket === "in_progress" ? "◐" : "🔒"}
+                      </div>
+                      <p
+                        className={`text-xs font-medium leading-tight ${
+                          bucket === "coming_up" ? "text-slate/60" : "text-charcoal"
+                        }`}
+                        title={skill.description ?? undefined}
+                      >
+                        {skill.name}
+                      </p>
+                      {bucket === "achieved" && awardedAt && (
+                        <p className="mt-0.5 text-[10px] text-slate">
+                          {formatDate(awardedAt.slice(0, 10))}
+                        </p>
+                      )}
+                      <SimpleSelect
+                        className="mt-2 w-full"
+                        value={status}
+                        onValueChange={(v) =>
+                          handleStatusChange(skill, v as SkillStatus)
+                        }
+                        options={SKILL_STATUS_OPTIONS}
+                        placeholder="Status"
+                      />
+                      {isPending && (
+                        <p className="mt-1 text-[10px] text-slate">Saving…</p>
+                      )}
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

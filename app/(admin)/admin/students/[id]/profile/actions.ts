@@ -497,3 +497,60 @@ export async function checkBillingPlan(formData: FormData) {
   // 3. Fallback
   return { planType: "per_class" as const, message: "No plan or credits. Standard rate applies." };
 }
+
+// ---------------------------------------------------------------------------
+// Curriculum skills — upsert a student_skill_records row for the active season
+// ---------------------------------------------------------------------------
+type SkillStatus = "not_started" | "in_progress" | "achieved" | "mastered";
+const SKILL_STATUSES: SkillStatus[] = [
+  "not_started",
+  "in_progress",
+  "achieved",
+  "mastered",
+];
+
+export async function setStudentSkillStatus(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const studentId = formData.get("studentId") as string;
+  const skillId = formData.get("skillId") as string;
+  const seasonId = formData.get("seasonId") as string;
+  const tenantId = formData.get("tenantId") as string;
+  const status = formData.get("status") as SkillStatus;
+
+  if (!studentId || !skillId || !seasonId || !tenantId) {
+    return { error: "Missing required field" };
+  }
+  if (!SKILL_STATUSES.includes(status)) {
+    return { error: "Invalid status" };
+  }
+
+  const now = new Date().toISOString();
+  const isAwarded = status === "achieved" || status === "mastered";
+
+  // UNIQUE(student_id, skill_id, season_id) — upsert on that key
+  const { error } = await supabase
+    .from("student_skill_records")
+    .upsert(
+      {
+        tenant_id: tenantId,
+        student_id: studentId,
+        skill_id: skillId,
+        season_id: seasonId,
+        status,
+        awarded_by: isAwarded ? user.id : null,
+        awarded_at: isAwarded ? now : null,
+        updated_at: now,
+      },
+      { onConflict: "student_id,skill_id,season_id" }
+    );
+
+  if (error) return { error: error.message };
+
+  revalidatePath(`/admin/students/${studentId}/profile`);
+  return {};
+}
