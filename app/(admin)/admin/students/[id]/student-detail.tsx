@@ -23,6 +23,8 @@ import {
 import { US_STATES } from "@/lib/constants/us-states";
 import { PhotosTab } from "./photos-tab";
 import { DocumentsTab } from "./documents-tab";
+import { SkillsTab } from "./skills-tab";
+import { EvaluationsTab } from "./evaluations-tab";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -194,7 +196,7 @@ function googleCalendarUrl(row: ScheduleRow): string {
 
 // ── Component ────────────────────────────────────────────────
 
-type Tab = "profile" | "classes" | "schedule" | "tuition" | "contacts" | "photos" | "documents";
+type Tab = "profile" | "classes" | "skills" | "evaluations" | "schedule" | "tuition" | "contacts" | "photos" | "documents";
 
 export function StudentDetail({
   student,
@@ -425,6 +427,8 @@ export function StudentDetail({
   const tabs: { key: Tab; label: string }[] = [
     { key: "profile", label: "Profile" },
     { key: "classes", label: "Classes" },
+    { key: "skills", label: "Skills" },
+    { key: "evaluations", label: "Evaluations" },
     { key: "schedule", label: "Schedule" },
     { key: "photos", label: "Photos" },
     { key: "documents", label: "Documents" },
@@ -1006,6 +1010,12 @@ export function StudentDetail({
           </div>
         </div>
       )}
+
+      {/* ── Tab: Skills ── */}
+      {tab === "skills" && <SkillsTab studentId={student.id} />}
+
+      {/* ── Tab: Evaluations ── */}
+      {tab === "evaluations" && <EvaluationsTab studentId={student.id} />}
 
       {/* ── Tab: Photos ── */}
       {tab === "photos" && (
