@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { Database } from "@/types/database.types";
 import { ChatModeToggle } from "./ChatModeToggle";
 import { CreateGroupButton } from "./CreateGroupButton";
@@ -42,8 +43,12 @@ export default async function CommunicationGroupsPage() {
   }
 
   const supabase = await createClient();
+  // Admin client bypasses RLS — safe here because the page is gated to
+  // admin/super_admin above. Used for the communications-hub queries to
+  // sidestep policy evaluation entirely on this admin-only surface.
+  const admin = createAdminClient();
 
-  // Resolve tenant
+  // Resolve tenant (regular client is fine — tenants is publicly readable)
   const { data: tenant } = await supabase
     .from("tenants")
     .select("id")
@@ -52,7 +57,7 @@ export default async function CommunicationGroupsPage() {
   const tenantId = tenant?.id ?? process.env.DEFAULT_TENANT_ID!;
 
   // Fetch groups
-  const { data: groupsData } = await supabase
+  const { data: groupsData } = await admin
     .from("communication_groups")
     .select("id, name, group_type, chat_mode, is_active, created_at")
     .eq("tenant_id", tenantId)
@@ -64,7 +69,7 @@ export default async function CommunicationGroupsPage() {
   // Member counts (one query, group_id list)
   const memberCounts: Record<string, number> = {};
   if (groupIds.length > 0) {
-    const { data: members } = await supabase
+    const { data: members } = await admin
       .from("communication_group_members")
       .select("group_id")
       .in("group_id", groupIds);
@@ -76,7 +81,7 @@ export default async function CommunicationGroupsPage() {
   // Last activity per group (most recent group_post)
   const lastActivity: Record<string, string> = {};
   if (groupIds.length > 0) {
-    const { data: posts } = await supabase
+    const { data: posts } = await admin
       .from("group_posts")
       .select("group_id, created_at")
       .in("group_id", groupIds)
