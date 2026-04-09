@@ -339,6 +339,11 @@ function CalendarView({
   selected: Post | null;
   onClose: () => void;
 }) {
+  // Default to list on mobile (<768px), month on larger
+  const [view, setView] = useState<"month" | "list">(() => {
+    if (typeof window !== "undefined" && window.innerWidth < 768) return "list";
+    return "month";
+  });
   const firstDay = new Date(year, month, 1);
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const startWeekday = firstDay.getDay();
@@ -370,28 +375,73 @@ function CalendarView({
     teacher_name?: string;
   };
 
+  // Build sorted list view across ALL events (not just current month)
+  const sortedEvents = [...events].sort((a, b) => {
+    const am = (a.metadata as { event_date?: string }).event_date ?? "";
+    const bm = (b.metadata as { event_date?: string }).event_date ?? "";
+    return am.localeCompare(bm);
+  });
+
   return (
     <div className="flex flex-col gap-4 py-4 lg:flex-row">
       <div className="min-w-0 flex-1">
-        <div className="mb-3 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={onPrev}
-            className="rounded-md border border-silver px-3 py-1.5 text-sm text-slate hover:bg-cloud"
-          >
-            ← Prev
-          </button>
-          <h2 className="font-heading text-lg text-charcoal">
-            {MONTH_NAMES[month]} {year}
-          </h2>
-          <button
-            type="button"
-            onClick={onNext}
-            className="rounded-md border border-silver px-3 py-1.5 text-sm text-slate hover:bg-cloud"
-          >
-            Next →
-          </button>
+        <div className="mb-3 flex items-center justify-between gap-2">
+          {view === "month" ? (
+            <button
+              type="button"
+              onClick={onPrev}
+              className="rounded-md border border-silver px-3 py-1.5 text-sm text-slate hover:bg-cloud"
+            >
+              ← Prev
+            </button>
+          ) : (
+            <div />
+          )}
+          <div className="flex items-center gap-2">
+            {view === "month" && (
+              <h2 className="font-heading text-lg text-charcoal">
+                {MONTH_NAMES[month]} {year}
+              </h2>
+            )}
+            <div className="ml-2 inline-flex overflow-hidden rounded-full border border-silver">
+              <button
+                type="button"
+                onClick={() => setView("month")}
+                className={`px-3 py-1 text-xs font-semibold ${
+                  view === "month" ? "bg-lavender text-white" : "text-slate"
+                }`}
+              >
+                Month
+              </button>
+              <button
+                type="button"
+                onClick={() => setView("list")}
+                className={`px-3 py-1 text-xs font-semibold ${
+                  view === "list" ? "bg-lavender text-white" : "text-slate"
+                }`}
+              >
+                List
+              </button>
+            </div>
+          </div>
+          {view === "month" ? (
+            <button
+              type="button"
+              onClick={onNext}
+              className="rounded-md border border-silver px-3 py-1.5 text-sm text-slate hover:bg-cloud"
+            >
+              Next →
+            </button>
+          ) : (
+            <div />
+          )}
         </div>
+
+        {view === "list" && (
+          <ListEventView events={sortedEvents} onSelect={onSelect} />
+        )}
+
+        {view === "month" && (
 
         <div className="grid grid-cols-7 gap-px overflow-hidden rounded-xl border border-silver bg-silver text-xs">
           {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
@@ -439,6 +489,7 @@ function CalendarView({
             );
           })}
         </div>
+        )}
       </div>
 
       {selected && (
@@ -471,6 +522,91 @@ function CalendarView({
           <p className="mt-3 text-[11px] text-mist">Posted by {selected.author_name}</p>
         </aside>
       )}
+    </div>
+  );
+}
+
+function ListEventView({
+  events,
+  onSelect,
+}: {
+  events: Post[];
+  onSelect: (p: Post) => void;
+}) {
+  if (events.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-silver bg-white/50 p-8 text-center text-sm text-slate">
+        No events scheduled.
+      </div>
+    );
+  }
+
+  // Group by month
+  const groups: Record<string, Post[]> = {};
+  for (const e of events) {
+    const m = e.metadata as { event_date?: string };
+    if (!m.event_date) continue;
+    const d = new Date(`${m.event_date}T00:00:00`);
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(e);
+  }
+
+  return (
+    <div className="space-y-5">
+      {Object.entries(groups).map(([key, items]) => {
+        const [yStr, mStr] = key.split("-");
+        const label = `${MONTH_NAMES[parseInt(mStr, 10)]} ${yStr}`;
+        return (
+          <div key={key}>
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate">
+              {label}
+            </h3>
+            <div className="space-y-2">
+              {items.map((e) => {
+                const m = e.metadata as {
+                  event_date?: string;
+                  start_time?: string;
+                  end_time?: string;
+                  location?: string;
+                  teacher_name?: string;
+                };
+                const date = m.event_date ? new Date(`${m.event_date}T00:00:00`) : null;
+                const dayNum = date?.getDate() ?? "";
+                const dayName = date
+                  ? date.toLocaleDateString(undefined, { weekday: "short" })
+                  : "";
+                return (
+                  <button
+                    key={e.id}
+                    type="button"
+                    onClick={() => onSelect(e)}
+                    className="flex w-full items-center gap-4 rounded-xl border border-silver bg-white p-3 text-left hover:border-lavender/40"
+                  >
+                    <div className="flex w-12 shrink-0 flex-col items-center rounded-lg bg-lavender/10 py-1 text-lavender-dark">
+                      <span className="text-[10px] font-semibold uppercase">{dayName}</span>
+                      <span className="text-lg font-bold leading-none">{dayNum}</span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-charcoal">
+                        {e.content ?? "Event"}
+                      </p>
+                      <p className="text-xs text-slate">
+                        {m.start_time ? m.start_time.slice(0, 5) : ""}
+                        {m.end_time ? `–${m.end_time.slice(0, 5)}` : ""}
+                        {m.location ? ` · ${m.location}` : ""}
+                      </p>
+                      {m.teacher_name && (
+                        <p className="text-[11px] text-mist">{m.teacher_name}</p>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

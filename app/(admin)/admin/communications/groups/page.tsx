@@ -94,6 +94,51 @@ export default async function CommunicationGroupsPage() {
     }
   }
 
+  // Unified inbox: 10 most recent group posts across all groups
+  const groupNameMap = new Map<string, string>();
+  for (const g of groups) groupNameMap.set(g.id, g.name);
+
+  const { data: recentPosts } = groupIds.length
+    ? await admin
+        .from("group_posts")
+        .select("id, group_id, content, post_type, created_at, author_id")
+        .in("group_id", groupIds)
+        .order("created_at", { ascending: false })
+        .limit(10)
+    : { data: [] };
+
+  // 10 most recent direct-message threads where current user is participant
+  const { data: dmThreads } = await admin
+    .from("communication_threads")
+    .select("id, subject, last_message_at, unread_count, created_by, staff_user_id")
+    .eq("tenant_id", tenantId)
+    .eq("thread_type", "direct")
+    .eq("channel", "in_app")
+    .or(`created_by.eq.${user.id},staff_user_id.eq.${user.id}`)
+    .order("last_message_at", { ascending: false })
+    .limit(10);
+
+  const otherIds = Array.from(
+    new Set(
+      (dmThreads ?? [])
+        .map((t) => (t.created_by === user.id ? t.staff_user_id : t.created_by))
+        .filter(Boolean) as string[]
+    )
+  );
+  const { data: dmProfiles } = otherIds.length
+    ? await admin
+        .from("profiles")
+        .select("id, first_name, last_name")
+        .in("id", otherIds)
+    : { data: [] };
+  const dmProfileMap = new Map<string, string>();
+  for (const p of dmProfiles ?? []) {
+    dmProfileMap.set(
+      p.id,
+      [p.first_name, p.last_name].filter(Boolean).join(" ") || "Member"
+    );
+  }
+
   return (
     <div className="space-y-4 pb-24 md:space-y-6 md:pb-0">
       {/* Sticky mobile-friendly header */}
@@ -143,8 +188,9 @@ export default async function CommunicationGroupsPage() {
         )}
       </div>
 
-      {/* Desktop table */}
-      <div className="hidden overflow-hidden rounded-lg border border-silver bg-white md:block">
+      {/* Unified inbox + table — 2 col on desktop */}
+      <div className="hidden gap-6 md:grid md:grid-cols-3">
+      <div className="md:col-span-2 overflow-hidden rounded-lg border border-silver bg-white">
         <table className="min-w-full divide-y divide-silver text-sm">
           <thead className="bg-cloud text-left text-xs font-semibold uppercase tracking-wide text-slate">
             <tr>
@@ -197,6 +243,70 @@ export default async function CommunicationGroupsPage() {
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Unified inbox sidebar */}
+      <aside className="space-y-5">
+        <div className="rounded-xl border border-silver bg-white p-4">
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate">
+            Recent Group Posts
+          </h2>
+          {(recentPosts ?? []).length === 0 ? (
+            <p className="text-xs text-mist">No posts yet.</p>
+          ) : (
+            <ul className="space-y-2">
+              {(recentPosts ?? []).map((p) => (
+                <li key={p.id}>
+                  <Link
+                    href={`/admin/communications/groups/${p.group_id}`}
+                    className="block rounded-lg p-2 hover:bg-cloud"
+                  >
+                    <p className="text-[11px] font-semibold uppercase text-lavender-dark">
+                      {groupNameMap.get(p.group_id) ?? "Group"}
+                    </p>
+                    <p className="line-clamp-2 text-sm text-charcoal">
+                      {p.content ?? `(${p.post_type})`}
+                    </p>
+                    <p className="text-[10px] text-mist">{formatRelative(p.created_at)}</p>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="rounded-xl border border-silver bg-white p-4">
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate">
+            Direct Messages
+          </h2>
+          {(dmThreads ?? []).length === 0 ? (
+            <p className="text-xs text-mist">No direct messages yet.</p>
+          ) : (
+            <ul className="space-y-1">
+              {(dmThreads ?? []).map((t) => {
+                const otherUserId =
+                  t.created_by === user.id ? t.staff_user_id : t.created_by;
+                const otherName = otherUserId
+                  ? dmProfileMap.get(otherUserId) ?? "Member"
+                  : "Member";
+                return (
+                  <li
+                    key={t.id}
+                    className="flex items-center justify-between rounded-lg p-2 hover:bg-cloud"
+                  >
+                    <span className="truncate text-sm text-charcoal">{otherName}</span>
+                    {t.unread_count > 0 && (
+                      <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-lavender px-1.5 text-[10px] font-bold text-white">
+                        {t.unread_count}
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </aside>
       </div>
     </div>
   );

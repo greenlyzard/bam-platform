@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { DmPanel } from "./dm-panel";
 
 interface Member {
   id: string;
@@ -35,6 +36,7 @@ export function MemberSidebar({ groupId, members }: { groupId: string; members: 
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [dmTarget, setDmTarget] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const memberIdSet = new Set(members.map((m) => m.user_id));
@@ -92,6 +94,8 @@ export function MemberSidebar({ groupId, members }: { groupId: string; members: 
   }
 
   return (
+    <>
+    {dmTarget && <DmPanel profileId={dmTarget} onClose={() => setDmTarget(null)} />}
     <div className="rounded-xl border border-silver bg-white p-4">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-charcoal">
@@ -177,10 +181,16 @@ export function MemberSidebar({ groupId, members }: { groupId: string; members: 
                     {initials || "?"}
                   </div>
                 )}
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-charcoal">{m.name}</p>
+                <button
+                  type="button"
+                  onClick={() => setDmTarget(m.user_id)}
+                  className="min-w-0 flex-1 text-left"
+                >
+                  <p className="truncate text-sm font-medium text-charcoal hover:text-lavender-dark">
+                    {m.name}
+                  </p>
                   <p className="text-[11px] text-mist">{m.role}</p>
-                </div>
+                </button>
                 <button
                   type="button"
                   onClick={() => removeMember(m.user_id)}
@@ -196,5 +206,6 @@ export function MemberSidebar({ groupId, members }: { groupId: string; members: 
         </ul>
       )}
     </div>
+    </>
   );
 }
