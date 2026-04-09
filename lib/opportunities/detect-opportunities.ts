@@ -41,22 +41,23 @@ export async function detectAndUpsertOpportunities(
 
   if (futureSeasons && futureSeasons.length > 0) {
     const nextSeason = futureSeasons[0];
-    // Any enrollment for a class in this season?
-    const { data: futureEnrolls } = await supabase
+    // Enrollments table has no season_id — join via classes.season_id
+    const { data: nextSeasonEnrolls } = await supabase
       .from("enrollments")
-      .select("id")
+      .select("id, classes!inner(season_id)")
       .eq("student_id", studentId)
+      .eq("classes.season_id", nextSeason.id)
       .in("status", ["active", "trial"])
       .limit(1);
 
-    // Crude: if active, but we'll still surface re-enrollment for the next season
-    if (!futureEnrolls || futureEnrolls.length === 0) {
+    if (!nextSeasonEnrolls || nextSeasonEnrolls.length === 0) {
       detected.push({
         opportunity_type: "re_enrollment",
         title: "Re-enrollment Due",
         description: `${nextSeason.name} enrollment not yet confirmed.`,
         action_label: "Send Placement Reminder",
         action_url: `/admin/students/${studentId}`,
+        metadata: { season_id: nextSeason.id, season_name: nextSeason.name },
       });
     }
   }
@@ -138,8 +139,13 @@ export async function detectAndUpsertOpportunities(
 
   if (toInsert.length === 0) return;
 
-  const { error } = await supabase.from("student_opportunities").insert(toInsert);
+  const { error } = await supabase
+    .from("student_opportunities")
+    .upsert(toInsert, {
+      onConflict: "student_id,opportunity_type",
+      ignoreDuplicates: true,
+    });
   if (error) {
-    console.error("[detectAndUpsertOpportunities] insert failed:", error);
+    console.error("[detectAndUpsertOpportunities] upsert failed:", error);
   }
 }
