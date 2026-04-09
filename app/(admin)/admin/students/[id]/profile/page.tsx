@@ -1,8 +1,10 @@
 import { requireAdmin } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { AdminStudentProfile } from "./admin-student-profile";
+import { detectAndUpsertOpportunities } from "@/lib/opportunities/detect-opportunities";
 
 export default async function AdminStudentProfilePage({
   params,
@@ -158,6 +160,28 @@ export default async function AdminStudentProfilePage({
     }
   }
 
+  // Detect + load opportunities (admin client bypasses RLS)
+  const adminDb = createAdminClient();
+  if (student.tenant_id) {
+    try {
+      await detectAndUpsertOpportunities(student.tenant_id, studentId);
+    } catch (e) {
+      console.error("[opportunities] detect failed:", e);
+    }
+  }
+  const todayStr = new Date().toISOString().split("T")[0];
+  const { data: oppRows } = await adminDb
+    .from("student_opportunities")
+    .select("id, opportunity_type, title, description, action_label, action_url, snoozed_until, expires_at")
+    .eq("student_id", studentId)
+    .eq("status", "active")
+    .order("created_at", { ascending: false });
+  const opportunities = (oppRows ?? []).filter((o) => {
+    if (o.snoozed_until && o.snoozed_until >= todayStr) return false;
+    if (o.expires_at && o.expires_at <= todayStr) return false;
+    return true;
+  });
+
   return (
     <div className="space-y-6">
       <div>
@@ -170,6 +194,7 @@ export default async function AdminStudentProfilePage({
       </div>
 
       <AdminStudentProfile
+        opportunities={opportunities}
         student={student}
         badges={(badgesResult.data ?? []).map((b: any) => ({
           ...b,

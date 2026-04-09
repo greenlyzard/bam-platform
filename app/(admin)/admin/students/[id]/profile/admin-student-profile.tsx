@@ -19,6 +19,7 @@ import {
   setStudentSkillStatus,
 } from "./actions";
 import { AddToClassModal } from "./add-to-class-modal";
+import { OpportunitiesSection } from "./opportunities-section";
 
 // ---------------------------------------------------------------------------
 // Interfaces
@@ -191,6 +192,7 @@ export function AdminStudentProfile({
   activeSeason,
   curriculumSkills,
   skillRecords: initialSkillRecords,
+  opportunities = [],
 }: {
   student: Student;
   badges: BadgeAward[];
@@ -203,6 +205,14 @@ export function AdminStudentProfile({
   activeSeason: ActiveSeason | null;
   curriculumSkills: CurriculumSkill[];
   skillRecords: SkillRecord[];
+  opportunities?: Array<{
+    id: string;
+    opportunity_type: string;
+    title: string;
+    description: string | null;
+    action_label: string | null;
+    action_url: string | null;
+  }>;
 }) {
   // ── State ──
   const [student, setStudent] = useState(initialStudent);
@@ -627,6 +637,9 @@ export function AdminStudentProfile({
           </button>
         </div>
       </div>
+
+      {/* ── Section: Opportunities ── */}
+      <OpportunitiesSection studentId={student.id} initial={opportunities} />
 
       {/* ── Section: Skills (curriculum-based) ── */}
       <SkillsSection
