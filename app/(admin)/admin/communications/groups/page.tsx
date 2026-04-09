@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
@@ -94,13 +95,14 @@ export default async function CommunicationGroupsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-heading font-semibold text-charcoal">
-            Communication Groups
+    <div className="space-y-4 pb-24 md:space-y-6 md:pb-0">
+      {/* Sticky mobile-friendly header */}
+      <div className="sticky top-0 z-10 -mx-4 flex flex-wrap items-center justify-between gap-3 border-b border-silver bg-cream/95 px-4 py-3 backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:p-0">
+        <div className="min-w-0">
+          <h1 className="font-heading text-xl font-semibold text-charcoal md:text-2xl">
+            Communications
           </h1>
-          <p className="mt-1 text-sm text-slate">
+          <p className="hidden text-sm text-slate md:mt-1 md:block">
             Every class, production, and custom group — chat mode, members,
             and last activity.
           </p>
@@ -108,7 +110,41 @@ export default async function CommunicationGroupsPage() {
         <CreateGroupButton />
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-silver bg-white">
+      {/* Mobile card list */}
+      <div className="space-y-3 md:hidden">
+        {groups.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-silver bg-white/50 p-8 text-center text-sm text-slate">
+            No groups yet.
+          </div>
+        ) : (
+          groups.map((g) => (
+            <Link
+              key={g.id}
+              href={`/admin/communications/groups/${g.id}`}
+              className="block min-h-12 rounded-xl border border-silver bg-white p-4 active:bg-cloud"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <p className="min-w-0 flex-1 truncate text-base font-semibold text-charcoal">
+                  {g.name}
+                </p>
+                <span className="rounded-full bg-lavender/10 px-2 py-0.5 text-[11px] font-semibold text-lavender-dark">
+                  {GROUP_TYPE_LABEL[g.group_type] ?? g.group_type}
+                </span>
+              </div>
+              <div className="mt-2 flex items-center gap-3 text-xs text-slate">
+                <span>{memberCounts[g.id] ?? 0} members</span>
+                <span>·</span>
+                <span>{formatRelative(lastActivity[g.id] ?? null) || "no posts"}</span>
+                <span>·</span>
+                <span>{g.is_active === false ? "Archived" : "Active"}</span>
+              </div>
+            </Link>
+          ))
+        )}
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden overflow-hidden rounded-lg border border-silver bg-white md:block">
         <table className="min-w-full divide-y divide-silver text-sm">
           <thead className="bg-cloud text-left text-xs font-semibold uppercase tracking-wide text-slate">
             <tr>
@@ -123,10 +159,7 @@ export default async function CommunicationGroupsPage() {
           <tbody className="divide-y divide-silver">
             {groups.length === 0 ? (
               <tr>
-                <td
-                  colSpan={6}
-                  className="px-4 py-8 text-center text-sm text-slate"
-                >
+                <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate">
                   No groups yet.
                 </td>
               </tr>
@@ -134,7 +167,12 @@ export default async function CommunicationGroupsPage() {
               groups.map((g) => (
                 <tr key={g.id} className="hover:bg-cloud/50">
                   <td className="px-4 py-3 font-medium text-charcoal">
-                    {g.name}
+                    <Link
+                      href={`/admin/communications/groups/${g.id}`}
+                      className="hover:text-lavender-dark"
+                    >
+                      {g.name}
+                    </Link>
                   </td>
                   <td className="px-4 py-3 text-slate">
                     {GROUP_TYPE_LABEL[g.group_type] ?? g.group_type}
