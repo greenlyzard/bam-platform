@@ -1,3 +1,8 @@
+// LEGACY — tech debt. The canonical student profile is
+// app/(admin)/admin/students/[id]/profile/admin-student-profile.tsx.
+// Do NOT add new features here. This file should be removed once the
+// remaining surfaces that link to /admin/students/[id] are migrated to
+// /admin/students/[id]/profile.
 "use client";
 
 import { useState, useRef } from "react";

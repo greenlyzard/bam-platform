@@ -123,4 +123,22 @@ CREATE INDEX IF NOT EXISTS idx_student_opportunities_student        ON student_o
 CREATE INDEX IF NOT EXISTS idx_student_opportunities_status         ON student_opportunities(status);
 CREATE INDEX IF NOT EXISTS idx_student_opportunities_student_active ON student_opportunities(student_id) WHERE status = 'active';
 
+-- ============================================================================
+-- 6. RLS — student_opportunities (admin-only)
+-- The other tables (curriculum_*, season_curriculum, student_skill_records)
+-- intentionally have no RLS yet — to be added in a follow-up alongside the
+-- parent-visibility rules from CURRICULUM_AND_PROGRESSION.md §4.2.
+-- ============================================================================
+ALTER TABLE student_opportunities ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "student_opportunities_admin_all" ON student_opportunities;
+CREATE POLICY "student_opportunities_admin_all" ON student_opportunities
+  FOR ALL TO authenticated
+  USING (EXISTS (
+    SELECT 1 FROM profile_roles
+    WHERE user_id = auth.uid()
+      AND role IN ('admin','super_admin','studio_admin','studio_manager')
+      AND is_active = true
+  ));
+
 NOTIFY pgrst, 'reload schema';
