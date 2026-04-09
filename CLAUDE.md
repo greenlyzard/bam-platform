@@ -329,5 +329,43 @@ Known column name traps from past bugs:
 
 ---
 
-*Last updated: March 2026*
+## 15. Workflow Rules
+
+- Do not enter plan mode for simple execution requests like commits, pushes, or running commands. Only plan for multi-step feature work.
+- For execution-only tasks prefix internally with "Execute directly without entering plan mode"
+- Batch no more than 2 tasks per request — a third task will be deferred to planning and never executed
+- Run tsc after EVERY file edit, not just at the end of a session
+
+## 16. Implementation Rules
+
+- Before implementing from ANY spec, read ALL referenced spec docs fully first — confirm understanding before writing a single line of code
+- If a spec references other docs, read those too before coding
+- Never rebuild from an outdated spec — always check the docs/ directory for the latest version of any spec file
+- Verify enum/level values against actual production DB before writing any filter or WHERE clause
+
+## 17. Database / Supabase Rules
+
+- Supabase joined relations return as arrays — type casts must always account for this (never assume .single() on a join)
+- Verify FK relationships are unambiguous before writing joins
+- Before writing any migration: list every table and enum it references and verify each exists in the current schema
+- Before writing any filter: run SELECT DISTINCT on that column via supabase to confirm exact production values
+- Never assume a column, table, or enum exists — check types/database.types.ts first
+- Always use supabaseAdmin (not the regular client) for all server-side DB writes in API routes and webhooks
+
+## 18. Parallel Agent Strategy
+
+These module groups can run in parallel — no file conflicts:
+- Group A: Tuition/Billing, Contract signing, Parent checkout
+- Group B: SEO landing pages, Help Center, Marketing content
+- Group C: Playwright test setup, GitHub Actions, Test fixtures
+
+Rules for parallel sessions:
+- Each session starts with: git pull origin main
+- Each session works in a different route group or module
+- Only ONE session pushes at a time — coordinate via Derek in Claude Chat
+- Final step of every session: git add -A && git commit -m "..." && git push origin main
+
+---
+
+*Last updated: April 2026*
 *Update whenever a major decision is made, a module ships, a table is added, or strategy shifts.*

@@ -1,0 +1,1 @@
+Before writing migration: list every table and enum referenced, verify each exists in types/database.types.ts. Write migration with IF NOT EXISTS on all DDL. No forward FKs. After writing: remind Derek to run supabase db push in Regular Terminal, then supabase gen types.
