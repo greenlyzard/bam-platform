@@ -68,6 +68,18 @@ export default async function AttendancePage({
     notes: r.notes,
   }));
 
+  // Pre-marked absences reported by parents for today's session
+  const { data: absences } = await supabase
+    .from("absence_records")
+    .select("student_id, parent_note")
+    .eq("class_id", classId)
+    .eq("absence_date", today);
+
+  const preMarkedAbsences: Record<string, string | null> = {};
+  for (const a of absences ?? []) {
+    preMarkedAbsences[a.student_id] = a.parent_note;
+  }
+
   return (
     <AttendanceClient
       classId={classId}
@@ -76,6 +88,7 @@ export default async function AttendancePage({
       existingRecords={existingRecords}
       tenantId={tenantId}
       teacherId={user.id}
+      preMarkedAbsences={preMarkedAbsences}
     />
   );
 }

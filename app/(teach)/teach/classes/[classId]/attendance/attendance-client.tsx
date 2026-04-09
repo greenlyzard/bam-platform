@@ -26,6 +26,7 @@ interface Props {
   existingRecords: AttendanceRecord[];
   tenantId: string;
   teacherId: string;
+  preMarkedAbsences?: Record<string, string | null>;
 }
 
 type StatusType = "present" | "absent" | "late" | "excused";
@@ -55,7 +56,7 @@ function buildInitialRecords(
   return map;
 }
 
-export function AttendanceClient({ classId, className, students, existingRecords, tenantId, teacherId }: Props) {
+export function AttendanceClient({ classId, className, students, existingRecords, tenantId, teacherId, preMarkedAbsences = {} }: Props) {
   const today = new Date().toISOString().split("T")[0];
   const minDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
@@ -199,6 +200,14 @@ export function AttendanceClient({ classId, className, students, existingRecords
                     <p className="font-semibold text-charcoal text-sm truncate">
                       {s.firstName} {s.lastName}
                     </p>
+                    {s.id in preMarkedAbsences && (
+                      <p className="mt-0.5 text-[11px] font-medium text-slate">
+                        <span className="inline-flex items-center rounded-full bg-lavender/10 px-1.5 py-0.5 text-lavender-dark">
+                          Parent reported absence
+                        </span>
+                        {preMarkedAbsences[s.id] ? ` — ${preMarkedAbsences[s.id]}` : ""}
+                      </p>
+                    )}
                   </div>
                   <div className="flex items-center gap-1.5">
                     {STATUSES.map((status) => {
