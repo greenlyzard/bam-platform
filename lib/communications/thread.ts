@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createHash } from "crypto";
 
 const REPLY_DOMAIN = "mail.balletacademyandmovement.com";
@@ -55,8 +56,8 @@ interface ThreadParams {
 /**
  * Look up a thread by token, or create one if it doesn't exist.
  */
-export async function getOrCreateThread(params: ThreadParams) {
-  const supabase = await createClient();
+export async function getOrCreateThread(params: ThreadParams, client?: SupabaseClient) {
+  const supabase = client ?? (await createClient());
 
   // Try to find existing thread
   const { data: existing } = await supabase
@@ -108,8 +109,8 @@ interface MessageInsert {
 /**
  * Append a message to a thread and update thread metadata.
  */
-export async function appendMessage(params: MessageInsert) {
-  const supabase = await createClient();
+export async function appendMessage(params: MessageInsert, client?: SupabaseClient) {
+  const supabase = client ?? (await createClient());
 
   const { data: message, error: msgError } = await supabase
     .from("communication_messages")

@@ -182,7 +182,7 @@ export async function POST(req: NextRequest) {
           bodyHtml: htmlBody || null,
           bodyText: textBody || null,
           matched: false,
-        });
+        }, supabase);
         await supabase
           .from("communication_messages")
           .update({
@@ -260,7 +260,7 @@ export async function POST(req: NextRequest) {
         bodyHtml: htmlBody || null,
         bodyText: textBody || null,
         matched: knownSender || classification.label === "inquiry",
-      });
+      }, supabase);
 
       // Tag the message with classifier metadata
       await supabase
@@ -410,7 +410,7 @@ export async function POST(req: NextRequest) {
     leadId,
     contactName: senderName,
     contactEmail: senderEmail,
-  });
+  }, supabase);
 
   // Append inbound message
   await appendMessage({
@@ -424,7 +424,7 @@ export async function POST(req: NextRequest) {
     bodyHtml: htmlBody || null,
     bodyText: textBody || null,
     matched,
-  });
+  }, supabase);
 
   // Update thread: reopen if resolved, increment unread
   await supabase
