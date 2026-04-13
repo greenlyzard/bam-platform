@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { SimpleSelect } from "@/components/ui/select";
 import {
   updateStudentBasics,
@@ -119,7 +119,8 @@ interface ActiveSeason {
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-const LEVELS = [
+// Fallback levels used if API fails or table is empty
+const FALLBACK_LEVELS = [
   "Petites", "Level 1", "Level 2", "Level 2A", "Level 2B", "Level 2B+",
   "Level 2C", "Level 2C+", "Level 3A", "Level 3B", "Level 3C",
   "Level 4", "Level 4A", "Level 4B", "Level 4C", "Adult/Teen",
@@ -236,6 +237,17 @@ export function AdminStudentProfile({
     allergy_notes: student.allergy_notes ?? "",
   });
   const [selectedLevel, setSelectedLevel] = useState(student.current_level ?? "");
+  const [levelOptions, setLevelOptions] = useState<string[]>(FALLBACK_LEVELS);
+
+  useEffect(() => {
+    fetch("/api/admin/studio-levels")
+      .then((r) => r.json())
+      .then((d) => {
+        const names = (d.levels ?? []).map((l: { name: string }) => l.name);
+        if (names.length > 0) setLevelOptions(names);
+      })
+      .catch(() => {});
+  }, []);
 
   // Badge award
   const [showBadgeForm, setShowBadgeForm] = useState(false);
@@ -629,7 +641,7 @@ export function AdminStudentProfile({
             className="w-full"
             value={selectedLevel}
             onValueChange={setSelectedLevel}
-            options={LEVELS.map((l) => ({ value: l, label: l }))}
+            options={levelOptions.map((l) => ({ value: l, label: l }))}
             placeholder="Select level..."
           />
           <button onClick={saveLevel} disabled={isPending || !selectedLevel} className={btnPrimary + " shrink-0"}>

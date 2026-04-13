@@ -124,8 +124,8 @@ const studioSettings: SettingsItem[] = [
     icon: "◈",
   },
   {
-    label: "Levels",
-    description: "Manage class level names and order",
+    label: "Levels & Programs",
+    description: "Manage class levels, programs, and sub-brands",
     href: "/admin/settings/levels",
     icon: "≡",
   },

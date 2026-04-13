@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   DndContext,
   closestCenter,
@@ -15,65 +16,182 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
-export function LevelsManager({ initialLevels }: { initialLevels: string[] }) {
+// ── Types ──────────────────────────────────────────────────────
+interface Level {
+  id: string;
+  name: string;
+  description: string | null;
+  age_min: number | null;
+  age_max: number | null;
+  sort_order: number;
+  is_active: boolean;
+  color_hex: string | null;
+}
+
+interface Program {
+  id: string;
+  name: string;
+  description: string | null;
+  color_hex: string | null;
+  requires_audition: boolean;
+  has_contract: boolean;
+  sort_order: number;
+  is_active: boolean;
+  eligible_level_ids: string[];
+}
+
+// ── Main ───────────────────────────────────────────────────────
+export function LevelsAndProgramsManager({
+  initialLevels,
+  initialPrograms,
+}: {
+  initialLevels: Level[];
+  initialPrograms: Program[];
+}) {
+  const router = useRouter();
+  const [tab, setTab] = useState<"levels" | "programs">("levels");
   const [levels, setLevels] = useState(initialLevels);
-  const [newLevel, setNewLevel] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [programs, setPrograms] = useState(initialPrograms);
   const [toast, setToast] = useState("");
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
-
-  function handleDragEnd(event: any) {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const oldIndex = levels.indexOf(active.id as string);
-    const newIndex = levels.indexOf(over.id as string);
-    setLevels(arrayMove(levels, oldIndex, newIndex));
-  }
-
-  function addLevel() {
-    const trimmed = newLevel.trim();
-    if (!trimmed || levels.includes(trimmed)) return;
-    setLevels([...levels, trimmed]);
-    setNewLevel("");
-  }
-
-  function removeLevel(level: string) {
-    setLevels(levels.filter((l) => l !== level));
-  }
-
-  async function handleSave() {
-    setSaving(true);
-    try {
-      const res = await fetch("/api/admin/studio-settings/levels", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ levels }),
-      });
-      if (res.ok) {
-        setToast("Saved");
-        setTimeout(() => setToast(""), 2000);
-      } else {
-        setToast("Error saving");
-      }
-    } catch {
-      setToast("Error saving");
-    }
-    setSaving(false);
+  function flash(msg: string) {
+    setToast(msg);
+    setTimeout(() => setToast(""), 2000);
   }
 
   return (
     <div className="space-y-4">
       {toast && (
-        <div className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">{toast}</div>
+        <div className="rounded-lg bg-success/10 px-3 py-2 text-sm text-success">
+          {toast}
+        </div>
       )}
+      <div className="flex gap-1 border-b border-silver">
+        {(["levels", "programs"] as const).map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors capitalize ${
+              tab === t
+                ? "border-lavender text-lavender-dark"
+                : "border-transparent text-slate hover:text-charcoal"
+            }`}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
 
+      {tab === "levels" && (
+        <LevelsTab
+          levels={levels}
+          setLevels={setLevels}
+          flash={flash}
+          refresh={() => router.refresh()}
+        />
+      )}
+      {tab === "programs" && (
+        <ProgramsTab
+          programs={programs}
+          setPrograms={setPrograms}
+          levels={levels}
+          flash={flash}
+          refresh={() => router.refresh()}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Levels Tab ─────────────────────────────────────────────────
+function LevelsTab({
+  levels,
+  setLevels,
+  flash,
+  refresh,
+}: {
+  levels: Level[];
+  setLevels: (l: Level[]) => void;
+  flash: (m: string) => void;
+  refresh: () => void;
+}) {
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const [form, setForm] = useState<Partial<Level> & { open: boolean }>({ open: false });
+  const [saving, setSaving] = useState(false);
+
+  async function handleDragEnd(event: { active: { id: string | number }; over: { id: string | number } | null }) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIdx = levels.findIndex((l) => l.id === active.id);
+    const newIdx = levels.findIndex((l) => l.id === over.id);
+    const reordered = arrayMove(levels, oldIdx, newIdx);
+    setLevels(reordered);
+    await fetch("/api/admin/studio-levels", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "reorder", ids: reordered.map((l) => l.id) }),
+    });
+    flash("Order saved");
+  }
+
+  async function save() {
+    setSaving(true);
+    const action = form.id ? "update" : "create";
+    const res = await fetch("/api/admin/studio-levels", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action,
+        id: form.id,
+        name: form.name,
+        description: form.description,
+        age_min: form.age_min ?? null,
+        age_max: form.age_max ?? null,
+        color_hex: form.color_hex,
+        sort_order: form.sort_order ?? levels.length,
+      }),
+    });
+    setSaving(false);
+    if (res.ok) {
+      setForm({ open: false });
+      flash(action === "create" ? "Level added" : "Level updated");
+      refresh();
+    }
+  }
+
+  async function remove(id: string) {
+    if (!confirm("Delete this level?")) return;
+    await fetch("/api/admin/studio-levels", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "delete", id }),
+    });
+    flash("Level deleted");
+    refresh();
+  }
+
+  return (
+    <div className="space-y-4">
       <div className="rounded-xl border border-silver bg-white divide-y divide-silver">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={levels} strategy={verticalListSortingStrategy}>
-            {levels.map((level) => (
-              <SortableLevel key={level} level={level} onRemove={() => removeLevel(level)} />
+          <SortableContext items={levels.map((l) => l.id)} strategy={verticalListSortingStrategy}>
+            {levels.map((l) => (
+              <SortableLevelRow
+                key={l.id}
+                level={l}
+                onEdit={() =>
+                  setForm({ open: true, ...l })
+                }
+                onRemove={() => remove(l.id)}
+              />
             ))}
           </SortableContext>
         </DndContext>
@@ -82,40 +200,91 @@ export function LevelsManager({ initialLevels }: { initialLevels: string[] }) {
         )}
       </div>
 
-      {/* Add new */}
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={newLevel}
-          onChange={(e) => setNewLevel(e.target.value)}
-          placeholder="New level name..."
-          onKeyDown={(e) => { if (e.key === "Enter") addLevel(); }}
-          className="flex-1 h-10 rounded-lg border border-silver px-3 text-sm text-charcoal focus:border-lavender focus:outline-none focus:ring-1 focus:ring-lavender"
-        />
+      {!form.open && (
         <button
-          onClick={addLevel}
-          disabled={!newLevel.trim()}
-          className="h-10 rounded-lg bg-lavender hover:bg-lavender-dark text-white text-sm font-medium px-4 disabled:opacity-50 transition-colors"
+          type="button"
+          onClick={() => setForm({ open: true, name: "", sort_order: levels.length })}
+          className="h-10 rounded-lg bg-lavender px-5 text-sm font-semibold text-white hover:bg-lavender-dark"
         >
-          Add
+          + Add Level
         </button>
-      </div>
+      )}
 
-      {/* Save */}
-      <button
-        onClick={handleSave}
-        disabled={saving}
-        className="h-10 rounded-lg bg-lavender hover:bg-lavender-dark text-white text-sm font-semibold px-6 disabled:opacity-50 transition-colors"
-      >
-        {saving ? "Saving..." : "Save Order"}
-      </button>
+      {form.open && (
+        <div className="space-y-3 rounded-xl border border-silver bg-white p-4">
+          <h3 className="text-sm font-semibold text-charcoal">
+            {form.id ? "Edit Level" : "New Level"}
+          </h3>
+          <input
+            type="text"
+            placeholder="Level name"
+            value={form.name ?? ""}
+            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+            className="h-12 w-full rounded-md border border-silver bg-white px-3 text-base text-charcoal focus:border-lavender focus:outline-none focus:ring-2 focus:ring-lavender/20"
+          />
+          <input
+            type="text"
+            placeholder="Description (optional)"
+            value={form.description ?? ""}
+            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+            className="h-12 w-full rounded-md border border-silver bg-white px-3 text-base text-charcoal focus:border-lavender focus:outline-none focus:ring-2 focus:ring-lavender/20"
+          />
+          <div className="grid grid-cols-3 gap-3">
+            <input
+              type="number"
+              placeholder="Age min"
+              value={form.age_min ?? ""}
+              onChange={(e) => setForm((f) => ({ ...f, age_min: e.target.value ? parseInt(e.target.value, 10) : null }))}
+              className="h-12 rounded-md border border-silver bg-white px-3 text-base text-charcoal focus:border-lavender focus:outline-none focus:ring-2 focus:ring-lavender/20"
+            />
+            <input
+              type="number"
+              placeholder="Age max"
+              value={form.age_max ?? ""}
+              onChange={(e) => setForm((f) => ({ ...f, age_max: e.target.value ? parseInt(e.target.value, 10) : null }))}
+              className="h-12 rounded-md border border-silver bg-white px-3 text-base text-charcoal focus:border-lavender focus:outline-none focus:ring-2 focus:ring-lavender/20"
+            />
+            <input
+              type="color"
+              value={form.color_hex || "#9C8BBF"}
+              onChange={(e) => setForm((f) => ({ ...f, color_hex: e.target.value }))}
+              className="h-12 w-full rounded-md border border-silver bg-white"
+            />
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={save}
+              disabled={saving || !form.name?.trim()}
+              className="h-10 rounded-lg bg-lavender px-5 text-sm font-semibold text-white hover:bg-lavender-dark disabled:opacity-50"
+            >
+              {saving ? "Saving…" : form.id ? "Update" : "Create"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setForm({ open: false })}
+              className="h-10 rounded-lg border border-silver px-4 text-sm text-slate hover:bg-cloud"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function SortableLevel({ level, onRemove }: { level: string; onRemove: () => void }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: level });
-
+function SortableLevelRow({
+  level,
+  onEdit,
+  onRemove,
+}: {
+  level: Level;
+  onEdit: () => void;
+  onRemove: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: level.id });
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -132,13 +301,254 @@ function SortableLevel({ level, onRemove }: { level: string; onRemove: () => voi
           <circle cx="5" cy="12" r="1.5" /><circle cx="11" cy="12" r="1.5" />
         </svg>
       </button>
-      <span className="flex-1 text-sm font-medium text-charcoal">{level}</span>
-      <button
-        onClick={onRemove}
-        className="text-mist hover:text-red-500 transition-colors text-sm"
-      >
-        &times;
+      {level.color_hex && (
+        <span
+          className="h-4 w-4 rounded-full shrink-0"
+          style={{ backgroundColor: level.color_hex }}
+        />
+      )}
+      <span className="flex-1 text-sm font-medium text-charcoal">{level.name}</span>
+      {level.age_min != null || level.age_max != null ? (
+        <span className="text-xs text-mist">
+          {level.age_min ?? "?"}-{level.age_max ?? "?"} yrs
+        </span>
+      ) : null}
+      <button onClick={onEdit} className="text-xs text-lavender hover:text-lavender-dark">
+        Edit
       </button>
+      <button onClick={onRemove} className="text-mist hover:text-error text-sm">&times;</button>
+    </div>
+  );
+}
+
+// ── Programs Tab ───────────────────────────────────────────────
+function ProgramsTab({
+  programs,
+  setPrograms,
+  levels,
+  flash,
+  refresh,
+}: {
+  programs: Program[];
+  setPrograms: (p: Program[]) => void;
+  levels: Level[];
+  flash: (m: string) => void;
+  refresh: () => void;
+}) {
+  const [form, setForm] = useState<Partial<Program> & { open: boolean; eligible_level_ids?: string[] }>({ open: false });
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    setSaving(true);
+    const action = form.id ? "update" : "create";
+    const res = await fetch("/api/admin/studio-programs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action,
+        id: form.id,
+        name: form.name,
+        description: form.description,
+        color_hex: form.color_hex,
+        requires_audition: form.requires_audition ?? false,
+        has_contract: form.has_contract ?? false,
+        sort_order: form.sort_order ?? programs.length,
+        eligible_level_ids: form.eligible_level_ids ?? [],
+      }),
+    });
+    setSaving(false);
+    if (res.ok) {
+      setForm({ open: false });
+      flash(action === "create" ? "Program added" : "Program updated");
+      refresh();
+    }
+  }
+
+  async function remove(id: string) {
+    if (!confirm("Delete this program?")) return;
+    await fetch("/api/admin/studio-programs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "delete", id }),
+    });
+    flash("Program deleted");
+    refresh();
+  }
+
+  function toggleLevel(levelId: string) {
+    setForm((f) => {
+      const ids = new Set(f.eligible_level_ids ?? []);
+      if (ids.has(levelId)) ids.delete(levelId);
+      else ids.add(levelId);
+      return { ...f, eligible_level_ids: Array.from(ids) };
+    });
+  }
+
+  return (
+    <div className="space-y-4">
+      {programs.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-silver bg-white/50 p-6 text-center text-sm text-mist">
+          No programs configured.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {programs.map((p) => (
+            <div key={p.id} className="flex items-start justify-between gap-3 rounded-xl border border-silver bg-white p-4">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  {p.color_hex && (
+                    <span className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: p.color_hex }} />
+                  )}
+                  <p className="text-sm font-semibold text-charcoal">{p.name}</p>
+                  {p.requires_audition && (
+                    <span className="rounded-full bg-gold/20 px-1.5 py-0.5 text-[10px] font-semibold text-gold-dark">
+                      Audition
+                    </span>
+                  )}
+                  {p.has_contract && (
+                    <span className="rounded-full bg-lavender/10 px-1.5 py-0.5 text-[10px] font-semibold text-lavender-dark">
+                      Contract
+                    </span>
+                  )}
+                </div>
+                {p.description && <p className="mt-0.5 text-xs text-slate">{p.description}</p>}
+                {p.eligible_level_ids.length > 0 && (
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {p.eligible_level_ids.map((lid) => {
+                      const lev = levels.find((l) => l.id === lid);
+                      return (
+                        <span key={lid} className="rounded bg-cloud px-1.5 py-0.5 text-[10px] font-medium text-slate">
+                          {lev?.name ?? lid.slice(0, 8)}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setForm({
+                      open: true,
+                      ...p,
+                    })
+                  }
+                  className="text-xs text-lavender hover:text-lavender-dark"
+                >
+                  Edit
+                </button>
+                <button onClick={() => remove(p.id)} className="text-sm text-mist hover:text-error">
+                  &times;
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!form.open && (
+        <button
+          type="button"
+          onClick={() => setForm({ open: true, name: "", eligible_level_ids: [] })}
+          className="h-10 rounded-lg bg-lavender px-5 text-sm font-semibold text-white hover:bg-lavender-dark"
+        >
+          + Add Program
+        </button>
+      )}
+
+      {form.open && (
+        <div className="space-y-3 rounded-xl border border-silver bg-white p-4">
+          <h3 className="text-sm font-semibold text-charcoal">
+            {form.id ? "Edit Program" : "New Program"}
+          </h3>
+          <input
+            type="text"
+            placeholder="Program name"
+            value={form.name ?? ""}
+            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+            className="h-12 w-full rounded-md border border-silver bg-white px-3 text-base text-charcoal focus:border-lavender focus:outline-none focus:ring-2 focus:ring-lavender/20"
+          />
+          <textarea
+            placeholder="Description (optional)"
+            rows={2}
+            value={form.description ?? ""}
+            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+            className="w-full rounded-md border border-silver bg-white px-3 py-2 text-base text-charcoal focus:border-lavender focus:outline-none focus:ring-2 focus:ring-lavender/20"
+          />
+          <div className="grid grid-cols-3 gap-3">
+            <label className="flex items-center gap-2 text-sm text-charcoal">
+              <input
+                type="checkbox"
+                checked={form.requires_audition ?? false}
+                onChange={(e) => setForm((f) => ({ ...f, requires_audition: e.target.checked }))}
+                className="rounded border-silver"
+              />
+              Requires Audition
+            </label>
+            <label className="flex items-center gap-2 text-sm text-charcoal">
+              <input
+                type="checkbox"
+                checked={form.has_contract ?? false}
+                onChange={(e) => setForm((f) => ({ ...f, has_contract: e.target.checked }))}
+                className="rounded border-silver"
+              />
+              Has Contract
+            </label>
+            <input
+              type="color"
+              value={form.color_hex || "#9C8BBF"}
+              onChange={(e) => setForm((f) => ({ ...f, color_hex: e.target.value }))}
+              className="h-10 w-full rounded-md border border-silver bg-white"
+            />
+          </div>
+          {levels.length > 0 && (
+            <div>
+              <p className="mb-1.5 text-xs font-semibold text-charcoal">Eligible Levels</p>
+              <div className="flex flex-wrap gap-2">
+                {levels.map((l) => {
+                  const checked = (form.eligible_level_ids ?? []).includes(l.id);
+                  return (
+                    <label
+                      key={l.id}
+                      className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium cursor-pointer ${
+                        checked
+                          ? "border-lavender bg-lavender/10 text-lavender-dark"
+                          : "border-silver text-slate"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleLevel(l.id)}
+                        className="sr-only"
+                      />
+                      {l.name}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={save}
+              disabled={saving || !form.name?.trim()}
+              className="h-10 rounded-lg bg-lavender px-5 text-sm font-semibold text-white hover:bg-lavender-dark disabled:opacity-50"
+            >
+              {saving ? "Saving…" : form.id ? "Update" : "Create"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setForm({ open: false })}
+              className="h-10 rounded-lg border border-silver px-4 text-sm text-slate hover:bg-cloud"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
