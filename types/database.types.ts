@@ -2273,7 +2273,15 @@ export type Database = {
           skill_type?: string
           tenant_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "curriculum_skills_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "curriculum_categories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       dance_curriculum: {
         Row: {
@@ -5839,7 +5847,15 @@ export type Database = {
           sort_order?: number | null
           tenant_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "season_curriculum_skill_id_fkey"
+            columns: ["skill_id"]
+            isOneToOne: false
+            referencedRelation: "curriculum_skills"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       season_placement_releases: {
         Row: {
