@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth/guards";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -70,6 +71,7 @@ export async function POST(req: NextRequest) {
       }));
       await supabase.from("program_eligible_levels").insert(rows);
     }
+    revalidatePath("/admin/settings/levels");
     return NextResponse.json({ success: true, id: data.id });
   }
 
@@ -96,12 +98,14 @@ export async function POST(req: NextRequest) {
       }));
       await supabase.from("program_eligible_levels").insert(rows);
     }
+    revalidatePath("/admin/settings/levels");
     return NextResponse.json({ success: true });
   }
 
   if (action === "delete") {
     const { error } = await supabase.from("studio_programs").delete().eq("id", body.id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    revalidatePath("/admin/settings/levels");
     return NextResponse.json({ success: true });
   }
 
