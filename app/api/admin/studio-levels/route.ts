@@ -68,11 +68,11 @@ export async function POST(req: NextRequest) {
         color_hex: body.color_hex || null,
         sort_order: body.sort_order ?? 0,
       })
-      .select("id")
+      .select("id, name, description, parent_id, age_min, age_max, sort_order, is_active, color_hex")
       .single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     revalidatePath("/admin/settings/levels");
-    return NextResponse.json({ success: true, id: data.id });
+    return NextResponse.json({ success: true, level: data });
   }
 
   if (action === "update") {

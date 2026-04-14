@@ -60,19 +60,23 @@ export async function POST(req: NextRequest) {
         has_contract: body.has_contract ?? false,
         sort_order: body.sort_order ?? 0,
       })
-      .select("id")
+      .select("id, name, description, color_hex, requires_audition, has_contract, sort_order, is_active")
       .single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    if (body.eligible_level_ids?.length) {
-      const rows = (body.eligible_level_ids as string[]).map((lid: string) => ({
+    const eligibleIds = (body.eligible_level_ids ?? []) as string[];
+    if (eligibleIds.length) {
+      const rows = eligibleIds.map((lid: string) => ({
         program_id: data.id,
         level_id: lid,
       }));
       await supabase.from("program_eligible_levels").insert(rows);
     }
     revalidatePath("/admin/settings/levels");
-    return NextResponse.json({ success: true, id: data.id });
+    return NextResponse.json({
+      success: true,
+      program: { ...data, eligible_level_ids: eligibleIds },
+    });
   }
 
   if (action === "update") {
@@ -99,7 +103,21 @@ export async function POST(req: NextRequest) {
       await supabase.from("program_eligible_levels").insert(rows);
     }
     revalidatePath("/admin/settings/levels");
-    return NextResponse.json({ success: true });
+    const eligibleIds = (body.eligible_level_ids ?? []) as string[];
+    return NextResponse.json({
+      success: true,
+      program: {
+        id: body.id,
+        name: body.name,
+        description: body.description || null,
+        color_hex: body.color_hex || null,
+        requires_audition: body.requires_audition ?? false,
+        has_contract: body.has_contract ?? false,
+        sort_order: body.sort_order ?? 0,
+        is_active: true,
+        eligible_level_ids: eligibleIds,
+      },
+    });
   }
 
   if (action === "delete") {

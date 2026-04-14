@@ -120,7 +120,7 @@ function LevelsTab({
   refresh,
 }: {
   levels: Level[];
-  setLevels: (l: Level[]) => void;
+  setLevels: React.Dispatch<React.SetStateAction<Level[]>>;
   flash: (m: string) => void;
   refresh: () => void;
 }) {
@@ -209,10 +209,28 @@ function LevelsTab({
         setSaving(false);
         return;
       }
+      if (action === "create" && json.level) {
+        setLevels((prev) => [...prev, json.level]);
+      } else if (action === "update") {
+        setLevels((prev) =>
+          prev.map((l) =>
+            l.id === form.id
+              ? {
+                  ...l,
+                  name: form.name ?? l.name,
+                  description: form.description ?? l.description,
+                  parent_id: form.parent_id ?? l.parent_id,
+                  age_min: form.age_min ?? l.age_min,
+                  age_max: form.age_max ?? l.age_max,
+                  color_hex: form.color_hex ?? l.color_hex,
+                }
+              : l
+          )
+        );
+      }
       setForm({ open: false });
       setLevelsError(null);
       flash(action === "create" ? "Level added" : "Level updated");
-      refresh();
     } catch (e) {
       setLevelsError(e instanceof Error ? e.message : "Network error");
     }
@@ -226,8 +244,8 @@ function LevelsTab({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "delete", id }),
     });
+    setLevels((prev) => prev.filter((l) => l.id !== id));
     flash("Level deleted");
-    refresh();
   }
 
   const allDragIds = levels.map((l) => l.id);
@@ -451,7 +469,7 @@ function ProgramsTab({
   refresh,
 }: {
   programs: Program[];
-  setPrograms: (p: Program[]) => void;
+  setPrograms: React.Dispatch<React.SetStateAction<Program[]>>;
   levels: Level[];
   flash: (m: string) => void;
   refresh: () => void;
@@ -486,10 +504,16 @@ function ProgramsTab({
         setSaving(false);
         return;
       }
+      if (action === "create" && json.program) {
+        setPrograms((prev) => [...prev, json.program]);
+      } else if (action === "update" && json.program) {
+        setPrograms((prev) =>
+          prev.map((p) => (p.id === json.program.id ? json.program : p))
+        );
+      }
       setForm({ open: false });
       setError(null);
       flash(action === "create" ? "Program added" : "Program updated");
-      refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Network error");
     }
@@ -503,8 +527,8 @@ function ProgramsTab({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "delete", id }),
     });
+    setPrograms((prev) => prev.filter((p) => p.id !== id));
     flash("Program deleted");
-    refresh();
   }
 
   function toggleLevel(levelId: string) {
