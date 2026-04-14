@@ -29,6 +29,7 @@ interface Level {
   id: string;
   name: string;
   description: string | null;
+  parent_id: string | null;
   age_min: number | null;
   age_max: number | null;
   sort_order: number;
@@ -126,14 +127,46 @@ function LevelsTab({
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const [form, setForm] = useState<Partial<Level> & { open: boolean }>({ open: false });
   const [saving, setSaving] = useState(false);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set(levels.filter((l) => !l.parent_id).map((l) => l.id)));
+
+  const parents = levels.filter((l) => !l.parent_id);
+  const childrenOf = (pid: string) =>
+    levels.filter((l) => l.parent_id === pid).sort((a, b) => a.sort_order - b.sort_order);
+
+  function toggleExpand(id: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   async function handleDragEnd(event: { active: { id: string | number }; over: { id: string | number } | null }) {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
-    const oldIdx = levels.findIndex((l) => l.id === active.id);
-    const newIdx = levels.findIndex((l) => l.id === over.id);
-    const reordered = arrayMove(levels, oldIdx, newIdx);
-    setLevels(reordered);
+    // Only reorder within same level (top-level or siblings)
+    const dragged = levels.find((l) => l.id === active.id);
+    const target = levels.find((l) => l.id === over.id);
+    if (!dragged || !target) return;
+    if (dragged.parent_id !== target.parent_id) return;
+
+    const siblings = dragged.parent_id
+      ? levels.filter((l) => l.parent_id === dragged.parent_id)
+      : parents;
+    const oldIdx = siblings.findIndex((l) => l.id === active.id);
+    const newIdx = siblings.findIndex((l) => l.id === over.id);
+    const reordered = arrayMove(siblings, oldIdx, newIdx);
+
+    // Update full list
+    const reorderedIds = new Set(reordered.map((l) => l.id));
+    const newLevels = levels.map((l) => {
+      if (!reorderedIds.has(l.id)) return l;
+      const idx = reordered.findIndex((r) => r.id === l.id);
+      return { ...l, sort_order: idx };
+    });
+    setLevels(newLevels);
+
     await fetch("/api/admin/studio-levels", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -153,6 +186,7 @@ function LevelsTab({
         id: form.id,
         name: form.name,
         description: form.description,
+        parent_id: form.parent_id || null,
         age_min: form.age_min ?? null,
         age_max: form.age_max ?? null,
         color_hex: form.color_hex,
@@ -168,7 +202,7 @@ function LevelsTab({
   }
 
   async function remove(id: string) {
-    if (!confirm("Delete this level?")) return;
+    if (!confirm("Delete this level? Sub-levels will become top-level.")) return;
     await fetch("/api/admin/studio-levels", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -178,21 +212,52 @@ function LevelsTab({
     refresh();
   }
 
+  const allDragIds = levels.map((l) => l.id);
+
   return (
     <div className="space-y-4">
       <div className="rounded-xl border border-silver bg-white divide-y divide-silver">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={levels.map((l) => l.id)} strategy={verticalListSortingStrategy}>
-            {levels.map((l) => (
-              <SortableLevelRow
-                key={l.id}
-                level={l}
-                onEdit={() =>
-                  setForm({ open: true, ...l })
-                }
-                onRemove={() => remove(l.id)}
-              />
-            ))}
+          <SortableContext items={allDragIds} strategy={verticalListSortingStrategy}>
+            {parents.map((p) => {
+              const kids = childrenOf(p.id);
+              const isExpanded = expanded.has(p.id);
+              return (
+                <div key={p.id}>
+                  <LevelRow
+                    level={p}
+                    indent={false}
+                    hasChildren={kids.length > 0}
+                    isExpanded={isExpanded}
+                    onToggle={() => toggleExpand(p.id)}
+                    onEdit={() => setForm({ open: true, ...p })}
+                    onRemove={() => remove(p.id)}
+                    onAddChild={() =>
+                      setForm({
+                        open: true,
+                        name: "",
+                        parent_id: p.id,
+                        sort_order: kids.length,
+                      })
+                    }
+                  />
+                  {isExpanded &&
+                    kids.map((c) => (
+                      <LevelRow
+                        key={c.id}
+                        level={c}
+                        indent
+                        hasChildren={false}
+                        isExpanded={false}
+                        onToggle={() => {}}
+                        onEdit={() => setForm({ open: true, ...c })}
+                        onRemove={() => remove(c.id)}
+                        onAddChild={() => {}}
+                      />
+                    ))}
+                </div>
+              );
+            })}
           </SortableContext>
         </DndContext>
         {levels.length === 0 && (
@@ -203,7 +268,7 @@ function LevelsTab({
       {!form.open && (
         <button
           type="button"
-          onClick={() => setForm({ open: true, name: "", sort_order: levels.length })}
+          onClick={() => setForm({ open: true, name: "", parent_id: null, sort_order: parents.length })}
           className="h-10 rounded-lg bg-lavender px-5 text-sm font-semibold text-white hover:bg-lavender-dark"
         >
           + Add Level
@@ -213,8 +278,13 @@ function LevelsTab({
       {form.open && (
         <div className="space-y-3 rounded-xl border border-silver bg-white p-4">
           <h3 className="text-sm font-semibold text-charcoal">
-            {form.id ? "Edit Level" : "New Level"}
+            {form.id ? "Edit Level" : form.parent_id ? "New Sub-level" : "New Level"}
           </h3>
+          {form.parent_id && (
+            <p className="text-xs text-mist">
+              Under: {levels.find((l) => l.id === form.parent_id)?.name ?? "Parent"}
+            </p>
+          )}
           <input
             type="text"
             placeholder="Level name"
@@ -274,14 +344,24 @@ function LevelsTab({
   );
 }
 
-function SortableLevelRow({
+function LevelRow({
   level,
+  indent,
+  hasChildren,
+  isExpanded,
+  onToggle,
   onEdit,
   onRemove,
+  onAddChild,
 }: {
   level: Level;
+  indent: boolean;
+  hasChildren: boolean;
+  isExpanded: boolean;
+  onToggle: () => void;
   onEdit: () => void;
   onRemove: () => void;
+  onAddChild: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: level.id });
@@ -293,29 +373,47 @@ function SortableLevelRow({
   };
 
   return (
-    <div ref={setNodeRef} style={style} className="flex items-center gap-3 px-4 py-3 bg-white">
-      <button {...attributes} {...listeners} className="cursor-grab text-mist hover:text-charcoal">
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center gap-3 px-4 py-3 bg-white ${indent ? "pl-10" : ""}`}
+    >
+      <button {...attributes} {...listeners} className="cursor-grab text-mist hover:text-charcoal shrink-0">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
           <circle cx="5" cy="4" r="1.5" /><circle cx="11" cy="4" r="1.5" />
           <circle cx="5" cy="8" r="1.5" /><circle cx="11" cy="8" r="1.5" />
           <circle cx="5" cy="12" r="1.5" /><circle cx="11" cy="12" r="1.5" />
         </svg>
       </button>
+      {!indent && (
+        <button
+          type="button"
+          onClick={onToggle}
+          className="w-4 text-center text-xs text-mist hover:text-charcoal shrink-0"
+        >
+          {hasChildren ? (isExpanded ? "▼" : "▶") : "·"}
+        </button>
+      )}
+      {indent && <span className="text-xs text-mist shrink-0">→</span>}
       {level.color_hex && (
-        <span
-          className="h-4 w-4 rounded-full shrink-0"
-          style={{ backgroundColor: level.color_hex }}
-        />
+        <span className="h-4 w-4 rounded-full shrink-0" style={{ backgroundColor: level.color_hex }} />
       )}
       <span className="flex-1 text-sm font-medium text-charcoal">{level.name}</span>
-      {level.age_min != null || level.age_max != null ? (
+      {(level.age_min != null || level.age_max != null) && (
         <span className="text-xs text-mist">
           {level.age_min ?? "?"}-{level.age_max ?? "?"} yrs
         </span>
-      ) : null}
-      <button onClick={onEdit} className="text-xs text-lavender hover:text-lavender-dark">
-        Edit
-      </button>
+      )}
+      {!indent && (
+        <button
+          type="button"
+          onClick={onAddChild}
+          className="text-[11px] text-lavender hover:text-lavender-dark"
+        >
+          + Sub
+        </button>
+      )}
+      <button onClick={onEdit} className="text-xs text-lavender hover:text-lavender-dark">Edit</button>
       <button onClick={onRemove} className="text-mist hover:text-error text-sm">&times;</button>
     </div>
   );

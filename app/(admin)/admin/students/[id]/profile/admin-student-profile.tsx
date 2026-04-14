@@ -1,7 +1,16 @@
 "use client";
 
 import { useState, useTransition, useEffect } from "react";
-import { SimpleSelect } from "@/components/ui/select";
+import {
+  SimpleSelect,
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   updateStudentBasics,
   updateStudentLevel,
@@ -237,14 +246,21 @@ export function AdminStudentProfile({
     allergy_notes: student.allergy_notes ?? "",
   });
   const [selectedLevel, setSelectedLevel] = useState(student.current_level ?? "");
-  const [levelOptions, setLevelOptions] = useState<string[]>(FALLBACK_LEVELS);
+  interface LevelOption {
+    id: string;
+    name: string;
+    parent_id: string | null;
+  }
+  const [levelOptions, setLevelOptions] = useState<LevelOption[]>(
+    FALLBACK_LEVELS.map((n) => ({ id: n, name: n, parent_id: null }))
+  );
 
   useEffect(() => {
     fetch("/api/admin/studio-levels")
       .then((r) => r.json())
       .then((d) => {
-        const names = (d.levels ?? []).map((l: { name: string }) => l.name);
-        if (names.length > 0) setLevelOptions(names);
+        const rows = d.levels ?? [];
+        if (rows.length > 0) setLevelOptions(rows);
       })
       .catch(() => {});
   }, []);
@@ -637,13 +653,39 @@ export function AdminStudentProfile({
           </span>
         )}
         <div className="flex items-center gap-3">
-          <SimpleSelect
-            className="w-full"
-            value={selectedLevel}
-            onValueChange={setSelectedLevel}
-            options={levelOptions.map((l) => ({ value: l, label: l }))}
-            placeholder="Select level..."
-          />
+          <Select value={selectedLevel} onValueChange={setSelectedLevel}>
+            <SelectTrigger className="h-10 w-full">
+              <SelectValue placeholder="Select level..." />
+            </SelectTrigger>
+            <SelectContent>
+              {(() => {
+                const parents = levelOptions.filter((l) => !l.parent_id);
+                const childMap = new Map<string, LevelOption[]>();
+                for (const l of levelOptions) {
+                  if (l.parent_id) {
+                    if (!childMap.has(l.parent_id)) childMap.set(l.parent_id, []);
+                    childMap.get(l.parent_id)!.push(l);
+                  }
+                }
+                return parents.map((p) => {
+                  const kids = childMap.get(p.id) ?? [];
+                  if (kids.length === 0) {
+                    return <SelectItem key={p.name} value={p.name}>{p.name}</SelectItem>;
+                  }
+                  return (
+                    <SelectGroup key={p.name}>
+                      <SelectItem value={p.name}>{p.name}</SelectItem>
+                      {kids.map((k) => (
+                        <SelectItem key={k.name} value={k.name}>
+                          <span className="pl-3 text-xs text-slate">→ {k.name}</span>
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  );
+                });
+              })()}
+            </SelectContent>
+          </Select>
           <button onClick={saveLevel} disabled={isPending || !selectedLevel} className={btnPrimary + " shrink-0"}>
             Update Level
           </button>

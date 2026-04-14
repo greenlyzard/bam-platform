@@ -18,7 +18,7 @@ export default async function LevelsPage() {
   // Fetch levels from the new studio_levels table
   const { data: levelsData } = await supabase
     .from("studio_levels")
-    .select("id, name, description, age_min, age_max, sort_order, is_active, color_hex")
+    .select("id, name, description, parent_id, age_min, age_max, sort_order, is_active, color_hex")
     .eq("tenant_id", tenantId)
     .order("sort_order");
 

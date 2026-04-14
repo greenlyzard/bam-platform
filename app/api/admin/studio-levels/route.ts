@@ -15,11 +15,32 @@ export async function GET() {
 
   const { data } = await supabase
     .from("studio_levels")
-    .select("id, name, description, age_min, age_max, sort_order, is_active, color_hex")
+    .select("id, name, description, parent_id, age_min, age_max, sort_order, is_active, color_hex")
     .eq("tenant_id", tenantId!)
     .order("sort_order");
 
-  return NextResponse.json({ levels: data ?? [] });
+  // Sort hierarchically: parents by sort_order, children grouped under parent
+  const all = data ?? [];
+  const parents = all.filter((l) => !l.parent_id).sort((a, b) => a.sort_order - b.sort_order);
+  const childMap = new Map<string, typeof all>();
+  for (const l of all) {
+    if (l.parent_id) {
+      if (!childMap.has(l.parent_id)) childMap.set(l.parent_id, []);
+      childMap.get(l.parent_id)!.push(l);
+    }
+  }
+  for (const children of childMap.values()) {
+    children.sort((a, b) => a.sort_order - b.sort_order);
+  }
+
+  const sorted: typeof all = [];
+  for (const p of parents) {
+    sorted.push(p);
+    const kids = childMap.get(p.id);
+    if (kids) sorted.push(...kids);
+  }
+
+  return NextResponse.json({ levels: sorted });
 }
 
 export async function POST(req: NextRequest) {
@@ -40,6 +61,7 @@ export async function POST(req: NextRequest) {
         tenant_id: tenantId,
         name: body.name,
         description: body.description || null,
+        parent_id: body.parent_id || null,
         age_min: body.age_min ?? null,
         age_max: body.age_max ?? null,
         color_hex: body.color_hex || null,
