@@ -5022,6 +5022,39 @@ export type Database = {
         }
         Relationships: []
       }
+      program_eligible_levels: {
+        Row: {
+          id: string
+          level_id: string
+          program_id: string
+        }
+        Insert: {
+          id?: string
+          level_id: string
+          program_id: string
+        }
+        Update: {
+          id?: string
+          level_id?: string
+          program_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "program_eligible_levels_level_id_fkey"
+            columns: ["level_id"]
+            isOneToOne: false
+            referencedRelation: "studio_levels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "program_eligible_levels_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "studio_programs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rehearsal_attendance: {
         Row: {
           created_at: string
@@ -7082,6 +7115,74 @@ export type Database = {
           },
         ]
       }
+      student_programs: {
+        Row: {
+          created_at: string | null
+          id: string
+          joined_at: string | null
+          left_at: string | null
+          notes: string | null
+          program_id: string
+          season_id: string | null
+          status: string
+          student_id: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          joined_at?: string | null
+          left_at?: string | null
+          notes?: string | null
+          program_id: string
+          season_id?: string | null
+          status?: string
+          student_id: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          joined_at?: string | null
+          left_at?: string | null
+          notes?: string | null
+          program_id?: string
+          season_id?: string | null
+          status?: string
+          student_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_programs_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "studio_programs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_programs_season_id_fkey"
+            columns: ["season_id"]
+            isOneToOne: false
+            referencedRelation: "seasons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_programs_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_programs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       student_skill_records: {
         Row: {
           awarded_at: string | null
@@ -7380,6 +7481,66 @@ export type Database = {
         }
         Relationships: []
       }
+      studio_levels: {
+        Row: {
+          age_max: number | null
+          age_min: number | null
+          color_hex: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          parent_id: string | null
+          sort_order: number
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          age_max?: number | null
+          age_min?: number | null
+          color_hex?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          parent_id?: string | null
+          sort_order?: number
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          age_max?: number | null
+          age_min?: number | null
+          color_hex?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          parent_id?: string | null
+          sort_order?: number
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "studio_levels_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "studio_levels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "studio_levels_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       studio_locations: {
         Row: {
           address: string | null
@@ -7426,6 +7587,56 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "studio_locations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      studio_programs: {
+        Row: {
+          color_hex: string | null
+          created_at: string | null
+          description: string | null
+          has_contract: boolean
+          id: string
+          is_active: boolean
+          name: string
+          requires_audition: boolean
+          sort_order: number
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          color_hex?: string | null
+          created_at?: string | null
+          description?: string | null
+          has_contract?: boolean
+          id?: string
+          is_active?: boolean
+          name: string
+          requires_audition?: boolean
+          sort_order?: number
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          color_hex?: string | null
+          created_at?: string | null
+          description?: string | null
+          has_contract?: boolean
+          id?: string
+          is_active?: boolean
+          name?: string
+          requires_audition?: boolean
+          sort_order?: number
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "studio_programs_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
