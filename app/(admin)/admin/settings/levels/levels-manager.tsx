@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   DndContext,
@@ -127,6 +127,13 @@ function LevelsTab({
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const [form, setForm] = useState<Partial<Level> & { open: boolean }>({ open: false });
   const [saving, setSaving] = useState(false);
+  const formRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (form.open) {
+      setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 50);
+    }
+  }, [form.open, form.id]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set(levels.filter((l) => !l.parent_id).map((l) => l.id)));
 
   const parents = levels.filter((l) => !l.parent_id);
@@ -227,6 +234,7 @@ function LevelsTab({
                   <LevelRow
                     level={p}
                     indent={false}
+                    isEditing={form.open && form.id === p.id}
                     hasChildren={kids.length > 0}
                     isExpanded={isExpanded}
                     onToggle={() => toggleExpand(p.id)}
@@ -247,6 +255,7 @@ function LevelsTab({
                         key={c.id}
                         level={c}
                         indent
+                        isEditing={form.open && form.id === c.id}
                         hasChildren={false}
                         isExpanded={false}
                         onToggle={() => {}}
@@ -276,7 +285,7 @@ function LevelsTab({
       )}
 
       {form.open && (
-        <div className="space-y-3 rounded-xl border border-silver bg-white p-4">
+        <div ref={formRef} className="space-y-3 rounded-xl border border-lavender bg-white p-4 shadow-md">
           <h3 className="text-sm font-semibold text-charcoal">
             {form.id ? "Edit Level" : form.parent_id ? "New Sub-level" : "New Level"}
           </h3>
@@ -347,6 +356,7 @@ function LevelsTab({
 function LevelRow({
   level,
   indent,
+  isEditing,
   hasChildren,
   isExpanded,
   onToggle,
@@ -356,6 +366,7 @@ function LevelRow({
 }: {
   level: Level;
   indent: boolean;
+  isEditing: boolean;
   hasChildren: boolean;
   isExpanded: boolean;
   onToggle: () => void;
@@ -376,7 +387,7 @@ function LevelRow({
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex items-center gap-3 px-4 py-3 bg-white ${indent ? "pl-10" : ""}`}
+      className={`flex items-center gap-3 px-4 py-3 ${indent ? "pl-10" : ""} ${isEditing ? "bg-lavender/5 ring-1 ring-inset ring-lavender" : "bg-white"}`}
     >
       <button {...attributes} {...listeners} className="cursor-grab text-mist hover:text-charcoal shrink-0">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
