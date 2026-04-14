@@ -48,6 +48,7 @@ export async function updateStudent(formData: FormData) {
     city: formData.get("city") || null,
     state: formData.get("state") || null,
     zip_code: formData.get("zip_code") || null,
+    current_level: formData.get("current_level") || null,
   };
 
   // Set media_consent_date on first consent

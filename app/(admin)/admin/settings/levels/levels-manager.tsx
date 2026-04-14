@@ -127,6 +127,7 @@ function LevelsTab({
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const [form, setForm] = useState<Partial<Level> & { open: boolean }>({ open: false });
   const [saving, setSaving] = useState(false);
+  const [levelsError, setLevelsError] = useState<string | null>(null);
   const formRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -184,28 +185,38 @@ function LevelsTab({
 
   async function save() {
     setSaving(true);
+    setLevelsError(null);
     const action = form.id ? "update" : "create";
-    const res = await fetch("/api/admin/studio-levels", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action,
-        id: form.id,
-        name: form.name,
-        description: form.description,
-        parent_id: form.parent_id || null,
-        age_min: form.age_min ?? null,
-        age_max: form.age_max ?? null,
-        color_hex: form.color_hex,
-        sort_order: form.sort_order ?? levels.length,
-      }),
-    });
-    setSaving(false);
-    if (res.ok) {
+    try {
+      const res = await fetch("/api/admin/studio-levels", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          id: form.id,
+          name: form.name,
+          description: form.description,
+          parent_id: form.parent_id || null,
+          age_min: form.age_min ?? null,
+          age_max: form.age_max ?? null,
+          color_hex: form.color_hex,
+          sort_order: form.sort_order ?? levels.length,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setLevelsError(json.error ?? "Failed to save");
+        setSaving(false);
+        return;
+      }
       setForm({ open: false });
+      setLevelsError(null);
       flash(action === "create" ? "Level added" : "Level updated");
       refresh();
+    } catch (e) {
+      setLevelsError(e instanceof Error ? e.message : "Network error");
     }
+    setSaving(false);
   }
 
   async function remove(id: string) {
@@ -330,6 +341,7 @@ function LevelsTab({
               className="h-12 w-full rounded-md border border-silver bg-white"
             />
           </div>
+          {levelsError && <p className="text-sm text-error">{levelsError}</p>}
           <div className="flex gap-2">
             <button
               type="button"
@@ -341,7 +353,7 @@ function LevelsTab({
             </button>
             <button
               type="button"
-              onClick={() => setForm({ open: false })}
+              onClick={() => { setForm({ open: false }); setLevelsError(null); }}
               className="h-10 rounded-lg border border-silver px-4 text-sm text-slate hover:bg-cloud"
             >
               Cancel
@@ -446,31 +458,42 @@ function ProgramsTab({
 }) {
   const [form, setForm] = useState<Partial<Program> & { open: boolean; eligible_level_ids?: string[] }>({ open: false });
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function save() {
     setSaving(true);
+    setError(null);
     const action = form.id ? "update" : "create";
-    const res = await fetch("/api/admin/studio-programs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action,
-        id: form.id,
-        name: form.name,
-        description: form.description,
-        color_hex: form.color_hex,
-        requires_audition: form.requires_audition ?? false,
-        has_contract: form.has_contract ?? false,
-        sort_order: form.sort_order ?? programs.length,
-        eligible_level_ids: form.eligible_level_ids ?? [],
-      }),
-    });
-    setSaving(false);
-    if (res.ok) {
+    try {
+      const res = await fetch("/api/admin/studio-programs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          id: form.id,
+          name: form.name,
+          description: form.description,
+          color_hex: form.color_hex,
+          requires_audition: form.requires_audition ?? false,
+          has_contract: form.has_contract ?? false,
+          sort_order: form.sort_order ?? programs.length,
+          eligible_level_ids: form.eligible_level_ids ?? [],
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? "Failed to save");
+        setSaving(false);
+        return;
+      }
       setForm({ open: false });
+      setError(null);
       flash(action === "create" ? "Program added" : "Program updated");
       refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Network error");
     }
+    setSaving(false);
   }
 
   async function remove(id: string) {
@@ -639,6 +662,7 @@ function ProgramsTab({
               </div>
             </div>
           )}
+          {error && <p className="text-sm text-error">{error}</p>}
           <div className="flex gap-2">
             <button
               type="button"
@@ -650,7 +674,7 @@ function ProgramsTab({
             </button>
             <button
               type="button"
-              onClick={() => setForm({ open: false })}
+              onClick={() => { setForm({ open: false }); setError(null); }}
               className="h-10 rounded-lg border border-silver px-4 text-sm text-slate hover:bg-cloud"
             >
               Cancel

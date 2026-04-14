@@ -5,7 +5,7 @@
 // /admin/students/[id]/profile.
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { updateStudent, addExtendedContact, removeExtendedContact } from "../actions";
 import {
@@ -16,6 +16,7 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -227,6 +228,17 @@ export function StudentDetail({
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Level dropdown
+  const [currentLevel, setCurrentLevel] = useState(student.current_level ?? "");
+  interface LevelOpt { id: string; name: string; parent_id: string | null }
+  const [levelOpts, setLevelOpts] = useState<LevelOpt[]>([]);
+  useEffect(() => {
+    fetch("/api/admin/studio-levels")
+      .then((r) => r.json())
+      .then((d) => { if (d.levels?.length) setLevelOpts(d.levels); })
+      .catch(() => {});
+  }, []);
+
   // Emergency contact state
   const [ecName, setEcName] = useState(student.emergency_contact?.name ?? "");
   const [ecPhone, setEcPhone] = useState(student.emergency_contact?.phone ?? "");
@@ -304,6 +316,7 @@ export function StudentDetail({
     fd.set("city", city);
     fd.set("state", stateVal);
     fd.set("zip_code", zipCode);
+    fd.set("current_level", currentLevel);
     fd.set(
       "emergency_contact",
       JSON.stringify({
@@ -556,6 +569,51 @@ export function StudentDetail({
               </div>
               <span className="text-charcoal">Active Student</span>
             </label>
+          </div>
+
+          <div className={CARD}>
+            <h2 className="text-lg font-heading font-semibold text-charcoal">Level</h2>
+            <div className="flex items-center gap-3">
+              <div className="flex-1">
+                <Select value={currentLevel || "__none__"} onValueChange={(v) => setCurrentLevel(v === "__none__" ? "" : v)}>
+                  <SelectTrigger className="h-12 w-full">
+                    <SelectValue placeholder="Select level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Select level</SelectItem>
+                    {(() => {
+                      const parents = levelOpts.filter((l) => !l.parent_id);
+                      const childMap = new Map<string, LevelOpt[]>();
+                      for (const l of levelOpts) {
+                        if (l.parent_id) {
+                          if (!childMap.has(l.parent_id)) childMap.set(l.parent_id, []);
+                          childMap.get(l.parent_id)!.push(l);
+                        }
+                      }
+                      return parents.map((p) => {
+                        const kids = childMap.get(p.id) ?? [];
+                        if (kids.length === 0) {
+                          return <SelectItem key={p.name} value={p.name}>{p.name}</SelectItem>;
+                        }
+                        return (
+                          <SelectGroup key={p.name}>
+                            <SelectItem value={p.name}>{p.name}</SelectItem>
+                            {kids.map((k) => (
+                              <SelectItem key={k.name} value={k.name}>
+                                <span className="pl-3 text-xs text-slate">→ {k.name}</span>
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        );
+                      });
+                    })()}
+                  </SelectContent>
+                </Select>
+              </div>
+              {currentLevel !== (student.current_level ?? "") && (
+                <span className="text-xs text-mist">unsaved</span>
+              )}
+            </div>
           </div>
 
           <div className={CARD}>
