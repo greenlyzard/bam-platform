@@ -129,6 +129,12 @@ const studioSettings: SettingsItem[] = [
     href: "/admin/settings/levels",
     icon: "≡",
   },
+  {
+    label: "Seasons",
+    description: "Manage studio seasons and registration windows",
+    href: "/admin/settings/seasons",
+    icon: "◷",
+  },
 ];
 
 const platformSettings: SettingsItem[] = [
