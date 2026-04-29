@@ -1,3 +1,26 @@
+> ⚠️ **DEPRECATED — PROPOSAL REJECTED**
+>
+> This document was a Claude Code build prompt (note the leftover 
+> "Create docs/UNIFIED_SCHEDULE.md..." boilerplate at the top of the 
+> body) proposing to merge /admin/classes into /admin/schedule with 
+> a 301 redirect.
+>
+> Decision 2026-04-29: NOT IMPLEMENTING. The premise was wrong. 
+> /admin/schedule and /admin/classes serve two distinct workflows:
+>
+> - **/admin/schedule** = operational live view of everything 
+>   happening at the studio (classes, rehearsals, privates, closures, 
+>   photo shoots, camps). Day-to-day use.
+> - **/admin/classes** = class management surface, planned to grow 
+>   into a proper Class Builder (bulk import, drag-drop drafts, 
+>   capacity planning, publish-to-schedule). Season-planning use, 
+>   different mental mode.
+>
+> See docs/_INDEX.md "Pending Reconciliation Tasks" for the new 
+> Class Builder spec placeholder.
+
+---
+
 Create docs/UNIFIED_SCHEDULE.md with this content:
 
 # Unified Schedule — BAM Platform Spec

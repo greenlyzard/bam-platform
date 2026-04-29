@@ -44,7 +44,7 @@
 | Schedule + classes | `docs/CLASSES.md` + `docs/DATABASE_SCHEMA.md` (current state) | `docs/SCHEDULING_AND_LMS.md` (design exploration) |
 | Seasons & archival | `docs/SEASONS_AND_ARCHIVAL.md` | — |
 
-**Deprecated:** `CALENDAR_AND_SCHEDULING.md`
+**Deprecated:** `CALENDAR_AND_SCHEDULING.md`, `UNIFIED_SCHEDULE.md` (proposal rejected — see header)
 
 ## Enrollment & Registration
 | Topic | Canonical | Status |
@@ -166,10 +166,11 @@
 ## Pending Reconciliation Tasks
 1. Enrollment master: pick REGISTRATION_AND_ONBOARDING vs ENROLLMENT_AND_PLACEMENT
 2. ✅ RESOLVED 2026-04-29 — Module count discrepancy. The two docs were not versions of the same list — they describe the platform from different angles. MODULES.md renamed to PORTAL_SURFACES.md (12 route surfaces); strategy PRD remains canonical for the M1–M13 capability taxonomy. New thin MODULES.md pointer file created to route readers to the right doc.
-3. UNIFIED_SCHEDULE: verify if merge was implemented in code
+3. ✅ RESOLVED 2026-04-29 — UNIFIED_SCHEDULE proposal rejected. /admin/schedule and /admin/classes intentionally remain separate surfaces serving distinct workflows. Class Builder enhancement tracked as item 10 below.
 4. Teacher rate management: rewrite to match `teacher_rate_cards`
 5. Teacher substitute system: rewrite to match plural table names + `substitute_requests`
 6. SUBSTITUTE_TEACHER (39KB): decide whether to build onboarding tables or rewrite doc
 7. Style/UX nuance pass: pull forward Derek's UI directives into _INDEX.md (deferred to dedicated session)
 8. CLASSES_ARCHITECTURE_CLEANUP rewrite: doc was drafted without context of canonical specs. Rewrite required to resolve discipline_ids type, status vocabulary, visibility column naming, current_tenant_id() helper definition, studio_locations table existence, classes-levels wiring, and tenant_id-on-classes project-wide decision. See chat audit 2026-04-29 for full conflict list.
 9. ✅ RESOLVED 2026-04-29 — Inter-canonical class conflict resolution. See docs/CLASS_SCHEMA_DECISIONS.md. SCHEDULING_AND_LMS.md demoted to vision doc; CLASSES.md + DATABASE_SCHEMA.md are operational canonical.
+10. Class Builder module — current /admin/classes is a basic CRUD surface. Spec needed for the real Class Builder workflow: bulk CSV import (see deferred docs/CLASS_CSV_IMPORT.md draft), drag-and-drop draft mode, multi-class conflict detection, capacity vs demand planning, atomic publish action that promotes drafts to active classes visible in /admin/schedule. Used during season planning, not day-to-day. Distinct from the operational /admin/schedule view.
