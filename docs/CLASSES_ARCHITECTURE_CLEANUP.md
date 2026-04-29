@@ -7,7 +7,11 @@
 >
 > **Issue:** Drafted before the canonical doc index existed. Reconciliation review (in chat, 2026-04-29) found 7 conflicts with canonical specs: discipline_ids type mismatch (text[] vs uuid[]), status vocabulary disagreement, visibility column naming inconsistency, undefined current_tenant_id() helper, studio_locations reference to nonexistent table, levels join contradicts CLASSES.md, and tenant_id-on-classes contradicts DATABASE_SCHEMA.md. Schema migration in §6 is partially correct but unsafe to execute without rewrite.
 >
-> **Canonical replacement:** Pending rewrite — see _INDEX.md "Pending Reconciliation" list item 8
+> **Canonical replacement:** Superseded by `docs/CLASS_SCHEMA_DECISIONS.md` 
+> (2026-04-29). The architectural conflicts that motivated this doc were 
+> resolved by D3 (classes.status CHECK constraint migration) and the 
+> decision to defer the full definitions/offerings table split. This 
+> doc is preserved as a historical artifact only.
 >
 > See `docs/_AUDIT_2026_04_29.md` for full audit findings.
 > See `docs/_INDEX.md` for the current canonical doc map.
