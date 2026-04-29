@@ -1,3 +1,19 @@
+---
+> ⚠️ **DEPRECATED — DO NOT IMPLEMENT FROM THIS SPEC**
+>
+> This document references tables, columns, or architectural decisions that 
+> conflict with the live database or current canonical specs. Last verified 
+> against live DB on 2026-04-29.
+>
+> **Issue:** References `admin_tasks`, `student_class_approvals`, `promo_codes` — none exist in DB.
+>
+> **Canonical replacement:** Pending reconciliation
+>
+> See `docs/_AUDIT_2026_04_29.md` for full audit findings.
+> See `docs/_INDEX.md` for the current canonical doc map.
+
+---
+
 Create docs/ENROLLMENT_POLICY.md with this content:
 
 # Enrollment Policy Engine — BAM Platform Spec

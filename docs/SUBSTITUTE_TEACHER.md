@@ -1,3 +1,19 @@
+---
+> ⚠️ **DEPRECATED — DO NOT IMPLEMENT FROM THIS SPEC**
+>
+> This document references tables, columns, or architectural decisions that 
+> conflict with the live database or current canonical specs. Last verified 
+> against live DB on 2026-04-29.
+>
+> **Issue:** Defines `onboarding_templates` / `onboarding_checklists` — neither exists in DB. Closest live table is `teacher_compliance`.
+>
+> **Canonical replacement:** Pending reconciliation
+>
+> See `docs/_AUDIT_2026_04_29.md` for full audit findings.
+> See `docs/_INDEX.md` for the current canonical doc map.
+
+---
+
 # SUBSTITUTE_TEACHER.md
 # Ballet Academy and Movement — Teacher Onboarding & Substitute System Spec
 # Module: Teacher Onboarding, Classification, and Substitute Management

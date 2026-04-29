@@ -32,6 +32,23 @@
 
 ---
 
+## 0.5. Canonical Doc Index — READ BEFORE ANY SPEC
+
+**Before reading or writing any spec in `docs/`, consult `docs/_INDEX.md`.**
+
+The index lists exactly one canonical doc per topic. If a doc has a 
+deprecation header at the top, do not implement from it — it has drift 
+or has been superseded.
+
+Subordinate docs are read only when explicitly referenced from a canonical 
+doc. Do not try to reconcile multiple specs on the same topic by reading 
+all of them — find the canonical via `docs/_INDEX.md` and stop there.
+
+If you find drift between any spec and the live database (`types/database.types.ts`), 
+add a deprecation header to the spec and flag it in the next session.
+
+---
+
 ## 1. Project Identity
 
 **Studio:** Ballet Academy and Movement  

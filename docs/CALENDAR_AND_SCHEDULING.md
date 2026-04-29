@@ -1,3 +1,19 @@
+---
+> ⚠️ **DEPRECATED — DO NOT IMPLEMENT FROM THIS SPEC**
+>
+> This document references tables, columns, or architectural decisions that 
+> conflict with the live database or current canonical specs. Last verified 
+> against live DB on 2026-04-29.
+>
+> **Issue:** Older v1.0 spec, superseded by SCHEDULING_AND_LMS.md v2.0. References `class_session` (DB has `schedule_instances`).
+>
+> **Canonical replacement:** docs/SCHEDULING_AND_LMS.md
+>
+> See `docs/_AUDIT_2026_04_29.md` for full audit findings.
+> See `docs/_INDEX.md` for the current canonical doc map.
+
+---
+
 # CALENDAR_AND_SCHEDULING.md
 # Ballet Academy and Movement — Platform Module Spec
 # Module: Calendar, Scheduling & Resource Management

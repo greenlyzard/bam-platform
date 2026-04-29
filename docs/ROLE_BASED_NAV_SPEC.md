@@ -1,3 +1,19 @@
+---
+> ⚠️ **DEPRECATED — DO NOT IMPLEMENT FROM THIS SPEC**
+>
+> This document references tables, columns, or architectural decisions that 
+> conflict with the live database or current canonical specs. Last verified 
+> against live DB on 2026-04-29.
+>
+> **Issue:** Says roles live in `profiles.role`. Live DB and root CLAUDE.md require `profile_roles` table.
+>
+> **Canonical replacement:** docs/RBAC_AND_PERMISSIONS.md
+>
+> See `docs/_AUDIT_2026_04_29.md` for full audit findings.
+> See `docs/_INDEX.md` for the current canonical doc map.
+
+---
+
 # ROLE_BASED_NAV_AND_ACCESS.md
 # Ballet Academy and Movement — Portal Access Control Spec
 # Status: Ready to build

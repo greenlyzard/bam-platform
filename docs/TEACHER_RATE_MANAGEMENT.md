@@ -1,3 +1,19 @@
+---
+> ⚠️ **DEPRECATED — DO NOT IMPLEMENT FROM THIS SPEC**
+>
+> This document references tables, columns, or architectural decisions that 
+> conflict with the live database or current canonical specs. Last verified 
+> against live DB on 2026-04-29.
+>
+> **Issue:** Defines `rate_definition` / `global_rate` / `teacher_rate` tables — none exist in DB. Live table is `teacher_rate_cards`.
+>
+> **Canonical replacement:** Pending reconciliation
+>
+> See `docs/_AUDIT_2026_04_29.md` for full audit findings.
+> See `docs/_INDEX.md` for the current canonical doc map.
+
+---
+
 # BAM Platform — Teacher Rate Management Module
 
 **Status:** Spec Updated — v2  

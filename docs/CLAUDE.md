@@ -1,3 +1,19 @@
+---
+> ⚠️ **DEPRECATED — DO NOT IMPLEMENT FROM THIS SPEC**
+>
+> This document references tables, columns, or architectural decisions that 
+> conflict with the live database or current canonical specs. Last verified 
+> against live DB on 2026-04-29.
+>
+> **Issue:** Stale module catalog (says 9 modules, root CLAUDE.md says 13). Lists 16 files in `/docs/claude/` that don't exist there.
+>
+> **Canonical replacement:** Root /CLAUDE.md
+>
+> See `docs/_AUDIT_2026_04_29.md` for full audit findings.
+> See `docs/_INDEX.md` for the current canonical doc map.
+
+---
+
 # BAM Platform — Claude Code Context
 ## Last Updated: March 2026 — 16 context files, 4,000+ lines
 
