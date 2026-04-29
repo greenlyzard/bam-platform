@@ -25,8 +25,8 @@
 ## Strategy & Modules
 | Topic | Canonical | Notes |
 |---|---|---|
-| Platform PRD | `docs/strategy/platform-product-requirements.md` | 🟡 Module count needs reconciliation to 13 |
-| Module map | `docs/MODULES.md` | 🟡 Currently says 12; update to 13 |
+| Module map (capabilities, M1–M13) | `docs/strategy/platform-product-requirements.md` | Canonical |
+| Portal/route surface map | `docs/PORTAL_SURFACES.md` | Canonical |
 | Sprint plan | `docs/ACTION_PLAN.md` | Living |
 | Current state | `docs/CURRENT_STATE.md` | Stale — refresh needed |
 | Studio Pro comparison | `docs/STUDIO_PRO_COMPARISON.md` | + `docs/operations/studio-pro-gap-analysis.md` |
@@ -165,7 +165,7 @@
 
 ## Pending Reconciliation Tasks
 1. Enrollment master: pick REGISTRATION_AND_ONBOARDING vs ENROLLMENT_AND_PLACEMENT
-2. Module count: confirm 13; update MODULES.md and strategy PRD
+2. ✅ RESOLVED 2026-04-29 — Module count discrepancy. The two docs were not versions of the same list — they describe the platform from different angles. MODULES.md renamed to PORTAL_SURFACES.md (12 route surfaces); strategy PRD remains canonical for the M1–M13 capability taxonomy. New thin MODULES.md pointer file created to route readers to the right doc.
 3. UNIFIED_SCHEDULE: verify if merge was implemented in code
 4. Teacher rate management: rewrite to match `teacher_rate_cards`
 5. Teacher substitute system: rewrite to match plural table names + `substitute_requests`

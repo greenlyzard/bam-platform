@@ -1,3 +1,15 @@
+> 🏛️ **Capability Module Architecture (M1–M13)**
+>
+> This document defines the platform by **capability domain** — the 
+> 13 capability modules (Communications, Scheduling, Teachers, etc.) 
+> that compose the BAM Platform. This is the canonical source for the 
+> M1–M13 taxonomy.
+>
+> For the route/UI surface map (Parent Portal, Teacher Portal, etc.), 
+> see `docs/PORTAL_SURFACES.md`.
+
+---
+
 # BAM Platform — Product Requirements Document
 
 > **Module:** Strategy  
