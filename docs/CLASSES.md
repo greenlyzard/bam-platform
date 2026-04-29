@@ -226,6 +226,17 @@ ALTER TABLE classes
   ADD COLUMN IF NOT EXISTS updated_at           timestamptz DEFAULT now();
 ```
 
+### classes.status — valid values
+
+The `status` column has four valid values (CHECK constraint added 2026-04-29):
+
+- `draft` — being planned, not yet enrollable
+- `active` — currently running and enrollable (default)
+- `cancelled` — was active, no longer running; preserved for history
+- `completed` — season ended naturally
+
+See docs/CLASS_SCHEMA_DECISIONS.md for the decision record.
+
 ### class_teachers
 
 ```sql

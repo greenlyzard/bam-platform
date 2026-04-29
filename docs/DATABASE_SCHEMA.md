@@ -214,7 +214,7 @@ Class templates (not specific scheduled occurrences — those are `schedule_inst
 | season | text | YES | null |
 | notes | text | YES | null |
 | enrolled_count | integer | NO | 0 |
-| status | text | NO | 'active' |
+| status | text | NO | 'active' · CHECK IN ('draft','active','cancelled','completed') |
 | short_description | text | YES | null |
 | medium_description | text | YES | null |
 | long_description | text | YES | null |

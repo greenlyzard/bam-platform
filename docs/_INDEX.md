@@ -39,9 +39,9 @@
 | Quick ref for Claude | `docs/claude/COMMUNICATIONS.md` | — |
 
 ## Scheduling
-| Topic | Canonical | Subordinate |
+| Topic | Canonical | Vision/Reference |
 |---|---|---|
-| Schedule + classes + LMS | `docs/SCHEDULING_AND_LMS.md` | UNIFIED_SCHEDULE (verify if implemented) |
+| Schedule + classes | `docs/CLASSES.md` + `docs/DATABASE_SCHEMA.md` (current state) | `docs/SCHEDULING_AND_LMS.md` (design exploration) |
 | Seasons & archival | `docs/SEASONS_AND_ARCHIVAL.md` | — |
 
 **Deprecated:** `CALENDAR_AND_SCHEDULING.md`
@@ -172,4 +172,4 @@
 6. SUBSTITUTE_TEACHER (39KB): decide whether to build onboarding tables or rewrite doc
 7. Style/UX nuance pass: pull forward Derek's UI directives into _INDEX.md (deferred to dedicated session)
 8. CLASSES_ARCHITECTURE_CLEANUP rewrite: doc was drafted without context of canonical specs. Rewrite required to resolve discipline_ids type, status vocabulary, visibility column naming, current_tenant_id() helper definition, studio_locations table existence, classes-levels wiring, and tenant_id-on-classes project-wide decision. See chat audit 2026-04-29 for full conflict list.
-9. Inter-canonical conflict resolution: SCHEDULING_AND_LMS.md, CLASSES.md, and DATABASE_SCHEMA.md disagree on classes.tenant_id existence, status enum values, and visibility column naming. Project-wide reconciliation needed before any classes-related schema migration.
+9. ✅ RESOLVED 2026-04-29 — Inter-canonical class conflict resolution. See docs/CLASS_SCHEMA_DECISIONS.md. SCHEDULING_AND_LMS.md demoted to vision doc; CLASSES.md + DATABASE_SCHEMA.md are operational canonical.

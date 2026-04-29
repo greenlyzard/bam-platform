@@ -1,3 +1,26 @@
+---
+> 📐 **VISION DOC — design exploration, not current implementation contract**
+>
+> This document proposes substantial schema and architecture changes 
+> (class_sessions table, four-layer naming, tenant_id on classes, etc.) 
+> that were never implemented. The live database and operational 
+> behaviors do NOT match all of this spec.
+>
+> **For current truth:** see `docs/CLASSES.md` and `docs/DATABASE_SCHEMA.md`.
+> **For decisions reconciling this doc with current state:** see 
+> `docs/CLASS_SCHEMA_DECISIONS.md` (2026-04-29).
+>
+> Sections that DO match current implementation: §5 Student Check-In, 
+> §6 Substitute Teacher Workflow, §7 Calendar Sync. These describe 
+> built behaviors accurately.
+>
+> Sections that are vision/aspiration: §2 Class Entity (four-layer 
+> naming, tenant_id), §3 Session Entity (class_sessions table — DB has 
+> schedule_instances), §16 AI Attendance Intelligence, §15 Front Desk, 
+> §14 Bundles & Promotions.
+
+---
+
 # SCHEDULING_AND_LMS.md
 # Ballet Academy and Movement — Scheduling & Learning Management System
 # Version: 2.0 | Status: Authoritative | Owner: Derek Shaw (Green Lyzard)
