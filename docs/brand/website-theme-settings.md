@@ -1,3 +1,21 @@
+> 🌐 **Public WordPress Website Only**
+>
+> This document describes the styling for the public marketing website 
+> at `balletacademyandmovement.com` — built on Flatsome (WordPress).
+>
+> This is **NOT** the spec for the portal application 
+> (`portal.balletacademyandmovement.com`). The portal uses different 
+> colors (lavender `#9C8BBF` not `#b4a7d6`), different fonts (Montserrat 
+> + Cormorant Garamond, not the Flatsome stack), and different patterns.
+>
+> **For portal styling:** see `docs/UI_STYLE_DIRECTIVES.md`.
+>
+> The website and the portal are intentionally separate visual systems. 
+> If a future decision unifies them, that's a new spec. Until then, treat 
+> them as distinct.
+
+---
+
 # BAM Website Theme Settings
 ## Flatsome 3.20.5 — balletacademyandmovement.com
 ### Master Reference for All Page Builds

@@ -7,6 +7,10 @@ The BAM platform should feel like the physical studio experience translated to s
 
 Every screen should pass this test: *Would Amanda Cobb be proud to show this to a Royal Ballet parent?*
 
+> **For visual tokens** (exact hex values, button radius, typography 
+> classes), see `docs/UI_STYLE_DIRECTIVES.md`. This document focuses 
+> on UX patterns and component behaviors.
+
 ---
 
 ## Layout Patterns

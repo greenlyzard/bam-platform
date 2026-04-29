@@ -19,6 +19,7 @@
 |---|---|
 | `/CLAUDE.md` | Canonical — session-start protocol |
 | `docs/DATABASE_SCHEMA.md` | Canonical — schema source of truth |
+| `docs/UI_STYLE_DIRECTIVES.md` | Canonical — portal styling (visual tokens) |
 | `docs/_INDEX.md` | This file |
 | `docs/_AUDIT_2026_04_29.md` | Reference — historical audit |
 
@@ -102,11 +103,14 @@
 **Deprecated:** `TENANT_PAYMENT_CONFIG.md` (white-label feature deferred)
 
 ## Brand
-| Topic | Canonical |
-|---|---|
-| Developer-facing tokens | `docs/BRAND.md` |
-| Long-form brand manual | `docs/brand/brand-guidelines.md` |
-| WordPress theme | `docs/brand/website-theme-settings.md` |
+| Topic | Canonical | Status |
+|---|---|---|
+| Brand identity, voice, photography | `docs/BRAND.md` | Canonical |
+| Portal styling (visual tokens) | `docs/UI_STYLE_DIRECTIVES.md` | Canonical |
+| UX patterns (component behaviors) | `docs/UX_PATTERNS.md` | Canonical |
+| Public website styling (Flatsome / WordPress) | `docs/brand/website-theme-settings.md` | Canonical (website only) |
+
+**Deprecated:** `brand/brand-guidelines.md` (split between BRAND.md and UI_STYLE_DIRECTIVES.md)
 
 ## Marketing
 | Topic | Canonical |
@@ -152,7 +156,6 @@
 - `docs/COMPETITION_SEASONS_PRIVATES.md`
 - `docs/PRIVATE_LESSONS.md`
 - `docs/DATA_MODEL.md`
-- `docs/UX_PATTERNS.md`
 - `docs/ANGELINA_SPEC_V2.md`
 - `docs/ANGELINA_AND_CLAUDE_API.md`
 - `docs/SAAS.md`
@@ -171,7 +174,7 @@
 4. ✅ RESOLVED 2026-04-29 — Teacher rate management. Doc rewritten to match live `teacher_rate_cards` schema. The earlier proposal of three split tables was replaced by a single consolidated rate-cards table in the live DB; doc now reflects that.
 5. ✅ RESOLVED 2026-04-29 — Teacher substitute system. Three docs rewritten: TEACHER_SUBSTITUTE_COVERAGE.md and TEACHER_ABSENCE_SUBSTITUTE_SUMMARY.md aligned to plural table names (absence_records, substitute_requests, substitute_alerts, substitute_authorizations, teacher_sub_eligibility) with workflow notes on the request-fill model. SUBSTITUTE_TEACHER.md (item #6) remains separately pending.
 6. SUBSTITUTE_TEACHER (39KB): decide whether to build onboarding tables or rewrite doc
-7. Style/UX nuance pass: pull forward Derek's UI directives into _INDEX.md (deferred to dedicated session)
+7. ✅ RESOLVED 2026-04-29 — Style/UX nuance pass. Canonical UI_STYLE_DIRECTIVES.md created for portal app. Five docs reduced to three canonicals (BRAND.md for identity, UI_STYLE_DIRECTIVES.md for portal styling, UX_PATTERNS.md for component behaviors). website-theme-settings.md scoped to public WordPress site only. brand/brand-guidelines.md deprecated.
 8. ✅ RESOLVED 2026-04-29 — CLASSES_ARCHITECTURE_CLEANUP rewrite no-longer-needed. Underlying conflicts resolved via D3 status constraint migration and CLASS_SCHEMA_DECISIONS.md. Doc stays deprecated as historical artifact.
 9. ✅ RESOLVED 2026-04-29 — Inter-canonical class conflict resolution. See docs/CLASS_SCHEMA_DECISIONS.md. SCHEDULING_AND_LMS.md demoted to vision doc; CLASSES.md + DATABASE_SCHEMA.md are operational canonical.
 10. Class Builder module — current /admin/classes is a basic CRUD surface. Spec needed for the real Class Builder workflow: bulk CSV import (see deferred docs/CLASS_CSV_IMPORT.md draft), drag-and-drop draft mode, multi-class conflict detection, capacity vs demand planning, atomic publish action that promotes drafts to active classes visible in /admin/schedule. Used during season planning, not day-to-day. Distinct from the operational /admin/schedule view.

@@ -47,6 +47,10 @@ all of them — find the canonical via `docs/_INDEX.md` and stop there.
 If you find drift between any spec and the live database (`types/database.types.ts`), 
 add a deprecation header to the spec and flag it in the next session.
 
+- Building anything visual for the portal? Read 
+  `docs/UI_STYLE_DIRECTIVES.md` first — it's the canonical source for 
+  colors, typography, button styles, and the dropdown rule.
+
 ---
 
 ## 1. Project Identity
@@ -318,9 +322,10 @@ Full strategy: `docs/marketing/local-seo-strategy.md`
 
 ## 14. UI Component Guidelines
 
-- Use `SimpleSelect` from `components/ui/select.tsx` for all simple dropdowns — it takes `value`, `onValueChange`, `options` (array of `{value, label}`), `placeholder` as flat props and is fully theme-aware via CSS variables. It renders the Radix UI compound pattern internally.
-- For complex select needs (grouped options, custom rendering), use the compound `Select`/`SelectTrigger`/`SelectContent`/`SelectItem` exports from the same file.
-- Native `<select>` elements are acceptable for server-rendered forms or where Radix overhead is unnecessary — use the standardized classes: `appearance-none bg-white border border-silver rounded-md px-3 py-1.5 text-sm text-charcoal focus:outline-none focus:border-lavender focus:ring-2 focus:ring-lavender/20 cursor-pointer`.
+For all visual styling in the portal — colors, typography, buttons, 
+inputs, dropdowns, cards, and the full design system — see 
+`docs/UI_STYLE_DIRECTIVES.md` (canonical). This section used to inline 
+those directives but they now live in their own doc.
 
 ---
 

@@ -1,3 +1,18 @@
+> ⚠️ **DEPRECATED — Content has been split between two canonical docs**
+>
+> This file used to be the catch-all brand-and-styling doc. As of 
+> 2026-04-29 its content lives in two places:
+>
+> - **Brand identity, voice, photography, what-not-to-do**: 
+>   `docs/BRAND.md` (canonical)
+> - **Portal technical styling (colors, typography, components)**: 
+>   `docs/UI_STYLE_DIRECTIVES.md` (canonical)
+>
+> This file is preserved as a historical reference only. Do not implement 
+> from it. Where it conflicts with the canonical docs above, they win.
+
+---
+
 # Brand Guidelines
 ## Ballet Academy and Movement
 

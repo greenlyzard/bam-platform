@@ -11,6 +11,12 @@
 **Email:** dance@bamsocal.com  
 **Website:** balletacademyandmovement.com  
 
+> **Companion docs:** Technical styling for the portal (color tokens, 
+> typography classes, component patterns) lives in 
+> `docs/UI_STYLE_DIRECTIVES.md`. UX patterns (cards, empty states, 
+> loading) live in `docs/UX_PATTERNS.md`. Public website styling 
+> (different system) lives in `docs/brand/website-theme-settings.md`.
+
 ---
 
 ## Positioning
