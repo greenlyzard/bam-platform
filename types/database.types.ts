@@ -5985,7 +5985,7 @@ export type Database = {
           id: string
           is_active: boolean | null
           is_ongoing: boolean
-          is_public: boolean | null
+          is_public: boolean
           name: string
           period: string | null
           program: string | null
@@ -6002,7 +6002,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           is_ongoing?: boolean
-          is_public?: boolean | null
+          is_public?: boolean
           name: string
           period?: string | null
           program?: string | null
@@ -6019,7 +6019,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           is_ongoing?: boolean
-          is_public?: boolean | null
+          is_public?: boolean
           name?: string
           period?: string | null
           program?: string | null

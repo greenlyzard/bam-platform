@@ -39,10 +39,16 @@ export async function PATCH(
   // General update
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
   for (const key of [
-    "name", "start_date", "end_date", "period", "year",
+    "name", "start_date", "end_date",
     "is_public", "is_ongoing", "registration_open", "display_priority",
   ]) {
     if (key in body) updates[key] = body[key];
+  }
+  if ("period" in body) {
+    updates.period = body.period ? String(body.period).toLowerCase().trim() || null : null;
+  }
+  if ("year" in body) {
+    updates.year = body.year && String(body.year).trim() !== '' ? Number(body.year) : null;
   }
 
   const { data, error } = await supabase
