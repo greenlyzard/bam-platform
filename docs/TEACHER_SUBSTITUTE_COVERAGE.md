@@ -1,19 +1,3 @@
----
-> ⚠️ **DEPRECATED — DO NOT IMPLEMENT FROM THIS SPEC**
->
-> This document references tables, columns, or architectural decisions that 
-> conflict with the live database or current canonical specs. Last verified 
-> against live DB on 2026-04-29.
->
-> **Issue:** Singular `absence_record` / `substitute_assignment`. DB has plural `absence_records` and `substitute_requests`.
->
-> **Canonical replacement:** Pending reconciliation
->
-> See `docs/_AUDIT_2026_04_29.md` for full audit findings.
-> See `docs/_INDEX.md` for the current canonical doc map.
-
----
-
 # BAM Platform — Substitute & Coverage Alerts Module
 
 **Status:** Spec Updated — v2  
@@ -123,35 +107,104 @@ When the class period arrives with no confirmed substitute:
 
 ## Data Model
 
-### `absence_record`
-| Field | Type | Notes |
-|---|---|---|
-| `id` | UUID | |
-| `tenant_id` | FK | |
-| `session_id` | FK → class_session | |
-| `teacher_id` | FK → teacher_profile | |
-| `reason_category` | enum | illness / personal / emergency / professional_development / other |
-| `notes` | text | Admin-visible only |
-| `reported_at` | datetime | |
-| `reported_by` | FK → user | Teacher or Admin |
+The live database splits the absence and substitute workflow into five 
+related tables. Each plays a distinct role in the coverage workflow.
 
-### `substitute_assignment`
+### `absence_records` — student or teacher absence events
 | Field | Type | Notes |
 |---|---|---|
 | `id` | UUID | |
-| `tenant_id` | FK | |
-| `absence_record_id` | FK → absence_record | |
-| `session_id` | FK → class_session | |
-| `substitute_teacher_id` | FK → teacher_profile | Includes Amanda's user ID if she covers |
-| `assigned_at` | datetime | |
-| `assigned_by` | FK → user | Admin or Super Admin |
-| `status` | enum | pending / confirmed / declined / cancelled |
-| `confirmed_at` | datetime | |
-| `response_deadline` | datetime | Default: 2 hours from assignment |
-| `sub_rate_amount` | decimal | Rate for this specific session |
-| `sub_rate_override_by` | FK → user | Finance Admin if overridden |
-| `notes` | text | Coverage context; visible to Admin and Super Admin only |
-| `decline_reason` | text | Optional if declined |
+| `tenant_id` | FK → tenants | |
+| `schedule_instance_id` | FK → schedule_instances | The session affected |
+| `class_id` | FK → classes (optional) | The class context |
+| `student_id` | FK → students | The student (this table primarily tracks student absences) |
+| `absence_date` | date | When |
+| `report_channel` | text | How the absence was reported (e.g., parent_app, admin, sms) |
+| `status` | text | Lifecycle status |
+| `parent_note` | text | Optional reason from parent |
+| `reported_by` | FK → profiles | Who logged it |
+| `notified_admin_at` | timestamptz | When admin was notified |
+| `notified_teacher_at` | timestamptz | When teacher was notified |
+| `override_by` | FK → profiles | If admin overrode the record |
+| `override_note` | text | Why |
+| `created_at` | timestamptz | |
+
+> **Note:** Teacher absences are tracked through the `substitute_requests` 
+> table (the teacher's session needs coverage); `absence_records` here 
+> primarily covers student absences. If teacher-absence reporting needs 
+> a parallel structure with reason categories per the workflow above, 
+> that's tracked as a future enhancement.
+
+### `substitute_requests` — coverage needed for a session
+| Field | Type | Notes |
+|---|---|---|
+| `id` | UUID | |
+| `tenant_id` | FK → tenants | |
+| `instance_id` | FK → schedule_instances | The session needing coverage |
+| `requesting_teacher_id` | FK → profiles | The absent teacher |
+| `reason` | text | Free-form reason or category |
+| `status` | text | open / filled / cancelled |
+| `filled_by` | FK → profiles | Substitute who confirmed |
+| `filled_at` | timestamptz | When confirmed |
+| `created_at` | timestamptz | |
+| `updated_at` | timestamptz | |
+
+### `substitute_alerts` — outreach attempts to potential substitutes
+| Field | Type | Notes |
+|---|---|---|
+| `id` | UUID | |
+| `tenant_id` | FK → tenants | |
+| `request_id` | FK → substitute_requests | |
+| `teacher_id` | FK → profiles | The substitute who was alerted |
+| `alert_channel` | text[] | Which channels (push, email, sms) |
+| `alert_sent_at` | timestamptz | When alert went out |
+| `response` | text | confirmed / declined / no_response |
+| `responded_at` | timestamptz | When they responded |
+| `created_at` | timestamptz | |
+
+> Multiple `substitute_alerts` rows can exist per `substitute_request` — 
+> the system can outreach to several potential subs in priority order.
+
+### `substitute_authorizations` — which teachers can sub for what
+| Field | Type | Notes |
+|---|---|---|
+| `id` | UUID | |
+| `tenant_id` | FK → tenants | |
+| `teacher_id` | FK → profiles | |
+| `authorized_for_levels` | text[] | Levels this teacher can substitute for |
+| `authorized_for_types` | text[] | Class types they can sub (regular, private, etc.) |
+| `priority_order` | integer | Sort order when offering subs |
+| `is_active` | boolean | |
+| `notes` | text | |
+| `created_at` | timestamptz | |
+
+### `teacher_sub_eligibility` — per-teacher overall sub flag
+| Field | Type | Notes |
+|---|---|---|
+| `id` | UUID | |
+| `tenant_id` | FK → tenants | |
+| `teacher_id` | FK → profiles | |
+| `is_sub_eligible` | boolean | Master flag for whether this teacher can sub |
+| `eligible_disciplines` | text[] | |
+| `eligible_levels` | text[] | |
+| `notes` | text | |
+| `updated_by` | FK → profiles | |
+| `created_at` | timestamptz | |
+| `updated_at` | timestamptz | |
+
+### Workflow summary
+1. Teacher absent → `substitute_requests` row created (status=open)
+2. System fans out via `substitute_alerts` to teachers in priority order
+3. First confirm wins → `substitute_requests.filled_by` and `filled_at` set
+4. Other alerts marked declined or no_response
+5. If no fills before class → admin escalation, possible cancellation
+
+### Workflow gap to fix
+The original spec used the name `substitute_assignment` for the per-fill 
+record. The live schema uses `substitute_requests` with `filled_by`/`filled_at` 
+columns rather than a separate assignment record. References to 
+`substitute_assignment` in this doc and any code should be updated to 
+`substitute_requests`.
 
 ---
 

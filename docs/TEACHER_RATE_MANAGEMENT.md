@@ -1,19 +1,3 @@
----
-> ⚠️ **DEPRECATED — DO NOT IMPLEMENT FROM THIS SPEC**
->
-> This document references tables, columns, or architectural decisions that 
-> conflict with the live database or current canonical specs. Last verified 
-> against live DB on 2026-04-29.
->
-> **Issue:** Defines `rate_definition` / `global_rate` / `teacher_rate` tables — none exist in DB. Live table is `teacher_rate_cards`.
->
-> **Canonical replacement:** Pending reconciliation
->
-> See `docs/_AUDIT_2026_04_29.md` for full audit findings.
-> See `docs/_INDEX.md` for the current canonical doc map.
-
----
-
 # BAM Platform — Teacher Rate Management Module
 
 **Status:** Spec Updated — v2  
@@ -102,38 +86,58 @@ Global Default Rates (system-wide starting point)
 
 ## Data Model
 
-### `rate_definition`
-| Field | Type | Notes |
-|---|---|---|
-| `id` | UUID | |
-| `tenant_id` | FK | |
-| `rate_key` | string | System identifier |
-| `label` | string | Human-readable |
-| `description` | text | Optional |
-| `edit_requires_role` | enum | finance_admin / finance_lead / super_admin | Some rate keys restricted |
-| `is_active` | boolean | Inactive rates hidden from dropdowns |
+The live database has a single `teacher_rate_cards` table that consolidates 
+what an earlier draft of this spec split across three tables. Per-teacher, 
+per-session-type rate cards with built-in cancellation policy.
 
-### `global_rate`
+### `teacher_rate_cards`
 | Field | Type | Notes |
 |---|---|---|
 | `id` | UUID | |
-| `tenant_id` | FK | |
-| `rate_key` | FK → rate_definition | |
-| `rate_amount` | decimal | Per hour |
-| `effective_date` | date | |
-| `set_by` | FK → user | |
+| `tenant_id` | FK → tenants | |
+| `teacher_id` | FK → profiles | |
+| `session_type` | text | Maps to rate categories below |
+| `market_rate_60` | numeric | Market (premium) rate for 60-minute session |
+| `market_rate_45` | numeric | Market rate for 45-minute session |
+| `market_rate_30` | numeric | Market rate for 30-minute session |
+| `standard_rate_60` | numeric | Standard (discounted/internal) rate for 60-minute session |
+| `standard_rate_45` | numeric | Standard rate for 45-minute session |
+| `standard_rate_30` | numeric | Standard rate for 30-minute session |
+| `point_cost` | integer | Cost in unlimited-plan points (default 2) |
+| `cancellation_notice_hours` | integer | Hours of notice required for free cancel (default 24) |
+| `late_cancel_charge_pct` | numeric | % charged for late cancel (default 100.00) |
+| `no_show_charge_pct` | numeric | % charged for no-show (default 100.00) |
+| `cancellation_policy_note` | text | Free-form override note |
+| `is_active` | boolean | Inactive rate cards hidden but preserved |
+| `created_at` | timestamptz | |
+| `updated_at` | timestamptz | |
 
-### `teacher_rate`
-| Field | Type | Notes |
-|---|---|---|
-| `id` | UUID | |
-| `tenant_id` | FK | |
-| `teacher_id` | FK → teacher_profile | |
-| `rate_key` | FK → rate_definition | |
-| `rate_amount` | decimal | Per hour |
-| `effective_date` | date | |
-| `set_by` | FK → user | Finance Admin, Finance Lead, or Super Admin |
-| `notes` | text | Optional context for rate change |
+### Session type values
+The `session_type` column drives which rate category applies. Categories 
+correspond to the rate keys defined earlier in this doc:
+
+- `regular_class_lead`, `regular_class_assistant`
+- `discounted_class_lead`, `discounted_class_assistant`
+- `private`, `discounted_private`
+- `admin`, `bonus`
+- `performance`, `competition`
+
+### Discounted vs. standard rates
+The `market_rate_*` columns hold the premium rate; `standard_rate_*` hold 
+the discounted/internal rate. When a class or session is flagged 
+discounted (e.g., `is_discounted` on the timesheet entry), the system 
+reads `standard_rate_*` instead of `market_rate_*`.
+
+### Rate change history
+This table does not store effective dates per row. Rate changes are 
+captured in `payroll_change_log` (which logs every modification with 
+who/when/old-value/new-value). Historical timesheet entries are never 
+retroactively repriced — they store the rate amount that was applied 
+at submission time on the entry itself.
+
+### 1099 / substitute rate handling
+1099 substitutes do not need a `teacher_rate_cards` row. Their rate is 
+entered directly on the timesheet entry by Finance Admin or Super Admin.
 
 ---
 

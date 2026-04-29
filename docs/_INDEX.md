@@ -78,10 +78,11 @@
 | Time & attendance | `docs/TEACHER_TIME_ATTENDANCE.md` | Canonical |
 | Onboarding (HR) | `docs/operations/teacher-onboarding.md` | Canonical |
 | Recruitment | `docs/operations/teacher-recruitment.md` | Canonical |
-| Rate management | 🟡 Pending — schema drift to fix | |
-| Substitute coverage | 🟡 Pending — schema drift to fix | |
+| Rate management | `docs/TEACHER_RATE_MANAGEMENT.md` | Canonical |
+| Substitute coverage | `docs/TEACHER_SUBSTITUTE_COVERAGE.md` | Canonical |
+| Substitute reporting | `docs/TEACHER_ABSENCE_SUBSTITUTE_SUMMARY.md` | Canonical |
 
-**Deprecated:** TEACHER_RATE_MANAGEMENT, TEACHER_SUBSTITUTE_COVERAGE, TEACHER_ABSENCE_SUBSTITUTE_SUMMARY, SUBSTITUTE_TEACHER
+**Deprecated:** SUBSTITUTE_TEACHER
 
 ## RBAC & Permissions
 | Topic | Canonical |
@@ -167,8 +168,8 @@
 1. Enrollment master: pick REGISTRATION_AND_ONBOARDING vs ENROLLMENT_AND_PLACEMENT
 2. ✅ RESOLVED 2026-04-29 — Module count discrepancy. The two docs were not versions of the same list — they describe the platform from different angles. MODULES.md renamed to PORTAL_SURFACES.md (12 route surfaces); strategy PRD remains canonical for the M1–M13 capability taxonomy. New thin MODULES.md pointer file created to route readers to the right doc.
 3. ✅ RESOLVED 2026-04-29 — UNIFIED_SCHEDULE proposal rejected. /admin/schedule and /admin/classes intentionally remain separate surfaces serving distinct workflows. Class Builder enhancement tracked as item 10 below.
-4. Teacher rate management: rewrite to match `teacher_rate_cards`
-5. Teacher substitute system: rewrite to match plural table names + `substitute_requests`
+4. ✅ RESOLVED 2026-04-29 — Teacher rate management. Doc rewritten to match live `teacher_rate_cards` schema. The earlier proposal of three split tables was replaced by a single consolidated rate-cards table in the live DB; doc now reflects that.
+5. ✅ RESOLVED 2026-04-29 — Teacher substitute system. Three docs rewritten: TEACHER_SUBSTITUTE_COVERAGE.md and TEACHER_ABSENCE_SUBSTITUTE_SUMMARY.md aligned to plural table names (absence_records, substitute_requests, substitute_alerts, substitute_authorizations, teacher_sub_eligibility) with workflow notes on the request-fill model. SUBSTITUTE_TEACHER.md (item #6) remains separately pending.
 6. SUBSTITUTE_TEACHER (39KB): decide whether to build onboarding tables or rewrite doc
 7. Style/UX nuance pass: pull forward Derek's UI directives into _INDEX.md (deferred to dedicated session)
 8. CLASSES_ARCHITECTURE_CLEANUP rewrite: doc was drafted without context of canonical specs. Rewrite required to resolve discipline_ids type, status vocabulary, visibility column naming, current_tenant_id() helper definition, studio_locations table existence, classes-levels wiring, and tenant_id-on-classes project-wide decision. See chat audit 2026-04-29 for full conflict list.

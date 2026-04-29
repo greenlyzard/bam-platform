@@ -1,19 +1,3 @@
----
-> ⚠️ **DEPRECATED — DO NOT IMPLEMENT FROM THIS SPEC**
->
-> This document references tables, columns, or architectural decisions that 
-> conflict with the live database or current canonical specs. Last verified 
-> against live DB on 2026-04-29.
->
-> **Issue:** Same singular/plural drift as TEACHER_SUBSTITUTE_COVERAGE.
->
-> **Canonical replacement:** Pending reconciliation
->
-> See `docs/_AUDIT_2026_04_29.md` for full audit findings.
-> See `docs/_INDEX.md` for the current canonical doc map.
-
----
-
 # BAM Platform — Teacher Absence & Substitute Summary Module
 
 **Status:** Spec Updated — v2  
@@ -24,7 +8,7 @@
 
 ## Overview
 
-Provides structured reporting on teacher absences and substitution activity across the studio. Data surfaces in two places: the Studio Admin/Super Admin dashboard (studio-wide view) and each teacher's own portal (personal view). No new data collection required — all reports are computed from existing `absence_records`, `substitute_assignments`, `class_sessions`, and `timesheet_entries` tables.
+Provides structured reporting on teacher absences and substitution activity across the studio. Data surfaces in two places: the Studio Admin/Super Admin dashboard (studio-wide view) and each teacher's own portal (personal view). No new data collection required — all reports are computed from existing `absence_records`, `substitute_requests`, `substitute_alerts`, `schedule_instances`, and `timesheet_entries` tables.
 
 ---
 
@@ -133,7 +117,7 @@ Donut chart: distribution of `reason_category` values for the selected filter se
 | 2026-03-07 | Petites Fri 10am | Petites | Personal | Lauryn M. | Covered ✓ | "Notified 2 hrs before" |
 | 2025-11-22 | Petites Fri 10am | Petites | Emergency | — | Cancelled ✗ | "No available sub; parents notified" |
 
-- **Notes column:** populated from `absence_record.notes` and `substitute_assignment.notes`; visible to Admin and Super Admin only
+- **Notes column:** populated from `absence_records.parent_note` and `substitute_requests.reason`; visible to Admin and Super Admin only
 - Export to CSV
 
 ### Pattern Flags (Auto-Generated, Admin/Super Admin Only)
@@ -190,7 +174,7 @@ Matrix: programs (rows) × teachers (columns), showing times each teacher has co
 |---|---|---|---|---|---|---|
 | 2026-03-11 | Company Tue 3:30pm | Company | 1.0h | 18 min | $[rate] | "Sub for Campbell" |
 
-- **Notes** visible to teacher; sourced from `substitute_assignment.notes`
+- **Notes** visible to teacher; sourced from `substitute_requests.reason`
 - **"For whom"** — the absent teacher's name is **NOT** shown to the substitute teacher (privacy). They see only the class name and program. Admin and Super Admin see the full detail.
 
 ### Sub Sessions Received (someone covered this teacher's class)
@@ -243,15 +227,17 @@ Matrix: programs (rows) × teachers (columns), showing times each teacher has co
 | Data Point | Source |
 |---|---|
 | Absences | `absence_records` |
-| Sub assignments | `substitute_assignments` |
-| Coverage outcome | `substitute_assignments.status` + `class_sessions.is_cancelled` |
-| Confirm time | `confirmed_at` - `assigned_at` |
-| Assigned sessions | `class_sessions` (lead/assistant teacher IDs) |
+| Coverage requests | `substitute_requests` |
+| Outreach attempts | `substitute_alerts` |
+| Coverage outcome | `substitute_requests.status` + `schedule_instances.status` |
+| Confirm time | `substitute_alerts.responded_at` − `substitute_alerts.alert_sent_at` |
+| Assigned sessions | `schedule_instances` (teacher_id, substitute_teacher_id) |
 | Hours | `timesheet_entries` |
-| Private billing | `private_billing_records`, `private_billing_splits` |
-| Notes on absence | `absence_records.notes` |
-| Notes on sub | `substitute_assignments.notes` |
-| Amanda coverage | `substitute_assignments` where `substitute_teacher_id` = Amanda's user ID |
+| Sub authorizations | `substitute_authorizations` |
+| Sub eligibility | `teacher_sub_eligibility` |
+| Notes on absence | `absence_records.parent_note`, `override_note` |
+| Notes on coverage | `substitute_requests.reason`, `substitute_alerts` response data |
+| Amanda coverage | `substitute_requests` where `filled_by` = Amanda's user ID |
 
 All reports computed server-side as PostgreSQL aggregates. No aggregation in the browser.
 
