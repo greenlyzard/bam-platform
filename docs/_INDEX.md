@@ -52,7 +52,7 @@
 ## Locations & Facilities
 | Topic | Canonical | Status |
 |---|---|---|
-| Multi-location model (`studio_locations`, `rooms`, `location_hours`, `studio_closures`) | 🔴 **NONE** | Undocumented gap — no canonical spec |
+| Multi-location model (`studio_locations`, `rooms`, `location_hours`, `studio_closures`) | `docs/LOCATIONS_AND_FACILITIES.md` | ✅ Canonical (approved 2026-07-09) |
 | Room / resource management | `docs/RESOURCE_INTELLIGENCE_SPEC.md` | Vision only — single-location, invents non-live tables |
 
 🔴 **Known gap (flagged 2026-07-09).** The live DB has a multi-location model with **no governing
@@ -67,7 +67,8 @@ Live data: 2 locations — **San Clemente** (primary, 63 classes, 4 rooms) and *
 Margarita / "RSM"** (`is_active=true`, 0 classes, 3 rooms). Only *deprecated* docs
 (`CLASSES_ARCHITECTURE_CLEANUP.md`, `TENANT_PAYMENT_CONFIG.md`) even name these columns;
 `strategy/platform-product-requirements.md` describes multi-location conceptually (M5) but names no
-table and no route. **Action:** write a canonical `LOCATIONS_AND_FACILITIES.md` — see Pending task 11.
+table and no route. ✅ **Resolved (2026-07-09):** canonical spec approved — see `docs/LOCATIONS_AND_FACILITIES.md`,
+which supersedes this gap note with the reconciliation + build sequence. Pending task 11 tracks it.
 
 ## Enrollment & Registration
 | Topic | Canonical | Status |
@@ -240,6 +241,7 @@ table and no route. **Action:** write a canonical `LOCATIONS_AND_FACILITIES.md` 
 | `INVOICE_PDF.md` | 🧱 | Billing | invoices⚠ | api/invoices, portal/billing/invoices | FSA/HSA PDF invoices (only Stripe receipts today) |
 | `LEVEL_SYSTEM.md` | 🔴 | Students | — | ~admin/settings/levels | Fixed level taxonomy (conflicts LEVELS_AND_PROGRAMS) |
 | `LEVELS_AND_PROGRAMS.md` | ✅ | Students | studio_levels, studio_programs, program_eligible_levels, student_programs | ~admin/settings/levels-programs | Dynamic per-tenant Levels vs Programs model |
+| `LOCATIONS_AND_FACILITIES.md` | ✅ | Locations & Facilities | studio_locations, rooms, location_hours, studio_closures, schedule_instances (location fields), classes.location_id | admin/settings/studio, admin/schedule, class-edit-drawer, portal/public catalog + ICS | Canonical multi-location + facilities model; fork reconciliation + per-surface location resolution |
 | `MAKEUP_POLICY.md` | 🧱 | Scheduling | enrollments, students, private_billing_records, makeup_credits⚠, school_years⚠ | ~admin/makeups | Makeup credit eligibility, requests, scheduling |
 | `MARKETING.md` | 📖 | Marketing | — | ~SEO city pages | SEO/ads/Klaviyo/social acquisition playbook |
 | `MARKETING_INTEGRATIONS.md` | 🔵 | Marketing | marketing_consents⚠, marketing_assets⚠, marketing_campaigns⚠ | admin/integrations/marketing | Ad-audience sync + marketing AI (all unbuilt) |
@@ -318,7 +320,7 @@ table and no route. **Action:** write a canonical `LOCATIONS_AND_FACILITIES.md` 
 10. Class Builder module — current /admin/classes is a basic CRUD surface. Spec needed for the real Class Builder workflow: bulk CSV import (see deferred docs/CLASS_CSV_IMPORT.md draft), drag-and-drop draft mode, multi-class conflict detection, capacity vs demand planning, atomic publish action that promotes drafts to active classes visible in /admin/schedule. Used during season planning, not day-to-day. Distinct from the operational /admin/schedule view.
 
 ### Added 2026-07-09 (spec-manifest + drift pass)
-11. **Locations & Facilities — undocumented (P0 for multi-location).** Write canonical `LOCATIONS_AND_FACILITIES.md` covering `studio_locations`/`rooms`/`location_hours`/`studio_closures`/`classes.location_id`. Resolve the **duplicated admin CRUD** (`settings/studio` vs `resources/manage`) and the **double room model** (`rooms` vs `studio_resources`) into one. Decide whether the parent/public side gets a location label/filter/picker (today it has none) and whether a location needs a published/visible flag distinct from `is_active`. RSM now live as a 2nd location with 0 classes — before RSM classes publish, parents can't tell the two studios apart. See the Locations & Facilities section above.
+11. **Locations & Facilities — ✅ canonical spec approved 2026-07-09 · see `docs/LOCATIONS_AND_FACILITIES.md`.** The spec canonicalizes `studio_locations`/`rooms`/`location_hours`/`studio_closures`/`classes.location_id` (+ new `location_type` and `schedule_instances` override fields). Resolve the **duplicated admin CRUD** (`settings/studio` vs `resources/manage`) and the **double room model** (`rooms` vs `studio_resources`) into one. Decide whether the parent/public side gets a location label/filter/picker (today it has none) and whether a location needs a published/visible flag distinct from `is_active`. RSM now live as a 2nd location with 0 classes — before RSM classes publish, parents can't tell the two studios apart. See the Locations & Facilities section above.
     - **Verdict (rooms vs studio_resources, investigated 2026-07-09):** **`rooms` is canonical.** It is the FK target for `classes.room_id`, `schedule_instances.room_id`, and `schedule_templates.room_id` (all 63 live classes carry a `room_id`); it backs the class Room dropdown (`admin/classes/page.tsx:145` → `class-edit-drawer.tsx:830-838`, saving `classes.room_id`) and drives schedule, calendar, portal/widget feeds, **and** rentals + utilization (`lib/resources/utilization.ts`, `resources/rentals` read `rooms`, not `studio_resources`). It is written by exactly one CRUD, `settings/studio/actions.ts` ("Studio Profile"). **`studio_resources` is legacy/secondary:** its only live consumer beyond its own `resources/manage` CRUD is the per-class "Resources" multi-select, which writes `studio_resource_assignments` — **0 rows in prod**. Its 3 room-type rows are inactive duplicates of `rooms`; its `type`/`is_portable` equipment fields are read by nothing. Both CRUDs also write `studio_locations` (a genuine double-write, incl. two independent primary-flag-clear paths).
     - **Reconciliation plan (in order):**
       1. Strip the location CRUD (`createLocation`/`updateLocation`/`toggleLocationActive`) from `app/(admin)/admin/resources/manage/actions.ts` so `app/(admin)/admin/settings/studio/actions.ts` is the **sole `studio_locations` writer** — fixes the double primary-flag-clear bug.
