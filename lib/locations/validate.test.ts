@@ -1,6 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isValidClassHomeLocation, LOCATION_TYPE_OPTIONS } from "./validate.ts";
+import {
+  isValidClassHomeLocation,
+  LOCATION_TYPE_OPTIONS,
+  OVERRIDE_ELIGIBLE_LOCATION_TYPES,
+  isOverrideEligibleLocationType,
+  isValidLocationVenueXor,
+} from "./validate.ts";
 
 const studios = new Set(["loc-sc", "loc-rsm"]);
 
@@ -31,4 +37,30 @@ test("LOCATION_TYPE_OPTIONS covers all three enum values in order", () => {
     LOCATION_TYPE_OPTIONS.map((o) => o.value),
     ["studio", "partner_venue", "internal"],
   );
+});
+
+// ── Single-instance override rules ───────────────────────────────────────────
+
+test("override eligibility: studio + partner_venue allowed, internal rejected", () => {
+  assert.equal(isOverrideEligibleLocationType("studio"), true);
+  assert.equal(isOverrideEligibleLocationType("partner_venue"), true);
+  assert.equal(isOverrideEligibleLocationType("internal"), false);
+});
+
+test("OVERRIDE_ELIGIBLE_LOCATION_TYPES is exactly [studio, partner_venue]", () => {
+  assert.deepEqual([...OVERRIDE_ELIGIBLE_LOCATION_TYPES], ["studio", "partner_venue"]);
+  assert.equal(OVERRIDE_ELIGIBLE_LOCATION_TYPES.includes("internal"), false);
+});
+
+test("location-XOR-venue: rejects both set; allows neither or exactly one", () => {
+  assert.equal(isValidLocationVenueXor(null, null), true); // inherit (neither)
+  assert.equal(isValidLocationVenueXor("loc-sc", null), true); // location only
+  assert.equal(isValidLocationVenueXor(null, "San Juan Hills Theater"), true); // venue only
+  assert.equal(isValidLocationVenueXor("loc-sc", "San Juan Hills Theater"), false); // both -> invalid
+});
+
+test("location-XOR-venue: empty / whitespace strings count as unset", () => {
+  assert.equal(isValidLocationVenueXor("", ""), true);
+  assert.equal(isValidLocationVenueXor("   ", "Venue"), true); // whitespace-only location = unset
+  assert.equal(isValidLocationVenueXor("loc-sc", "   "), true); // whitespace-only venue = unset
 });

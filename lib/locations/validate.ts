@@ -27,3 +27,40 @@ export function isValidClassHomeLocation(
   if (!locationId) return true;
   return studioLocationIds.has(locationId);
 }
+
+// ── Single-instance override rules (spec §4) ─────────────────────────────────
+
+/**
+ * Location types eligible as a per-instance override target: `studio` and
+ * `partner_venue`. `internal` is never eligible (non-teaching sites never appear
+ * on schedules). Use this to build the override location picker's option list.
+ */
+export const OVERRIDE_ELIGIBLE_LOCATION_TYPES: readonly LocationType[] = [
+  "studio",
+  "partner_venue",
+];
+
+/**
+ * Whether a location may be used as a single-instance override target:
+ * studio + partner_venue allowed, internal rejected.
+ */
+export function isOverrideEligibleLocationType(type: LocationType): boolean {
+  return OVERRIDE_ELIGIBLE_LOCATION_TYPES.includes(type);
+}
+
+/**
+ * A schedule instance's location override may set EITHER a studio_locations
+ * `location_id` OR a free-text `venue_name` — never both (they are mutually
+ * exclusive; spec §4). Returns false only when both are set; "neither" (inherit
+ * the class home) and "exactly one" are both valid. Empty/whitespace counts as unset.
+ */
+export function isValidLocationVenueXor(
+  locationId: string | null | undefined,
+  venueName: string | null | undefined,
+): boolean {
+  return !(hasText(locationId) && hasText(venueName));
+}
+
+function hasText(value: string | null | undefined): boolean {
+  return value != null && value.trim() !== "";
+}
