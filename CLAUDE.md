@@ -36,6 +36,15 @@
 
 **Before reading or writing any spec in `docs/`, consult `docs/_INDEX.md`.**
 
+**Source of truth:** specs in `docs/` are authoritative for **intended** behavior;
+the live Supabase schema is authoritative for the **actual** schema (verify via the
+`bam-schema-sync` skill and `types/database.types.ts`). When the two disagree, the
+live schema wins for what *is*, the spec for what *should be* — reconcile, never guess.
+
+`docs/_INDEX.md` is the manifest mapping each spec → the module, tables, and key
+routes it governs. Use it to find the right doc instead of rereading all of `docs/`.
+(If `docs/_INDEX.md` is ever missing, say so rather than guessing at which doc governs.)
+
 The index lists exactly one canonical doc per topic. If a doc has a 
 deprecation header at the top, do not implement from it — it has drift 
 or has been superseded.
@@ -170,6 +179,12 @@ If migration was applied manually but not tracked:
 ```bash
 npx supabase migration repair --status applied MIGRATION_TIMESTAMP
 ```
+
+### Schema changes NEVER run through Claude Code
+
+- The Supabase MCP in this session is **READ-ONLY** for Claude Code — use it only for verification and `SELECT` queries.
+- **Never** use `execute_sql` to run `INSERT` / `UPDATE` / `DELETE` / DDL, and **never** use `apply_migration`. Every schema change goes through `supabase db push` in the Regular Terminal (Derek runs it), followed by type regeneration (see the Schema Verification section).
+- This holds even though `execute_sql` currently appears in the local permission allowlist — the allowlist is a convenience for reads, not permission to mutate.
 
 ---
 
@@ -364,6 +379,9 @@ Known column name traps from past bugs:
 - If a spec references other docs, read those too before coding
 - Never rebuild from an outdated spec — always check the docs/ directory for the latest version of any spec file
 - Verify enum/level values against actual production DB before writing any filter or WHERE clause
+- Before building a module, read its governing spec(s) — find them via `docs/_INDEX.md`. If no spec governs the work, say so before writing code (don't invent behavior)
+- After changing schema, RLS, routes, or module behavior, update the governing spec(s) in the same change — or flag which spec applies if you're unsure. Keep specs and code in lockstep
+- If code and a spec disagree, stop and surface it — never silently diverge (spec-vs-live-DB drift is handled per §0.5)
 
 ## 17. Database / Supabase Rules
 
@@ -373,6 +391,7 @@ Known column name traps from past bugs:
 - Before writing any filter: run SELECT DISTINCT on that column via supabase to confirm exact production values
 - Never assume a column, table, or enum exists — check types/database.types.ts first
 - Always use supabaseAdmin (not the regular client) for all server-side DB writes in API routes and webhooks
+- The Supabase MCP is READ-ONLY for Claude Code — verification / `SELECT` only. No `execute_sql` writes or DDL, no `apply_migration`; all schema changes go through `db push` in the Regular Terminal per §5
 
 ## 18. Parallel Agent Strategy
 
@@ -389,5 +408,5 @@ Rules for parallel sessions:
 
 ---
 
-*Last updated: April 2026*
+*Last updated: July 2026*
 *Update whenever a major decision is made, a module ships, a table is added, or strategy shifts.*
