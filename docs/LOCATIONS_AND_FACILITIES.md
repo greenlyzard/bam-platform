@@ -94,7 +94,7 @@ All surfaces that render an occurrence's location must call the §4 resolver. En
 
 ### Admin
 - **Class builder / scheduler** — add a location + room field (currently missing). Sets `classes.location_id` (must be a `studio`) and `classes.room_id`. Room dropdown filtered to the chosen location's rooms.
-- **Instance override UI** — in the schedule, allow moving a single instance: pick another `studio`/`partner_venue` location + room, or enter a one-off external venue. Clearly marks the instance as relocated.
+- **Instance override UI (Step 4b) — ⛔ DEFERRED (blocked on the schedule_instances generator; see the deferral note below).** In the schedule, allow moving a single instance: pick another `studio`/`partner_venue` location + room, or enter a one-off external venue. Clearly marks the instance as relocated.
 - **Class list filter** — filter/group by location.
 - **Attendance** — attendance records reference the resolved instance location (where it actually happened).
 - **Timesheets / payroll** — hours reference the resolved instance location. Per-location cost reporting is a goal (Amanda will want per-site payroll/revenue). *Open item — confirm whether payroll must attribute per location in v1 or is report-only (§9).*
@@ -114,7 +114,11 @@ All surfaces that render an occurrence's location must call the §4 resolver. En
 - **Public enrollment widget** — same location label + filter.
 - **Enrollment / checkout** — show the class's home studio; no behavioral change to enrollment itself (location is class-level).
 - **Schedule / portal calendar** — render resolved instance location per session.
-- **Calendar / ICS feed — HIGHEST STAKES.** Must render the *resolved* instance location and **real address** (replace the hardcoded studio name currently in the ICS). When an instance's resolved location differs from the class default, visibly flag "location changed" so a parent never drives to the wrong place for a relocated rehearsal or performance.
+- **Calendar / ICS feed — HIGHEST STAKES.** Must render the *resolved* instance location and **real address** (replace the hardcoded studio name currently in the ICS). When an instance's resolved location differs from the class default, visibly flag "location changed" so a parent never drives to the wrong place for a relocated rehearsal or performance. **⛔ The resolved-*instance* address + "location changed" flag are DEFERRED (blocked on the generator; see note). At class-level, the ICS may still show the class's home-studio address instead of the hardcoded studio name — that part is not blocked.**
+
+> ⛔ **Deferred — instance-level location (blocked on the schedule_instances generator).**
+> The per-instance override editor (**Step 4b**), the **ICS resolved-instance address + "location changed"/relocated flag**, and **venue relocations** (moving one occurrence to a `partner_venue` or one-off venue) all depend on there being real, current `schedule_instances` occurrences to attach an override to. There is **no working occurrence generator** today: the only generator targets the phantom `class_sessions` table (migration never applied), and `schedule_instances` holds just 61 stale rows from March 2026. **A schedule_instances occurrence generator is a hard prerequisite** — see `_INDEX.md` Pending task 19 (class_sessions blast-radius).
+> **Steps 5–6 proceed at CLASS level only** for now: the class-home location label + the parent `studio`-only catalog/widget filter (§6 Parent) and class-level ICS home address are unblocked and can ship; anything keyed to a *resolved instance* waits on the generator.
 
 ---
 
@@ -140,6 +144,7 @@ All surfaces that render an occurrence's location must call the §4 resolver. En
 
 ## 9. Open items / future
 
+- **🔴 BLOCKER — no schedule_instances occurrence generator.** All instance-level location work — **Step 4b (instance-override editor)**, the **ICS resolved-instance address + "location changed"/relocated flag**, and **venue relocations** (moving one occurrence to a `partner_venue` or one-off venue) — is **DEFERRED until a working `schedule_instances` generator exists.** Today none does: the only session generator targets the phantom `class_sessions` table (migration `20260312000004_schedule_phase1.sql` never applied), and `schedule_instances` holds only 61 stale rows from March 2026. **Steps 5–6 proceed at CLASS level only** in the meantime (class-home label, `studio`-only catalog/widget filter, class-level ICS home address). Full analysis: `_INDEX.md` Pending task 19 (class_sessions blast-radius).
 - **Partner/internal venue rows — DEFERRED to the staff-editor step (§10 step 4).** Do NOT seed San Juan Hills HS, Casa Romantica, or Pelican Hill (`partner_venue`), or the storage facility (`internal`) — not via migration and not now. Create them in the UI once the `location_type` selector ships, with real addresses Derek verifies before saving (the ICS feed will surface them to parents). Step 2 added only the schema; the enum values exist but no venue rows are seeded.
 - **Studio-only class-home constraint — enforcement depth.** Enforced in UI + client `handleSave` only (no server action exists for class writes). DB-level enforcement (trigger, since it's a cross-table rule a CHECK can't express) is deferred hardening — acceptable for single-admin now, revisit before multi-admin or any non-UI class-write path.
 - **Timesheet per-location attribution** — confirm whether v1 payroll attributes hours per location or per-location is report-only. Decide at the timesheet build step.
@@ -151,12 +156,14 @@ All surfaces that render an occurrence's location must call the §4 resolver. En
 
 ## 10. Build sequence (step by step)
 
-1. **Reconciliation (§5)** — collapse CRUD, enforce single primary, retire dead room UI, clean orphan rooms. *Ship standalone first.*
-2. **Schema migration (§8)** — `location_type`, instance override fields, seed partner/internal locations. Via `db push`.
-3. **Location resolver (§4)** — single shared helper used by every surface.
-4. **Staff-side assignment (§6 admin)** — location+room in class builder; instance override UI.
-5. **Cross-persona reads (§6 admin/teacher)** — attendance, teacher schedule, reports resolve location.
-6. **Parent-facing (§6 parent)** — catalog/widget label + filter; ICS/calendar resolved address + "location changed" flag.
+1. **Reconciliation (§5)** — collapse CRUD, enforce single primary, retire dead room UI, clean orphan rooms. *Ship standalone first.* ✅ done (Step 1).
+2. **Schema migration (§8)** — `location_type`, instance override fields, seed partner/internal locations. Via `db push`. ✅ done (Step 2; partner/internal seeding deferred per §9).
+3. **Location resolver (§4)** — single shared helper used by every surface. ✅ done (Step 3).
+4. **Staff-side assignment (§6 admin)** — 4a: location+room in class builder ✅ done. 4b: instance override UI **⛔ DEFERRED — blocked on the schedule_instances generator (see §6 note + `_INDEX.md` task 19).**
+5. **Cross-persona reads (§6 admin/teacher)** — attendance, teacher schedule, reports resolve location. **CLASS-LEVEL ONLY for now** (show the class's home location); *resolved-instance* reads wait on the generator.
+6. **Parent-facing (§6 parent)** — catalog/widget `studio`-only label + filter and class-level ICS home address are unblocked; **ICS/calendar *resolved-instance* address + "location changed" flag ⛔ DEFERRED** (generator prerequisite).
 7. **Launch (§7)** — publish RSM classes once the parent filter is live.
+
+> **Generator prerequisite:** Steps 4b and the instance-level parts of 5–6 are blocked until a working `schedule_instances` occurrence generator exists (today none does — the only generator targets the phantom `class_sessions`; see `_INDEX.md` task 19). Class-level work in 5–6 is not blocked.
 
 Each step is its own Claude Code build with Derek's review before commit.
