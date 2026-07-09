@@ -5591,6 +5591,7 @@ export type Database = {
           ical_uid: string | null
           id: string
           is_trial_eligible: boolean | null
+          location_id: string | null
           notes: string | null
           notification_sent_at: string | null
           production_id: string | null
@@ -5602,6 +5603,8 @@ export type Database = {
           template_id: string | null
           tenant_id: string
           updated_at: string
+          venue_address: string | null
+          venue_name: string | null
         }
         Insert: {
           approval_status?: string | null
@@ -5617,6 +5620,7 @@ export type Database = {
           ical_uid?: string | null
           id?: string
           is_trial_eligible?: boolean | null
+          location_id?: string | null
           notes?: string | null
           notification_sent_at?: string | null
           production_id?: string | null
@@ -5628,6 +5632,8 @@ export type Database = {
           template_id?: string | null
           tenant_id: string
           updated_at?: string
+          venue_address?: string | null
+          venue_name?: string | null
         }
         Update: {
           approval_status?: string | null
@@ -5643,6 +5649,7 @@ export type Database = {
           ical_uid?: string | null
           id?: string
           is_trial_eligible?: boolean | null
+          location_id?: string | null
           notes?: string | null
           notification_sent_at?: string | null
           production_id?: string | null
@@ -5654,6 +5661,8 @@ export type Database = {
           template_id?: string | null
           tenant_id?: string
           updated_at?: string
+          venue_address?: string | null
+          venue_name?: string | null
         }
         Relationships: [
           {
@@ -5689,6 +5698,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "teacher_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedule_instances_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "studio_locations"
             referencedColumns: ["id"]
           },
           {
@@ -7549,6 +7565,7 @@ export type Database = {
           id: string
           is_active: boolean
           is_primary: boolean
+          location_type: Database["public"]["Enums"]["location_type"]
           name: string
           sort_order: number
           state: string | null
@@ -7563,6 +7580,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           is_primary?: boolean
+          location_type?: Database["public"]["Enums"]["location_type"]
           name: string
           sort_order?: number
           state?: string | null
@@ -7577,6 +7595,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           is_primary?: boolean
+          location_type?: Database["public"]["Enums"]["location_type"]
           name?: string
           sort_order?: number
           state?: string | null
@@ -9401,6 +9420,7 @@ export type Database = {
     }
     Enums: {
       billing_status: "unbilled" | "pending" | "charged" | "waived" | "disputed"
+      location_type: "studio" | "partner_venue" | "internal"
       user_role:
         | "super_admin"
         | "admin"
@@ -9546,6 +9566,7 @@ export const Constants = {
   public: {
     Enums: {
       billing_status: ["unbilled", "pending", "charged", "waived", "disputed"],
+      location_type: ["studio", "partner_venue", "internal"],
       user_role: [
         "super_admin",
         "admin",
