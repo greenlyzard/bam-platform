@@ -2,12 +2,10 @@
 
 import { useState, useTransition, useRef } from "react";
 import {
-  toggleLocationActive,
   toggleResourceActive,
   deleteResource,
   updateResourceOrder,
 } from "./actions";
-import { LocationDrawer } from "./location-drawer";
 import { ResourceDrawer } from "./resource-drawer";
 
 interface Location {
@@ -69,7 +67,7 @@ function formatAddress(loc: Location): string {
 }
 
 export function ResourceManagement({
-  locations: initialLocations,
+  locations,
   resources: initialResources,
   tenantId,
 }: {
@@ -77,10 +75,9 @@ export function ResourceManagement({
   resources: Resource[];
   tenantId: string;
 }) {
-  const [locations, setLocations] = useState(initialLocations);
+  // Locations are read-only here — displayed for reference and used by the resource
+  // location dropdown. Editing lives in Settings → Studio Profile (the sole studio_locations writer).
   const [resources, setResources] = useState(initialResources);
-  const [locationDrawerOpen, setLocationDrawerOpen] = useState(false);
-  const [editingLocation, setEditingLocation] = useState<Location | undefined>();
   const [resourceDrawerOpen, setResourceDrawerOpen] = useState(false);
   const [editingResource, setEditingResource] = useState<Resource | undefined>();
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -97,36 +94,6 @@ export function ResourceManagement({
   function showToast(msg: string) {
     setToast(msg);
     setTimeout(() => setToast(""), 3000);
-  }
-
-  // ── Location handlers ──────────────────────────────────
-
-  function openNewLocation() {
-    setEditingLocation(undefined);
-    setLocationDrawerOpen(true);
-  }
-
-  function openEditLocation(location: Location) {
-    setEditingLocation(location);
-    setLocationDrawerOpen(true);
-  }
-
-  function handleLocationSaved() {
-    showToast(editingLocation ? "Location updated" : "Location created");
-  }
-
-  function handleToggleLocationActive(locationId: string, value: boolean) {
-    setLocations((prev) => prev.map((l) => l.id === locationId ? { ...l, is_active: value } : l));
-    startTransition(async () => {
-      const fd = new FormData();
-      fd.set("locationId", locationId);
-      fd.set("isActive", String(value));
-      const result = await toggleLocationActive(fd);
-      if (result?.error) {
-        setLocations((prev) => prev.map((l) => l.id === locationId ? { ...l, is_active: !value } : l));
-        showToast(result.error);
-      }
-    });
   }
 
   // ── Resource handlers ──────────────────────────────────
@@ -245,16 +212,17 @@ export function ResourceManagement({
         </div>
       )}
 
-      {/* ── Section 1: Studio Locations ───────────────────── */}
+      {/* ── Section 1: Studio Locations (read-only reference) ─ */}
+      {/* Locations are edited in Settings → Studio Profile — the sole studio_locations writer. */}
       <section>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-heading font-semibold text-charcoal">Studio Locations</h2>
-          <button
-            onClick={openNewLocation}
-            className="h-8 rounded-lg border border-silver text-charcoal hover:bg-cloud font-medium text-sm px-4 transition-colors"
+          <a
+            href="/admin/settings/studio"
+            className="text-xs text-lavender hover:text-lavender-dark font-medium"
           >
-            + Add Location
-          </button>
+            Edit in Settings → Studio Profile
+          </a>
         </div>
 
         {locations.length === 0 ? (
@@ -268,44 +236,22 @@ export function ResourceManagement({
                   key={loc.id}
                   className="rounded-xl border border-silver bg-white p-3"
                 >
-                  <div className="flex items-start gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-charcoal">{loc.name}</span>
-                        {loc.is_primary && (
-                          <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-lavender/10 text-lavender-dark">
-                            Primary
-                          </span>
-                        )}
-                      </div>
-                      {address && (
-                        <p className="text-xs text-slate mt-0.5">{address}</p>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-3 shrink-0">
-                      {/* Active toggle */}
-                      <label className="flex items-center gap-1.5 cursor-pointer">
-                        <span className="relative inline-flex items-center">
-                          <input
-                            type="checkbox"
-                            checked={loc.is_active}
-                            onChange={(e) => handleToggleLocationActive(loc.id, e.target.checked)}
-                            className="sr-only peer"
-                          />
-                          <div className="w-9 h-5 bg-silver rounded-full peer peer-checked:bg-lavender transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4" />
-                        </span>
-                        <span className="text-xs text-slate">Active</span>
-                      </label>
-
-                      <button
-                        onClick={() => openEditLocation(loc)}
-                        className="text-xs text-lavender hover:text-lavender-dark font-medium px-2 py-1 rounded transition-colors"
-                      >
-                        Edit
-                      </button>
-                    </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium text-charcoal">{loc.name}</span>
+                    {loc.is_primary && (
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-lavender/10 text-lavender-dark">
+                        Primary
+                      </span>
+                    )}
+                    {!loc.is_active && (
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-silver text-slate">
+                        Inactive
+                      </span>
+                    )}
                   </div>
+                  {address && (
+                    <p className="text-xs text-slate mt-0.5">{address}</p>
+                  )}
                 </div>
               );
             })}
@@ -439,15 +385,6 @@ export function ResourceManagement({
       </section>
 
       {/* ── Drawers ───────────────────────────────────────── */}
-      {locationDrawerOpen && (
-        <LocationDrawer
-          location={editingLocation}
-          tenantId={tenantId}
-          onClose={() => setLocationDrawerOpen(false)}
-          onSaved={handleLocationSaved}
-        />
-      )}
-
       {resourceDrawerOpen && (
         <ResourceDrawer
           resource={editingResource}

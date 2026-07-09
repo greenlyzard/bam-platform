@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { SimpleSelect } from "@/components/ui/select";
 import { createClient } from "@/lib/supabase/client";
 import type {
@@ -148,35 +148,6 @@ export function ClassEditDrawer({
   const [endDate, setEndDate] = useState(classData?.end_date ?? "");
   const [seasonId, setSeasonId] = useState(classData?.season_id ?? "");
   const [roomId, setRoomId] = useState(classData?.room_id ?? "");
-
-  // ── Resources ───────────────────────────────────────
-  const [allResources, setAllResources] = useState<{ id: string; name: string; type: string; is_active: boolean }[]>([]);
-  const [selectedResourceIds, setSelectedResourceIds] = useState<string[]>([]);
-
-  useEffect(() => {
-    // Fetch active resources
-    supabase
-      .from("studio_resources")
-      .select("id, name, type, is_active")
-      .eq("is_active", true)
-      .order("sort_order")
-      .then(({ data }) => setAllResources(data ?? []));
-
-    // Fetch current assignments if editing
-    if (classData?.id) {
-      supabase
-        .from("studio_resource_assignments")
-        .select("resource_id")
-        .eq("class_id", classData.id)
-        .then(({ data }) => setSelectedResourceIds((data ?? []).map((r) => r.resource_id)));
-    }
-  }, [classData?.id, supabase]);
-
-  function toggleResource(id: string) {
-    setSelectedResourceIds((prev) =>
-      prev.includes(id) ? prev.filter((r) => r !== id) : [...prev, id]
-    );
-  }
 
   // ── Section 3: Teachers ──────────────────────────────
   const [teacherRows, setTeacherRows] = useState<TeacherRow[]>(() => {
@@ -522,23 +493,6 @@ export function ClassEditDrawer({
       onPhasesUpdated(classId, []);
     }
 
-    // Save resource assignments: delete and reinsert
-    await supabase
-      .from("studio_resource_assignments")
-      .delete()
-      .eq("class_id", classId);
-    if (selectedResourceIds.length > 0) {
-      await supabase
-        .from("studio_resource_assignments")
-        .insert(
-          selectedResourceIds.map((rid) => ({
-            class_id: classId,
-            resource_id: rid,
-            tenant_id: tenantId,
-          }))
-        );
-    }
-
     // Fetch the saved class back for state update
     const { data: saved } = await supabase
       .from("classes")
@@ -856,29 +810,6 @@ export function ClassEditDrawer({
               </div>
             )}
           </Section>
-
-          {/* ── Resources ────────────────────────────────── */}
-          {allResources.length > 0 && (
-            <Section title="Resources">
-              <div className="space-y-1.5">
-                {allResources.map((res) => (
-                  <label
-                    key={res.id}
-                    className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-cloud/50 cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedResourceIds.includes(res.id)}
-                      onChange={() => toggleResource(res.id)}
-                      className="h-4 w-4 rounded border-silver text-lavender focus:ring-lavender/20"
-                    />
-                    <span className="text-sm text-charcoal">{res.name}</span>
-                    <span className="text-xs text-mist capitalize">({res.type})</span>
-                  </label>
-                ))}
-              </div>
-            </Section>
-          )}
 
           {/* ── SECTION 3: Teachers ─────────────────────── */}
           <Section title="Teachers">
