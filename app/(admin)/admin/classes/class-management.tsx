@@ -32,6 +32,7 @@ export interface ClassRecord {
   end_time: string | null;
   room: string | null;
   room_id: string | null;
+  location_id: string | null;
   max_students: number;
   is_active: boolean;
   teacher_id: string | null;
@@ -275,6 +276,7 @@ export function ClassManagement({
   fieldConfig,
   roomMap = {},
   locationMap = {},
+  studioLocations = [],
   activeRooms = [],
   privateSessionsRaw = [],
   studioClosures = [],
@@ -299,7 +301,8 @@ export function ClassManagement({
   fieldConfig: FieldConfigRow[];
   roomMap?: Record<string, string>;
   locationMap?: Record<string, string>;
-  activeRooms?: Array<{ id: string; name: string; color_hex: string | null }>;
+  studioLocations?: Array<{ id: string; name: string }>;
+  activeRooms?: Array<{ id: string; name: string; color_hex: string | null; location_id: string | null }>;
   privateSessionsRaw?: Array<{ id: string; session_date: string; start_time: string; end_time: string; status: string; studio: string | null; primary_teacher_id: string | null; student_ids: string[]; notes: string | null; billing_status: string | null; session_rate: number | null }>;
   studioClosures?: Array<{ id: string; closed_date: string; reason: string | null }>;
   classColorPalette?: string[];
@@ -1935,6 +1938,7 @@ ${(byDay[d] ?? [])
               : []
           }
           rooms={activeRooms}
+          studioLocations={studioLocations}
           classColorPalette={classColorPalette}
           availableLevels={availableLevels}
           tenantId={tenantId}

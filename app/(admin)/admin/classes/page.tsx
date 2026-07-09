@@ -141,14 +141,19 @@ export default async function ClassesPage({
     .eq("tenant_id", user.tenantId!)
     .order("start_date");
 
-  // Fetch rooms and locations for name resolution
-  const { data: roomRows } = await supabase.from("rooms").select("id, name, color_hex, is_active").eq("is_active", true);
+  // Fetch rooms and locations for name resolution + class-builder assignment
+  const { data: roomRows } = await supabase.from("rooms").select("id, name, color_hex, is_active, location_id").eq("is_active", true);
   const roomMap: Record<string, string> = {};
   for (const r of roomRows ?? []) roomMap[r.id] = r.name;
 
-  const { data: locationRows } = await supabase.from("studio_locations").select("id, name");
+  const { data: locationRows } = await supabase.from("studio_locations").select("id, name, location_type, is_active");
   const locationMap: Record<string, string> = {};
   for (const l of locationRows ?? []) locationMap[l.id] = l.name;
+
+  // A class's home location must be an active teaching studio (spec §4/§6) — offer only those.
+  const studioLocations = (locationRows ?? [])
+    .filter((l) => l.location_type === "studio" && l.is_active)
+    .map((l) => ({ id: l.id, name: l.name }));
 
   // Fetch private sessions and studio closures for calendar view
   const { data: privateSessionsRaw } = await supabase
@@ -232,7 +237,8 @@ export default async function ClassesPage({
       fieldConfig={fieldConfigRows ?? []}
       roomMap={roomMap}
       locationMap={locationMap}
-      activeRooms={(roomRows ?? []).map(r => ({ id: r.id, name: r.name, color_hex: (r as any).color_hex ?? null }))}
+      studioLocations={studioLocations}
+      activeRooms={(roomRows ?? []).map(r => ({ id: r.id, name: r.name, color_hex: (r as any).color_hex ?? null, location_id: r.location_id ?? null }))}
       privateSessionsRaw={(privateSessionsRaw ?? []).map((p: any) => ({ id: p.id, session_date: p.session_date, start_time: p.start_time, end_time: p.end_time, status: p.status, studio: p.studio, primary_teacher_id: p.primary_teacher_id, student_ids: p.student_ids ?? [], notes: p.session_notes, billing_status: p.billing_status ?? null, session_rate: p.session_rate ?? null }))}
       studioClosures={(studioClosureRows ?? []).map((c: any) => ({ id: c.id, closed_date: c.closed_date, reason: c.reason }))}
       classColorPalette={classColorPalette}

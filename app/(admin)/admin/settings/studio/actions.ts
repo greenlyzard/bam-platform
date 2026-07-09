@@ -1,6 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import type { LocationType } from "@/lib/locations/validate";
 
 const TENANT_ID = "84d98f72-c82f-414f-8b17-172b802f6993";
 const STUDIO_SETTINGS_ID = "807cadc5-405f-4d24-9225-ae8458a31577";
@@ -39,6 +40,7 @@ export async function upsertLocation(payload: {
   state?: string;
   zip?: string;
   is_primary?: boolean;
+  location_type?: LocationType;
 }): Promise<{ success: boolean; error?: string }> {
   const supabase = createAdminClient();
 
@@ -60,6 +62,7 @@ export async function upsertLocation(payload: {
     zip: payload.zip || null,
     is_primary: payload.is_primary ?? false,
     is_active: true,
+    location_type: payload.location_type ?? "studio",
   };
 
   if (payload.id) {

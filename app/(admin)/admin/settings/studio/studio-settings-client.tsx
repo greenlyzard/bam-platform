@@ -8,6 +8,8 @@ import {
   toggleLocationActive,
   toggleRoomActive,
 } from "./actions";
+import { SimpleSelect } from "@/components/ui/select";
+import { LOCATION_TYPE_OPTIONS, type LocationType } from "@/lib/locations/validate";
 
 interface StudioSettings {
   id: string;
@@ -31,6 +33,7 @@ interface Location {
   is_primary: boolean;
   is_active: boolean;
   sort_order: number;
+  location_type: LocationType;
 }
 
 interface Room {
@@ -500,6 +503,7 @@ function LocationForm({
     state?: string;
     zip?: string;
     is_primary?: boolean;
+    location_type: LocationType;
   }) => Promise<void>;
   onCancel: () => void;
 }) {
@@ -509,6 +513,9 @@ function LocationForm({
   const [state, setState] = useState(initial?.state ?? "");
   const [zip, setZip] = useState(initial?.zip ?? "");
   const [isPrimary, setIsPrimary] = useState(initial?.is_primary ?? false);
+  const [locationType, setLocationType] = useState<LocationType>(
+    initial?.location_type ?? "studio"
+  );
   const [saving, setSaving] = useState(false);
 
   return (
@@ -522,6 +529,18 @@ function LocationForm({
           placeholder="Studio location name"
           className="w-full h-9 rounded-lg border border-silver px-3 text-sm text-charcoal focus:border-lavender focus:outline-none focus:ring-1 focus:ring-lavender"
         />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-charcoal mb-1">Type</label>
+        <SimpleSelect
+          value={locationType}
+          onValueChange={(val) => setLocationType(val as LocationType)}
+          options={LOCATION_TYPE_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+          className="w-full"
+        />
+        <p className="text-[11px] text-mist mt-1">
+          Only <span className="font-medium">Teaching studio</span> locations can be a class&apos;s home and appear in the parent catalog.
+        </p>
       </div>
       <div>
         <label className="block text-xs font-medium text-charcoal mb-1">Address</label>
@@ -575,7 +594,7 @@ function LocationForm({
           onClick={async () => {
             if (!name.trim()) return;
             setSaving(true);
-            await onSave({ name, address, city, state, zip, is_primary: isPrimary });
+            await onSave({ name, address, city, state, zip, is_primary: isPrimary, location_type: locationType });
             setSaving(false);
           }}
           disabled={saving || !name.trim()}

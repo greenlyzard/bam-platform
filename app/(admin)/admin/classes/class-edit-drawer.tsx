@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import { SimpleSelect } from "@/components/ui/select";
 import { createClient } from "@/lib/supabase/client";
+import { isValidClassHomeLocation } from "@/lib/locations/validate";
 import type {
   ClassRecord,
   ClassTeacher,
@@ -81,6 +82,7 @@ export function ClassEditDrawer({
   pricingRules,
   classPhases,
   rooms,
+  studioLocations,
   classColorPalette,
   availableLevels = DEFAULT_LEVEL_OPTIONS,
   tenantId,
@@ -101,7 +103,8 @@ export function ClassEditDrawer({
   classTeachers: ClassTeacher[];
   pricingRules: PricingRule[];
   classPhases: ClassPhase[];
-  rooms: Array<{ id: string; name: string }>;
+  rooms: Array<{ id: string; name: string; location_id: string | null }>;
+  studioLocations: Array<{ id: string; name: string }>;
   classColorPalette: string[];
   availableLevels?: string[];
   tenantId: string;
@@ -147,7 +150,14 @@ export function ClassEditDrawer({
   const [startDate, setStartDate] = useState(classData?.start_date ?? "");
   const [endDate, setEndDate] = useState(classData?.end_date ?? "");
   const [seasonId, setSeasonId] = useState(classData?.season_id ?? "");
+  const [locationId, setLocationId] = useState(classData?.location_id ?? "");
   const [roomId, setRoomId] = useState(classData?.room_id ?? "");
+
+  // Home location must be a teaching studio (spec §4/§6); rooms filter to that location.
+  const studioLocationIds = new Set(studioLocations.map((l) => l.id));
+  const roomsForLocation = locationId
+    ? rooms.filter((r) => r.location_id === locationId)
+    : [];
 
   // ── Section 3: Teachers ──────────────────────────────
   const [teacherRows, setTeacherRows] = useState<TeacherRow[]>(() => {
@@ -341,6 +351,12 @@ export function ClassEditDrawer({
       setError("Class name is required");
       return;
     }
+    // A class's home location must be a teaching studio (partner_venue/internal are
+    // only valid per-instance via the override editor, not as a class home).
+    if (!isValidClassHomeLocation(locationId || null, studioLocationIds)) {
+      setError("A class's home location must be a teaching studio.");
+      return;
+    }
     setSaving(true);
     setError(null);
 
@@ -364,6 +380,7 @@ export function ClassEditDrawer({
       start_date: startDate || null,
       end_date: endDate || null,
       season_id: seasonId || null,
+      location_id: locationId || null,
       room_id: roomId || null,
       max_enrollment: maxEnrollment ? parseInt(maxEnrollment) : null,
       max_students: maxEnrollment ? parseInt(maxEnrollment) : 10,
@@ -781,13 +798,32 @@ export function ClassEditDrawer({
                   className="w-full"
                 />
               </Field>
+              <Field label="Location">
+                <SimpleSelect
+                  value={locationId}
+                  onValueChange={(val) => {
+                    const next = val === "__none__" ? "" : val;
+                    setLocationId(next);
+                    // Clear the room if it no longer belongs to the chosen location.
+                    if (roomId && !rooms.some((r) => r.id === roomId && r.location_id === next)) {
+                      setRoomId("");
+                    }
+                  }}
+                  options={[
+                    { value: "__none__", label: "No location" },
+                    ...studioLocations.map((l) => ({ value: l.id, label: l.name })),
+                  ]}
+                  placeholder="No location"
+                  className="w-full"
+                />
+              </Field>
               <Field label="Room">
                 <SimpleSelect
                   value={roomId}
                   onValueChange={(val) => setRoomId(val === "__none__" ? "" : val)}
                   options={[
-                    { value: "__none__", label: "No room" },
-                    ...rooms.map((r) => ({ value: r.id, label: r.name })),
+                    { value: "__none__", label: locationId ? "No room" : "Select a location first" },
+                    ...roomsForLocation.map((r) => ({ value: r.id, label: r.name })),
                   ]}
                   placeholder="No room"
                   className="w-full"

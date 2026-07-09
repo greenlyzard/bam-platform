@@ -141,6 +141,7 @@ All surfaces that render an occurrence's location must call the §4 resolver. En
 ## 9. Open items / future
 
 - **Partner/internal venue rows — DEFERRED to the staff-editor step (§10 step 4).** Do NOT seed San Juan Hills HS, Casa Romantica, or Pelican Hill (`partner_venue`), or the storage facility (`internal`) — not via migration and not now. Create them in the UI once the `location_type` selector ships, with real addresses Derek verifies before saving (the ICS feed will surface them to parents). Step 2 added only the schema; the enum values exist but no venue rows are seeded.
+- **Studio-only class-home constraint — enforcement depth.** Enforced in UI + client `handleSave` only (no server action exists for class writes). DB-level enforcement (trigger, since it's a cross-table rule a CHECK can't express) is deferred hardening — acceptable for single-admin now, revisit before multi-admin or any non-UI class-write path.
 - **Timesheet per-location attribution** — confirm whether v1 payroll attributes hours per location or per-location is report-only. Decide at the timesheet build step.
 - **Per-location roles** — not in v1. Note any place a future "RSM site manager who only sees RSM" would need location in the RLS/permission layer, so we don't build into a corner. Flag-only.
 - **Equipment booking** — dormant `studio_resources` is the seed. Out of scope here.
