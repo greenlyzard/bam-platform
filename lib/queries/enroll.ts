@@ -37,6 +37,19 @@ export async function getClassCatalog(filters?: {
     return [];
   }
 
+  // Resolve each class's home studio name (class-level location — spec §6 parent).
+  const locationIds = [
+    ...new Set((data ?? []).map((c) => c.location_id).filter(Boolean) as string[]),
+  ];
+  const locationNames: Record<string, string> = {};
+  if (locationIds.length > 0) {
+    const { data: locs } = await supabase
+      .from("studio_locations")
+      .select("id, name")
+      .in("id", locationIds);
+    for (const l of locs ?? []) locationNames[l.id] = l.name;
+  }
+
   return (data ?? []).map((cls) => {
     const enrollments = cls.enrollments as { id: string; status: string }[];
     const activeCount = enrollments.filter(
@@ -64,6 +77,10 @@ export async function getClassCatalog(filters?: {
       startTime: cls.start_time as string,
       endTime: cls.end_time as string,
       room: cls.room as string | null,
+      locationId: (cls.location_id as string | null) ?? null,
+      locationName: cls.location_id
+        ? (locationNames[cls.location_id as string] ?? null)
+        : null,
       teacherName: teacher
         ? `${teacher.first_name} ${teacher.last_name}`
         : null,

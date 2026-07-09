@@ -1,6 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import {
+  matchesLocationFilter,
+  deriveLocationOptionsFromClasses,
+} from "@/lib/locations/validate";
 
 interface ClassInfo {
   id: string;
@@ -15,6 +19,8 @@ interface ClassInfo {
   startTime: string;
   endTime: string;
   room: string | null;
+  locationId: string | null;
+  locationName: string | null;
   teacherName: string | null;
   activeCount: number;
   spotsRemaining: number;
@@ -53,14 +59,23 @@ function formatTime(t: string) {
 export function ClassCatalog({ classes }: { classes: ClassInfo[] }) {
   const [styleFilter, setStyleFilter] = useState("");
   const [dayFilter, setDayFilter] = useState<number | null>(null);
+  const [locationFilter, setLocationFilter] = useState("");
 
   const styles = [...new Set(classes.map((c) => c.style))];
   const days = [...new Set(classes.map((c) => c.dayOfWeek))].sort();
+
+  // Location options are derived from the classes the parent can actually see, so a
+  // studio with no visible classes (e.g. RSM today) never appears. Show the filter only
+  // when 2+ locations have visible classes — a single-studio filter is noise.
+  const locationOptions = deriveLocationOptionsFromClasses(classes);
+  const showLocationFilter = locationOptions.length >= 2;
 
   let filtered = classes;
   if (styleFilter) filtered = filtered.filter((c) => c.style === styleFilter);
   if (dayFilter !== null)
     filtered = filtered.filter((c) => c.dayOfWeek === dayFilter);
+  if (showLocationFilter && locationFilter)
+    filtered = filtered.filter((c) => matchesLocationFilter(c.locationId, locationFilter));
 
   // Group by day
   const grouped = new Map<number, ClassInfo[]>();
@@ -77,6 +92,37 @@ export function ClassCatalog({ classes }: { classes: ClassInfo[] }) {
 
   return (
     <div className="space-y-6">
+      {/* Location filter — shown only when 2+ studios have visible classes */}
+      {showLocationFilter && (
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setLocationFilter("")}
+            className={`h-9 rounded-full px-4 text-xs font-medium border transition-colors ${
+              !locationFilter
+                ? "bg-lavender text-white border-lavender"
+                : "bg-white text-slate border-silver hover:border-lavender"
+            }`}
+          >
+            All Locations
+          </button>
+          {locationOptions.map((loc) => (
+            <button
+              key={loc.id}
+              type="button"
+              onClick={() => setLocationFilter(locationFilter === loc.id ? "" : loc.id)}
+              className={`h-9 rounded-full px-4 text-xs font-medium border transition-colors ${
+                locationFilter === loc.id
+                  ? "bg-lavender text-white border-lavender"
+                  : "bg-white text-slate border-silver hover:border-lavender"
+              }`}
+            >
+              {loc.name}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Filters */}
       <div className="flex flex-wrap gap-2">
         <button
@@ -165,6 +211,7 @@ export function ClassCatalog({ classes }: { classes: ClassInfo[] }) {
                   </div>
                   <p className="text-xs text-slate">
                     {formatTime(cls.startTime)}–{formatTime(cls.endTime)}
+                    {cls.locationName && ` · ${cls.locationName}`}
                     {cls.teacherName && ` · ${cls.teacherName}`}
                     {cls.ageMin && ` · Ages ${cls.ageMin}–${cls.ageMax ?? "up"}`}
                   </p>

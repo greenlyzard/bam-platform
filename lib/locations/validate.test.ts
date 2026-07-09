@@ -7,6 +7,7 @@ import {
   isOverrideEligibleLocationType,
   isValidLocationVenueXor,
   matchesLocationFilter,
+  deriveLocationOptionsFromClasses,
 } from "./validate.ts";
 
 const studios = new Set(["loc-sc", "loc-rsm"]);
@@ -84,4 +85,44 @@ test("matchesLocationFilter: selecting a location with no classes (RSM) yields e
   const classes = [{ location_id: "loc-sc" }, { location_id: "loc-sc" }, { location_id: null }];
   const rsmResults = classes.filter((c) => matchesLocationFilter(c.location_id, "loc-rsm"));
   assert.deepEqual(rsmResults, []);
+});
+
+// ── Parent-catalog Location filter options (derive from visible classes) ──────
+
+test("deriveLocationOptionsFromClasses: single studio → one option (caller collapses)", () => {
+  const classes = [
+    { locationId: "loc-sc", locationName: "San Clemente" },
+    { locationId: "loc-sc", locationName: "San Clemente" }, // dedup
+  ];
+  assert.deepEqual(deriveLocationOptionsFromClasses(classes), [
+    { id: "loc-sc", name: "San Clemente" },
+  ]);
+});
+
+test("deriveLocationOptionsFromClasses: RSM (no visible classes) never appears", () => {
+  // Visible classes are all San Clemente; RSM/partner/internal have no visible classes.
+  const classes = [{ locationId: "loc-sc", locationName: "San Clemente" }];
+  const opts = deriveLocationOptionsFromClasses(classes);
+  assert.equal(opts.length, 1);
+  assert.equal(opts.some((o) => o.id === "loc-rsm"), false);
+});
+
+test("deriveLocationOptionsFromClasses: 2+ studios with visible classes → sorted options", () => {
+  const classes = [
+    { locationId: "loc-rsm", locationName: "Rancho Santa Margarita" },
+    { locationId: "loc-sc", locationName: "San Clemente" },
+    { locationId: "loc-sc", locationName: "San Clemente" },
+  ];
+  assert.deepEqual(deriveLocationOptionsFromClasses(classes), [
+    { id: "loc-rsm", name: "Rancho Santa Margarita" },
+    { id: "loc-sc", name: "San Clemente" },
+  ]);
+});
+
+test("deriveLocationOptionsFromClasses: classes with null location are ignored; empty → []", () => {
+  assert.deepEqual(deriveLocationOptionsFromClasses([]), []);
+  assert.deepEqual(
+    deriveLocationOptionsFromClasses([{ locationId: null, locationName: null }]),
+    [],
+  );
 });

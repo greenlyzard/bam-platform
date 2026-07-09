@@ -42,6 +42,28 @@ export function matchesLocationFilter(
   return classLocationId === selectedLocationId;
 }
 
+/**
+ * Derive the parent-catalog Location filter options from the classes a parent can
+ * actually SEE (spec §6 parent / §7 launch gating). Options are the DISTINCT home
+ * locations present among the given visible classes — so a studio with no visible
+ * classes (e.g. RSM today) never appears, and partner_venue/internal never appear
+ * (they can't be class homes). Sorted by name. Callers should render the filter only
+ * when 2+ options exist (a single-studio filter is noise — "single-studio collapse").
+ */
+export function deriveLocationOptionsFromClasses(
+  classes: ReadonlyArray<{ locationId: string | null; locationName: string | null }>,
+): Array<{ id: string; name: string }> {
+  const byId = new Map<string, string>();
+  for (const c of classes) {
+    if (c.locationId && !byId.has(c.locationId)) {
+      byId.set(c.locationId, c.locationName ?? c.locationId);
+    }
+  }
+  return [...byId.entries()]
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 // ── Single-instance override rules (spec §4) ─────────────────────────────────
 
 /**
