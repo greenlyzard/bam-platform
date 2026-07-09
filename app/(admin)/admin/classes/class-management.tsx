@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SimpleSelect } from "@/components/ui/select";
+import { matchesLocationFilter } from "@/lib/locations/validate";
 import { createClient } from "@/lib/supabase/client";
 import {
   DndContext,
@@ -321,6 +322,7 @@ export function ClassManagement({
   const [filterSeason, setFilterSeason] = useState("");
   const [filterTeacher, setFilterTeacher] = useState("");
   const [filterLevel, setFilterLevel] = useState("");
+  const [filterLocation, setFilterLocation] = useState("");
   const [filterDiscipline, setFilterDiscipline] = useState("");
   const [filterDay, setFilterDay] = useState("");
   const [filterType, setFilterType] = useState("");
@@ -375,7 +377,7 @@ export function ClassManagement({
     return localStorage.getItem("bam-schedule-show-competitions") === "true";
   });
 
-  const activeFilterCount = [filterSeason, filterTeacher, filterLevel, filterDiscipline, filterDay, filterType, filterStatus].filter(Boolean).length;
+  const activeFilterCount = [filterSeason, filterTeacher, filterLevel, filterLocation, filterDiscipline, filterDay, filterType, filterStatus].filter(Boolean).length;
 
   // Column config driven by class_field_config table
   const DEFAULT_COLUMNS = buildDefaultColumns(fieldConfig);
@@ -444,6 +446,7 @@ export function ClassManagement({
       return false;
     if (filterSeason && c.season_id !== filterSeason && c.season !== filterSeason)
       return false;
+    if (!matchesLocationFilter(c.location_id, filterLocation)) return false;
     if (filterTeacher) {
       const hasTeacher =
         c.teacher_id === filterTeacher ||
@@ -1450,11 +1453,12 @@ ${(byDay[d] ?? [])
             filterSeason={filterSeason} setFilterSeason={setFilterSeason}
             filterTeacher={filterTeacher} setFilterTeacher={setFilterTeacher}
             filterLevel={filterLevel} setFilterLevel={setFilterLevel}
+            filterLocation={filterLocation} setFilterLocation={setFilterLocation}
             filterDiscipline={filterDiscipline} setFilterDiscipline={setFilterDiscipline}
             filterDay={filterDay} setFilterDay={setFilterDay}
             filterType={filterType} setFilterType={setFilterType}
             filterStatus={filterStatus} setFilterStatus={setFilterStatus}
-            seasons={seasons} teachers={teachers} disciplines={disciplines} availableLevels={availableLevels}
+            seasons={seasons} teachers={teachers} disciplines={disciplines} studioLocations={studioLocations} availableLevels={availableLevels}
           />
           {isTeacher && myClassIds.length > 0 && (
             <button
@@ -1484,11 +1488,12 @@ ${(byDay[d] ?? [])
                   filterSeason={filterSeason} setFilterSeason={setFilterSeason}
                   filterTeacher={filterTeacher} setFilterTeacher={setFilterTeacher}
                   filterLevel={filterLevel} setFilterLevel={setFilterLevel}
+                  filterLocation={filterLocation} setFilterLocation={setFilterLocation}
                   filterDiscipline={filterDiscipline} setFilterDiscipline={setFilterDiscipline}
                   filterDay={filterDay} setFilterDay={setFilterDay}
                   filterType={filterType} setFilterType={setFilterType}
                   filterStatus={filterStatus} setFilterStatus={setFilterStatus}
-                  seasons={seasons} teachers={teachers} disciplines={disciplines}
+                  seasons={seasons} teachers={teachers} disciplines={disciplines} studioLocations={studioLocations}
                   stacked
                 />
               </div>
@@ -2129,17 +2134,19 @@ function FilterSelects({
   filterSeason, setFilterSeason,
   filterTeacher, setFilterTeacher,
   filterLevel, setFilterLevel,
+  filterLocation, setFilterLocation,
   filterDiscipline, setFilterDiscipline,
   filterDay, setFilterDay,
   filterType, setFilterType,
   filterStatus, setFilterStatus,
-  seasons, teachers, disciplines,
+  seasons, teachers, disciplines, studioLocations,
   availableLevels,
   stacked,
 }: {
   filterSeason: string; setFilterSeason: (v: string) => void;
   filterTeacher: string; setFilterTeacher: (v: string) => void;
   filterLevel: string; setFilterLevel: (v: string) => void;
+  filterLocation: string; setFilterLocation: (v: string) => void;
   filterDiscipline: string; setFilterDiscipline: (v: string) => void;
   filterDay: string; setFilterDay: (v: string) => void;
   filterType: string; setFilterType: (v: string) => void;
@@ -2147,6 +2154,7 @@ function FilterSelects({
   seasons: { id: string; name: string }[];
   teachers: { id: string; name: string }[];
   disciplines: { id: string; name: string }[];
+  studioLocations: { id: string; name: string }[];
   availableLevels?: string[];
   stacked?: boolean;
 }) {
@@ -2154,6 +2162,9 @@ function FilterSelects({
   return (
     <>
       <SimpleSelect value={filterSeason || "__all__"} onValueChange={(val) => setFilterSeason(val === "__all__" ? "" : val)} options={[{ value: "__all__", label: "All Seasons" }, ...seasons.map((s) => ({ value: s.id, label: s.name }))]} placeholder="All Seasons" className={cls} />
+      {studioLocations.length > 0 && (
+        <SimpleSelect value={filterLocation || "__all__"} onValueChange={(val) => setFilterLocation(val === "__all__" ? "" : val)} options={[{ value: "__all__", label: "All Locations" }, ...studioLocations.map((l) => ({ value: l.id, label: l.name }))]} placeholder="All Locations" className={cls} />
+      )}
       <SimpleSelect value={filterTeacher || "__all__"} onValueChange={(val) => setFilterTeacher(val === "__all__" ? "" : val)} options={[{ value: "__all__", label: "All Teachers" }, ...teachers.map((t) => ({ value: t.id, label: t.name }))]} placeholder="All Teachers" className={cls} />
       <SimpleSelect value={filterLevel || "__all__"} onValueChange={(val) => setFilterLevel(val === "__all__" ? "" : val)} options={[{ value: "__all__", label: "All Levels" }, ...((availableLevels ?? []).length > 0 ? (availableLevels ?? []) : LEVEL_OPTIONS).map((l) => ({ value: l, label: l }))]} placeholder="All Levels" className={cls} />
       <SimpleSelect value={filterDiscipline || "__all__"} onValueChange={(val) => setFilterDiscipline(val === "__all__" ? "" : val)} options={[{ value: "__all__", label: "All Disciplines" }, ...disciplines.map((d) => ({ value: d.id, label: d.name }))]} placeholder="All Disciplines" className={cls} />

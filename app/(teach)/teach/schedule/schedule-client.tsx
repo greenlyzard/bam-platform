@@ -10,6 +10,7 @@ interface ClassItem {
   startTime: string;
   endTime: string;
   room: string | null;
+  location: string | null;
   levels: string[] | null;
   enrolled: number;
   capacity: number;
@@ -195,6 +196,7 @@ export function ScheduleClient({ classes, userId }: { classes: ClassItem[]; user
                             <p className="font-semibold text-charcoal text-sm truncate">{cls.name}</p>
                             <p className="text-xs text-slate">
                               {formatTime(cls.startTime)} – {formatTime(cls.endTime)}
+                              {cls.location && <span className="text-mist"> &middot; {cls.location}</span>}
                               {cls.room && <span className="text-mist"> &middot; {cls.room}</span>}
                               <span className="text-mist"> &middot; {cls.enrolled}/{cls.capacity}</span>
                             </p>
@@ -247,7 +249,7 @@ export function ScheduleClient({ classes, userId }: { classes: ClassItem[]; user
                           {formatTime(cls.startTime)} – {formatTime(cls.endTime)}
                         </p>
                         <p className="text-[10px] text-mist">
-                          {cls.room && `${cls.room} · `}{cls.enrolled}/{cls.capacity}
+                          {cls.location && `${cls.location} · `}{cls.room && `${cls.room} · `}{cls.enrolled}/{cls.capacity}
                         </p>
                       </Link>
                     ))}

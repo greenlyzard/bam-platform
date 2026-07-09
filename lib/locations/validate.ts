@@ -28,6 +28,20 @@ export function isValidClassHomeLocation(
   return studioLocationIds.has(locationId);
 }
 
+/**
+ * Class-level Location filter (admin class list, spec §6 admin). No selection
+ * (null/empty) passes every class; a selected location id matches only classes whose
+ * home `location_id` equals it. Selecting a location with no classes (e.g. RSM today)
+ * yields an empty result set — the caller renders its normal "no classes" state.
+ */
+export function matchesLocationFilter(
+  classLocationId: string | null | undefined,
+  selectedLocationId: string | null | undefined,
+): boolean {
+  if (!selectedLocationId) return true;
+  return classLocationId === selectedLocationId;
+}
+
 // ── Single-instance override rules (spec §4) ─────────────────────────────────
 
 /**

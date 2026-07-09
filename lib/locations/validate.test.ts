@@ -6,6 +6,7 @@ import {
   OVERRIDE_ELIGIBLE_LOCATION_TYPES,
   isOverrideEligibleLocationType,
   isValidLocationVenueXor,
+  matchesLocationFilter,
 } from "./validate.ts";
 
 const studios = new Set(["loc-sc", "loc-rsm"]);
@@ -63,4 +64,24 @@ test("location-XOR-venue: empty / whitespace strings count as unset", () => {
   assert.equal(isValidLocationVenueXor("", ""), true);
   assert.equal(isValidLocationVenueXor("   ", "Venue"), true); // whitespace-only location = unset
   assert.equal(isValidLocationVenueXor("loc-sc", "   "), true); // whitespace-only venue = unset
+});
+
+// ── Class-level Location filter (admin class list) ───────────────────────────
+
+test("matchesLocationFilter: no selection passes all classes", () => {
+  assert.equal(matchesLocationFilter("loc-sc", null), true);
+  assert.equal(matchesLocationFilter("loc-sc", ""), true);
+  assert.equal(matchesLocationFilter(null, null), true);
+});
+
+test("matchesLocationFilter: a selected location matches only that location's classes", () => {
+  assert.equal(matchesLocationFilter("loc-sc", "loc-sc"), true);
+  assert.equal(matchesLocationFilter("loc-rsm", "loc-sc"), false);
+  assert.equal(matchesLocationFilter(null, "loc-sc"), false);
+});
+
+test("matchesLocationFilter: selecting a location with no classes (RSM) yields empty, not error", () => {
+  const classes = [{ location_id: "loc-sc" }, { location_id: "loc-sc" }, { location_id: null }];
+  const rsmResults = classes.filter((c) => matchesLocationFilter(c.location_id, "loc-rsm"));
+  assert.deepEqual(rsmResults, []);
 });
