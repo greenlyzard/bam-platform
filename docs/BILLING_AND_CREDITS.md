@@ -1,7 +1,14 @@
+> # ⚠️ DEPRECATED — superseded by `docs/COMMERCE_AND_BILLING.md`
+> Do not implement from this file. The canonical successor is **`docs/COMMERCE_AND_BILLING.md`**:
+> - the **credit/point concept** is absorbed there as the bounded credit/prepaid layer (§8.5) — dollar-denominated, not points;
+> - the **`billing_charges` L2 master table** is superseded by the dimensioned **`ledger_entries`** spine.
+>
+> Retained only as historical context for the pre-ledger design.
+
 # BILLING_AND_CREDITS.md
 # Ballet Academy and Movement — Billing Engine & Credits Spec
-# Version: 2.0 | Status: Authoritative | Owner: Derek Shaw (Green Lyzard)
-# Updated: March 2026 — merged BILLING.md + BILLING_AND_CREDITS.md
+# Version: 2.0 | Status: DEPRECATED (superseded by COMMERCE_AND_BILLING.md) | Owner: Derek Shaw (Green Lyzard)
+# Updated: March 2026 — merged BILLING.md + BILLING_AND_CREDITS.md · Deprecated: July 2026
 
 ---
 
