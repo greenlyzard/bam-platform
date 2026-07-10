@@ -117,13 +117,13 @@ which supersedes this gap note with the reconciliation + build sequence. Pending
 **Deprecated:** `ROLES_AND_PERMISSIONS.md`, `ROLE_BASED_NAV_SPEC.md`
 
 ## Billing
-| Topic | Canonical |
-|---|---|
-| Tuition & credits | `docs/BILLING_AND_CREDITS.md` |
-| FSA/HSA invoice PDF | `docs/INVOICE_PDF.md` |
-| Performance/competition costs | `docs/PERFORMANCE_COMPETITION_COSTS.md` |
+| Topic | Canonical | Notes |
+|---|---|---|
+| Commerce & billing (payments, ledger, pricing, credits) | `docs/COMMERCE_AND_BILLING.md` | ✅ Canonical *(Draft)* — supersedes `BILLING_AND_CREDITS.md` |
+| FSA/HSA invoice PDF | `docs/INVOICE_PDF.md` | Subordinate — downstream renderer; reads from `ledger_entries` |
+| Performance/competition costs | `docs/PERFORMANCE_COMPETITION_COSTS.md` | |
 
-**Deprecated:** `TENANT_PAYMENT_CONFIG.md` (white-label feature deferred)
+**Deprecated:** `TENANT_PAYMENT_CONFIG.md` (white-label feature deferred) · `BILLING_AND_CREDITS.md` (**superseded by `COMMERCE_AND_BILLING.md`** — its credit concept is absorbed as the bounded credit layer, `COMMERCE_AND_BILLING.md` §8.5; its `billing_charges` L2 spine is superseded by `ledger_entries`)
 
 ## Brand
 | Topic | Canonical | Status |
@@ -201,7 +201,7 @@ which supersedes this gap note with the reconciliation + build sequence. Pending
 | `APP_STORE_SETUP.md` | 📖 | Ops | — | capacitor.config, ios/, android/ | Capacitor native iOS/Android wrapper setup |
 | `ATTENDANCE.md` | 🟠 | Students | attendance_records, timesheet_alerts, timesheet_entries, sessions⚠ | api/attendance, cron/generate-sessions | Attendance tracking + overpayment alerts (legacy `sessions`/`user_profiles`) |
 | `BALLET_DOMAIN.md` | 📖 | Brand/Domain | — | lib/ai prompts | Ballet vocab, curriculum, skill/badge taxonomy reference |
-| `BILLING_AND_CREDITS.md` | 🧱 | Billing | credit_accounts, credit_transactions, invoices⚠, billing_charges⚠ | admin/billing, portal/billing | Credit/point + dollar billing engine (most tables unbuilt) |
+| `BILLING_AND_CREDITS.md` | 🔴 | Billing | credit_accounts, credit_transactions, invoices⚠, billing_charges⚠ | admin/billing, portal/billing | (dep) credit/point + `billing_charges` engine — **superseded by `COMMERCE_AND_BILLING.md`** (credit concept → bounded credit layer §8.5; `billing_charges` L2 → `ledger_entries`) |
 | `BRAND.md` | ✅ | Brand | — | tailwind, UI_STYLE_DIRECTIVES | Studio identity, voice, colors, typography |
 | `CALENDAR_AND_SCHEDULING.md` | 🔴 | Scheduling | schedule_instances, schedule_templates, rooms, calendar_subscriptions, approval_tasks | admin/calendar, widget/schedule | (dep) calendar/scheduling approvals + sync |
 | `CASTING_AND_REHEARSAL.md` | ✅ | Scheduling | productions, dances, production_dances, casting, rehearsals, rehearsal_attendance | admin/schedule, portal rehearsals | Casting/rehearsal/production schema + approvals |
@@ -240,7 +240,7 @@ which supersedes this gap note with the reconciliation + build sequence. Pending
 | `EXPANSION.md` | ✅ | Expansion | expansion_markets, competitor_studios | admin/expansion, lib/queries/admin | Market/competitor readiness scoring for Location #2 |
 | `HOW_TO_ADD_SKILLS.md` | 📖 | Ops | — | CLAUDE.md | Skill-file loading guide (recommends @import — conflicts convention) |
 | `INTEGRATIONS.md` | 🔵 | Ops | tenant_integrations⚠ | admin/settings/integrations | Tenant-scoped integration adapter pattern (unbuilt) |
-| `INVOICE_PDF.md` | 🧱 | Billing | invoices⚠ | api/invoices, portal/billing/invoices | FSA/HSA PDF invoices (only Stripe receipts today) |
+| `INVOICE_PDF.md` | 🧱 | Billing | invoices⚠ | api/invoices, portal/billing/invoices | FSA/HSA PDF invoices — **subordinate to `COMMERCE_AND_BILLING.md`** (downstream renderer, reads `ledger_entries`; no conflict); only Stripe receipts today |
 | `LEVEL_SYSTEM.md` | 🔴 | Students | — | ~admin/settings/levels | Fixed level taxonomy (conflicts LEVELS_AND_PROGRAMS) |
 | `LEVELS_AND_PROGRAMS.md` | ✅ | Students | studio_levels, studio_programs, program_eligible_levels, student_programs | ~admin/settings/levels-programs | Dynamic per-tenant Levels vs Programs model |
 | `LOCATIONS_AND_FACILITIES.md` | ✅ | Locations & Facilities | studio_locations, rooms, location_hours, studio_closures, schedule_instances (location fields), classes.location_id | admin/settings/studio, admin/schedule, class-edit-drawer, portal/public catalog + ICS | Canonical multi-location + facilities model; fork reconciliation + per-surface location resolution |

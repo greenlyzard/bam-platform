@@ -126,6 +126,27 @@ A single ledger where every revenue and expense entry lands, carrying the dimens
 
 ---
 
+## 8.5 Credits & prepaid balances
+
+**The default path is pay-in-advance by card → `ledger_entries`. Credits are a bounded EXCEPTION, not the primary mechanism.** Nearly every charge is paid up front on a saved card; the credit layer exists only for the specific cases below and is applied as an explicit adjustment, never assumed.
+
+**Credits are dollar-denominated** and arise in exactly three cases:
+1. **Admin-granted goodwill credit** — a trade, a pause credit, a service-recovery gesture; an admin issues a $ credit to a family.
+2. **Refund-to-credit** — instead of cash back to the card, a refund is held as account credit.
+3. **Prepaid privates / Pilates** — a family pays ahead and sessions **draw down** the balance as they're used.
+
+**Mechanism (already partly LIVE — integrate, do not orphan or rebuild):**
+- `credit_accounts` (`balance`, `lifetime_spent`) + `credit_transactions` = the family balance layer.
+- `teacher_rate_cards.point_cost` = the per-private/Pilates credit **cost** that draws from the balance. **Live and load-bearing** — the privates path (`admin/privates/actions.ts`) reads it to check sufficiency against the balance; **KEEP it.**
+
+**Application:** a charge can be satisfied by **card**, by a **credit draw** (when a balance exists), or a **mix**. Default is card; credit is applied as an adjustment on the charge, not assumed.
+
+**Accounting:** prepaid balances and granted credits are a **liability** until consumed (bookkeeper concern — see §11). The ledger reflects **consumption**: revenue is recognized as the credit is drawn down, not when it is granted or prepaid.
+
+**Retirement note — `classes.point_cost`:** the `point_cost` column on `classes` (default 1; all 63 live classes at default; zero real data) is the vestigial "points for regular group classes" residue of the old credit-first model. **Retire it in a later cleanup slice, NOT in the checkout spine.** Prerequisite before dropping: update `admin/students/[id]/profile/add-to-class-modal.tsx` to stop `SELECT`ing `point_cost` (otherwise PostgREST errors the modal's class list) and retire its bundle/credit-deduction branch. This is **distinct from** `teacher_rate_cards.point_cost` (privates/Pilates credit cost — untouched by this retirement).
+
+---
+
 ## 9. Commerce surfaces & admin tools
 
 - **In-portal catalog + cart + checkout:** logged-in families browse bundles-made-of-classes, add to cart (`enrollment_carts`), one-click checkout (saved customer), get upsold. **Not gated behind the Angelina lead funnel** — commerce is a platform primitive.
@@ -147,6 +168,7 @@ A single ledger where every revenue and expense entry lands, carrying the dimens
 
 - **Chart of accounts** + the revenue/expense `category` list (finance + QBO decision).
 - **QBO mapping:** which categories ↔ which QBO accounts; `location_id`/`event_id` ↔ QBO classes/locations.
+- **Credit/liability accounting treatment:** confirm the accounting treatment + QBO mapping for prepaid privates/Pilates and admin-granted credits (a liability until consumed — §8.5) with the bookkeeper.
 - **Bundle tiers + exact prices** (BAM's real pricing sheet) and their **level/placement gates**.
 - **Discount stacking/precedence** rules (early + military + scholarship: which stack, which exclude, order of application).
 - **Overhead allocation methodology** (Layer 4): allocation basis, empty-time treatment, fixed vs. variable — a bookkeeper/CPA decision.
