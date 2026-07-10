@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getClassCatalog } from "@/lib/queries/enroll";
 import { getAssistantConfig } from "@/lib/assistant/config";
 import { EnrollPageClient } from "./enroll-page-client";
@@ -24,6 +25,38 @@ export default async function EnrollPage() {
     .single();
   const studioName = tenant?.name ?? "Ballet Academy and Movement";
 
+  // Footer contact + address. studio_settings is authenticated-only under RLS, so read
+  // this public-display data server-side with the service role (never sent to the client).
+  const admin = createAdminClient();
+  const { data: settingsRow } = await admin
+    .from("studio_settings")
+    .select("*")
+    .maybeSingle();
+  // phone/email are added by 20260710120000_studio_settings_contact.sql; until the
+  // generated types are regenerated they aren't on the Row, so read via an explicit shape.
+  const contact = settingsRow as unknown as
+    | { phone: string | null; email: string | null }
+    | null;
+  const phone = contact?.phone?.trim() || null;
+  const email = contact?.email?.trim() || null;
+
+  const { data: primaryLocation } = await admin
+    .from("studio_locations")
+    .select("address, city, state, zip")
+    .eq("tenant_id", tenantId)
+    .eq("is_primary", true)
+    .maybeSingle();
+
+  const cityStateZip = [
+    [primaryLocation?.city, primaryLocation?.state].filter(Boolean).join(", "),
+    primaryLocation?.zip,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const addressLine = [primaryLocation?.address, cityStateZip]
+    .filter(Boolean)
+    .join(" / ");
+
   return (
     <div className="min-h-screen bg-cream">
       {/* Header */}
@@ -34,9 +67,6 @@ export default async function EnrollPage() {
               {studioName}
             </h1>
           </a>
-          <p className="mt-1 text-sm text-white/80">
-            San Clemente, California
-          </p>
         </div>
       </header>
 
@@ -45,11 +75,25 @@ export default async function EnrollPage() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-silver py-6 text-center">
-        <p className="text-xs text-mist">
-          {studioName} · 400-C Camino De Estrella, San Clemente,
-          CA 92672 · (949) 229-0846
-        </p>
+      <footer className="border-t border-silver px-4 py-6 text-center">
+        {(phone || email) && (
+          <p className="text-xs text-mist flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
+            {phone && (
+              <a href={`tel:${phone.replace(/[^\d+]/g, "")}`} className="hover:text-charcoal transition-colors">
+                {phone}
+              </a>
+            )}
+            {phone && email && <span aria-hidden="true">·</span>}
+            {email && (
+              <a href={`mailto:${email}`} className="hover:text-charcoal transition-colors">
+                {email}
+              </a>
+            )}
+          </p>
+        )}
+        {addressLine && (
+          <p className="mt-1 text-xs text-mist">{addressLine}</p>
+        )}
       </footer>
     </div>
   );

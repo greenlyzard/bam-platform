@@ -21,6 +21,8 @@ interface StudioSettings {
   app_icon_url: string | null;
   student_term_singular: string | null;
   student_term_plural: string | null;
+  phone?: string | null;
+  email?: string | null;
 }
 
 interface Location {
@@ -76,6 +78,8 @@ function IdentitySection({ settings }: { settings: StudioSettings | null }) {
   const [faviconUrl, setFaviconUrl] = useState(settings?.favicon_url ?? "");
   const [studentTermSingular, setStudentTermSingular] = useState(settings?.student_term_singular ?? "Student");
   const [studentTermPlural, setStudentTermPlural] = useState(settings?.student_term_plural ?? "Students");
+  const [phone, setPhone] = useState(settings?.phone ?? "");
+  const [email, setEmail] = useState(settings?.email ?? "");
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState<string | null>(null);
   const [toast, setToast] = useState("");
@@ -108,6 +112,8 @@ function IdentitySection({ settings }: { settings: StudioSettings | null }) {
       favicon_url: faviconUrl || null,
       student_term_singular: studentTermSingular || "Student",
       student_term_plural: studentTermPlural || "Students",
+      phone: phone || null,
+      email: email || null,
     });
     setSaving(false);
     if (result.success) {
@@ -137,6 +143,38 @@ function IdentitySection({ settings }: { settings: StudioSettings | null }) {
             onChange={(e) => setStudioName(e.target.value)}
             className="w-full max-w-md h-11 rounded-lg border border-silver bg-white px-4 text-sm text-charcoal placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
           />
+        </div>
+
+        {/* Contact — shown on the public enrollment page footer */}
+        <div>
+          <label className="block text-sm font-medium text-charcoal mb-1.5">
+            Contact
+          </label>
+          <p className="text-xs text-mist mb-2">
+            Shown on the public enrollment page footer.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md">
+            <div>
+              <label className="text-xs text-mist mb-1 block">Phone</label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="(949) 229-0846"
+                className="w-full h-11 rounded-lg border border-silver bg-white px-4 text-sm text-charcoal placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-mist mb-1 block">Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="dance@bamsocal.com"
+                className="w-full h-11 rounded-lg border border-silver bg-white px-4 text-sm text-charcoal placeholder:text-mist focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
+              />
+            </div>
+          </div>
         </div>
 
         {/* Light Logo */}

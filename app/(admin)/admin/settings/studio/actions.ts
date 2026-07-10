@@ -13,19 +13,29 @@ export async function updateStudioIdentity(payload: {
   favicon_url: string | null;
   student_term_singular?: string;
   student_term_plural?: string;
+  phone?: string | null;
+  email?: string | null;
 }): Promise<{ success: boolean; error?: string }> {
   const supabase = createAdminClient();
+
+  // Built as a variable (not an inline literal) so the new phone/email columns —
+  // present at runtime after 20260710120000_studio_settings_contact.sql, but not yet in
+  // the generated types — don't trip excess-property checks before types are regenerated.
+  const updates = {
+    studio_name: payload.studio_name,
+    logo_light_url: payload.logo_light_url || null,
+    logo_dark_url: payload.logo_dark_url || null,
+    favicon_url: payload.favicon_url || null,
+    student_term_singular: payload.student_term_singular || "Student",
+    student_term_plural: payload.student_term_plural || "Students",
+    phone: payload.phone?.trim() || null,
+    email: payload.email?.trim() || null,
+    updated_at: new Date().toISOString(),
+  };
+
   const { error } = await supabase
     .from("studio_settings")
-    .update({
-      studio_name: payload.studio_name,
-      logo_light_url: payload.logo_light_url || null,
-      logo_dark_url: payload.logo_dark_url || null,
-      favicon_url: payload.favicon_url || null,
-      student_term_singular: payload.student_term_singular || "Student",
-      student_term_plural: payload.student_term_plural || "Students",
-      updated_at: new Date().toISOString(),
-    })
+    .update(updates)
     .eq("id", STUDIO_SETTINGS_ID);
 
   if (error) return { success: false, error: error.message };

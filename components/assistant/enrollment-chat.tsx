@@ -7,6 +7,7 @@ import { EntryChoiceCard } from "./enrollment-cards/entry-choice-card";
 import { AccountCard } from "./enrollment-cards/account-card";
 import { DancerCard } from "./enrollment-cards/dancer-card";
 import { ClassRecommendationCard } from "./enrollment-cards/class-recommendation-card";
+import { formatDayTime } from "@/lib/format/schedule";
 import { ContactCard } from "./enrollment-cards/contact-card";
 import { TermsCard } from "./enrollment-cards/terms-card";
 import { PaymentCard } from "./enrollment-cards/payment-card";
@@ -65,7 +66,7 @@ export function EnrollmentChat({ config, studioName, tenantId }: EnrollmentChatP
     setEnrollmentData((p) => ({ ...p, choice }));
     addUserMessage(choice === "trial" ? "Free Trial Class" : "Enroll Now");
     pushMsg(
-      { role: "assistant", content: `Wonderful! Let's get you set up. Have you visited ${studioName} before?` },
+      { role: "assistant", content: `Wonderful! Let's set up your account — already have one? You can sign in below.` },
       { role: "card", content: "", cardType: "account" },
     );
     setStep(1);
@@ -129,7 +130,7 @@ export function EnrollmentChat({ config, studioName, tenantId }: EnrollmentChatP
           id: c.id as string,
           name: c.name as string,
           description: (c.description as string) || "",
-          dayTime: `${c.day_of_week} ${c.start_time}`,
+          dayTime: formatDayTime(c.day_of_week as number, c.start_time as string),
           ageRange: `Ages ${c.age_min}-${c.age_max}`,
           spotsRemaining: Math.max(0, ((c.max_enrollment as number) || 20) - ((c.enrolled_count as number) || 0)),
           // fee_cents is the monthly fee in cents; the card renders `price` as dollars.

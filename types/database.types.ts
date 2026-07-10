@@ -7763,12 +7763,14 @@ export type Database = {
           app_icon_url: string | null
           body_font: string
           custom_colors: Json | null
+          email: string | null
           favicon_url: string | null
           heading_font: string
           id: string
           logo_dark_url: string | null
           logo_light_url: string | null
           logo_url: string | null
+          phone: string | null
           student_term_plural: string | null
           student_term_singular: string | null
           studio_name: string
@@ -7780,12 +7782,14 @@ export type Database = {
           app_icon_url?: string | null
           body_font?: string
           custom_colors?: Json | null
+          email?: string | null
           favicon_url?: string | null
           heading_font?: string
           id?: string
           logo_dark_url?: string | null
           logo_light_url?: string | null
           logo_url?: string | null
+          phone?: string | null
           student_term_plural?: string | null
           student_term_singular?: string | null
           studio_name?: string
@@ -7797,12 +7801,14 @@ export type Database = {
           app_icon_url?: string | null
           body_font?: string
           custom_colors?: Json | null
+          email?: string | null
           favicon_url?: string | null
           heading_font?: string
           id?: string
           logo_dark_url?: string | null
           logo_light_url?: string | null
           logo_url?: string | null
+          phone?: string | null
           student_term_plural?: string | null
           student_term_singular?: string | null
           studio_name?: string
