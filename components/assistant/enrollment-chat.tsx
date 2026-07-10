@@ -110,27 +110,38 @@ export function EnrollmentChat({ config, studioName, tenantId }: EnrollmentChatP
     pushMsg({ role: "assistant", content: `Based on ${student.firstName}'s age, here are perfect classes at ${studioName}:` });
 
     try {
-      const { data: classData } = await supabase
+      const { data: classData, error: classError } = await supabase
         .from("classes")
-        .select("id, name, description, day_of_week, start_time, age_min, age_max, max_enrollment, enrollment_count, monthly_price")
+        .select("id, name, description, day_of_week, start_time, age_min, age_max, max_enrollment, enrolled_count, fee_cents")
         .gte("age_max", student.age)
         .lte("age_min", student.age)
-        .eq("is_active", true);
+        .eq("is_active", true)
+        .eq("is_hidden", false)
+        .eq("is_rehearsal", false)
+        .eq("is_performance", false);
 
-      const formatted = (classData || []).map((c: Record<string, unknown>) => ({
-        id: c.id as string,
-        name: c.name as string,
-        description: (c.description as string) || "",
-        dayTime: `${c.day_of_week} ${c.start_time}`,
-        ageRange: `Ages ${c.age_min}-${c.age_max}`,
-        spotsRemaining: Math.max(0, ((c.max_enrollment as number) || 20) - ((c.enrollment_count as number) || 0)),
-        price: (c.monthly_price as number) || 0,
-        isFull: ((c.enrollment_count as number) || 0) >= ((c.max_enrollment as number) || 20),
-      }));
+      if (classError) {
+        // Surface a real query failure instead of silently rendering "no classes".
+        console.error("[enrollment-chat:classes]", classError);
+        pushMsg({ role: "assistant", content: "I'm having trouble loading classes right now. Please try again in a moment." });
+      } else {
+        const formatted = (classData || []).map((c: Record<string, unknown>) => ({
+          id: c.id as string,
+          name: c.name as string,
+          description: (c.description as string) || "",
+          dayTime: `${c.day_of_week} ${c.start_time}`,
+          ageRange: `Ages ${c.age_min}-${c.age_max}`,
+          spotsRemaining: Math.max(0, ((c.max_enrollment as number) || 20) - ((c.enrolled_count as number) || 0)),
+          // fee_cents is the monthly fee in cents; the card renders `price` as dollars.
+          price: ((c.fee_cents as number) || 0) / 100,
+          isFull: ((c.enrolled_count as number) || 0) >= ((c.max_enrollment as number) || 20),
+        }));
 
-      setClasses(formatted);
-      pushMsg({ role: "card", content: "", cardType: "class-recommendation", cardProps: { classes: formatted } });
-    } catch {
+        setClasses(formatted);
+        pushMsg({ role: "card", content: "", cardType: "class-recommendation", cardProps: { classes: formatted } });
+      }
+    } catch (err) {
+      console.error("[enrollment-chat:classes]", err);
       pushMsg({ role: "assistant", content: "I'm having trouble loading classes right now. Please try again in a moment." });
     }
 
