@@ -3544,6 +3544,110 @@ export type Database = {
           },
         ]
       }
+      ledger_entries: {
+        Row: {
+          account: string | null
+          amount_cents: number
+          category: string | null
+          charge_status: string
+          class_id: string | null
+          created_at: string | null
+          currency: string
+          direction: string
+          discount_id: string | null
+          event_id: string | null
+          family_id: string | null
+          id: string
+          location_id: string | null
+          occurred_at: string | null
+          period: string | null
+          posted_at: string | null
+          qbo_export_ref: string | null
+          review_tier: string
+          source: string | null
+          stripe_reference: string | null
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          account?: string | null
+          amount_cents: number
+          category?: string | null
+          charge_status?: string
+          class_id?: string | null
+          created_at?: string | null
+          currency?: string
+          direction: string
+          discount_id?: string | null
+          event_id?: string | null
+          family_id?: string | null
+          id?: string
+          location_id?: string | null
+          occurred_at?: string | null
+          period?: string | null
+          posted_at?: string | null
+          qbo_export_ref?: string | null
+          review_tier?: string
+          source?: string | null
+          stripe_reference?: string | null
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          account?: string | null
+          amount_cents?: number
+          category?: string | null
+          charge_status?: string
+          class_id?: string | null
+          created_at?: string | null
+          currency?: string
+          direction?: string
+          discount_id?: string | null
+          event_id?: string | null
+          family_id?: string | null
+          id?: string
+          location_id?: string | null
+          occurred_at?: string | null
+          period?: string | null
+          posted_at?: string | null
+          qbo_export_ref?: string | null
+          review_tier?: string
+          source?: string | null
+          stripe_reference?: string | null
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ledger_entries_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ledger_entries_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ledger_entries_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "studio_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ledger_entries_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       level_up_requests: {
         Row: {
           admin_note: string | null
