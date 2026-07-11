@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/stripe";
 
 const CART_COOKIE = "bam_cart_token";
@@ -70,6 +71,39 @@ export async function POST(req: Request) {
       }
     }
 
+    const stripe = getStripe();
+
+    // Create or reuse a Stripe Customer for the family and persist it on the family
+    // row. This saves the card at checkout (setup_future_usage below) so later batch
+    // charging (COMMERCE_AND_BILLING.md §4) can run off-session. Guests (no family_id)
+    // fall back to email-only checkout.
+    let customerId: string | undefined;
+    if (cart.family_id) {
+      const admin = createAdminClient();
+      const { data: family } = await admin
+        .from("families")
+        .select("id, stripe_customer_id, billing_email, family_name")
+        .eq("id", cart.family_id)
+        .single();
+
+      if (family) {
+        if (family.stripe_customer_id) {
+          customerId = family.stripe_customer_id;
+        } else {
+          const customer = await stripe.customers.create({
+            email: customerEmail ?? family.billing_email ?? undefined,
+            name: family.family_name ?? undefined,
+            metadata: { family_id: family.id, tenant_id: cart.tenant_id },
+          });
+          customerId = customer.id;
+          await admin
+            .from("families")
+            .update({ stripe_customer_id: customerId })
+            .eq("id", family.id);
+        }
+      }
+    }
+
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://portal.balletacademyandmovement.com";
 
     // Build Stripe line items
@@ -113,14 +147,17 @@ export async function POST(req: Request) {
       };
     });
 
-    // Create Stripe Checkout Session
-    const stripe = getStripe();
+    // Create Stripe Checkout Session. When we have a Customer, attach it and save the
+    // payment method for future off-session charges; otherwise fall back to email.
+    // (Stripe rejects passing both `customer` and `customer_email`.)
     const checkoutSession = await stripe.checkout.sessions.create({
       mode: "payment",
       line_items: lineItems,
       success_url: `${appUrl}/enroll/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/enroll/cart`,
-      customer_email: customerEmail,
+      ...(customerId
+        ? { customer: customerId, payment_intent_data: { setup_future_usage: "off_session" as const } }
+        : { customer_email: customerEmail }),
       metadata: {
         cart_id: cart.id,
         tenant_id: cart.tenant_id,

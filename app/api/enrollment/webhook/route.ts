@@ -1,12 +1,54 @@
 import { NextResponse } from "next/server";
 import { getStripe } from "@/lib/stripe";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEnrollmentConfirmation } from "@/lib/email/enrollment-confirmation";
+import {
+  selectUnprocessedItems,
+  enrollmentDedupeKey,
+  currentPeriod,
+  buildTuitionLedgerRow,
+  type CheckoutItem,
+} from "@/lib/billing/enrollment-ledger";
 import type Stripe from "stripe";
 
 /**
- * POST — handle Stripe webhook events for enrollment checkout
+ * POST — Stripe webhook for the Checkout-Session enrollment path.
+ *
+ * This is the SINGLE source of enrollment-record creation (COMMERCE_AND_BILLING.md §3,
+ * Layer 1). On `checkout.session.completed` it creates, server-side with the service
+ * role, both the `enrollments` row(s) AND the matching `ledger_entries` revenue row(s),
+ * idempotently (keyed on the Stripe payment intent + student + class), so a webhook
+ * retry never double-creates. Failures are surfaced (HTTP 500) so Stripe retries.
  */
+
+interface JoinedClass {
+  id: string;
+  name: string | null;
+  day_of_week: number | null;
+  start_time: string | null;
+  end_time: string | null;
+  room: string | null;
+  enrolled_count: number | null;
+  location_id: string | null;
+  teacher:
+    | { first_name: string; last_name: string }
+    | { first_name: string; last_name: string }[]
+    | null;
+}
+
+interface CartItemRow {
+  id: string;
+  class_id: string;
+  student_id: string | null;
+  student_name: string | null;
+  price_cents: number;
+  class: JoinedClass | JoinedClass[] | null;
+}
+
+function firstOrSelf<T>(v: T | T[] | null): T | null {
+  return Array.isArray(v) ? (v[0] ?? null) : v;
+}
+
 export async function POST(req: Request) {
   const body = await req.text();
   const sig = req.headers.get("stripe-signature");
@@ -27,7 +69,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
-  const supabase = await createClient();
+  // Service role: ledger_entries is admin-only under RLS, and a webhook has no user session.
+  const supabase = createAdminClient();
 
   switch (event.type) {
     case "checkout.session.completed": {
@@ -37,40 +80,88 @@ export async function POST(req: Request) {
 
       if (!cartId || !tenantId) {
         console.error("[enrollment:webhook] Missing cart_id or tenant_id in metadata");
-        return NextResponse.json({ received: true });
+        // Nothing we can do — ack so Stripe stops retrying a malformed event.
+        return NextResponse.json({ received: true, skipped: "missing_metadata" });
       }
-
-      // Load cart items
-      const { data: items } = await supabase
-        .from("enrollment_cart_items")
-        .select(`
-          *,
-          class:classes(
-            id, name, day_of_week, start_time, end_time, room,
-            teacher:profiles!teacher_id(first_name, last_name),
-            enrolled_count
-          )
-        `)
-        .eq("cart_id", cartId);
-
-      if (!items || items.length === 0) {
-        console.error("[enrollment:webhook] No items found for cart", cartId);
-        return NextResponse.json({ received: true });
-      }
-
-      // Load cart to get family_id
-      const { data: cart } = await supabase
-        .from("enrollment_carts")
-        .select("family_id")
-        .eq("id", cartId)
-        .single();
 
       const paymentIntentId =
         typeof session.payment_intent === "string"
           ? session.payment_intent
           : session.payment_intent?.id ?? null;
 
-      // Create enrollment records
+      if (!paymentIntentId) {
+        console.error("[enrollment:webhook] No payment_intent on session", session.id);
+        return NextResponse.json({ error: "No payment intent" }, { status: 500 });
+      }
+
+      // Load cart items + class detail.
+      const { data: itemsRaw, error: itemsErr } = await supabase
+        .from("enrollment_cart_items")
+        .select(
+          `
+          id, class_id, student_id, student_name, price_cents,
+          class:classes(
+            id, name, day_of_week, start_time, end_time, room, enrolled_count, location_id,
+            teacher:profiles!teacher_id(first_name, last_name)
+          )
+        `
+        )
+        .eq("cart_id", cartId);
+
+      if (itemsErr) {
+        console.error("[enrollment:webhook] Failed to load cart items", itemsErr);
+        return NextResponse.json({ error: "Failed to load cart" }, { status: 500 });
+      }
+
+      const items = (itemsRaw ?? []) as unknown as CartItemRow[];
+      if (items.length === 0) {
+        console.error("[enrollment:webhook] No items found for cart", cartId);
+        return NextResponse.json({ received: true, skipped: "empty_cart" });
+      }
+
+      // Cart → family.
+      const { data: cart } = await supabase
+        .from("enrollment_carts")
+        .select("family_id")
+        .eq("id", cartId)
+        .single();
+      const familyId = cart?.family_id ?? null;
+
+      // ── Idempotency: which (paymentIntent, student, class) enrollments already exist? ──
+      const { data: existing, error: existingErr } = await supabase
+        .from("enrollments")
+        .select("student_id, class_id")
+        .eq("stripe_payment_intent_id", paymentIntentId);
+
+      if (existingErr) {
+        console.error("[enrollment:webhook] Failed to read existing enrollments", existingErr);
+        return NextResponse.json({ error: "Idempotency check failed" }, { status: 500 });
+      }
+
+      const existingKeys = new Set(
+        (existing ?? []).map((e) =>
+          enrollmentDedupeKey(paymentIntentId, e.student_id, e.class_id)
+        )
+      );
+
+      const checkoutItems: (CheckoutItem & { row: CartItemRow })[] = items.map((it) => {
+        const cls = firstOrSelf(it.class);
+        return {
+          classId: it.class_id,
+          studentId: it.student_id,
+          priceCents: it.price_cents,
+          locationId: cls?.location_id ?? null,
+          row: it,
+        };
+      });
+
+      const toProcess = selectUnprocessedItems(checkoutItems, existingKeys, paymentIntentId);
+
+      const currency = session.currency ?? "usd";
+      const now = new Date();
+      const period = currentPeriod(now);
+      const occurredAt = now.toISOString();
+
       const enrolledClasses: {
         name: string;
         dayOfWeek: number;
@@ -79,88 +170,121 @@ export async function POST(req: Request) {
         room: string | null;
         teacherName: string | null;
       }[] = [];
+      const errors: string[] = [];
 
-      for (const item of items) {
-        const cls = item.class as Record<string, unknown> | null;
-        const teacherRaw = cls?.teacher as unknown;
-        const teacher = (Array.isArray(teacherRaw) ? teacherRaw[0] : teacherRaw) as {
-          first_name: string;
-          last_name: string;
-        } | null;
+      for (const item of toProcess) {
+        const cls = firstOrSelf(item.row.class);
 
-        // Create enrollment
-        const { error: enrollErr } = await supabase.from("enrollments").insert({
-          tenant_id: tenantId,
-          family_id: cart?.family_id ?? null,
-          student_id: item.student_id ?? null,
-          class_id: item.class_id,
-          status: "active",
-          enrollment_type: "paid",
-          stripe_payment_intent_id: paymentIntentId,
-          amount_paid_cents: item.price_cents,
-        });
+        // 1. Enrollment (the idempotency anchor).
+        const { data: enr, error: enrollErr } = await supabase
+          .from("enrollments")
+          .insert({
+            tenant_id: tenantId,
+            family_id: familyId,
+            student_id: item.studentId,
+            class_id: item.classId,
+            status: "active",
+            enrollment_type: "paid",
+            stripe_payment_intent_id: paymentIntentId,
+            amount_paid_cents: item.priceCents,
+          })
+          .select("id")
+          .single();
 
-        if (enrollErr) {
-          console.error("[enrollment:webhook] Failed to create enrollment", enrollErr);
+        if (enrollErr || !enr) {
+          console.error("[enrollment:webhook] enrollment insert failed", item.classId, enrollErr);
+          errors.push(`enrollment:${item.classId}`);
           continue;
         }
 
-        // Update enrolled_count
+        // 2. Ledger revenue (tuition) row. If it fails, compensate by deleting the
+        //    enrollment so the item reprocesses atomically on the next retry.
+        const { error: ledgerErr } = await supabase
+          .from("ledger_entries")
+          .insert(
+            buildTuitionLedgerRow({
+              tenantId,
+              item,
+              familyId,
+              paymentIntentId,
+              currency,
+              period,
+              occurredAt,
+            })
+          );
+
+        if (ledgerErr) {
+          console.error("[enrollment:webhook] ledger insert failed; rolling back enrollment", item.classId, ledgerErr);
+          await supabase.from("enrollments").delete().eq("id", enr.id);
+          errors.push(`ledger:${item.classId}`);
+          continue;
+        }
+
+        // 3. Bump enrolled_count (NOT the phantom `enrollment_count`).
         if (cls && typeof cls.enrolled_count === "number") {
           await supabase
             .from("classes")
             .update({ enrolled_count: cls.enrolled_count + 1 })
-            .eq("id", item.class_id);
+            .eq("id", item.classId);
         }
 
+        const teacher = firstOrSelf(cls?.teacher ?? null);
         enrolledClasses.push({
-          name: (cls?.name as string) ?? "Class",
-          dayOfWeek: (cls?.day_of_week as number) ?? 0,
-          startTime: (cls?.start_time as string) ?? "",
-          endTime: (cls?.end_time as string) ?? "",
-          room: (cls?.room as string) ?? null,
+          name: cls?.name ?? "Class",
+          dayOfWeek: cls?.day_of_week ?? 0,
+          startTime: cls?.start_time ?? "",
+          endTime: cls?.end_time ?? "",
+          room: cls?.room ?? null,
           teacherName: teacher ? `${teacher.first_name} ${teacher.last_name}` : null,
         });
       }
 
-      // Update cart status
+      // Surface partial failure so Stripe retries; already-created items are skipped next time.
+      if (errors.length > 0) {
+        console.error("[enrollment:webhook] finalization had errors", cartId, errors);
+        return NextResponse.json(
+          { error: "Finalization incomplete", failed: errors },
+          { status: 500 }
+        );
+      }
+
+      // Mark cart completed (idempotent).
       await supabase
         .from("enrollment_carts")
         .update({ status: "completed" })
         .eq("id", cartId);
 
-      // Send confirmation email
-      const customerEmail = session.customer_email ?? session.customer_details?.email;
-      const customerName = session.customer_details?.name ?? null;
-
-      if (customerEmail) {
-        await sendEnrollmentConfirmation({
-          to: customerEmail,
-          parentName: customerName,
-          classes: enrolledClasses,
-        }).catch((err) => {
-          console.error("[enrollment:webhook] Failed to send confirmation email", err);
-        });
+      // Confirmation email only when new enrollments were created (skips on pure retry).
+      if (enrolledClasses.length > 0) {
+        const customerEmail = session.customer_email ?? session.customer_details?.email;
+        const customerName = session.customer_details?.name ?? null;
+        if (customerEmail) {
+          await sendEnrollmentConfirmation({
+            to: customerEmail,
+            parentName: customerName,
+            classes: enrolledClasses,
+          }).catch((err) => {
+            console.error("[enrollment:webhook] confirmation email failed (non-fatal)", err);
+          });
+        }
       }
 
       console.log(
         "[enrollment:webhook] Checkout completed:",
         cartId,
-        `${enrolledClasses.length} enrollments created`
+        `${enrolledClasses.length} new enrollment(s), ${existingKeys.size} pre-existing`
       );
-      break;
+      return NextResponse.json({ received: true, created: enrolledClasses.length });
     }
 
     case "checkout.session.expired": {
       const session = event.data.object as Stripe.Checkout.Session;
       const cartId = session.metadata?.cart_id;
-
       if (cartId) {
         await supabase
           .from("enrollment_carts")
           .update({ status: "expired" })
           .eq("id", cartId);
-
         console.log("[enrollment:webhook] Checkout expired:", cartId);
       }
       break;

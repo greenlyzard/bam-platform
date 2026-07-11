@@ -221,18 +221,13 @@ export function EnrollmentChat({ config, studioName, tenantId }: EnrollmentChatP
 
   async function handlePaymentSuccess() {
     addUserMessage("Payment complete");
-    try {
-      const { completeRegistration } = await import("@/app/(public)/enroll/actions");
-      await completeRegistration({
-        student_first_name: enrollmentData.student!.firstName,
-        student_last_name: enrollmentData.student!.lastName,
-        student_dob: enrollmentData.student!.dob,
-        emergency_contacts: enrollmentData.contact
-          ? [{ first_name: enrollmentData.contact.emergencyName.split(" ")[0] || "", last_name: enrollmentData.contact.emergencyName.split(" ").slice(1).join(" ") || "", phone: enrollmentData.contact.emergencyPhone }]
-          : [],
-        class_ids: [enrollmentData.selectedClass!.id],
-      });
-    } catch { /* Non-blocking — payment already succeeded */ }
+    // NOTE: enrollment finalization is NO LONGER done here.
+    // The client-side completeRegistration() call was retired so there is exactly ONE
+    // finalization path — the server-side Checkout-Session webhook at
+    // /api/enrollment/webhook, which creates enrollments + ledger_entries idempotently
+    // (COMMERCE_AND_BILLING.md §3, Layer 1). This PaymentIntent-based chat checkout is a
+    // separate, currently-inert path pending its own reconciliation slice; it must not
+    // become a second writer of records.
     showConfirmation();
   }
 
