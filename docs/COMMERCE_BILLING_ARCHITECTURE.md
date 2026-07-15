@@ -30,6 +30,7 @@
 14. **Fee recovery** — recovered per tender via CA-compliant dual pricing (ACH shown cheaper than card); ACH fees passed through too; debit never surcharged; card capped to cost; counsel-gated. Tuition rail = **standard ACH Direct Debit**.
 15. **Failed payments** — keep enrollment active, flag finance_admin; no auto freeze/drop.
 16. **Stripe** — credentials in hand.
+17. **Drop-ins** — supported as one-time paid attendance; per-class rate via `class_pricing_rules` (label='drop_in'); `drop_ins_enabled` per class; no schedule, no reg fee, recognized immediately; counts toward class capacity; per-student cap (`students.drop_in_limit`, admin-set, null = unlimited).
 
 ---
 
@@ -117,6 +118,8 @@ Alternative to recurring. `family_id`, `season_id`, `total_cents`, `covered_from
 ### 4.9 Registration fee config
 - `seasons.registration_fee_cents` (season default, per family per season).
 - `classes.registration_fee_override_cents` (nullable) + `classes.requires_registration_fee` (bool, default true). A family owing at least one fee-bearing class pays the fee once per season; families in only-exempt classes owe nothing.
+- `classes.drop_ins_enabled` (bool, default false) gates whether a class accepts drop-ins; the drop-in price lives in `class_pricing_rules` (label='drop_in').
+- `students.drop_in_limit` (int, nullable, admin-set) caps drop-ins before enrollment is required; null = unlimited.
 
 ### 4.10 `award_definitions` (scholarships / discounts / comps)
 `code`, `name`, `award_class` (`scholarship|discount|comp`), `method` (`percent|fixed|full_waiver|force_price_tier`), `value?`, `scope` (`registration_fee|tuition|private|pilates|merch|all`), `eligibility` (`manual|category|date_based`), `is_scholarship` (bool → counts toward parent banner), `stackable` (bool), `valid_from?`, `valid_to?`, `is_active`.
@@ -160,6 +163,7 @@ Add dimension **`teacher_id`** and **`award_id`**; add FK **`event_id`** → `pr
 |---|---|---|
 | `tuition_monthly` | `revenue_tuition` | recognized in the month billed |
 | `tuition_prepaid` | `deferred_revenue` | recognized monthly on delivery (§11.3) |
+| `drop_in` | `revenue_tuition` | single paid class attendance; one-time, no schedule |
 | `registration_fee` | `revenue_registration` | season default / class override |
 | `deposit` | `deposit_liability` | until applied/forfeited |
 | `costume` | `revenue_costume` | purchase; tags event/dance |
@@ -179,6 +183,7 @@ Add dimension **`teacher_id`** and **`award_id`**; add FK **`event_id`** → `pr
 ## 6. Pricing Resolution (per invoice)
 
 1. **Base + deadline tier** from `class_pricing_rules`; record `pricing_rule_id`. An `award_grant` with `force_price_tier` can grant an expired early-bird tier (logged exception).
+   - **Drop-in:** if a class has `drop_ins_enabled` and the booking is a single attendance (not an enrollment), price from the class's `class_pricing_rules` row where `label='drop_in'`. Drop-ins skip the registration fee and create no `tuition_schedule`. A drop-in counts toward the class's capacity for that date (capacity check = enrolled + drop-in attendances). Enforce the per-student cap: if `students.drop_in_limit` is set and the student's drop-in attendance count has reached it, block the drop-in and require enrollment.
 2. **Registration fee** — season default or class override; once per family per season; skipped if all classes exempt.
 3. **Bundle covering** — active pack/points/unlimited entitlement covers the line → charge resolves to $0 (class pack) or points debit (private); consumption row written.
 4. **Automatic discount bundles** — sibling/multi-class → `discount` line.
@@ -199,6 +204,7 @@ Add dimension **`teacher_id`** and **`award_id`**; add FK **`event_id`** → `pr
 - **ACH settlement (standard):** charges confirm/settle in ~4 business days; a `tuition_charge` sits `processing` until then. Post `cash_clearing` on `succeeded`, not on initiation. A late **return** (`succeeded → returned`) fires a ledger reversal (§11.2) and reflags `finance_admin` — the same review queue as a hard failure.
 - **Failure:** dunning T+1/T+3/T+5; after cycle, **keep enrollment active**, flag `finance_admin` (review queue) — no auto freeze/drop.
 - **Commitment:** `month_to_month` charges only while active; `annual` continues the schedule through season end (early exit handled in §9 with override).
+- **Drop-ins (one-time):** a single class attendance is a one-time invoice + single payment + an `attendance` record — no `tuition_schedule`, no commitment, no registration fee. Revenue recognized immediately (consumed same day), so it posts to `revenue_tuition`, not `deferred_revenue`. Drop-ins count toward class capacity for that date. A per-student cap (`students.drop_in_limit`, nullable, admin-set; null = unlimited) gates how many drop-ins a student may take before enrollment is required.
 
 **Pay-in-full alternative:** one invoice for the covered term → `prepaid_terms` with `deferred_balance_cents`; recognized monthly (§11.3); no `tuition_charges`.
 
@@ -365,7 +371,7 @@ Webhooks dedupe on processor event id. Off-session charges keyed on `tuition_cha
 1. Money-unit normalization (cents migrations).
 2. Ledger dimensions — `teacher_id`, `award_id`, `event_id` FK; idempotent index.
 3. Canonical tables — invoices, line_items, payments, allocations, refunds (+RLS, finance_admin).
-4. Registration-fee config (season default + class override) + pricing resolver (§6), tested vs `class_pricing_rules`.
+4. Registration-fee config (season default + class override) + pricing resolver (§6) and drop-in resolution (per-class `drop_in` rate, per-student cap enforcement, capacity counting), tested vs `class_pricing_rules`. One-time drop-in checkout rides the same one-time invoice+payment path used for pay-in-full (available once Layer 7's checkout lands).
 5. Ledger posting service — revenue recipes (§11.2), post from finalized invoice + manual payment.
 6. Processor interface + Stripe (Checkout, vaulting, **standard ACH Direct Debit** w/ mandate + verification + `succeeded→returned` handling, webhook normalization); `tenant_payment_config`, `processor_*_refs`.
 7. **Recurring monthly tuition** — schedules/charges, proration, cron off-session, dunning + admin flag. *(Revenue live.)*
