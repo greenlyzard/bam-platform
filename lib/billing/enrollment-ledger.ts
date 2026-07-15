@@ -1,7 +1,3 @@
-import type { Database } from "@/types/database.types";
-
-export type LedgerInsert = Database["public"]["Tables"]["ledger_entries"]["Insert"];
-
 /** A cart item reduced to exactly what checkout finalization needs. */
 export interface CheckoutItem {
   classId: string;
@@ -49,35 +45,6 @@ export function currentPeriod(now: Date): string {
   return `${y}-${m}`;
 }
 
-/**
- * Build the tuition revenue ledger row for one enrolled class.
- * (Registration-fee entries — category='registration' — are added separately
- * when the cart model carries a registration line; it does not today.)
- */
-export function buildTuitionLedgerRow(args: {
-  tenantId: string;
-  item: CheckoutItem;
-  familyId: string | null;
-  paymentIntentId: string | null;
-  currency: string;
-  period: string;
-  occurredAt: string;
-}): LedgerInsert {
-  return {
-    tenant_id: args.tenantId,
-    direction: "revenue",
-    account: "tuition",
-    category: "tuition",
-    source: "enrollment",
-    class_id: args.item.classId,
-    location_id: args.item.locationId,
-    family_id: args.familyId,
-    amount_cents: args.item.priceCents,
-    currency: args.currency,
-    period: args.period,
-    occurred_at: args.occurredAt,
-    charge_status: "charged",
-    review_tier: "auto",
-    stripe_reference: args.paymentIntentId,
-  };
-}
+// NOTE: the old single-entry `buildTuitionLedgerRow` was retired in the double-entry cutover
+// (LEDGER_DOUBLE_ENTRY_DESIGN.md). Ledger rows are now built by lib/billing/ledger-posting.ts
+// as balanced debit/credit posting groups.

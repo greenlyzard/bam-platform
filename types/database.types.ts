@@ -3793,7 +3793,127 @@ export type Database = {
           },
         ]
       }
+      ledger_accounts: {
+        Row: {
+          acct_type: string
+          code: number
+          is_active: boolean
+          name: string
+          normal_balance: string
+          slug: string
+        }
+        Insert: {
+          acct_type: string
+          code: number
+          is_active?: boolean
+          name: string
+          normal_balance: string
+          slug: string
+        }
+        Update: {
+          acct_type?: string
+          code?: number
+          is_active?: boolean
+          name?: string
+          normal_balance?: string
+          slug?: string
+        }
+        Relationships: []
+      }
       ledger_entries: {
+        Row: {
+          account: string
+          amount_cents: number
+          award_id: string | null
+          charge_status: string | null
+          class_id: string | null
+          created_at: string
+          direction: string
+          discount_id: string | null
+          entry_group_id: string
+          event_id: string | null
+          family_id: string | null
+          id: string
+          invoice_id: string | null
+          jurisdiction_code: string | null
+          line_item_id: string | null
+          location_id: string | null
+          occurred_at: string
+          payment_id: string | null
+          product_id: string | null
+          student_id: string | null
+          tax_rate_bps: number | null
+          teacher_id: string | null
+          tenant_id: string
+        }
+        Insert: {
+          account: string
+          amount_cents: number
+          award_id?: string | null
+          charge_status?: string | null
+          class_id?: string | null
+          created_at?: string
+          direction: string
+          discount_id?: string | null
+          entry_group_id: string
+          event_id?: string | null
+          family_id?: string | null
+          id?: string
+          invoice_id?: string | null
+          jurisdiction_code?: string | null
+          line_item_id?: string | null
+          location_id?: string | null
+          occurred_at: string
+          payment_id?: string | null
+          product_id?: string | null
+          student_id?: string | null
+          tax_rate_bps?: number | null
+          teacher_id?: string | null
+          tenant_id: string
+        }
+        Update: {
+          account?: string
+          amount_cents?: number
+          award_id?: string | null
+          charge_status?: string | null
+          class_id?: string | null
+          created_at?: string
+          direction?: string
+          discount_id?: string | null
+          entry_group_id?: string
+          event_id?: string | null
+          family_id?: string | null
+          id?: string
+          invoice_id?: string | null
+          jurisdiction_code?: string | null
+          line_item_id?: string | null
+          location_id?: string | null
+          occurred_at?: string
+          payment_id?: string | null
+          product_id?: string | null
+          student_id?: string | null
+          tax_rate_bps?: number | null
+          teacher_id?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ledger_entries_account_fkey"
+            columns: ["account"]
+            isOneToOne: false
+            referencedRelation: "ledger_accounts"
+            referencedColumns: ["slug"]
+          },
+          {
+            foreignKeyName: "ledger_entries_entry_group_id_fkey"
+            columns: ["entry_group_id"]
+            isOneToOne: false
+            referencedRelation: "ledger_entry_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ledger_entries_legacy_single: {
         Row: {
           account: string | null
           amount_cents: number
@@ -3916,6 +4036,83 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ledger_entry_groups: {
+        Row: {
+          adjusts_period: string | null
+          event_type: string
+          id: string
+          memo: string | null
+          occurred_at: string
+          posted_at: string
+          posting_key: string
+          reversal_of_group_id: string | null
+          source_ref: string | null
+          source_system: string
+          tenant_id: string
+        }
+        Insert: {
+          adjusts_period?: string | null
+          event_type: string
+          id?: string
+          memo?: string | null
+          occurred_at: string
+          posted_at?: string
+          posting_key: string
+          reversal_of_group_id?: string | null
+          source_ref?: string | null
+          source_system: string
+          tenant_id: string
+        }
+        Update: {
+          adjusts_period?: string | null
+          event_type?: string
+          id?: string
+          memo?: string | null
+          occurred_at?: string
+          posted_at?: string
+          posting_key?: string
+          reversal_of_group_id?: string | null
+          source_ref?: string | null
+          source_system?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ledger_entry_groups_reversal_of_group_id_fkey"
+            columns: ["reversal_of_group_id"]
+            isOneToOne: false
+            referencedRelation: "ledger_entry_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ledger_period_closes: {
+        Row: {
+          closed_at: string
+          closed_by: string | null
+          period: string
+          tenant_id: string
+          total_credits: number
+          total_debits: number
+        }
+        Insert: {
+          closed_at?: string
+          closed_by?: string | null
+          period: string
+          tenant_id: string
+          total_credits: number
+          total_debits: number
+        }
+        Update: {
+          closed_at?: string
+          closed_by?: string | null
+          period?: string
+          tenant_id?: string
+          total_credits?: number
+          total_debits?: number
+        }
+        Relationships: []
       }
       level_up_requests: {
         Row: {
@@ -8562,6 +8759,36 @@ export type Database = {
           },
         ]
       }
+      tax_rates: {
+        Row: {
+          effective_from: string
+          effective_to: string | null
+          id: string
+          jurisdiction_code: string
+          rate_bps: number
+          tax_type: string
+          tenant_id: string
+        }
+        Insert: {
+          effective_from: string
+          effective_to?: string | null
+          id?: string
+          jurisdiction_code: string
+          rate_bps: number
+          tax_type: string
+          tenant_id: string
+        }
+        Update: {
+          effective_from?: string
+          effective_to?: string | null
+          id?: string
+          jurisdiction_code?: string
+          rate_bps?: number
+          tax_type?: string
+          tenant_id?: string
+        }
+        Relationships: []
+      }
       teacher_affiliations: {
         Row: {
           affiliation_type: string
@@ -9991,6 +10218,19 @@ export type Database = {
         | { Args: { p_user_id: string }; Returns: boolean }
       my_class_ids: { Args: never; Returns: string[] }
       my_student_ids: { Args: never; Returns: string[] }
+      post_ledger_group: {
+        Args: {
+          p_event_type: string
+          p_legs: Json
+          p_occurred_at: string
+          p_posting_key: string
+          p_reversal_of?: string
+          p_source_ref: string
+          p_source_system: string
+          p_tenant: string
+        }
+        Returns: string
+      }
     }
     Enums: {
       billing_status: "unbilled" | "pending" | "charged" | "waived" | "disputed"

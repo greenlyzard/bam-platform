@@ -4,7 +4,6 @@ import {
   enrollmentDedupeKey,
   selectUnprocessedItems,
   currentPeriod,
-  buildTuitionLedgerRow,
   type CheckoutItem,
 } from "./enrollment-ledger.ts";
 
@@ -54,28 +53,4 @@ test("currentPeriod: YYYY-MM in UTC", () => {
   assert.equal(currentPeriod(new Date("2026-08-03T00:00:00Z")), "2026-08");
   assert.equal(currentPeriod(new Date("2026-01-31T23:59:59Z")), "2026-01");
   assert.equal(currentPeriod(new Date("2026-12-01T12:00:00Z")), "2026-12");
-});
-
-test("buildTuitionLedgerRow: revenue/tuition entry with the right dimensions", () => {
-  const row = buildTuitionLedgerRow({
-    tenantId: "ten-1",
-    item: itemA,
-    familyId: "fam-1",
-    paymentIntentId: PI,
-    currency: "usd",
-    period: "2026-08",
-    occurredAt: "2026-08-03T00:00:00.000Z",
-  });
-  assert.equal(row.direction, "revenue");
-  assert.equal(row.account, "tuition");
-  assert.equal(row.category, "tuition");
-  assert.equal(row.source, "enrollment");
-  assert.equal(row.charge_status, "charged");
-  assert.equal(row.review_tier, "auto");
-  assert.equal(row.amount_cents, 15000);
-  assert.equal(row.class_id, "cls-a");
-  assert.equal(row.location_id, "loc-1");
-  assert.equal(row.family_id, "fam-1");
-  assert.equal(row.stripe_reference, PI);
-  assert.equal(row.period, "2026-08");
 });

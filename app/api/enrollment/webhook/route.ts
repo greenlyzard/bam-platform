@@ -5,11 +5,31 @@ import { sendEnrollmentConfirmation } from "@/lib/email/enrollment-confirmation"
 import {
   selectUnprocessedItems,
   enrollmentDedupeKey,
-  currentPeriod,
-  buildTuitionLedgerRow,
   type CheckoutItem,
 } from "@/lib/billing/enrollment-ledger";
+import {
+  buildCheckoutPostingGroups,
+  assertBalanced,
+  type LedgerLeg,
+} from "@/lib/billing/ledger-posting";
 import type Stripe from "stripe";
+
+// Type bridge for the post_ledger_group RPC (added by 20260715180000_ledger_groups_rebuild.sql;
+// not in the generated types until `supabase gen types` runs). Remove after regen.
+interface PostLedgerGroupArgs {
+  p_tenant: string;
+  p_posting_key: string;
+  p_event_type: string;
+  p_occurred_at: string;
+  p_source_system: string;
+  p_source_ref: string;
+  p_legs: LedgerLeg[];
+  p_reversal_of: string | null;
+}
+type RpcFn = (
+  name: "post_ledger_group",
+  args: PostLedgerGroupArgs
+) => Promise<{ error: { message: string } | null }>;
 
 /**
  * POST — Stripe webhook for the Checkout-Session enrollment path.
@@ -157,10 +177,7 @@ export async function POST(req: Request) {
 
       const toProcess = selectUnprocessedItems(checkoutItems, existingKeys, paymentIntentId);
 
-      const currency = session.currency ?? "usd";
-      const now = new Date();
-      const period = currentPeriod(now);
-      const occurredAt = now.toISOString();
+      const occurredAt = new Date().toISOString();
 
       const enrolledClasses: {
         name: string;
@@ -197,30 +214,8 @@ export async function POST(req: Request) {
           continue;
         }
 
-        // 2. Ledger revenue (tuition) row. If it fails, compensate by deleting the
-        //    enrollment so the item reprocesses atomically on the next retry.
-        const { error: ledgerErr } = await supabase
-          .from("ledger_entries")
-          .insert(
-            buildTuitionLedgerRow({
-              tenantId,
-              item,
-              familyId,
-              paymentIntentId,
-              currency,
-              period,
-              occurredAt,
-            })
-          );
-
-        if (ledgerErr) {
-          console.error("[enrollment:webhook] ledger insert failed; rolling back enrollment", item.classId, ledgerErr);
-          await supabase.from("enrollments").delete().eq("id", enr.id);
-          errors.push(`ledger:${item.classId}`);
-          continue;
-        }
-
-        // 3. Bump enrolled_count (NOT the phantom `enrollment_count`).
+        // 2. Bump enrolled_count (NOT the phantom `enrollment_count`).
+        //    (Ledger is posted once, for the whole checkout, after this loop — see below.)
         if (cls && typeof cls.enrolled_count === "number") {
           await supabase
             .from("classes")
@@ -246,6 +241,46 @@ export async function POST(req: Request) {
           { error: "Finalization incomplete", failed: errors },
           { status: 500 }
         );
+      }
+
+      // ── Post balanced double-entry ledger groups via the RPC (Fable §3: R1 finalize + R2
+      // payment). The WRITE PATH is post_ledger_group(): it inserts group + legs atomically in
+      // one transaction and dedupes on UNIQUE(tenant_id, posting_key) via ON CONFLICT DO NOTHING,
+      // so a redelivered/concurrent webhook no-ops (no check-then-insert race). The DB's deferred
+      // constraint trigger enforces Σdebits=Σcredits at commit; we also assert here before the
+      // call. Posted for ALL cart items once enrollments are in place. Payment/enrollment STATE
+      // lives on their own rows, never the ledger.
+      const groups = buildCheckoutPostingGroups({
+        paymentIntentId,
+        familyId,
+        items: checkoutItems.map((c) => ({
+          classId: c.classId,
+          studentId: c.studentId,
+          priceCents: c.priceCents,
+          locationId: c.locationId,
+        })),
+      });
+
+      const rpc = supabase.rpc.bind(supabase) as unknown as RpcFn;
+      for (const group of groups) {
+        assertBalanced(group); // defense-in-depth ahead of the DB trigger
+        const { error: postErr } = await rpc("post_ledger_group", {
+          p_tenant: tenantId,
+          p_posting_key: group.postingKey,
+          p_event_type: group.eventType,
+          p_occurred_at: occurredAt,
+          p_source_system: group.sourceSystem,
+          p_source_ref: group.sourceRef,
+          p_legs: group.legs,
+          p_reversal_of: null,
+        });
+        if (postErr) {
+          console.error("[enrollment:webhook] ledger posting failed", group.eventType, postErr);
+          return NextResponse.json(
+            { error: "Ledger posting failed", group: group.eventType },
+            { status: 500 }
+          );
+        }
       }
 
       // Mark cart completed (idempotent).
