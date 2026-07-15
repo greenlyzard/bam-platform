@@ -3548,6 +3548,7 @@ export type Database = {
         Row: {
           account: string | null
           amount_cents: number
+          award_id: string | null
           category: string | null
           charge_status: string
           class_id: string | null
@@ -3566,12 +3567,14 @@ export type Database = {
           review_tier: string
           source: string | null
           stripe_reference: string | null
+          teacher_id: string | null
           tenant_id: string
           updated_at: string | null
         }
         Insert: {
           account?: string | null
           amount_cents: number
+          award_id?: string | null
           category?: string | null
           charge_status?: string
           class_id?: string | null
@@ -3590,12 +3593,14 @@ export type Database = {
           review_tier?: string
           source?: string | null
           stripe_reference?: string | null
+          teacher_id?: string | null
           tenant_id: string
           updated_at?: string | null
         }
         Update: {
           account?: string | null
           amount_cents?: number
+          award_id?: string | null
           category?: string | null
           charge_status?: string
           class_id?: string | null
@@ -3614,6 +3619,7 @@ export type Database = {
           review_tier?: string
           source?: string | null
           stripe_reference?: string | null
+          teacher_id?: string | null
           tenant_id?: string
           updated_at?: string | null
         }
@@ -3623,6 +3629,13 @@ export type Database = {
             columns: ["class_id"]
             isOneToOne: false
             referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ledger_entries_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "productions"
             referencedColumns: ["id"]
           },
           {
@@ -3637,6 +3650,13 @@ export type Database = {
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "studio_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ledger_entries_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "teachers"
             referencedColumns: ["id"]
           },
           {
