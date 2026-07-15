@@ -1,11 +1,13 @@
 // Double-entry ledger posting for the enrollment checkout.
-// Implements docs/LEDGER_FOUNDATION_REVIEW.md §3 recipes R1 (invoice_finalized: DR AR / CR
-// revenue) and R2 (payment_captured: DR cash_clearing / CR AR) for the Stripe Checkout flow.
+// Implements docs/LEDGER_FOUNDATION_REVIEW.md §3.3 `direct_sale_captured`: an immediately-paid
+// checkout (no invoice, no receivable) posts ONE balanced group — DR cash_clearing (total) /
+// CR revenue_tuition (per item). No accounts_receivable leg: AR is reserved for genuinely-owed
+// money (the recurring-tuition path), so an instant sale reads like a receipt (cash in = revenue).
 //
 // Pure + deterministic: no DB, no clock, no randomness. The WRITE PATH is the SECURITY DEFINER
-// RPC post_ledger_group() — this module only shapes the balanced groups + legs the webhook hands
+// RPC post_ledger_group() — this module only shapes the balanced group + legs the webhook hands
 // to it. Idempotency is the RPC's ON CONFLICT (tenant_id, posting_key) DO NOTHING; the posting
-// keys below are deterministic so a redelivered webhook no-ops.
+// key below is deterministic so a redelivered webhook no-ops.
 
 /** Chart-of-accounts slugs (must exist in ledger_accounts) touched by checkout. */
 export const ACCOUNTS = {
@@ -38,8 +40,8 @@ export interface LedgerLeg {
 /** One economic event → one call to post_ledger_group. */
 export interface PostingGroupSpec {
   postingKey: string;
-  eventType: "invoice_finalized" | "payment_captured";
-  sourceSystem: "app" | "stripe";
+  eventType: "direct_sale_captured";
+  sourceSystem: "stripe";
   sourceRef: string;
   legs: LedgerLeg[];
 }
@@ -63,29 +65,29 @@ function leg(partial: Partial<LedgerLeg> & { account: string; direction: LegDire
 }
 
 /**
- * Build the two balanced groups for a completed enrollment checkout:
- *   R1 invoice_finalized: per item  DR accounts_receivable / CR revenue_tuition
- *   R2 payment_captured:  total     DR cash_clearing       / CR accounts_receivable
- * AR opens in R1 and clears in R2; each group independently balances (>=2 legs, Σdr=Σcr).
- * Posting keys follow the Fable format {source_system}:{source_ref}:{event_type}.
+ * Build the single balanced group for an immediately-paid enrollment checkout (Fable §3.3):
+ *   direct_sale_captured: one DR cash_clearing (total) + per-item CR revenue_tuition.
+ * No accounts_receivable — the money is already paid, so this reads like a receipt
+ * (cash in = revenue). The group balances (Σdr=Σcr) and has >=2 legs.
+ * Posting key follows the Fable format {source_system}:{source_ref}:{event_type}.
  */
 export function buildCheckoutPostingGroups(input: CheckoutPostingInput): PostingGroupSpec[] {
   const { paymentIntentId: pi, familyId, items } = input;
-  const groups: PostingGroupSpec[] = [];
+  const totalCents = items.reduce((sum, it) => sum + it.priceCents, 0);
+  if (totalCents <= 0) return [];
 
-  // R1 — invoice/enrollment finalized (revenue recognized against AR).
-  const finalizeLegs: LedgerLeg[] = [];
+  // One debit for the cash received, one revenue credit per item (keeps per-class dims).
+  const legs: LedgerLeg[] = [
+    leg({
+      account: ACCOUNTS.cash_clearing,
+      direction: "debit",
+      amount_cents: totalCents,
+      family_id: familyId,
+      charge_status: "captured",
+    }),
+  ];
   for (const it of items) {
-    finalizeLegs.push(
-      leg({
-        account: ACCOUNTS.accounts_receivable,
-        direction: "debit",
-        amount_cents: it.priceCents,
-        family_id: familyId,
-        student_id: it.studentId,
-        class_id: it.classId,
-        location_id: it.locationId,
-      }),
+    legs.push(
       leg({
         account: ACCOUNTS.revenue_tuition,
         direction: "credit",
@@ -94,35 +96,20 @@ export function buildCheckoutPostingGroups(input: CheckoutPostingInput): Posting
         student_id: it.studentId,
         class_id: it.classId,
         location_id: it.locationId,
+        charge_status: "captured",
       })
     );
   }
-  if (finalizeLegs.length > 0) {
-    groups.push({
-      postingKey: `app:${pi}:invoice_finalized`,
-      eventType: "invoice_finalized",
-      sourceSystem: "app",
-      sourceRef: pi,
-      legs: finalizeLegs,
-    });
-  }
 
-  // R2 — payment captured (cash clears AR).
-  const totalCents = items.reduce((sum, it) => sum + it.priceCents, 0);
-  if (totalCents > 0) {
-    groups.push({
-      postingKey: `stripe:${pi}:payment_captured`,
-      eventType: "payment_captured",
+  return [
+    {
+      postingKey: `stripe:${pi}:direct_sale_captured`,
+      eventType: "direct_sale_captured",
       sourceSystem: "stripe",
       sourceRef: pi,
-      legs: [
-        leg({ account: ACCOUNTS.cash_clearing, direction: "debit", amount_cents: totalCents, family_id: familyId, charge_status: "captured" }),
-        leg({ account: ACCOUNTS.accounts_receivable, direction: "credit", amount_cents: totalCents, family_id: familyId, charge_status: "captured" }),
-      ],
-    });
-  }
-
-  return groups;
+      legs,
+    },
+  ];
 }
 
 /** Sum of debit and credit cents in a group. */
