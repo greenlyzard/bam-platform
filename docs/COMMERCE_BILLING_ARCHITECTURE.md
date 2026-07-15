@@ -2,402 +2,382 @@
 
 **Status:** Draft spec — not yet implemented
 **Owner:** Derek Shaw (Green Lyzard)
-**Scope decision (locked):** Full unified money layer — class enrollment, private lessons, shop/merch, and credits all reconcile onto `ledger_entries`.
-**Billing model (locked):** Pay-in-full **and** installment plans at Fall 2026 go-live.
-**Line-item types (locked):** Tuition + registration fee + deposits/costumes.
+**Version:** v3 — incorporates Amanda/finance decisions: recurring monthly tuition, commitment terms, awards/scholarship engine, points, per-item costumes, tax, and CA-compliant card-fee recovery.
 
-> Spec-first document. No code is written until this is reviewed and committed to `docs/`. Implementation is handled by Claude Code against the build sequence in §17. All money is stored as **integer cents** unless explicitly noted.
+**Scope (locked):** Unified money layer — enrollment, private lessons, Pilates, shop/merch, credits, awards, and payroll labor all reconcile onto `ledger_entries`.
+**Tuition model (locked):** Recurring monthly, billed on the 15th, prorated for partial months. Pay-in-full is an alternative path.
+**Line-item types (locked):** Tuition + registration fee + deposits/costumes + bundles/passes/points + merch.
+
+> Spec-first. No code until committed to `docs/`. Implementation follows §22. All money is **integer cents**.
+
+---
+
+## 0. Decisions Locked (this round)
+
+1. **Registration fee** — season default, per family per season; overridable at class level (exempt or custom amount); waivable per student/family via awards.
+2. **Tuition** — recurring monthly on the **15th**, prorated for partial months; schedule generated per season. Pay-in-full alternative.
+3. **Commitment term** — `month_to_month` (rec) vs `annual` (Company / Studio Company), with admin exceptions.
+4. **Drop proration** — month-to-month: admin case-by-case (refund *or* credit); annual: early-exit handling with override.
+5. **Costumes/deposits** — per-item: purchase | rental | flat_fee (sometimes per dance); refundable flag + optional deadline; rental deposits are liabilities.
+6. **Bundles** — sibling/multi-class discounts + class packs + unlimited passes; packs apply to group, **Pilates, and privates**.
+7. **Points** — customer points, both prepaid packs and pay-per-use; teacher-tiered cost; a point has a fixed dollar value.
+8. **Awards/discounts engine** — finance_admin+ manages named awards (Cobb Scholarship full/partial, Military, Early-bird w/ override, promos); scholarships surface a prominent parent-facing value total.
+9. **Teacher classification** — per teacher: W-2 (`wages_expense`) or 1099 (`contractor_expense`).
+10. **Teacher private pay** — flat rate per teacher (no comp-points).
+11. **Revenue recognition** — prepaid amounts are liabilities recognized **on consumption**; refunds draw from the unused balance.
+12. **Labor attribution** — by scheduled class time.
+13. **Sales tax** — on tangible retail goods (merch, snacks, future products); costumes/tuition untaxed.
+14. **Card-fee recovery** — CA-compliant dual-pricing + ACH steer for recurring tuition; debit excluded; capped to cost; counsel-gated.
+15. **Failed payments** — keep enrollment active, flag finance_admin; no auto freeze/drop.
+16. **Stripe** — credentials in hand.
 
 ---
 
 ## 1. Design Principles
 
-1. **Two layers, cleanly separated.**
-   - *Money-movement layer* talks to a payment processor and is swappable per tenant.
-   - *Accounting layer* (`ledger_entries`) is an immutable double-entry general ledger and is the single source of truth for reporting and QBO export. Nothing reads Stripe to answer "what does this family owe" — it reads the ledger.
-2. **Installments are the general case.** Pay-in-full is a plan with `num_installments = 1` due today. One intake path, one idempotent charge path.
-3. **Processor-agnostic by construction.** No Stripe-specific assumptions leak into the ledger or the invoice model. Stripe is the first implementation of a `PaymentProcessor` interface, not the architecture.
-4. **Cents everywhere.** Integer cents in every money column. The current `numeric` dollar columns are migrated (see §11).
-5. **Family is the billing account.** `families` carries the processor customer reference and is the unit that invoices, plans, and credits attach to.
-6. **Location is a filter dimension, never an RLS boundary.** `ledger_entries.location_id` is for reporting/splits; it does not gate access.
-7. **Idempotency is mandatory at every write** — webhook ingestion, off-session charges, and ledger posting all dedupe on a natural key.
-8. **Tenant isolation** on every table via `tenant_id`; parent reads scoped to their family; `finance_admin` for write/reconcile.
+1. Two layers: swappable processor money-movement vs immutable `ledger_entries` accounting truth.
+2. The ledger carries **revenue AND labor** on one dimension set → true per-class/location/production/teacher P&L.
+3. **Prepaid = liability until consumed.** Tuition-in-advance, packs, and points sit in liability accounts and recognize on use; refunds are clean.
+4. **Recurring is the tuition default;** pay-in-full is a special case, not the base model.
+5. Cents everywhere. Processor-agnostic by construction. Family is the billing account.
+6. Enrollment is fluid: add/drop/transfer are first-class financial events honoring commitment terms.
+7. Every economic event stamps dimensions: `family / class / location / event / teacher / award / discount / period`.
+8. Idempotency at every write; tenant isolation on every table; `finance_admin` owns billing/ledger/payroll/awards.
 
 ---
 
-## 2. Current Schema Reality
+## 2. Current Schema Reality (verified — project `niabwaofqsirfsktyyff`)
 
-Verified against project `niabwaofqsirfsktyyff`. Four payment surfaces already exist:
-
-### 2.1 Class enrollment (Stripe Checkout path)
-- `enrollment_carts` — `family_id`, `session_token`, `status`, `stripe_session_id`, `expires_at` (2h TTL).
-- `enrollment_cart_items` — `cart_id`, `class_id`, `student_id`, `student_name`, `price_cents`.
-- `enrollments` — `stripe_payment_intent_id`, `amount_paid_cents`, `billing_plan_type`, `enrollment_type` (`'full'` default), `family_id`, `enrolled_by`.
-- `families` — `stripe_customer_id`, `account_credit` (numeric), `billing_email`, `billing_phone`, `primary_contact_id`.
-- `class_pricing_rules` — deadline-tiered pricing per class: `label`, `deadline`, `amount` (numeric), `discount_type`, `discount_value`, `is_base_price`. (13 rows.)
-- `bundle_configs` — sibling / multi-class discounts: `trigger_type`, `trigger_value`, `discount_type`, `discount_value`, `is_unlimited`.
-- `seasons` — `registration_open`, `is_active`, `program`, `period`; season-scoped enrollment.
-- `trial_history` + `enrollments.trial_class_date` — free trial → conversion.
-
-### 2.2 Private lessons — **SPLIT-BRAIN (two models coexist)**
-- `private_session_billing` (flat, 2 rows) — `session_id`, `student_id`, `family_id`, `split_percentage`, `amount_owed`, `points_owed`, `market_value`, `studio_contribution`, `teacher_contribution`, `billing_status`, `credit_transaction_id`.
-- `private_billing_records` + `private_billing_splits` — a different split-based model with its own `billing_status` **enum** and confirmation flags.
-
-### 2.3 Shop / merch — self-contained, **does not post to ledger**
-- `shop_configs`, `products` (`price_cents`, `stripe_price_id`), `shop_orders` (`order_number`, `items` jsonb, `subtotal_cents`/`tax_cents`/`discount_cents`/`total_cents`, `payment_status`, `stripe_payment_intent_id`).
-
-### 2.4 Credits — **TWO representations**
-- `families.account_credit` — numeric dollars.
-- `credit_accounts` (`balance`, `lifetime_earned`, `lifetime_spent`) + `credit_transactions` (`type`, `amount`, `balance_after`, `reference_id`) — integer.
-
-### 2.5 The spine — `ledger_entries` (0 rows)
-Dimensioned double-entry GL, nothing posts to it yet:
-`direction`, `account`, `category`, `amount_cents`, `currency`, `period`, `occurred_at`, `posted_at`, `source`, `charge_status` (`'pending'`), `review_tier` (`'auto'`), `stripe_reference`, `qbo_export_ref`, plus dimensions `event_id`, `class_id`, `location_id`, `family_id`, `discount_id`.
+- **Enrollment:** `enrollment_carts` → `enrollment_cart_items` → `enrollments` (`stripe_payment_intent_id`, `amount_paid_cents`, `billing_plan_type`, `enrollment_type`, `family_id`, `dropped_at`). `families.stripe_customer_id`/`account_credit`. `class_pricing_rules` = deadline-tiered. `bundle_configs` (`is_unlimited`). `seasons` (`registration_open`).
+- **Private:** split-brain — `private_session_billing` (`teacher_contribution`, `points_owed`, `market_value`, `studio_contribution`) vs `private_billing_records`/`private_billing_splits`.
+- **Shop:** `shop_configs`, `products` (`stripe_price_id`), `shop_orders` — not on ledger.
+- **Credits:** `families.account_credit` (numeric) vs `credit_accounts`/`credit_transactions` (integer).
+- **Payroll v2:** `pay_periods`, `timesheets`, `timesheet_entries`, `teacher_rate_cards`, `teacher_hours` — not on ledger.
+- **Productions:** `productions`, `dances`, `production_dances`, `casting`, `rehearsals` — natural `event_id` referents.
+- **Spine:** `ledger_entries` (0 rows) — dimensioned double-entry GL; **needs a `teacher_id` dimension and an `event_id` FK** (§4.20).
 
 ---
 
 ## 3. Target Architecture
 
 ```
-                        INTAKE SURFACES
-   enrollment cart   private session   shop cart   admin adjustment
-          |                 |              |              |
-          v                 v              v              v
-  +--------------------------------------------------------------+
-  |            CANONICAL BILLING LAYER                           |
-  |   invoices  ->  invoice_line_items                          |
-  |   installment_plans -> installment_schedule                |
-  |   payments  ->  payment_allocations                        |
-  |   credits (credit_accounts / credit_transactions)          |
-  |   refunds                                                   |
-  +--------------------------------------------------------------+
-          |  (posting service: economic events -> entries)
-          v
-  +--------------------------------------------------------------+
-  |            LEDGER  (ledger_entries)  — source of truth       |
-  |            double-entry, dimensioned, QBO-exportable         |
-  +--------------------------------------------------------------+
-          ^
-          |  (normalized webhook events)
-  +--------------------------------------------------------------+
-  |   PaymentProcessor interface  (per-tenant config)            |
-  |   Stripe impl | Authorize.net | Square | PayPal              |
-  +--------------------------------------------------------------+
+   enrollment   private/pilates   shop   payroll approval   award grant   admin adj.
+       |             |             |            |               |             |
+       v             v             v            v               v             v
+ +--------------------------------------------------------------------------------+
+ |                          CANONICAL BILLING LAYER                               |
+ |  invoices -> line_items      recurring tuition schedule    award_grants        |
+ |  installment/plan (pay-in-full)   bundle_entitlements/consumptions (pts/class) |
+ |  payments -> allocations     credits    refunds            costume_fees        |
+ +--------------------------------------------------------------------------------+
+       |   posting service (revenue)                    |  payroll posting service
+       v                                                v
+ +--------------------------------------------------------------------------------+
+ |   LEDGER (ledger_entries): revenue + labor, one truth                          |
+ |   dims: family / class / location / EVENT / TEACHER / AWARD / discount / period|
+ +--------------------------------------------------------------------------------+
+       ^ normalized webhook events
+ +--------------------------------------------------------------------------------+
+ |  PaymentProcessor (per tenant): Stripe first | Authorize.net | Square | PayPal |
+ |  tenders: card | ACH (preferred for tuition) | credit | points | cash          |
+ +--------------------------------------------------------------------------------+
 ```
-
-The intake surfaces stay surface-specific (an enrollment cart is not a merch cart), but they all **materialize a canonical `invoice`** before any money moves. The processor only ever sees invoices/payments. The ledger only ever sees normalized economic events.
 
 ---
 
-## 4. Canonical Data Model (new tables)
+## 4. Canonical Data Model
 
-All new tables: `id uuid pk`, `tenant_id uuid not null`, `created_at`, `updated_at`, RLS on. Money = integer cents.
+New tables: `id`, `tenant_id`, `created_at`, `updated_at`, RLS. Money = cents.
 
 ### 4.1 `invoices`
-| column | type | notes |
-|---|---|---|
-| family_id | uuid | billing account |
-| season_id | uuid null | for tuition invoices |
-| source | text | `enrollment` \| `private` \| `shop` \| `manual` |
-| status | text | `draft` \| `open` \| `partially_paid` \| `paid` \| `void` \| `refunded` |
-| subtotal_cents | int | sum of line items pre-discount |
-| discount_cents | int | total discounts applied |
-| credit_applied_cents | int | customer credit tendered |
-| tax_cents | int | default 0 (services untaxed; merch may tax) |
-| total_cents | int | amount payable after discount/credit |
-| amount_paid_cents | int | running total from payments |
-| currency | text | `usd` |
-| location_id | uuid null | reporting dimension |
-| finalized_at | timestamptz null | when it left `draft` |
-| created_by | uuid null | |
+`family_id`, `season_id?`, `event_id?`, `source` (`enrollment|private|pilates|shop|manual|tuition_run`), `status` (`draft|open|partially_paid|paid|void|refunded`), `subtotal_cents`, `discount_cents`, `scholarship_cents`, `credit_applied_cents`, `tax_cents`, `surcharge_cents`, `total_cents`, `amount_paid_cents`, `currency`, `location_id?`, `period?` (e.g. `2026-09` for a tuition run), `finalized_at?`, `created_by?`.
 
 ### 4.2 `invoice_line_items`
-| column | type | notes |
-|---|---|---|
-| invoice_id | uuid | |
-| line_type | text | see §5 taxonomy |
-| description | text | human label |
-| class_id | uuid null | tuition lines |
-| enrollment_id | uuid null | set post-enrollment |
-| product_id | uuid null | merch lines |
-| private_session_id | uuid null | private lines |
-| student_id | uuid null | who it's for |
-| quantity | int | default 1 |
-| unit_price_cents | int | resolved price (see §6) |
-| pricing_rule_id | uuid null | `class_pricing_rules.id` used |
-| discount_id | uuid null | bundle/coupon applied |
-| discount_cents | int | default 0 |
-| amount_cents | int | `quantity*unit_price - discount` |
+`invoice_id`, `line_type` (§5), `description`, `class_id?`, `enrollment_id?`, `product_id?`, `private_session_id?`, `costume_fee_id?`, `bundle_entitlement_id?`, `award_id?`, `event_id?`, `dance_id?`, `student_id?`, `quantity`, `unit_price_cents`, `pricing_rule_id?`, `discount_cents`, `taxable` (bool), `tax_cents`, `amount_cents`.
 
 ### 4.3 `payments`
-A money receipt. Many payments may satisfy one invoice (installments/partials).
-| column | type | notes |
-|---|---|---|
-| family_id | uuid | |
-| processor | text | `stripe` (per tenant) |
-| processor_payment_ref | text | e.g. Stripe PaymentIntent id |
-| method | text | `card` \| `credit` \| `cash` \| `check` \| `ach` |
-| amount_cents | int | |
-| status | text | `pending` \| `succeeded` \| `failed` \| `refunded` \| `partially_refunded` |
-| installment_schedule_id | uuid null | set for scheduled charges |
-| idempotency_key | text unique | dedupe (see §15) |
-| captured_at | timestamptz null | |
+`family_id`, `processor`, `processor_payment_ref`, `method` (`card|ach|credit|points|cash|check`), `amount_cents`, `status`, `recurring_charge_id?`, `idempotency_key` (unique), `captured_at?`.
 
 ### 4.4 `payment_allocations`
-Allocates a payment across invoice line items (needed for installments and partial pays).
-`payment_id`, `invoice_id`, `invoice_line_item_id` (null = invoice-level), `amount_cents`.
+`payment_id`, `invoice_id`, `invoice_line_item_id?`, `amount_cents`.
 
-### 4.5 `installment_plans`
-| column | type | notes |
+### 4.5 `refunds`
+`payment_id`, `amount_cents`, `reason`, `destination` (`card|credit`), `processor_refund_ref?`, `status`, `created_by`.
+
+### 4.6 Recurring tuition — `tuition_schedules`
+Per active enrollment (or per family+season). `family_id`, `season_id`, `anchor_day` (default 15), `monthly_amount_cents`, `commitment_type` (`month_to_month|annual`), `status` (`active|paused|ended`), `start_date`, `end_date?`, `processor_payment_method_ref?`, `preferred_tender` (`ach|card`).
+
+### 4.7 `tuition_charges` (the generated calendar of 15ths)
+`schedule_id`, `enrollment_id`, `period` (`YYYY-MM`), `due_date`, `amount_cents` (prorated where partial), `proration_note?`, `status` (`scheduled|invoiced|paid|failed|skipped|superseded|credited`), `invoice_id?`, `payment_id?`, `attempts`, `next_retry_at?`, `supersedes_id?`.
+
+### 4.8 Pay-in-full — `prepaid_terms`
+Alternative to recurring. `family_id`, `season_id`, `total_cents`, `covered_from`, `covered_to`, `deferred_balance_cents` (unrecognized remainder), `status`. Recognized monthly against delivery (§11.3).
+
+### 4.9 Registration fee config
+- `seasons.registration_fee_cents` (season default, per family per season).
+- `classes.registration_fee_override_cents` (nullable) + `classes.requires_registration_fee` (bool, default true). A family owing at least one fee-bearing class pays the fee once per season; families in only-exempt classes owe nothing.
+
+### 4.10 `award_definitions` (scholarships / discounts / comps)
+`code`, `name`, `award_class` (`scholarship|discount|comp`), `method` (`percent|fixed|full_waiver|force_price_tier`), `value?`, `scope` (`registration_fee|tuition|private|pilates|merch|all`), `eligibility` (`manual|category|date_based`), `is_scholarship` (bool → counts toward parent banner), `stackable` (bool), `valid_from?`, `valid_to?`, `is_active`.
+
+### 4.11 `award_grants` (instances)
+`definition_id`, `family_id?`, `student_id?`, `season_id?`, `granted_by`, `override_reason?`, `status` (`active|expired|revoked`), `effective_from?`, `effective_to?`. Applying a grant emits tagged reduction lines; `award_id` on the line is this grant.
+
+### 4.12 `costume_fees`
+`event_id` (production), `dance_id?`, `fee_type` (`purchase|rental|flat_fee`), `amount_cents`, `refundable` (bool), `refund_deadline?`, `label`, `is_active`.
+
+### 4.13 `bundle_entitlements`
+`family_id`, `bundle_config_id`, `invoice_id`, `denomination` (`class_count|unlimited|points`), `applies_to` (`group|pilates|private|any`), `credits_total?`, `credits_remaining?`, `points_total?`, `points_remaining?`, `is_unlimited`, `valid_from`, `valid_to`, `status` (`active|expired|exhausted|cancelled`).
+
+### 4.14 `bundle_consumptions`
+`entitlement_id`, `enrollment_id?`, `private_session_id?`, `class_id?`, `student_id`, `units?` (class packs), `points_consumed?` (points packs), `consumed_at`, `reversal_of?`.
+
+### 4.15 Points config
+- Tenant-level `point_value_cents` (fixed dollar value of one point).
+- `teacher_private_rates`: `teacher_id`, `point_cost` (customer points to book a private with this teacher), `flat_payout_cents` (teacher's pay per private — §12.3). Pay-per-use price = `point_cost × point_value_cents`.
+
+### 4.16 `enrollment_changes`
+`enrollment_id`, `change_type` (`add|drop|transfer`), `effective_date`, `commitment_type` (copied), `proration_method` (`by_remaining_days|by_remaining_sessions|none`), `gross_adjustment_cents`, `adjustment_kind` (`charge|credit|refund|none`), `adjustment_invoice_id?`, `credit_transaction_id?`, `refund_id?`, `schedule_amended` (bool), `related_change_id?`, `override_reason?`, `created_by`.
+
+### 4.17 Teacher fields
+`teachers.payroll_classification` (`w2|1099`). Private payout via `teacher_private_rates.flat_payout_cents`.
+
+### 4.18 Tax
+`products.taxable` (bool) + category default; `invoice_line_items.taxable`/`tax_cents`; tuition/costume default untaxed.
+
+### 4.19 `tenant_payment_config` (white-label + card-fee recovery)
+`processor`, `mode`, `credentials_ref` (secret pointer — never raw keys), `is_active`, `ach_enabled` (bool), `preferred_recurring_tender` (`ach`), `card_cost_recovery_mode` (`none|dual_pricing|surcharge`), `surcharge_cap_pct`, `exclude_debit` (always true), `ca_counsel_approved` (bool — gates any surcharge/dual-pricing go-live), `statement_descriptor`. Plus `processor_customer_refs` / `processor_product_refs` (§de-Stripe-ing).
+
+### 4.20 `ledger_entries` additions
+Add dimension **`teacher_id`** and **`award_id`**; add FK **`event_id`** → `productions(id)`. All nullable; migrations §16.
+
+---
+
+## 5. Line-Item Taxonomy
+
+| line_type | account | notes |
 |---|---|---|
-| family_id | uuid | |
-| invoice_id | uuid | the invoice being financed |
-| total_cents | int | must equal invoice.total_cents |
-| num_installments | int | `1` = pay-in-full |
-| cadence | text | `monthly` \| `custom` |
-| status | text | `active` \| `completed` \| `defaulted` \| `cancelled` |
-| processor_payment_method_ref | text null | vaulted card token |
-| created_by | uuid null | |
-
-### 4.6 `installment_schedule`
-| column | type | notes |
-|---|---|---|
-| plan_id | uuid | |
-| seq | int | 1..n |
-| due_date | date | |
-| amount_cents | int | |
-| status | text | `scheduled` \| `paid` \| `failed` \| `skipped` \| `refunded` |
-| payment_id | uuid null | fk once charged |
-| attempts | int | default 0 |
-| last_attempt_at | timestamptz null | |
-| next_retry_at | timestamptz null | dunning |
-
-### 4.7 `refunds`
-`payment_id`, `amount_cents`, `reason`, `destination` (`card` \| `credit`), `processor_refund_ref`, `created_by`, `status`.
-
-### 4.8 `tenant_payment_config` (white-label)
-Mirrors the existing `tenant_assistant_config` pattern.
-`tenant_id`, `processor` (`stripe`|`authorize_net`|`square`|`paypal`), `mode` (`test`|`live`), `credentials_ref` (pointer to secret in env/secret store — **never store raw keys in DB**), `is_active`, `supports_installments bool`, `statement_descriptor`.
-
-### 4.9 Processor customer/price refs (de-Stripe-ing)
-Replace hardcoded `families.stripe_customer_id` and `products.stripe_price_id` reliance with a small mapping so a tenant on Square isn't stuck with Stripe columns:
-`processor_customer_refs` (`family_id`, `processor`, `customer_ref`) and `processor_product_refs` (`product_id`, `processor`, `price_ref`).
-*Migration keeps the existing Stripe columns readable but treats them as the `stripe` row of these tables. Non-breaking.*
+| `tuition_monthly` | `revenue_tuition` | recognized in the month billed |
+| `tuition_prepaid` | `deferred_revenue` | recognized monthly on delivery (§11.3) |
+| `registration_fee` | `revenue_registration` | season default / class override |
+| `deposit` | `deposit_liability` | until applied/forfeited |
+| `costume` | `revenue_costume` | purchase; tags event/dance |
+| `costume_rental_deposit` | `deposit_liability` | refundable on return |
+| `bundle` | `bundle_liability` | pack/pass; recognized per use |
+| `points_pack` | `points_liability` | recognized per private used |
+| `private_lesson` | `revenue_private` | dollar or points-funded |
+| `merch` | `revenue_merch` | taxable |
+| `credit_applied` | (contra) | tenders customer credit |
+| `scholarship` | `scholarship_contra` | tagged award; feeds parent banner |
+| `discount` | `discounts_contra` | ordinary promo/bundle discount |
+| `surcharge` | `card_fee_recovery` | only if dual-pricing/surcharge enabled |
+| `adjustment` | `revenue_adjustment` | add/drop proration, manual |
 
 ---
 
-## 5. Line-Item Taxonomy (`line_type`)
+## 6. Pricing Resolution (per invoice)
 
-| line_type | revenue account | notes |
-|---|---|---|
-| `tuition` | `revenue_tuition` | season/class; may be deferred (see §8) |
-| `registration_fee` | `revenue_registration` | per-family or per-student, per season |
-| `deposit` | `deposit_liability` | held as liability until applied/forfeited |
-| `costume` | `revenue_costume` | production costumes |
-| `merch` | `revenue_merch` | shop products; tax-eligible |
-| `private_lesson` | `revenue_private` | see §10.2 |
-| `credit_applied` | (contra) | negative line; tenders customer credit |
-| `discount` | `discounts_contra` | negative line; bundle/coupon |
-| `adjustment` | `revenue_adjustment` | admin manual +/- |
+1. **Base + deadline tier** from `class_pricing_rules`; record `pricing_rule_id`. An `award_grant` with `force_price_tier` can grant an expired early-bird tier (logged exception).
+2. **Registration fee** — season default or class override; once per family per season; skipped if all classes exempt.
+3. **Bundle covering** — active pack/points/unlimited entitlement covers the line → charge resolves to $0 (class pack) or points debit (private); consumption row written.
+4. **Automatic discount bundles** — sibling/multi-class → `discount` line.
+5. **Awards** — apply active `award_grants` (scholarship/military/promo) as `scholarship` or `discount` lines, tagged `award_id`.
+6. **Credit** — optional `credit_applied` line.
+7. **Tax** — per taxable line.
+8. **Card-fee recovery** — only in dual-pricing/surcharge mode and only for card tender (§13).
+9. Totals frozen on lines at creation.
 
 ---
 
-## 6. Pricing Resolution
+## 7. Recurring Monthly Tuition (primary flow)
 
-Order of operations when building an invoice line for a class:
+- On enrollment, create/attach a `tuition_schedule` (`anchor_day=15`, `commitment_type`, `preferred_tender=ach`). Generate `tuition_charges` for the season's months.
+- **Proration** — first month (late join) and any partial month computed `by_remaining_days` (Amanda may switch to sessions). Full months = `monthly_amount_cents`.
+- **Charge run (Vercel cron, daily):** find `tuition_charges` due on/before today with `status='scheduled'` → materialize a monthly `invoice` (`source='tuition_run'`, `period`) → charge the card/ACH on file off-session (idempotency key = `tuition_charge.id`) → post ledger.
+- **First payment** at checkout via Stripe Checkout with `setup_future_usage=off_session` to vault the tender; ACH mandate collected where used.
+- **Failure:** dunning T+1/T+3/T+5; after cycle, **keep enrollment active**, flag `finance_admin` (review queue) — no auto freeze/drop.
+- **Commitment:** `month_to_month` charges only while active; `annual` continues the schedule through season end (early exit handled in §9 with override).
 
-1. **Base price** — `class_pricing_rules` where `is_base_price = true` for the `class_id`.
-2. **Deadline tier** — among rules with a `deadline >= today`, pick the applicable early-bird `amount` (lowest-priced still-valid tier, by `sort_order`). Record the winning `pricing_rule_id` on the line.
-3. **Registration fee** — one `registration_fee` line per family per season (dedupe against existing paid invoices for that season). *Amount = Amanda decision, see §16.*
-4. **Bundle discount** — after all class lines are added, evaluate `bundle_configs`:
-   - `trigger_type` = `sibling_count` or `class_count`; if `trigger_value` met, apply `discount_type`/`discount_value` as a `discount` line.
-   - Bundles apply at the **invoice** level across students in a family.
-5. **Credit** — if the family has a positive credit balance and elects to apply it, add a `credit_applied` line up to the remaining balance.
-6. `total_cents = subtotal - discount - credit_applied + tax`.
-
-All amounts resolved to **cents** at line creation and frozen on the line (immune to later rule edits).
+**Pay-in-full alternative:** one invoice for the covered term → `prepaid_terms` with `deferred_balance_cents`; recognized monthly (§11.3); no `tuition_charges`.
 
 ---
 
-## 7. Installment Engine
+## 8. Bundles, Passes & Points
 
-### 7.1 Why custom, not Stripe Subscriptions
-Season tuition is a **fixed total split into known installments**, not open-ended recurring billing. A custom engine (vaulted card + scheduled off-session charges) gives the studio control over cadence, retries, and dunning, and — decisively — **ports to Authorize.net CIM, Square Cards-on-File, and PayPal Vault**. Stripe Subscriptions would lock the white-label product to Stripe.
-
-### 7.2 Flow
-1. At checkout, parent selects pay-in-full or a plan. Both create an `invoice` + an `installment_plan` (`num_installments = 1` for pay-in-full).
-2. **First charge** goes through a Stripe **Checkout Session** with `setup_future_usage = off_session`, which both collects installment #1 and **vaults the card** onto the family's processor customer. Store the payment-method token in `plan.processor_payment_method_ref`.
-3. Generate `installment_schedule` rows: due dates by `cadence`, amounts summing exactly to `total_cents` (put any rounding remainder on installment #1).
-4. **Vercel cron (daily)** selects `installment_schedule` rows where `status='scheduled'` and `due_date <= today`, and creates an **off-session PaymentIntent** per row. Idempotency key = `installment_schedule.id` (see §15).
-5. On success → mark row `paid`, insert `payment` + `payment_allocations`, post ledger (§8). On failure → `attempts += 1`, set `next_retry_at` (T+1, T+3, T+5). After 3 failures → plan `status='defaulted'`, notify `finance_admin` + parent via existing notifications infra.
-6. When the last row is `paid` → plan `status='completed'`, invoice `status='paid'`.
-
-### 7.3 Reconciliation with enrollment
-`enrollments.billing_plan_type` records `pay_in_full` | `installment`. Enrollment is created on **first successful payment** (installment #1), not on plan creation — a plan with no first payment never enrolls the student. This preserves the "no enrollment without money" invariant.
+- **Discount bundle** — pricing-time only (§6.4).
+- **Class pack** — `denomination='class_count'`, `applies_to` group/pilates/private; enrollment/booking consumes 1 unit ($0 line), drop reverses.
+- **Unlimited pass** — `denomination='unlimited'` within validity; covered enrollments = $0.
+- **Points pack** — `denomination='points'`; booking a private debits `teacher_private_rates.point_cost`; **pay-per-use** books without a pack and charges `point_cost × point_value_cents` in dollars.
+- **Recognition:** packs/points held in `bundle_liability`/`points_liability`; move to revenue per consumption (§11). Financing: a pack invoice can itself be pay-in-full or (rarely) split.
 
 ---
 
-## 8. Ledger Posting Contract
+## 9. Add / Drop / Transfer
 
-### 8.1 Accounts (`ledger_entries.account` values)
-`accounts_receivable`, `deferred_revenue`, `revenue_tuition`, `revenue_registration`, `revenue_costume`, `revenue_merch`, `revenue_private`, `revenue_adjustment`, `deposit_liability`, `cash_clearing`, `processing_fees`, `customer_credit_liability`, `discounts_contra`, `refunds_contra`.
-
-### 8.2 Event → entry recipes
-Each economic event posts a balanced set of entries sharing one `event_id`. Dimensions (`family_id`, `class_id`, `location_id`, `discount_id`, `period`) are stamped on every entry.
-
-1. **Invoice finalized** — per line: `DR accounts_receivable` / `CR revenue_*` (or `deferred_revenue` for tuition if deferral is chosen, §8.3). Discount lines: `DR discounts_contra` / `CR accounts_receivable`. `charge_status='pending'`.
-2. **Payment succeeded** — `DR cash_clearing` / `CR accounts_receivable`. Stamp `stripe_reference`, set `charge_status='captured'`.
-3. **Processing fee** (at payout reconciliation) — `DR processing_fees` / `CR cash_clearing`.
-4. **Credit issued** (goodwill or refund-to-credit) — `DR refunds_contra` (or `revenue_*` reversal) / `CR customer_credit_liability`.
-5. **Credit applied** to an invoice — `DR customer_credit_liability` / `CR accounts_receivable`.
-6. **Refund to card** — `DR refunds_contra` / `CR cash_clearing`.
-7. **Deposit taken** — `DR cash_clearing` / `CR deposit_liability`. **Deposit applied/forfeited** — `DR deposit_liability` / `CR revenue_*`.
-
-### 8.3 Revenue recognition (Amanda/accountant decision, §16)
-- **Simple (recommended v1):** recognize tuition revenue at payment. Easiest QBO mapping.
-- **Deferred:** post tuition to `deferred_revenue` at invoice, recognize monthly over the season via a cron. Better accrual accuracy; more moving parts. Flag for the accountant.
-
-### 8.4 Idempotent posting
-Add a unique guard so an event can't double-post: unique index on `ledger_entries (event_id, account, direction)`. The posting service computes `event_id` deterministically from `(source, source_ref, event_kind)` so a replayed webhook re-derives the same id and no-ops.
+Captured in `enrollment_changes`.
+- **Add** — prorated `adjustment`/`tuition` line from `effective_date`; amend the tuition schedule (supersede future `tuition_charges`, never paid ones); pay-in-full → prorated charge now; pass-covered → consume, $0.
+- **Drop (month-to-month)** — compute prorated unused portion; **admin routes it case-by-case as refund or credit** (or waive). Stop future charges; `enrollments.status='dropped'`.
+- **Drop (annual)** — schedule continues by default; early exit is an admin action with `override_reason` (owe remaining / fee / waive per Amanda policy).
+- **Transfer** — two linked changes (drop A + add B), net difference to one charge/credit; optional transfer fee.
+- Pass-covered drops reverse the consumption.
 
 ---
 
-## 9. Payment Processor Abstraction
+## 10. Event & Performance Tagging
 
-Interface (TypeScript, in the app layer — not the DB):
-
-```
-interface PaymentProcessor {
-  createCheckoutSession(invoice, opts): { url, sessionRef }   // vault on off-session opt
-  vaultPaymentMethod(customerRef): methodRef
-  chargeOffSession(methodRef, amountCents, idempotencyKey): PaymentResult
-  refund(paymentRef, amountCents): RefundResult
-  verifyWebhook(payload, sig): boolean
-  normalizeWebhook(payload): InternalPaymentEvent   // -> payment.succeeded/failed/refunded
-}
-```
-
-- Resolved per tenant from `tenant_payment_config`. Stripe is `StripeProcessor`; the interface is the contract new processors implement.
-- **Webhook normalization** is the key seam: every processor's webhook maps to a small set of `InternalPaymentEvent`s. The posting service (§8) consumes only normalized events and never touches processor SDKs.
-- Credentials resolved from env/secret store via `credentials_ref`; **raw keys never in Postgres**.
+`ledger_entries.event_id` and line `event_id` → `productions(id)` (Nutcracker, spring show, intensives). Costume/deposit/performance/merch lines and **all rehearsal/performance payroll** tag the event → `v_event_pnl` = Σ revenue(event) − Σ labor & costs(event). Generalizable to a `billable_events` table later without ledger change.
 
 ---
 
-## 10. Unifying the Four Surfaces
+## 11. Ledger Posting Contract
 
-### 10.1 Enrollment
-`enrollment_carts`/`enrollment_cart_items` become **draft-invoice builders**. On checkout, materialize an `invoice` (source=`enrollment`) with `tuition` + `registration_fee` (+ `deposit`/`costume` if applicable) lines, create the plan, charge. Post-payment, create `enrollments` and backfill `invoice_line_items.enrollment_id`.
+### 11.1 Accounts
+Revenue: `revenue_tuition`, `revenue_registration`, `revenue_costume`, `revenue_merch`, `revenue_private`, `revenue_adjustment`.
+Liabilities/deferral: `deferred_revenue`, `bundle_liability`, `points_liability`, `deposit_liability`, `customer_credit_liability`.
+Contra: `scholarship_contra`, `discounts_contra`, `refunds_contra`.
+Cash/asset: `accounts_receivable`, `cash_clearing`, `card_fee_recovery`, `processing_fees`.
+Labor: `wages_expense`, `contractor_expense`, `wages_payable`, `overhead_wages`.
+(Removed: `teacher_points_liability` — teachers paid flat cash.)
 
-### 10.2 Private lessons — resolve the split-brain
-- **Keep** `private_session_billing` as the *economic record* of a session (market value, studio/teacher contribution, points) — it carries data the invoice doesn't.
-- **Route the family-facing charge** through the canonical layer: each session produces one or more `invoice_line_items` (`line_type='private_lesson'`), one per paying family. Semi-private splits = multiple line items on **separate family invoices** referencing the same `private_session_id` (this is what `private_billing_splits` was reaching for).
-- **Deprecate** `private_billing_records` + `private_billing_splits` as a *charging* mechanism; migrate their open rows into invoice line items. (See §11.)
+### 11.2 Revenue & payment recipes (balanced, share one `event_id`; stamp all dims)
+1. **Monthly tuition invoiced** — `DR accounts_receivable` / `CR revenue_tuition` (dims class/family/period).
+2. **Prepaid tuition taken** — `DR cash_clearing` / `CR deferred_revenue`; **monthly recognition** — `DR deferred_revenue` / `CR revenue_tuition`.
+3. **Payment succeeded** — `DR cash_clearing` / `CR accounts_receivable`; stamp ref, `charge_status='captured'`.
+4. **Registration fee** — `DR accounts_receivable` / `CR revenue_registration`.
+5. **Scholarship/award** — `DR scholarship_contra` (scholarship) or `DR discounts_contra` (discount) / `CR accounts_receivable`; tag `award_id`.
+6. **Deposit / rental deposit** — `DR cash_clearing` / `CR deposit_liability`; applied/forfeited → `DR deposit_liability` / `CR revenue_costume`.
+7. **Pack/points purchased** — `DR cash_clearing` / `CR bundle_liability`|`points_liability`; **consumed** — `DR bundle_liability`|`points_liability` / `CR revenue_tuition`|`revenue_private`.
+8. **Credit** — issue `CR customer_credit_liability`; apply `DR customer_credit_liability` / `CR accounts_receivable`.
+9. **Refund** — card `DR refunds_contra` / `CR cash_clearing`; to-credit `DR refunds_contra` / `CR customer_credit_liability`.
+10. **Card-fee recovery** (if enabled) — `DR cash_clearing` / `CR card_fee_recovery`.
+11. **Processing fee** — `DR processing_fees` / `CR cash_clearing` (payout recon).
 
-### 10.3 Shop / merch
-`shop_orders` keeps its own intake UX but, on payment, **posts to the ledger** via `merch` lines (currently it doesn't). Two options: (a) generate a lightweight `invoice` mirror per order, or (b) teach the posting service to accept `shop_orders` as a source directly. Recommend (a) for uniformity — one posting path.
+### 11.3 Labor recipes (payroll)
+12. **Pay period approved** — per `timesheet_entry`: `DR wages_expense` (W-2) or `contractor_expense` (1099) / `CR wages_payable`. Dims teacher/class/location/event/period. Rate from `teacher_rate_cards` × hours; **multi-class blocks split by scheduled time**.
+13. **Payroll disbursed** — `DR wages_payable` / `CR cash_clearing`.
+14. **Private payout** — `teacher_private_rates.flat_payout_cents` → `DR contractor_expense`|`wages_expense` / `CR wages_payable`.
 
-### 10.4 Credits — resolve the split-brain
-- **Winner:** `credit_accounts` + `credit_transactions`, in **integer cents**.
-- **Deprecate** `families.account_credit`; migrate its balance into `credit_accounts` and stop writing it (keep as read-only shadow for one release, then drop).
-- Credit is a **tender**, not revenue: applying it hits `customer_credit_liability` (§8), never a revenue account.
-
----
-
-## 11. Landmine Resolutions & Migration Approach
-
-| Landmine | Resolution |
-|---|---|
-| Mixed money units (`class_pricing_rules.amount`, credit/private `numeric`) | Convert all to integer cents. Add `*_cents` columns, backfill `round(x*100)`, cut readers over, drop old columns in a later migration. |
-| Two private-billing models | Consolidate per §10.2; migrate `private_billing_splits` → `invoice_line_items`. |
-| Two credit stores | Consolidate per §10.4; migrate `families.account_credit` → `credit_accounts`. |
-| `shop_orders` not on ledger | Post via §10.3(a). |
-| Stripe-specific columns | Shadow into `processor_*_refs` per §4.9 (non-breaking). |
-
-**Migration safety (house rules):**
-- Every migration `IF NOT EXISTS`; no forward FK references to unconfirmed tables.
-- Pre-flight `DO` block validating row integrity before altering constraints; `RAISE EXCEPTION` on bad rows.
-- Applied via `supabase db push` (regular terminal) — **never** MCP `apply_migration`. Repair with `supabase migration repair` if drift occurs.
-- Regenerate types + `tsc --noEmit` after each schema change.
-- Money-unit conversions ship as **add → backfill → cutover → drop** across separate migrations, never a single destructive alter.
+### 11.4 Idempotency
+Unique `ledger_entries (event_id, account, direction)`; `event_id` derived deterministically from `(source, source_ref, event_kind)`.
 
 ---
 
-## 12. Refunds, Credits, Dunning
+## 12. Payroll Integration (mandatory)
 
-- **Refund destination** is a choice per refund: back to card (`refunds_contra`/`cash_clearing`) or to customer credit (`refunds_contra`/`customer_credit_liability`). Studios usually prefer credit.
-- **Dunning** on installment failure: retry schedule T+1/T+3/T+5, parent + `finance_admin` notifications, plan `defaulted` after 3. Enrollment status on default = Amanda decision (freeze vs drop).
-- **Proration** on mid-season drop = Amanda policy (§16); model as an `adjustment` line + refund/credit.
-
----
-
-## 13. RLS & Roles
-
-- All new tables `tenant_id`-scoped; helper predicates are `SECURITY DEFINER` functions over `profile_roles` (avoids the known RLS recursion).
-- **Parent:** read own family's invoices/payments/plans/credits; initiate checkout; no ledger read.
-- **finance_admin:** full read/write on billing + ledger, reconciliation, refunds, manual adjustments.
-- **admin/super_admin:** as today.
-- `ledger_entries` is **append-only** for everyone except a reconciliation service role; corrections are reversing entries, never updates/deletes.
-- `profile_roles` joins on `user_id` (not `profile_id`).
+- Payroll posting service reads approved `timesheets`/`timesheet_entries` → recipes §11.3, stamping the same dims as revenue.
+- **Attribution:** class hours → class(es) taught by scheduled time; rehearsal/performance hours → `event_id`; admin → `overhead_wages`.
+- **Private rev-share:** revenue side (`revenue_private`, funded by dollars or points) and payout side (flat `contractor/wages_expense`) are two sides of one session; `studio_contribution` is the retained margin.
+- **Outputs:** P&L by class, production, and teacher; QBO export carries revenue AND wages → accrual P&L.
+- **Reconciliation:** `Σ wages_payable(period) == payroll CSV total`; mismatch → `finance_admin` flag via `review_tier`.
 
 ---
 
-## 14. QBO Export
+## 13. Tax & Card-Fee Recovery (CA-compliant)
 
-- `ledger_entries.qbo_export_ref` marks synced entries.
-- Map internal accounts → QBO chart of accounts (config table or `tenant_payment_config` extension).
-- Export cadence: batch by `period`; push journal entries (or invoices+payments) per QBO's model; stamp `qbo_export_ref` on success; never re-export a stamped entry.
-- Deferred to a later phase (§17) — the ledger design makes it additive.
+### 13.1 Sales tax
+Taxable = tangible retail goods (merch, snacks, future products) via `products.taxable`/category. Tuition, fees, costumes untaxed. `tax_cents` per taxable line; Stripe Tax optional later.
 
----
-
-## 15. Idempotency & Reconciliation
-
-- **Webhook ingestion:** dedupe on processor event id; store processed ids.
-- **Off-session charges:** `idempotency_key = installment_schedule.id` passed to the processor AND unique on `payments.idempotency_key`.
-- **Ledger posting:** deterministic `event_id` + unique `(event_id, account, direction)` index (§8.4).
-- **Payout reconciliation:** daily job matches processor payouts to `cash_clearing`, posts `processing_fees`, flags mismatches for `finance_admin` (`review_tier` on the ledger supports this).
+### 13.2 Card-fee recovery — California
+**Do not** default to a surprise checkout surcharge line. CA's all-in pricing law (SB 478) requires the displayed price to be the total; the Ninth Circuit struck the old surcharge ban so disclosed surcharging is otherwise permitted, but debit can never be surcharged and any surcharge is capped at actual acceptance cost (~≤3%). **Design:**
+- **Primary: steer recurring tuition to ACH** (`preferred_recurring_tender='ach'`) — avoids card fees on the largest, most predictable charges entirely.
+- **Card path: dual pricing** — show the card-inclusive price as the displayed price (all-in compliant), not a bolt-on fee.
+- `exclude_debit` always true; `surcharge_cap_pct` enforced to cost; itemized disclosure when a `surcharge` line is used.
+- **`ca_counsel_approved` gates go-live** of any surcharge/dual-pricing mode. **Not legal advice — confirm current CA rules with counsel before enabling.**
 
 ---
 
-## 16. Open Decisions for Amanda / Accountant
+## 14. Processor Abstraction
 
-Blockers marked ⛔ (needed before that piece ships); others can default.
-
-1. ⛔ **Registration fee** — amount, per-family vs per-student, per-season vs annual.
-2. ⛔ **Installment cadence & count** — e.g. monthly over the season? Any plan/finance fee? First payment due at checkout?
-3. ⛔ **Deposit/costume policy** — refundable? forfeited when? applied to which production?
-4. **Revenue recognition** — simple (at payment) vs deferred over season (§8.3). Accountant call.
-5. **Refund/proration policy** on mid-season drop.
-6. **Default policy** — freeze vs drop enrollment after installment default.
-7. **Merch tax** — collect sales tax on shop orders? (Stripe Tax later if yes.)
-8. **Verify BAM's existing Stripe account credentials** before wiring test keys.
+`PaymentProcessor` interface (createCheckoutSession w/ vaulting, ACH mandate, chargeOffSession, refund, verifyWebhook, normalizeWebhook→InternalPaymentEvent). Resolved per tenant from `tenant_payment_config`. Stripe first (Checkout + `us_bank_account` for ACH). Credentials from secret store; raw keys never in Postgres.
 
 ---
 
-## 17. Layered Build Sequence (for Claude Code)
+## 15. Unifying the Surfaces
 
-Each layer is independently shippable and testable. Do not start a layer until the prior one's types regenerate clean.
-
-1. **Money-unit normalization** — cents migrations for `class_pricing_rules`, credit tables, private tables (add→backfill only; cutover later).
-2. **Canonical tables** — `invoices`, `invoice_line_items`, `payments`, `payment_allocations`, `refunds` (+ RLS, `finance_admin` policies).
-3. **Pricing resolver** — service that turns a cart into invoice lines (§6), unit-tested against the 13 `class_pricing_rules` rows.
-4. **Ledger posting service** — event→entry recipes (§8), idempotent index (§8.4). Post from a finalized invoice + a manual payment first (no processor yet).
-5. **Processor interface + Stripe impl** — `tenant_payment_config`, `processor_*_refs`, Checkout Session with vaulting, webhook normalization.
-6. **Enrollment checkout wired end-to-end** — cart → invoice → Checkout → webhook → payment → ledger → enrollment. (This is "turn checkout on," now on the unified spine.)
-7. **Installment engine** — `installment_plans`/`installment_schedule`, Vercel cron off-session charges, dunning + notifications.
-8. **Credit consolidation** — migrate `families.account_credit`, wire credit-as-tender.
-9. **Private-lesson consolidation** — route through invoices, migrate `private_billing_splits`.
-10. **Shop ledger posting** — mirror `shop_orders` into invoices/ledger.
-11. **Payout reconciliation** — fees + mismatch flags.
-12. **QBO export** — mapping + batch sync.
-
-Payment can go live after **layer 6**; installments after **7**; the rest hardens and unifies without blocking revenue.
+- **Enrollment** → tuition schedule + registration/costume/bundle lines → recurring charges.
+- **Private/Pilates** → keep `private_session_billing` as the economic record; family charge via `private_lesson`/points; payout per §12. Deprecate `private_billing_records`/`splits` as a charging mechanism (migrate).
+- **Shop** → mirror `shop_orders` into `invoice` (source=`shop`) with `merch` lines so it posts to the ledger; tag `event_id` for production merch.
+- **Credits** → winner is `credit_accounts`/`credit_transactions` (cents); deprecate `families.account_credit`; credit is a tender.
 
 ---
 
-## 18. Non-Goals (this spec)
+## 16. Landmines & Migration
 
-- Multi-currency (usd only for now; `currency` column reserved).
-- Real-time sales-tax calculation (deferred).
-- Second processor implementation (interface only; Stripe first).
-- Dunning UI beyond notifications (finance_admin manual tools first).
+Mixed money units → cents (add→backfill→cutover→drop). Two private models → consolidate. Two credit stores → consolidate. Shop not on ledger → post. Stripe-only columns → shadow into `processor_*_refs`. Ledger missing `teacher_id`/`award_id`/`event_id` FK → add (nullable).
+**House rules:** `IF NOT EXISTS`; pre-flight `DO` validation + `RAISE EXCEPTION`; `supabase db push` (regular terminal), never MCP `apply_migration`; regenerate types + `tsc --noEmit`; money conversions add→backfill→cutover→drop.
+
+---
+
+## 17. RLS & Roles
+
+Tenant-scoped; `SECURITY DEFINER` predicates over `profile_roles` (joins on `user_id`). Parent: own family's invoices/payments/schedule/credits/entitlements + **scholarship banner**; add/drop requests; no ledger read. `finance_admin`: billing/ledger/payroll/awards write, refunds, adjustments, dunning queue. `ledger_entries` append-only except reconciliation role; corrections are reversing entries.
+
+---
+
+## 18. Parent Finance Module
+
+Prominent **scholarship-value banner** at top: `Σ` scholarship-tagged reductions (`scholarship_contra`, `is_scholarship` awards) across tuition + privates + fees, per season and lifetime. Below: current balance, upcoming monthly charge + date (the 15th), payment method, entitlement balances (classes/points), invoice/payment history, credit balance.
+
+---
+
+## 19. QBO Export
+
+`ledger_entries.qbo_export_ref` marks synced. Map revenue AND wage accounts → QBO chart; batch by `period`; never re-export. Yields real accrual P&L. Later phase (§22).
+
+---
+
+## 20. Idempotency & Reconciliation
+
+Webhooks dedupe on processor event id. Off-session charges keyed on `tuition_charge.id`. Ledger keyed on `(event_id, account, direction)`. Schedule amendments supersede-not-mutate. Payout recon matches processor payouts to `cash_clearing`, posts fees, flags mismatches; payroll recon per §12.
+
+---
+
+## 21. Open Items
+
+**Numbers to confirm (Amanda):**
+- Season registration fee amount.
+- Monthly tuition amounts (per class/program) — feeds `tuition_schedules`.
+- Point dollar value (`point_value_cents`) and per-teacher `point_cost` + `flat_payout_cents`.
+- Costume fee amounts per production/dance.
+
+**Policies to confirm (Amanda / accountant / counsel):**
+- Annual early-exit rule (owe remaining vs fee vs waive) and transfer fee.
+- Whether **promotions** also show a value to parents or stay silent (scholarships already do).
+- Tuition proration basis: calendar days vs class sessions.
+- 15th billing-period boundary: covers upcoming vs current month.
+- Sales-tax registration/rate handling for retail goods.
+- ⛔ **CA counsel sign-off** before enabling any surcharge/dual-pricing (ACH steer needs no sign-off).
+
+**Resolved:** teacher classification (per-teacher W-2/1099), private pay (flat), revenue recognition (on consumption), labor attribution (scheduled time), failed-payment policy (keep active + flag), Stripe credentials (in hand).
+
+---
+
+## 22. Build Sequence (for Claude Code)
+
+1. Money-unit normalization (cents migrations).
+2. Ledger dimensions — `teacher_id`, `award_id`, `event_id` FK; idempotent index.
+3. Canonical tables — invoices, line_items, payments, allocations, refunds (+RLS, finance_admin).
+4. Registration-fee config (season default + class override) + pricing resolver (§6), tested vs `class_pricing_rules`.
+5. Ledger posting service — revenue recipes (§11.2), post from finalized invoice + manual payment.
+6. Processor interface + Stripe (Checkout, vaulting, **ACH**, webhook normalization); `tenant_payment_config`, `processor_*_refs`.
+7. **Recurring monthly tuition** — schedules/charges, proration, cron off-session, dunning + admin flag. *(Revenue live.)*
+8. Pay-in-full + deferred recognition.
+9. Awards/discounts engine (§4.10–4.11) + scholarship banner (§18).
+10. Bundles, passes & points (§8), incl. Pilates/private packs + teacher point costs.
+11. Add/drop/transfer (§9), schedule amendment, commitment handling.
+12. **Payroll posting service** (§11.3, §12). *(True P&L live.)*
+13. Private/Pilates consolidation + rev-share; migrate `private_billing_splits`.
+14. Credit consolidation; credit-as-tender.
+15. Shop ledger posting.
+16. Tax + card-fee recovery (dual-pricing/ACH steer), counsel-gated.
+17. Event/class/teacher P&L views.
+18. Payout + payroll reconciliation.
+19. QBO export.
+
+Revenue after **7**; awards/points by **10**; true P&L after **12**; the rest hardens without blocking revenue.
+
+---
+
+## 23. Non-Goals
+
+Multi-currency; real-time tax engine; second processor implementation (interface only); dunning UI beyond notifications + queue; teacher payroll self-service.
