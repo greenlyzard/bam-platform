@@ -2,7 +2,7 @@
 
 **Status:** Draft spec — not yet implemented
 **Owner:** Derek Shaw (Green Lyzard)
-**Version:** v3 — incorporates Amanda/finance decisions: recurring monthly tuition, commitment terms, awards/scholarship engine, points, per-item costumes, tax, and CA-compliant card-fee recovery.
+**Version:** v3.1 — adds standard ACH Direct Debit as the preferred tuition rail (async settlement + return handling) and generalizes fee recovery to per-tender dual pricing. (v3: recurring monthly tuition, commitment terms, awards/scholarship engine, points, per-item costumes, tax, CA-compliant fee recovery.)
 
 **Scope (locked):** Unified money layer — enrollment, private lessons, Pilates, shop/merch, credits, awards, and payroll labor all reconcile onto `ledger_entries`.
 **Tuition model (locked):** Recurring monthly, billed on the 15th, prorated for partial months. Pay-in-full is an alternative path.
@@ -27,7 +27,7 @@
 11. **Revenue recognition** — prepaid amounts are liabilities recognized **on consumption**; refunds draw from the unused balance.
 12. **Labor attribution** — by scheduled class time.
 13. **Sales tax** — on tangible retail goods (merch, snacks, future products); costumes/tuition untaxed.
-14. **Card-fee recovery** — CA-compliant dual-pricing + ACH steer for recurring tuition; debit excluded; capped to cost; counsel-gated.
+14. **Fee recovery** — recovered per tender via CA-compliant dual pricing (ACH shown cheaper than card); ACH fees passed through too; debit never surcharged; card capped to cost; counsel-gated. Tuition rail = **standard ACH Direct Debit**.
 15. **Failed payments** — keep enrollment active, flag finance_admin; no auto freeze/drop.
 16. **Stripe** — credentials in hand.
 
@@ -96,7 +96,8 @@ New tables: `id`, `tenant_id`, `created_at`, `updated_at`, RLS. Money = cents.
 `invoice_id`, `line_type` (§5), `description`, `class_id?`, `enrollment_id?`, `product_id?`, `private_session_id?`, `costume_fee_id?`, `bundle_entitlement_id?`, `award_id?`, `event_id?`, `dance_id?`, `student_id?`, `quantity`, `unit_price_cents`, `pricing_rule_id?`, `discount_cents`, `taxable` (bool), `tax_cents`, `amount_cents`.
 
 ### 4.3 `payments`
-`family_id`, `processor`, `processor_payment_ref`, `method` (`card|ach|credit|points|cash|check`), `amount_cents`, `status`, `recurring_charge_id?`, `idempotency_key` (unique), `captured_at?`.
+`family_id`, `processor`, `processor_payment_ref`, `method` (`card|ach|credit|points|cash|check`), `amount_cents`, `fee_cents` (processor cost), `status` (`pending|processing|succeeded|failed|returned|refunded`), `recurring_charge_id?`, `idempotency_key` (unique), `settlement_expected_at?`, `captured_at?`, `returned_at?`, `return_code?`.
+*ACH is asynchronous: a payment can sit `processing` for ~4 business days and, rarely, go `succeeded → returned` days later. The `returned` path triggers a ledger reversal (§11.2) and a `finance_admin` reflag.*
 
 ### 4.4 `payment_allocations`
 `payment_id`, `invoice_id`, `invoice_line_item_id?`, `amount_cents`.
@@ -145,8 +146,8 @@ Alternative to recurring. `family_id`, `season_id`, `total_cents`, `covered_from
 ### 4.18 Tax
 `products.taxable` (bool) + category default; `invoice_line_items.taxable`/`tax_cents`; tuition/costume default untaxed.
 
-### 4.19 `tenant_payment_config` (white-label + card-fee recovery)
-`processor`, `mode`, `credentials_ref` (secret pointer — never raw keys), `is_active`, `ach_enabled` (bool), `preferred_recurring_tender` (`ach`), `card_cost_recovery_mode` (`none|dual_pricing|surcharge`), `surcharge_cap_pct`, `exclude_debit` (always true), `ca_counsel_approved` (bool — gates any surcharge/dual-pricing go-live), `statement_descriptor`. Plus `processor_customer_refs` / `processor_product_refs` (§de-Stripe-ing).
+### 4.19 `tenant_payment_config` (white-label + fee recovery)
+`processor`, `mode`, `credentials_ref` (secret pointer — never raw keys), `is_active`, `ach_enabled` (bool), `ach_type` (`standard`), `preferred_recurring_tender` (`ach`), `fee_recovery_mode` (`none|dual_pricing`), `card_fee_pct` + `card_fee_cap_pct` (≤ actual cost), `ach_fee_pct` + `ach_fee_cap_cents` (mirror Stripe 0.8%/$5), `exclude_debit` (always true), `ca_counsel_approved` (bool — **gates any customer-facing fee**, card or ACH), `statement_descriptor`. Plus `processor_customer_refs` / `processor_product_refs` (de-Stripe-ing).
 
 ### 4.20 `ledger_entries` additions
 Add dimension **`teacher_id`** and **`award_id`**; add FK **`event_id`** → `productions(id)`. All nullable; migrations §16.
@@ -170,7 +171,7 @@ Add dimension **`teacher_id`** and **`award_id`**; add FK **`event_id`** → `pr
 | `credit_applied` | (contra) | tenders customer credit |
 | `scholarship` | `scholarship_contra` | tagged award; feeds parent banner |
 | `discount` | `discounts_contra` | ordinary promo/bundle discount |
-| `surcharge` | `card_fee_recovery` | only if dual-pricing/surcharge enabled |
+| `payment_fee` | `payment_fee_recovery` | per-tender (card or ACH) recovery; dual-pricing display |
 | `adjustment` | `revenue_adjustment` | add/drop proration, manual |
 
 ---
@@ -194,7 +195,8 @@ Add dimension **`teacher_id`** and **`award_id`**; add FK **`event_id`** → `pr
 - On enrollment, create/attach a `tuition_schedule` (`anchor_day=15`, `commitment_type`, `preferred_tender=ach`). Generate `tuition_charges` for the season's months.
 - **Proration** — first month (late join) and any partial month computed `by_remaining_days` (Amanda may switch to sessions). Full months = `monthly_amount_cents`.
 - **Charge run (Vercel cron, daily):** find `tuition_charges` due on/before today with `status='scheduled'` → materialize a monthly `invoice` (`source='tuition_run'`, `period`) → charge the card/ACH on file off-session (idempotency key = `tuition_charge.id`) → post ledger.
-- **First payment** at checkout via Stripe Checkout with `setup_future_usage=off_session` to vault the tender; ACH mandate collected where used.
+- **First payment** at checkout via Stripe Checkout with `setup_future_usage=off_session` to vault the tender; ACH mandate + bank verification collected at setup (Financial Connections, ~$1.50 one-time, or microdeposits).
+- **ACH settlement (standard):** charges confirm/settle in ~4 business days; a `tuition_charge` sits `processing` until then. Post `cash_clearing` on `succeeded`, not on initiation. A late **return** (`succeeded → returned`) fires a ledger reversal (§11.2) and reflags `finance_admin` — the same review queue as a hard failure.
 - **Failure:** dunning T+1/T+3/T+5; after cycle, **keep enrollment active**, flag `finance_admin` (review queue) — no auto freeze/drop.
 - **Commitment:** `month_to_month` charges only while active; `annual` continues the schedule through season end (early exit handled in §9 with override).
 
@@ -235,7 +237,7 @@ Captured in `enrollment_changes`.
 Revenue: `revenue_tuition`, `revenue_registration`, `revenue_costume`, `revenue_merch`, `revenue_private`, `revenue_adjustment`.
 Liabilities/deferral: `deferred_revenue`, `bundle_liability`, `points_liability`, `deposit_liability`, `customer_credit_liability`.
 Contra: `scholarship_contra`, `discounts_contra`, `refunds_contra`.
-Cash/asset: `accounts_receivable`, `cash_clearing`, `card_fee_recovery`, `processing_fees`.
+Cash/asset: `accounts_receivable`, `cash_clearing`, `payment_fee_recovery`, `processing_fees`.
 Labor: `wages_expense`, `contractor_expense`, `wages_payable`, `overhead_wages`.
 (Removed: `teacher_points_liability` — teachers paid flat cash.)
 
@@ -249,13 +251,14 @@ Labor: `wages_expense`, `contractor_expense`, `wages_payable`, `overhead_wages`.
 7. **Pack/points purchased** — `DR cash_clearing` / `CR bundle_liability`|`points_liability`; **consumed** — `DR bundle_liability`|`points_liability` / `CR revenue_tuition`|`revenue_private`.
 8. **Credit** — issue `CR customer_credit_liability`; apply `DR customer_credit_liability` / `CR accounts_receivable`.
 9. **Refund** — card `DR refunds_contra` / `CR cash_clearing`; to-credit `DR refunds_contra` / `CR customer_credit_liability`.
-10. **Card-fee recovery** (if enabled) — `DR cash_clearing` / `CR card_fee_recovery`.
+10. **Fee recovery** (if enabled, per tender) — `DR cash_clearing` / `CR payment_fee_recovery`.
 11. **Processing fee** — `DR processing_fees` / `CR cash_clearing` (payout recon).
+12. **ACH return** (late failure after `succeeded`) — reverse recipe 3: `DR accounts_receivable` / `CR cash_clearing`; set payment `returned`, reflag `finance_admin`. (Never delete the original entries — post reversing ones.)
 
 ### 11.3 Labor recipes (payroll)
-12. **Pay period approved** — per `timesheet_entry`: `DR wages_expense` (W-2) or `contractor_expense` (1099) / `CR wages_payable`. Dims teacher/class/location/event/period. Rate from `teacher_rate_cards` × hours; **multi-class blocks split by scheduled time**.
-13. **Payroll disbursed** — `DR wages_payable` / `CR cash_clearing`.
-14. **Private payout** — `teacher_private_rates.flat_payout_cents` → `DR contractor_expense`|`wages_expense` / `CR wages_payable`.
+13. **Pay period approved** — per `timesheet_entry`: `DR wages_expense` (W-2) or `contractor_expense` (1099) / `CR wages_payable`. Dims teacher/class/location/event/period. Rate from `teacher_rate_cards` × hours; **multi-class blocks split by scheduled time**.
+14. **Payroll disbursed** — `DR wages_payable` / `CR cash_clearing`.
+15. **Private payout** — `teacher_private_rates.flat_payout_cents` → `DR contractor_expense`|`wages_expense` / `CR wages_payable`.
 
 ### 11.4 Idempotency
 Unique `ledger_entries (event_id, account, direction)`; `event_id` derived deterministically from `(source, source_ref, event_kind)`.
@@ -277,12 +280,17 @@ Unique `ledger_entries (event_id, account, direction)`; `event_id` derived deter
 ### 13.1 Sales tax
 Taxable = tangible retail goods (merch, snacks, future products) via `products.taxable`/category. Tuition, fees, costumes untaxed. `tax_cents` per taxable line; Stripe Tax optional later.
 
-### 13.2 Card-fee recovery — California
-**Do not** default to a surprise checkout surcharge line. CA's all-in pricing law (SB 478) requires the displayed price to be the total; the Ninth Circuit struck the old surcharge ban so disclosed surcharging is otherwise permitted, but debit can never be surcharged and any surcharge is capped at actual acceptance cost (~≤3%). **Design:**
-- **Primary: steer recurring tuition to ACH** (`preferred_recurring_tender='ach'`) — avoids card fees on the largest, most predictable charges entirely.
-- **Card path: dual pricing** — show the card-inclusive price as the displayed price (all-in compliant), not a bolt-on fee.
-- `exclude_debit` always true; `surcharge_cap_pct` enforced to cost; itemized disclosure when a `surcharge` line is used.
-- **`ca_counsel_approved` gates go-live** of any surcharge/dual-pricing mode. **Not legal advice — confirm current CA rules with counsel before enabling.**
+### 13.2 Payment-fee recovery — California (card AND ACH)
+Recover processing cost on **both tenders** via **dual pricing**, never a surprise checkout fee. CA's all-in pricing law (SB 478) is tender-agnostic: whatever price a customer sees must be the total, so a dripped-in fee is the risk — for cards *and* ACH. Card-network surcharge caps/bans apply only to credit cards; **ACH is not a card**, so those don't bind it, but SB 478 display rules still do. **Design:**
+- **Dual pricing by tender** — show each method's all-in total. ACH is displayed **cheaper than card** (ACH ~0.8%/$5-cap vs card ~3%), which both recovers cost and steers families to ACH.
+- **Recurring tuition defaults to ACH** (`preferred_recurring_tender='ach'`) — cheapest rail on the largest, most predictable charges.
+- `exclude_debit` always true; card fee capped to actual acceptance cost; ACH fee mirrors Stripe (0.8%, $5 cap); disclosed as a `payment_fee` line where itemized.
+- **`ca_counsel_approved` gates go-live of any customer-facing fee** (card or ACH). **Not legal advice — confirm current CA rules with counsel before enabling.**
+
+### 13.3 ACH settlement & returns (standard Direct Debit)
+- **Async by design:** ~4-business-day confirmation/settlement; a charge sits `processing` until then. Don't recognize cash or treat tuition as paid until `succeeded`.
+- **Returns after success:** a payment can go `succeeded → returned` days later (e.g. insufficient funds). Handle via recipe §11.2.12 (reversing entry) + `finance_admin` reflag — the same queue as a hard failure, which is why the "keep enrollment active, flag admin" policy fits ACH cleanly.
+- **Setup:** mandate authorization + bank verification once per family (Financial Connections ~$1.50, or microdeposits). New-account ACH draft limits apply for the first 120 days; not a concern while cards remain the majority.
 
 ---
 
@@ -346,7 +354,7 @@ Webhooks dedupe on processor event id. Off-session charges keyed on `tuition_cha
 - Tuition proration basis: calendar days vs class sessions.
 - 15th billing-period boundary: covers upcoming vs current month.
 - Sales-tax registration/rate handling for retail goods.
-- ⛔ **CA counsel sign-off** before enabling any surcharge/dual-pricing (ACH steer needs no sign-off).
+- ⛔ **CA counsel sign-off** before enabling any customer-facing fee — card *or* ACH dual pricing. (Defaulting tuition to ACH with **no** added fee needs no sign-off.)
 
 **Resolved:** teacher classification (per-teacher W-2/1099), private pay (flat), revenue recognition (on consumption), labor attribution (scheduled time), failed-payment policy (keep active + flag), Stripe credentials (in hand).
 
@@ -359,7 +367,7 @@ Webhooks dedupe on processor event id. Off-session charges keyed on `tuition_cha
 3. Canonical tables — invoices, line_items, payments, allocations, refunds (+RLS, finance_admin).
 4. Registration-fee config (season default + class override) + pricing resolver (§6), tested vs `class_pricing_rules`.
 5. Ledger posting service — revenue recipes (§11.2), post from finalized invoice + manual payment.
-6. Processor interface + Stripe (Checkout, vaulting, **ACH**, webhook normalization); `tenant_payment_config`, `processor_*_refs`.
+6. Processor interface + Stripe (Checkout, vaulting, **standard ACH Direct Debit** w/ mandate + verification + `succeeded→returned` handling, webhook normalization); `tenant_payment_config`, `processor_*_refs`.
 7. **Recurring monthly tuition** — schedules/charges, proration, cron off-session, dunning + admin flag. *(Revenue live.)*
 8. Pay-in-full + deferred recognition.
 9. Awards/discounts engine (§4.10–4.11) + scholarship banner (§18).
@@ -369,7 +377,7 @@ Webhooks dedupe on processor event id. Off-session charges keyed on `tuition_cha
 13. Private/Pilates consolidation + rev-share; migrate `private_billing_splits`.
 14. Credit consolidation; credit-as-tender.
 15. Shop ledger posting.
-16. Tax + card-fee recovery (dual-pricing/ACH steer), counsel-gated.
+16. Tax + per-tender fee recovery (dual pricing, card + ACH), counsel-gated.
 17. Event/class/teacher P&L views.
 18. Payout + payroll reconciliation.
 19. QBO export.
