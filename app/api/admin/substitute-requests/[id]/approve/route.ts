@@ -56,7 +56,7 @@ export async function POST(
   const { data: classInfo } = instance?.class_id
     ? await supabase
         .from("classes")
-        .select("level, style")
+        .select("levels, style")
         .eq("id", instance.class_id)
         .single()
     : { data: null };

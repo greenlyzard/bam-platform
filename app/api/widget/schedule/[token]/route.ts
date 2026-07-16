@@ -88,7 +88,7 @@ export async function GET(
   if (classIds.length > 0) {
     const { data: classes } = await supabase
       .from("classes")
-      .select("id, name, level, style, age_min, age_max, discipline")
+      .select("id, name, levels, style, age_min, age_max, discipline")
       .in("id", classIds);
     for (const c of classes ?? []) {
       classInfo[c.id] = c;
@@ -125,7 +125,7 @@ export async function GET(
       ? (teacherNames[i.substitute_teacher_id] ?? null)
       : null,
     roomName: i.room_id ? (roomNames[i.room_id] ?? null) : null,
-    level: i.class_id ? ((classInfo[i.class_id]?.level as string) ?? null) : null,
+    level: i.class_id ? ((classInfo[i.class_id]?.levels as string[] | null)?.join(", ") ?? null) : null,
     style: i.class_id ? ((classInfo[i.class_id]?.style as string) ?? null) : null,
     ageMin: i.class_id ? ((classInfo[i.class_id]?.age_min as number) ?? null) : null,
     ageMax: i.class_id ? ((classInfo[i.class_id]?.age_max as number) ?? null) : null,

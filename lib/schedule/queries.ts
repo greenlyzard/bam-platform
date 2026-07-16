@@ -390,16 +390,16 @@ export async function getScheduleInstances(filters: {
 
   // Get class info for enrichment
   const classIds = [...new Set(instances.map((i) => i.class_id).filter(Boolean) as string[])];
-  const classMap: Record<string, { name: string; level: string | null; style: string | null; enrolled_count: number; max_students: number | null }> = {};
+  const classMap: Record<string, { name: string; levels: string[] | null; style: string | null; enrolled_count: number; max_students: number | null }> = {};
   if (classIds.length > 0) {
     const { data: classes } = await supabase
       .from("classes")
-      .select("id, name, level, style, enrolled_count, max_students")
+      .select("id, name, levels, style, enrolled_count, max_students")
       .in("id", classIds);
     for (const c of classes ?? []) {
       classMap[c.id] = {
         name: c.name,
-        level: c.level,
+        levels: c.levels,
         style: c.style,
         enrolled_count: c.enrolled_count ?? 0,
         max_students: c.max_students,
@@ -443,7 +443,7 @@ export async function getScheduleInstances(filters: {
     ...i,
     is_trial_eligible: i.is_trial_eligible ?? false,
     className: i.class_id ? (classMap[i.class_id]?.name ?? null) : null,
-    classLevel: i.class_id ? (classMap[i.class_id]?.level ?? null) : null,
+    classLevel: i.class_id ? (classMap[i.class_id]?.levels?.join(", ") ?? null) : null,
     classStyle: i.class_id ? (classMap[i.class_id]?.style ?? null) : null,
     teacherName: i.teacher_id ? (teacherMap[i.teacher_id]?.name ?? null) : null,
     teacherInitials: i.teacher_id ? (teacherMap[i.teacher_id]?.initials ?? null) : null,
@@ -455,8 +455,9 @@ export async function getScheduleInstances(filters: {
 
   // Client-side filters that need enriched data
   if (filters.level) {
-    enriched = enriched.filter((i) =>
-      i.classLevel?.toLowerCase().includes(filters.level!.toLowerCase())
+    const lvl = filters.level.toLowerCase();
+    enriched = enriched.filter(
+      (i) => !!i.class_id && (classMap[i.class_id]?.levels ?? []).some((l) => l.toLowerCase() === lvl)
     );
   }
   if (filters.style) {
@@ -555,6 +556,9 @@ export async function getClassesAsScheduleInstances(filters: {
     weekDates[dow] = dateStr;
   }
 
+  // Class levels for the CONTAINS filter below (multi-level classes appear under each level).
+  const classLevelsById = new Map<string, string[]>(classes.map((c) => [c.id, c.levels ?? []]));
+
   // Map classes to ScheduleInstance[] — deduplicate by class_id + day_of_week
   let instances: ScheduleInstance[] = [];
   const seen = new Set<string>();
@@ -564,7 +568,7 @@ export async function getClassesAsScheduleInstances(filters: {
     const daysToMap: number[] = c.days_of_week?.length ? c.days_of_week : (c.day_of_week != null ? [c.day_of_week] : []);
     const teacherId = classTeacherMap[c.id] ?? null;
     const teacher = teacherId ? teacherNameMap[teacherId] : null;
-    const level = c.levels?.length ? c.levels[0] : null;
+    const level = c.levels?.length ? c.levels.join(", ") : null;
     const displayName = c.name;
 
     for (const dow of daysToMap) {
@@ -610,7 +614,9 @@ export async function getClassesAsScheduleInstances(filters: {
   }
   if (filters.level) {
     const lvl = filters.level.toLowerCase();
-    instances = instances.filter((i) => i.classLevel?.toLowerCase().includes(lvl));
+    instances = instances.filter((i) =>
+      (classLevelsById.get(i.class_id ?? "") ?? []).some((l) => l.toLowerCase() === lvl)
+    );
   }
   if (filters.roomId) {
     instances = instances.filter((i) => i.roomName === filters.roomId);
@@ -630,10 +636,9 @@ export async function getDistinctLevels(): Promise<string[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("classes")
-    .select("level")
-    .eq("is_active", true)
-    .not("level", "is", null);
+    .select("levels")
+    .eq("is_active", true);
 
-  const levels = [...new Set((data ?? []).map((c) => c.level).filter(Boolean) as string[])];
+  const levels = [...new Set((data ?? []).flatMap((c) => c.levels ?? []).filter(Boolean) as string[])];
   return levels.sort();
 }

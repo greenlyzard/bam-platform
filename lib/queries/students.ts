@@ -91,7 +91,7 @@ export async function getStudentEnrollments(studentId: string) {
       enrolled_at,
       dropped_at,
       class_id,
-      classes (id, name, day_of_week, start_time, end_time, room, teacher_id, fee_cents, level, style)
+      classes (id, name, day_of_week, start_time, end_time, room, teacher_id, fee_cents, levels, style)
     `
     )
     .eq("student_id", studentId)
@@ -137,7 +137,7 @@ export async function getStudentEnrollments(studentId: string) {
       room: string | null;
       teacher_id: string | null;
       fee_cents: number | null;
-      level: string | null;
+      levels: string[] | null;
       style: string | null;
     } | null;
     return {

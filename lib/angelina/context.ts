@@ -80,7 +80,7 @@ async function buildPublicContext(
   const { data: classes } = await supabase
     .from("classes")
     .select(
-      "id, name, style, level, age_min, age_max, day_of_week, start_time, end_time, max_students, enrolled_count, status, fee_cents, notes, teacher_id"
+      "id, name, style, levels, age_min, age_max, day_of_week, start_time, end_time, max_students, enrolled_count, status, fee_cents, notes, teacher_id"
     )
     .eq("is_active", true)
     .order("day_of_week")
@@ -130,7 +130,7 @@ async function buildPublicContext(
         ? `${Math.max(0, c.max_students - c.enrolled_count)} spots available`
         : "";
     const status = c.status === "full" ? "FULL" : c.status === "waitlist" ? "WAITLIST" : "";
-    return `- ${c.name} (${c.level}) | ${day} ${time} | ${ages} | ${teacher} | ${fee} | ${spots} ${status}`.trim();
+    return `- ${c.name} (${c.levels?.join(", ") ?? ""}) | ${day} ${time} | ${ages} | ${teacher} | ${fee} | ${spots} ${status}`.trim();
   });
 
   // Format teacher list
@@ -253,7 +253,7 @@ async function buildParentContext(
     const { data: enrollments } = await supabase
       .from("enrollments")
       .select(
-        "student_id, status, classes(name, style, level, day_of_week, start_time, end_time, room, teacher_id)"
+        "student_id, status, classes(name, style, levels, day_of_week, start_time, end_time, room, teacher_id)"
       )
       .in("student_id", studentIds)
       .in("status", ["active", "trial"]);
@@ -439,7 +439,7 @@ async function buildTeacherContext(
   const { data: classes } = await supabase
     .from("classes")
     .select(
-      "id, name, style, level, day_of_week, start_time, end_time, room, max_students, enrolled_count"
+      "id, name, style, levels, day_of_week, start_time, end_time, room, max_students, enrolled_count"
     )
     .eq("teacher_id", userId)
     .eq("is_active", true)
@@ -461,7 +461,7 @@ async function buildTeacherContext(
   const weeklyLines = (classes ?? []).map((c) => {
     const day = DAYS[c.day_of_week] ?? "TBD";
     const time = `${formatTime(c.start_time)}–${formatTime(c.end_time)}`;
-    return `- ${day}: ${c.name} (${c.level}) | ${time} | Room: ${c.room ?? "TBD"}`;
+    return `- ${day}: ${c.name} (${c.levels?.join(", ") ?? ""}) | ${time} | Room: ${c.room ?? "TBD"}`;
   });
 
   // Get rosters for each class (student names only, no contact info)
@@ -604,7 +604,7 @@ async function buildAdminContext(
   const { data: classes } = await supabase
     .from("classes")
     .select(
-      "id, name, level, day_of_week, start_time, end_time, max_students, enrolled_count, status, teacher_id, room"
+      "id, name, levels, day_of_week, start_time, end_time, max_students, enrolled_count, status, teacher_id, room"
     )
     .eq("is_active", true)
     .order("day_of_week")
@@ -651,7 +651,10 @@ async function buildAdminContext(
   const levelCounts: Record<string, number> = {};
   for (const c of classes ?? []) {
     const enrolled = c.enrolled_count ?? 0;
-    levelCounts[c.level] = (levelCounts[c.level] ?? 0) + enrolled;
+    // Multi-level classes count toward each of their levels.
+    for (const level of c.levels ?? []) {
+      levelCounts[level] = (levelCounts[level] ?? 0) + enrolled;
+    }
   }
   const levelLines = Object.entries(levelCounts).map(
     ([level, count]) => `- ${level}: ${count} students`

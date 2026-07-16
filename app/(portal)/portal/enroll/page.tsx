@@ -33,7 +33,7 @@ export default async function ReEnrollPage() {
     students.map(async (s: Record<string, unknown>) => {
       const { data: enrollments } = await supabase
         .from("enrollments")
-        .select("class_id, classes(name, level)")
+        .select("class_id, classes(name, levels)")
         .eq("student_id", s.id as string)
         .eq("status", "active");
 
@@ -45,9 +45,9 @@ export default async function ReEnrollPage() {
       );
 
       const levels = (enrollments ?? [])
-        .map((e: Record<string, unknown>) => {
+        .flatMap((e: Record<string, unknown>) => {
           const cls = e.classes as Record<string, unknown> | null;
-          return cls?.level as string | null;
+          return (cls?.levels as string[] | null) ?? [];
         })
         .filter(Boolean);
 

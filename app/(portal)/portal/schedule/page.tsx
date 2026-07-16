@@ -21,7 +21,7 @@ export default async function PortalSchedulePage() {
       id: string;
       name: string;
       style: string | null;
-      level: string | null;
+      levels: string[] | null;
       day_of_week: number | null;
       start_time: string | null;
       end_time: string | null;
@@ -37,7 +37,7 @@ export default async function PortalSchedulePage() {
       .from("enrollments")
       .select(
         `id, student_id, class_id, status,
-         classes (id, name, style, level, day_of_week, start_time, end_time, room, teacher_id, max_students, enrolled_count)`
+         classes (id, name, style, levels, day_of_week, start_time, end_time, room, teacher_id, max_students, enrolled_count)`
       )
       .in("student_id", studentIds)
       .in("status", ["active", "trial"]);
@@ -118,7 +118,7 @@ export default async function PortalSchedulePage() {
     id: string;
     name: string;
     style: string | null;
-    level: string | null;
+    levels: string[] | null;
     day_of_week: number | null;
     start_time: string | null;
     end_time: string | null;
@@ -133,7 +133,7 @@ export default async function PortalSchedulePage() {
   if (students && students.length > 0) {
     const { data: allClasses } = await supabase
       .from("classes")
-      .select("id, name, style, level, day_of_week, start_time, end_time, room, teacher_id, max_students, enrolled_count, age_min, age_max")
+      .select("id, name, style, levels, day_of_week, start_time, end_time, room, teacher_id, max_students, enrolled_count, age_min, age_max")
       .eq("is_active", true)
       .order("name");
 
@@ -160,7 +160,13 @@ export default async function PortalSchedulePage() {
         const ageOk =
           (!cls.age_min || sa.age >= cls.age_min) &&
           (!cls.age_max || sa.age <= cls.age_max);
-        const levelOk = !cls.level || !sa.current_level || cls.level === sa.current_level || studentLevels.has(cls.level);
+        const lvl = sa.current_level;
+        const clsLevels = cls.levels ?? [];
+        const levelOk =
+          clsLevels.length === 0 ||
+          !lvl ||
+          clsLevels.includes(lvl) ||
+          clsLevels.some((l: string) => studentLevels.has(l));
         if (ageOk && levelOk) {
           matchesAny = true;
           break;

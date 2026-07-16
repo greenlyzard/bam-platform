@@ -80,7 +80,7 @@ interface ClassData {
   id: string;
   name: string;
   style: string | null;
-  level: string | null;
+  levels: string[] | null;
   day_of_week: number | null;
   start_time: string | null;
   end_time: string | null;
@@ -385,11 +385,11 @@ export function PortalScheduleView({
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  {cls.level && (
+                  {cls.levels?.length ? (
                     <span className="inline-flex items-center rounded-full bg-lavender/10 px-2 py-0.5 text-xs font-medium text-lavender-dark">
-                      {cls.level}
+                      {cls.levels.join(", ")}
                     </span>
-                  )}
+                  ) : null}
                   <h4 className="mt-1 font-semibold text-charcoal">{cls.name}</h4>
                   {cls.day_of_week != null && cls.start_time && (
                     <p className="text-sm text-slate mt-0.5">

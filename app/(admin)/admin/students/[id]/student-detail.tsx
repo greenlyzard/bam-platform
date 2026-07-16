@@ -71,7 +71,7 @@ interface EnrollmentRow {
     room: string | null;
     teacher_id: string | null;
     fee_cents: number | null;
-    level: string | null;
+    levels: string[] | null;
     style: string | null;
   } | null;
   teacherName: string | null;
@@ -858,7 +858,7 @@ export function StudentDetail({
                         <div>
                           <p className="text-charcoal font-medium">{e.class?.simple_name || e.class?.name || "Class"}</p>
                           <p className="text-xs text-mist">
-                            {e.class?.level ?? ""} {e.class?.style ?? ""}
+                            {(e.class?.levels?.join(", ") ?? "")} {e.class?.style ?? ""}
                           </p>
                         </div>
                         <span className="text-charcoal font-medium">

@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
   // Find eligible substitutes
   const { data: classInfo } = await supabase
     .from("classes")
-    .select("level, style")
+    .select("levels, style")
     .eq("id", instance.class_id)
     .single();
 
@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
       data: {
         request: subRequest,
         eligible_sub_count: subCount,
-        class_level: classInfo?.level ?? null,
+        class_level: classInfo?.levels?.join(", ") ?? null,
         class_style: classInfo?.style ?? null,
       },
     },

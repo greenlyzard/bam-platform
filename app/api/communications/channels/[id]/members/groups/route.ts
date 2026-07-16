@@ -99,7 +99,7 @@ export async function GET(
   const [classesRes, productionsRes] = await Promise.all([
     supabase
       .from("classes")
-      .select("id, name, style, level, season, teacher_id, day_of_week, start_time, end_time")
+      .select("id, name, style, levels, season, teacher_id, day_of_week, start_time, end_time")
       .eq("is_active", true)
       .order("day_of_week")
       .order("start_time")
@@ -137,7 +137,7 @@ export async function GET(
     id: c.id,
     name: formatClassLabel(c),
     type: "class" as const,
-    detail: [c.style, c.level, c.season].filter(Boolean).join(" · "),
+    detail: [c.style, c.levels?.join(", "), c.season].filter(Boolean).join(" · "),
     teacher: c.teacher_id ? teacherMap[c.teacher_id] ?? null : null,
   }));
 

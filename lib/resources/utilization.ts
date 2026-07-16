@@ -118,7 +118,7 @@ export async function getWeeklyUtilization(
   if (classIds.length > 0) {
     const { data: classes } = await supabase
       .from("classes")
-      .select("id, name, level, max_students")
+      .select("id, name, levels, max_students")
       .in("id", classIds);
     for (const c of classes ?? []) {
       classNames[c.id] = c.name;
