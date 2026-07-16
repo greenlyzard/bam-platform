@@ -1392,10 +1392,12 @@ export type Database = {
           description: string | null
           discipline: string | null
           discipline_ids: string[] | null
+          display_name: string | null
           end_date: string | null
           end_time: string | null
           enrolled_count: number
           fee_cents: number | null
+          full_name: string | null
           gender: string | null
           id: string
           is_active: boolean | null
@@ -1419,7 +1421,9 @@ export type Database = {
           season: string | null
           season_id: string | null
           short_description: string | null
+          short_name: string | null
           show_capacity_public: boolean | null
+          simple_name: string | null
           start_date: string | null
           start_time: string | null
           status: string
@@ -1439,10 +1443,12 @@ export type Database = {
           description?: string | null
           discipline?: string | null
           discipline_ids?: string[] | null
+          display_name?: string | null
           end_date?: string | null
           end_time?: string | null
           enrolled_count?: number
           fee_cents?: number | null
+          full_name?: string | null
           gender?: string | null
           id?: string
           is_active?: boolean | null
@@ -1466,7 +1472,9 @@ export type Database = {
           season?: string | null
           season_id?: string | null
           short_description?: string | null
+          short_name?: string | null
           show_capacity_public?: boolean | null
+          simple_name?: string | null
           start_date?: string | null
           start_time?: string | null
           status?: string
@@ -1486,10 +1494,12 @@ export type Database = {
           description?: string | null
           discipline?: string | null
           discipline_ids?: string[] | null
+          display_name?: string | null
           end_date?: string | null
           end_time?: string | null
           enrolled_count?: number
           fee_cents?: number | null
+          full_name?: string | null
           gender?: string | null
           id?: string
           is_active?: boolean | null
@@ -1513,7 +1523,9 @@ export type Database = {
           season?: string | null
           season_id?: string | null
           short_description?: string | null
+          short_name?: string | null
           show_capacity_public?: boolean | null
+          simple_name?: string | null
           start_date?: string | null
           start_time?: string | null
           status?: string
@@ -2679,6 +2691,7 @@ export type Database = {
       enrollments: {
         Row: {
           amount_paid_cents: number | null
+          billing_override: boolean
           billing_plan_type: string | null
           cancelled_at: string | null
           class_id: string
@@ -2689,6 +2702,11 @@ export type Database = {
           enrollment_type: string
           family_id: string | null
           id: string
+          override_amount: number | null
+          override_by: string | null
+          override_reason: string | null
+          prorated_amount: number | null
+          proration_method: string | null
           status: string
           stripe_payment_intent_id: string | null
           student_id: string
@@ -2699,6 +2717,7 @@ export type Database = {
         }
         Insert: {
           amount_paid_cents?: number | null
+          billing_override?: boolean
           billing_plan_type?: string | null
           cancelled_at?: string | null
           class_id: string
@@ -2709,6 +2728,11 @@ export type Database = {
           enrollment_type?: string
           family_id?: string | null
           id?: string
+          override_amount?: number | null
+          override_by?: string | null
+          override_reason?: string | null
+          prorated_amount?: number | null
+          proration_method?: string | null
           status?: string
           stripe_payment_intent_id?: string | null
           student_id: string
@@ -2719,6 +2743,7 @@ export type Database = {
         }
         Update: {
           amount_paid_cents?: number | null
+          billing_override?: boolean
           billing_plan_type?: string | null
           cancelled_at?: string | null
           class_id?: string
@@ -2729,6 +2754,11 @@ export type Database = {
           enrollment_type?: string
           family_id?: string | null
           id?: string
+          override_amount?: number | null
+          override_by?: string | null
+          override_reason?: string | null
+          prorated_amount?: number | null
+          proration_method?: string | null
           status?: string
           stripe_payment_intent_id?: string | null
           student_id?: string

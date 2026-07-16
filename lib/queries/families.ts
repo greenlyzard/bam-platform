@@ -31,7 +31,7 @@ export async function getFamilies(search?: string) {
   const { data, error } = await query;
 
   if (error) {
-    console.error("[families:getFamilies]", error);
+    console.error("[families:getFamilies]", { code: error.code, message: error.message, details: error.details, hint: error.hint });
     return [];
   }
 
@@ -121,7 +121,7 @@ export async function getFamilyById(id: string) {
     .single();
 
   if (error) {
-    console.error("[families:getFamilyById]", error);
+    console.error("[families:getFamilyById]", { code: error.code, message: error.message, details: error.details, hint: error.hint });
     return null;
   }
 
@@ -141,7 +141,7 @@ export async function getFamilyStudents(familyId: string) {
     .order("first_name");
 
   if (error) {
-    console.error("[families:getFamilyStudents]", error);
+    console.error("[families:getFamilyStudents]", { code: error.code, message: error.message, details: error.details, hint: error.hint });
     return [];
   }
 
@@ -211,7 +211,7 @@ export async function getFamilyEnrollments(familyId: string) {
     .order("enrolled_at", { ascending: false });
 
   if (error) {
-    console.error("[families:getFamilyEnrollments]", error);
+    console.error("[families:getFamilyEnrollments]", { code: error.code, message: error.message, details: error.details, hint: error.hint });
     return [];
   }
 
@@ -231,6 +231,9 @@ export async function searchFamiliesForEnrollment(query: string) {
     .order("family_name")
     .limit(10);
 
+  if (error) {
+    console.error("[families:searchFamiliesForEnrollment]", { code: error.code, message: error.message, details: error.details, hint: error.hint });
+  }
   if (error || !families) return [];
 
   const familyIds = families.map((f) => f.id);
@@ -261,6 +264,9 @@ export async function getStudentGuardians(studentId: string) {
     .eq("student_id", studentId)
     .order("is_primary", { ascending: false });
 
+  if (error) {
+    console.error("[families:getStudentGuardians]", { code: error.code, message: error.message, details: error.details, hint: error.hint });
+  }
   if (error || !guardians?.length) return [];
 
   const profileIds = guardians.map((g) => g.profile_id);
@@ -311,6 +317,9 @@ export async function getFamilyGuardians(familyId: string) {
     .in("student_id", studentIds)
     .order("is_primary", { ascending: false });
 
+  if (error) {
+    console.error("[families:getFamilyGuardians]", { code: error.code, message: error.message, details: error.details, hint: error.hint });
+  }
   if (error || !guardians?.length) return {};
 
   // Enrich with profile data
@@ -435,7 +444,7 @@ export async function getFamilyExtendedContacts(familyId: string) {
     .order("last_name");
 
   if (error) {
-    console.error("[families:getFamilyExtendedContacts]", error);
+    console.error("[families:getFamilyExtendedContacts]", { code: error.code, message: error.message, details: error.details, hint: error.hint });
     return [];
   }
 
@@ -469,7 +478,7 @@ export async function getClassEnrollments(classId: string) {
     .order("enrolled_at", { ascending: true });
 
   if (error) {
-    console.error("[families:getClassEnrollments]", error);
+    console.error("[families:getClassEnrollments]", { code: error.code, message: error.message, details: error.details, hint: error.hint });
     return [];
   }
 
