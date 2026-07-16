@@ -3,21 +3,19 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/stripe";
+import {
+  splitCheckoutLines,
+  immediateTotalCents,
+  buildAuthorizationSessionParams,
+  type CartLineInput,
+} from "@/lib/billing/checkout-lines";
 
 const CART_COOKIE = "bam_cart_token";
 
-const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
-function formatTime(t: string) {
-  const [h, m] = t.split(":");
-  const hour = parseInt(h);
-  const ampm = hour >= 12 ? "PM" : "AM";
-  const h12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
-  return `${h12}:${m} ${ampm}`;
-}
-
 /**
- * POST — create Stripe Checkout Session from server-side cart
+ * POST — Authorization checkout (docs/AUTHORIZATION_CHECKOUT.md Slice 1).
+ * Splits the cart into immediate (charge now: registration fee) vs scheduled (tuition intent),
+ * vaults the card on the family's Stripe Customer, and charges only the immediate lines.
  */
 export async function POST(req: Request) {
   try {
@@ -30,7 +28,7 @@ export async function POST(req: Request) {
 
     const supabase = await createClient();
 
-    // Load cart
+    // Load cart (ownership via the session-token cookie).
     const { data: cart } = await supabase
       .from("enrollment_carts")
       .select("*")
@@ -43,145 +41,116 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Cart not found or expired" }, { status: 400 });
     }
 
-    // Load items with class details
-    const { data: items } = await supabase
+    // Admin client: cart ownership was validated above; use the service role to read line items
+    // (incl. the new charge_timing), studio settings, and the family.
+    const admin = createAdminClient();
+
+    const { data: itemRows } = await admin
       .from("enrollment_cart_items")
-      .select(`
-        *,
-        class:classes(
-          id, name, season, day_of_week, start_time, end_time,
-          teacher:profiles!teacher_id(first_name, last_name)
-        )
-      `)
+      .select("class_id, student_id, student_name, price_cents, charge_timing")
       .eq("cart_id", cart.id);
 
-    if (!items || items.length === 0) {
+    if (!itemRows || itemRows.length === 0) {
       return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
     }
 
-    // Optionally get customer email if logged in
+    // Authorization checkout REQUIRES a family — the vaulted card is attached to and persisted on
+    // the family's Stripe Customer. The cart flow sets family_id when a signed-in parent checks out.
+    if (!cart.family_id) {
+      return NextResponse.json(
+        { error: "Please sign in before checkout so we can save your payment method." },
+        { status: 400 }
+      );
+    }
+
+    // Optional email for the Customer.
     let customerEmail: string | undefined;
     const body = await req.json().catch(() => ({}));
     if (body.email) {
       customerEmail = body.email;
     } else {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user?.email) {
-        customerEmail = user.email;
-      }
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user?.email) customerEmail = user.email;
     }
 
     const stripe = getStripe();
 
-    // Create or reuse a Stripe Customer for the family and persist it on the family
-    // row. This saves the card at checkout (setup_future_usage below) so later batch
-    // charging (COMMERCE_AND_BILLING.md §4) can run off-session. Guests (no family_id)
-    // fall back to email-only checkout.
-    let customerId: string | undefined;
-    if (cart.family_id) {
-      const admin = createAdminClient();
-      const { data: family } = await admin
-        .from("families")
-        .select("id, stripe_customer_id, billing_email, family_name")
-        .eq("id", cart.family_id)
-        .single();
-
-      if (family) {
-        if (family.stripe_customer_id) {
-          customerId = family.stripe_customer_id;
-        } else {
-          const customer = await stripe.customers.create({
-            email: customerEmail ?? family.billing_email ?? undefined,
-            name: family.family_name ?? undefined,
-            metadata: { family_id: family.id, tenant_id: cart.tenant_id },
-          });
-          customerId = customer.id;
-          await admin
-            .from("families")
-            .update({ stripe_customer_id: customerId })
-            .eq("id", family.id);
-        }
-      }
+    // Create or reuse the family's Stripe Customer (the vaulting target).
+    const { data: family } = await admin
+      .from("families")
+      .select("id, stripe_customer_id, billing_email, family_name")
+      .eq("id", cart.family_id)
+      .single();
+    if (!family) {
+      return NextResponse.json({ error: "Family not found" }, { status: 400 });
+    }
+    let customerId: string = family.stripe_customer_id ?? "";
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email: customerEmail ?? family.billing_email ?? undefined,
+        name: family.family_name ?? undefined,
+        metadata: { family_id: family.id, tenant_id: cart.tenant_id },
+      });
+      customerId = customer.id;
+      await admin.from("families").update({ stripe_customer_id: customerId }).eq("id", family.id);
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://portal.balletacademyandmovement.com";
+    // Registration fee (studio-wide config; spec §1).
+    const { data: settings } = await admin
+      .from("studio_settings")
+      .select("registration_fee_cents")
+      .limit(1)
+      .maybeSingle();
+    const registrationFeeCents = (settings?.registration_fee_cents as number | undefined) ?? 0;
 
-    // Build Stripe line items
-    const lineItems = items.map((item) => {
-      const cls = item.class as Record<string, unknown> | null;
-      const teacherRaw = cls?.teacher as unknown;
-      const teacher = (Array.isArray(teacherRaw) ? teacherRaw[0] : teacherRaw) as {
-        first_name: string;
-        last_name: string;
-      } | null;
+    // Split immediate (charge now) vs scheduled (record intent, drawn on the 15th later).
+    const lineInputs: CartLineInput[] = (itemRows as Array<Record<string, unknown>>).map((r) => ({
+      classId: r.class_id as string,
+      studentId: (r.student_id as string | null) ?? null,
+      studentName: (r.student_name as string | null) ?? null,
+      priceCents: (r.price_cents as number) ?? 0,
+      chargeTiming: (r.charge_timing as "immediate" | "scheduled") ?? "scheduled",
+    }));
+    const { immediate, scheduled } = splitCheckoutLines({ items: lineInputs, registrationFeeCents });
 
-      const dayOfWeek = cls?.day_of_week as number | undefined;
-      const startTime = cls?.start_time as string | undefined;
-      const season = cls?.season as string | undefined;
-      const className = (cls?.name as string) ?? "Class";
+    if (immediateTotalCents(immediate) <= 0) {
+      return NextResponse.json(
+        { error: "Nothing to charge now (no registration fee or immediate lines configured)." },
+        { status: 400 }
+      );
+    }
 
-      const nameParts = [className];
-      if (season) nameParts.push(`\u2014 ${season}`);
+    const appUrl =
+      process.env.NEXT_PUBLIC_APP_URL ?? "https://portal.balletacademyandmovement.com";
 
-      const descParts: string[] = [];
-      if (dayOfWeek !== undefined && startTime) {
-        descParts.push(`${DAYS[dayOfWeek]}s ${formatTime(startTime)}`);
-      }
-      if (teacher) {
-        descParts.push(`with ${teacher.first_name} ${teacher.last_name}`);
-      }
-      if (item.student_name) {
-        descParts.push(`for ${item.student_name}`);
-      }
-
-      return {
-        price_data: {
-          currency: "usd",
-          product_data: {
-            name: nameParts.join(" "),
-            description: descParts.join(" ") || undefined,
-          },
-          unit_amount: item.price_cents,
+    // Card-only this slice; VAULTS the card (setup_future_usage='off_session'); charges only the
+    // immediate lines; metadata carries the scheduled tuition intents for provenance.
+    const checkoutSession = await stripe.checkout.sessions.create(
+      buildAuthorizationSessionParams({
+        immediate,
+        customerId,
+        appUrl,
+        metadata: {
+          cart_id: cart.id,
+          tenant_id: cart.tenant_id,
+          family_id: cart.family_id,
+          scheduled_intents: JSON.stringify(scheduled),
         },
-        quantity: 1,
-      };
-    });
+      })
+    );
 
-    // Create Stripe Checkout Session. When we have a Customer, attach it and save the
-    // payment method for future off-session charges; otherwise fall back to email.
-    // (Stripe rejects passing both `customer` and `customer_email`.)
-    const checkoutSession = await stripe.checkout.sessions.create({
-      mode: "payment",
-      // Card + ACH Direct Debit. ACH (us_bank_account) settles asynchronously — the webhook
-      // finalizes on checkout.session.async_payment_succeeded, not on session completion.
-      payment_method_types: ["card", "us_bank_account"],
-      line_items: lineItems,
-      success_url: `${appUrl}/enroll/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${appUrl}/enroll/cart`,
-      ...(customerId
-        ? { customer: customerId, payment_intent_data: { setup_future_usage: "off_session" as const } }
-        : { customer_email: customerEmail }),
-      metadata: {
-        cart_id: cart.id,
-        tenant_id: cart.tenant_id,
-        family_id: cart.family_id ?? "",
-      },
-    });
-
-    // Update cart with Stripe session ID and status
     await supabase
       .from("enrollment_carts")
-      .update({
-        stripe_session_id: checkoutSession.id,
-        status: "checked_out",
-      })
+      .update({ stripe_session_id: checkoutSession.id, status: "checked_out" })
       .eq("id", cart.id);
 
     return NextResponse.json({ url: checkoutSession.url });
   } catch (err) {
     console.error("[checkout:create]", err);
     return NextResponse.json(
-      { error: "Failed to create checkout session" },
+      { error: "Failed to start checkout" },
       { status: 500 }
     );
   }

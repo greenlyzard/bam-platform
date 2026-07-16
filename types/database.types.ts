@@ -2535,6 +2535,7 @@ export type Database = {
       enrollment_cart_items: {
         Row: {
           cart_id: string
+          charge_timing: string
           class_id: string
           created_at: string
           id: string
@@ -2545,6 +2546,7 @@ export type Database = {
         }
         Insert: {
           cart_id: string
+          charge_timing?: string
           class_id: string
           created_at?: string
           id?: string
@@ -2555,6 +2557,7 @@ export type Database = {
         }
         Update: {
           cart_id?: string
+          charge_timing?: string
           class_id?: string
           created_at?: string
           id?: string
@@ -3163,6 +3166,8 @@ export type Database = {
           notes: string | null
           primary_contact_id: string | null
           stripe_customer_id: string | null
+          stripe_mandate_id: string | null
+          stripe_payment_method_id: string | null
           tenant_id: string
         }
         Insert: {
@@ -3175,6 +3180,8 @@ export type Database = {
           notes?: string | null
           primary_contact_id?: string | null
           stripe_customer_id?: string | null
+          stripe_mandate_id?: string | null
+          stripe_payment_method_id?: string | null
           tenant_id: string
         }
         Update: {
@@ -3187,6 +3194,8 @@ export type Database = {
           notes?: string | null
           primary_contact_id?: string | null
           stripe_customer_id?: string | null
+          stripe_mandate_id?: string | null
+          stripe_payment_method_id?: string | null
           tenant_id?: string
         }
         Relationships: [
@@ -8535,6 +8544,7 @@ export type Database = {
           logo_light_url: string | null
           logo_url: string | null
           phone: string | null
+          registration_fee_cents: number
           student_term_plural: string | null
           student_term_singular: string | null
           studio_name: string
@@ -8554,6 +8564,7 @@ export type Database = {
           logo_light_url?: string | null
           logo_url?: string | null
           phone?: string | null
+          registration_fee_cents?: number
           student_term_plural?: string | null
           student_term_singular?: string | null
           studio_name?: string
@@ -8573,6 +8584,7 @@ export type Database = {
           logo_light_url?: string | null
           logo_url?: string | null
           phone?: string | null
+          registration_fee_cents?: number
           student_term_plural?: string | null
           student_term_singular?: string | null
           studio_name?: string
@@ -10172,6 +10184,77 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "trial_history_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tuition_schedule_intent: {
+        Row: {
+          anchor_day: number
+          class_id: string | null
+          created_at: string
+          family_id: string | null
+          id: string
+          monthly_amount_cents: number
+          source_ref: string | null
+          status: string
+          student_id: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          anchor_day?: number
+          class_id?: string | null
+          created_at?: string
+          family_id?: string | null
+          id?: string
+          monthly_amount_cents: number
+          source_ref?: string | null
+          status?: string
+          student_id?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          anchor_day?: number
+          class_id?: string | null
+          created_at?: string
+          family_id?: string | null
+          id?: string
+          monthly_amount_cents?: number
+          source_ref?: string | null
+          status?: string
+          student_id?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tuition_schedule_intent_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tuition_schedule_intent_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tuition_schedule_intent_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tuition_schedule_intent_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"

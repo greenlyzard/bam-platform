@@ -28,6 +28,8 @@ export function EnrollmentCartView() {
     useCart();
   const [checkingOut, setCheckingOut] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
+  // Open-authorization consent (card-on-file + ACH mandate) — AUTHORIZATION_CHECKOUT.md §6.
+  const [agreed, setAgreed] = useState(false);
 
   async function handleCheckout() {
     setCheckingOut(true);
@@ -218,12 +220,29 @@ export function EnrollmentCartView() {
         </div>
       )}
 
+      {/* Open-authorization consent (card-on-file + ACH mandate) — spec §6. Wording TBD by counsel. */}
+      <label className="flex items-start gap-2 rounded-lg border border-silver/60 bg-white/60 px-4 py-3 text-xs text-slate">
+        <input
+          type="checkbox"
+          checked={agreed}
+          onChange={(e) => setAgreed(e.target.checked)}
+          className="mt-0.5 h-4 w-4 shrink-0 accent-lavender"
+        />
+        <span>
+          I authorize Ballet Academy and Movement to securely store my payment method and charge it
+          on an ongoing basis for monthly tuition (drawn on the 15th) and studio-approved fees
+          (registration, costumes, competitions, and adjustments), until I cancel in writing. This is
+          a card-on-file authorization, and where I pay by bank account, an ACH (Nacha) debit
+          authorization.
+        </span>
+      </label>
+
       {/* Actions */}
       <div className="space-y-3">
         <button
           type="button"
           onClick={handleCheckout}
-          disabled={checkingOut}
+          disabled={checkingOut || !agreed}
           className="flex h-12 items-center justify-center rounded-lg bg-lavender hover:bg-lavender-dark text-white font-semibold text-sm transition-colors w-full disabled:opacity-40"
         >
           {checkingOut ? "Redirecting to payment..." : "Proceed to Checkout"}

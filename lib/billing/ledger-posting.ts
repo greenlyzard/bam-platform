@@ -1,29 +1,20 @@
-// Double-entry ledger posting for the enrollment checkout.
-// Implements docs/LEDGER_FOUNDATION_REVIEW.md §3.3 `direct_sale_captured`: an immediately-paid
-// checkout (no invoice, no receivable) posts ONE balanced group — DR cash_clearing (total) /
-// CR revenue_tuition (per item). No accounts_receivable leg: AR is reserved for genuinely-owed
-// money (the recurring-tuition path), so an instant sale reads like a receipt (cash in = revenue).
+// Double-entry ledger posting for immediately-captured sales (Fable §3.3 `direct_sale_captured`).
+// One balanced group: DR cash_clearing (total) / CR <revenue account> per line. No accounts_receivable
+// — the money is already paid, so it reads like a receipt. Reserved for the immediate lines of the
+// authorization checkout (registration fee, and any admin-flipped immediate tuition).
 //
-// Pure + deterministic: no DB, no clock, no randomness. The WRITE PATH is the SECURITY DEFINER
-// RPC post_ledger_group() — this module only shapes the balanced group + legs the webhook hands
-// to it. Idempotency is the RPC's ON CONFLICT (tenant_id, posting_key) DO NOTHING; the posting
-// key below is deterministic so a redelivered webhook no-ops.
+// Pure/deterministic: no DB, no clock, no randomness. The WRITE PATH is the SECURITY DEFINER RPC
+// post_ledger_group(); idempotency is its ON CONFLICT (tenant_id, posting_key) DO NOTHING and the
+// deterministic posting_key below.
 
-/** Chart-of-accounts slugs (must exist in ledger_accounts) touched by checkout. */
+/** Chart-of-accounts slugs (must exist in ledger_accounts) touched by the immediate sale. */
 export const ACCOUNTS = {
-  accounts_receivable: "accounts_receivable",
   cash_clearing: "cash_clearing",
   revenue_tuition: "revenue_tuition",
+  revenue_registration: "revenue_registration",
 } as const;
 
 export type LegDirection = "debit" | "credit";
-
-export interface PostingItem {
-  classId: string;
-  studentId: string | null;
-  priceCents: number;
-  locationId: string | null;
-}
 
 /** A leg, shaped for the post_ledger_group RPC's p_legs jsonb (snake_case keys). */
 export interface LedgerLeg {
@@ -46,14 +37,19 @@ export interface PostingGroupSpec {
   legs: LedgerLeg[];
 }
 
-export interface CheckoutPostingInput {
-  /** Stripe payment intent id — the stable source_ref for deterministic posting keys. */
-  paymentIntentId: string;
+/** A revenue line captured now in an immediate sale. */
+export interface SaleLine {
+  account: string; // revenue_registration | revenue_tuition | ...
+  amountCents: number;
   familyId: string | null;
-  items: PostingItem[];
+  studentId?: string | null;
+  classId?: string | null;
+  locationId?: string | null;
 }
 
-function leg(partial: Partial<LedgerLeg> & { account: string; direction: LegDirection; amount_cents: number }): LedgerLeg {
+function leg(
+  partial: Partial<LedgerLeg> & { account: string; direction: LegDirection; amount_cents: number }
+): LedgerLeg {
   return {
     family_id: null,
     student_id: null,
@@ -65,51 +61,50 @@ function leg(partial: Partial<LedgerLeg> & { account: string; direction: LegDire
 }
 
 /**
- * Build the single balanced group for an immediately-paid enrollment checkout (Fable §3.3):
- *   direct_sale_captured: one DR cash_clearing (total) + per-item CR revenue_tuition.
- * No accounts_receivable — the money is already paid, so this reads like a receipt
- * (cash in = revenue). The group balances (Σdr=Σcr) and has >=2 legs.
+ * Build the balanced `direct_sale_captured` group for the immediately-charged lines:
+ *   DR cash_clearing (total) + CR <account> per line, all charge_status='captured'.
+ * Returns null when nothing is payable (caller skips posting). >=2 legs, Σdebit=Σcredit.
  * Posting key follows the Fable format {source_system}:{source_ref}:{event_type}.
  */
-export function buildCheckoutPostingGroups(input: CheckoutPostingInput): PostingGroupSpec[] {
-  const { paymentIntentId: pi, familyId, items } = input;
-  const totalCents = items.reduce((sum, it) => sum + it.priceCents, 0);
-  if (totalCents <= 0) return [];
+export function buildDirectSaleGroup(args: {
+  paymentIntentId: string;
+  familyId: string | null;
+  lines: SaleLine[];
+}): PostingGroupSpec | null {
+  const total = args.lines.reduce((sum, l) => sum + l.amountCents, 0);
+  if (total <= 0) return null;
 
-  // One debit for the cash received, one revenue credit per item (keeps per-class dims).
   const legs: LedgerLeg[] = [
     leg({
       account: ACCOUNTS.cash_clearing,
       direction: "debit",
-      amount_cents: totalCents,
-      family_id: familyId,
+      amount_cents: total,
+      family_id: args.familyId,
       charge_status: "captured",
     }),
   ];
-  for (const it of items) {
+  for (const l of args.lines) {
     legs.push(
       leg({
-        account: ACCOUNTS.revenue_tuition,
+        account: l.account,
         direction: "credit",
-        amount_cents: it.priceCents,
-        family_id: familyId,
-        student_id: it.studentId,
-        class_id: it.classId,
-        location_id: it.locationId,
+        amount_cents: l.amountCents,
+        family_id: l.familyId,
+        student_id: l.studentId ?? null,
+        class_id: l.classId ?? null,
+        location_id: l.locationId ?? null,
         charge_status: "captured",
       })
     );
   }
 
-  return [
-    {
-      postingKey: `stripe:${pi}:direct_sale_captured`,
-      eventType: "direct_sale_captured",
-      sourceSystem: "stripe",
-      sourceRef: pi,
-      legs,
-    },
-  ];
+  return {
+    postingKey: `stripe:${args.paymentIntentId}:direct_sale_captured`,
+    eventType: "direct_sale_captured",
+    sourceSystem: "stripe",
+    sourceRef: args.paymentIntentId,
+    legs,
+  };
 }
 
 /** Sum of debit and credit cents in a group. */

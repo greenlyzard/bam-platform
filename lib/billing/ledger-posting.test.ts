@@ -1,106 +1,88 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  buildCheckoutPostingGroups,
+  buildDirectSaleGroup,
   groupBalance,
   assertBalanced,
   ACCOUNTS,
-  type CheckoutPostingInput,
   type PostingGroupSpec,
+  type SaleLine,
 } from "./ledger-posting.ts";
 
-const INPUT: CheckoutPostingInput = {
-  paymentIntentId: "pi_abc",
-  familyId: "fam-1",
-  items: [
-    { classId: "cls-a", studentId: "stu-1", priceCents: 15000, locationId: "loc-1" },
-    { classId: "cls-b", studentId: "stu-1", priceCents: 12500, locationId: "loc-1" },
-  ],
-};
+const PI = "pi_abc";
 
-const keysOf = (gs: PostingGroupSpec[]) => gs.map((g) => g.postingKey);
-
-test("emits ONE direct_sale_captured group with the Fable posting key", () => {
-  const gs = buildCheckoutPostingGroups(INPUT);
-  assert.equal(gs.length, 1);
-  assert.equal(gs[0].eventType, "direct_sale_captured");
-  assert.equal(gs[0].sourceSystem, "stripe");
-  assert.deepEqual(keysOf(gs), ["stripe:pi_abc:direct_sale_captured"]);
-});
-
-test("group balances (Σdebits == Σcredits) and has >=2 legs", () => {
-  const g = buildCheckoutPostingGroups(INPUT)[0];
+test("registration-only sale: DR cash_clearing / CR revenue_registration, balances", () => {
+  const g = buildDirectSaleGroup({
+    paymentIntentId: PI,
+    familyId: "fam-1",
+    lines: [{ account: ACCOUNTS.revenue_registration, amountCents: 5000, familyId: "fam-1" }],
+  })!;
+  assert.equal(g.eventType, "direct_sale_captured");
+  assert.equal(g.postingKey, "stripe:pi_abc:direct_sale_captured");
   const { debitCents, creditCents } = groupBalance(g);
-  assert.equal(debitCents, creditCents);
-  assert.ok(g.legs.length >= 2);
+  assert.equal(debitCents, 5000);
+  assert.equal(creditCents, 5000);
   assert.doesNotThrow(() => assertBalanced(g));
-});
 
-test("no accounts_receivable leg — cash in = revenue (reads like a receipt)", () => {
-  const g = buildCheckoutPostingGroups(INPUT)[0];
-  assert.ok(g.legs.every((l) => l.account !== ACCOUNTS.accounts_receivable));
-});
-
-test("net effect: one cash debit (total) == Σ revenue credits == Σ item prices", () => {
-  const g = buildCheckoutPostingGroups(INPUT)[0];
-  const total = 15000 + 12500;
-
-  const cashLegs = g.legs.filter((l) => l.account === ACCOUNTS.cash_clearing && l.direction === "debit");
-  assert.equal(cashLegs.length, 1);
-  assert.equal(cashLegs[0].amount_cents, total);
-
-  const revenue = g.legs
-    .filter((l) => l.account === ACCOUNTS.revenue_tuition && l.direction === "credit")
-    .reduce((s, l) => s + l.amount_cents, 0);
-  assert.equal(revenue, total);
-});
-
-test("idempotent replay: same input → identical posting key (RPC ON CONFLICT dedupes)", () => {
-  assert.deepEqual(keysOf(buildCheckoutPostingGroups(INPUT)), keysOf(buildCheckoutPostingGroups(INPUT)));
-});
-
-test("every leg carries charge_status='captured'", () => {
-  const g = buildCheckoutPostingGroups(INPUT)[0];
+  const cash = g.legs.find((l) => l.account === ACCOUNTS.cash_clearing && l.direction === "debit")!;
+  assert.equal(cash.amount_cents, 5000);
+  const rev = g.legs.find((l) => l.account === ACCOUNTS.revenue_registration && l.direction === "credit")!;
+  assert.equal(rev.amount_cents, 5000);
   assert.ok(g.legs.every((l) => l.charge_status === "captured"));
 });
 
-test("dimensions stamped on revenue legs (family/student/class/location); cash leg is family-only", () => {
-  const g = buildCheckoutPostingGroups(INPUT)[0];
-  const revA = g.legs.find((l) => l.account === ACCOUNTS.revenue_tuition && l.class_id === "cls-a")!;
-  assert.equal(revA.family_id, "fam-1");
-  assert.equal(revA.student_id, "stu-1");
-  assert.equal(revA.location_id, "loc-1");
-
-  const cash = g.legs.find((l) => l.account === ACCOUNTS.cash_clearing)!;
-  assert.equal(cash.family_id, "fam-1");
-  assert.equal(cash.class_id, null);
-  assert.equal(cash.student_id, null);
+test("no accounts_receivable leg (reads like a receipt)", () => {
+  const g = buildDirectSaleGroup({
+    paymentIntentId: PI,
+    familyId: "fam-1",
+    lines: [{ account: ACCOUNTS.revenue_registration, amountCents: 5000, familyId: "fam-1" }],
+  })!;
+  assert.ok(g.legs.every((l) => l.account !== "accounts_receivable"));
 });
 
-test("two children in the same class → two distinct revenue legs (not merged), group balances", () => {
-  const g = buildCheckoutPostingGroups({
-    paymentIntentId: "pi_two",
-    familyId: "fam-1",
-    items: [
-      { classId: "cls-a", studentId: "stu-1", priceCents: 15000, locationId: "loc-1" },
-      { classId: "cls-a", studentId: "stu-2", priceCents: 15000, locationId: "loc-1" },
-    ],
-  })[0];
-  const revLegs = g.legs.filter((l) => l.account === ACCOUNTS.revenue_tuition);
-  assert.equal(revLegs.length, 2);
-  assert.deepEqual(revLegs.map((l) => l.student_id).sort(), ["stu-1", "stu-2"]);
-  assert.doesNotThrow(() => assertBalanced(g)); // cash 30000 == 15000 + 15000
+test("multi-line immediate sale: one cash debit == Σ revenue credits", () => {
+  const lines: SaleLine[] = [
+    { account: ACCOUNTS.revenue_registration, amountCents: 5000, familyId: "fam-1" },
+    { account: ACCOUNTS.revenue_tuition, amountCents: 15000, familyId: "fam-1", studentId: "stu-1", classId: "cls-a" },
+  ];
+  const g = buildDirectSaleGroup({ paymentIntentId: PI, familyId: "fam-1", lines })!;
+  const cash = g.legs.filter((l) => l.account === ACCOUNTS.cash_clearing && l.direction === "debit");
+  assert.equal(cash.length, 1);
+  assert.equal(cash[0].amount_cents, 20000);
+  const revenue = g.legs
+    .filter((l) => l.direction === "credit")
+    .reduce((s, l) => s + l.amount_cents, 0);
+  assert.equal(revenue, 20000);
+  assert.doesNotThrow(() => assertBalanced(g));
+  // dims stamped on the tuition line
+  const tui = g.legs.find((l) => l.account === ACCOUNTS.revenue_tuition)!;
+  assert.equal(tui.class_id, "cls-a");
+  assert.equal(tui.student_id, "stu-1");
+});
+
+test("nothing payable (0 total) → null", () => {
+  assert.equal(buildDirectSaleGroup({ paymentIntentId: PI, familyId: "f", lines: [] }), null);
+});
+
+test("idempotent posting key: same payment intent → same key", () => {
+  const mk = () =>
+    buildDirectSaleGroup({
+      paymentIntentId: PI,
+      familyId: "fam-1",
+      lines: [{ account: ACCOUNTS.revenue_registration, amountCents: 5000, familyId: "fam-1" }],
+    })!.postingKey;
+  assert.equal(mk(), mk());
 });
 
 test("assertBalanced throws on a tampered (unbalanced) group", () => {
-  const g = buildCheckoutPostingGroups(INPUT)[0];
+  const g = buildDirectSaleGroup({
+    paymentIntentId: PI,
+    familyId: "fam-1",
+    lines: [{ account: ACCOUNTS.revenue_registration, amountCents: 5000, familyId: "fam-1" }],
+  })!;
   const tampered: PostingGroupSpec = {
     ...g,
     legs: [...g.legs, { account: ACCOUNTS.revenue_tuition, direction: "credit", amount_cents: 1, family_id: null, student_id: null, class_id: null, location_id: null, charge_status: "captured" }],
   };
   assert.throws(() => assertBalanced(tampered), /Unbalanced/);
-});
-
-test("empty cart → no groups", () => {
-  assert.deepEqual(buildCheckoutPostingGroups({ paymentIntentId: "pi_z", familyId: "f", items: [] }), []);
 });

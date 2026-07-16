@@ -8,10 +8,11 @@ import {
   type CheckoutItem,
 } from "@/lib/billing/enrollment-ledger";
 import {
-  buildCheckoutPostingGroups,
+  buildDirectSaleGroup,
   assertBalanced,
   type LedgerLeg,
 } from "@/lib/billing/ledger-posting";
+import { splitCheckoutLines } from "@/lib/billing/checkout-lines";
 import type Stripe from "stripe";
 
 // Type bridge for the post_ledger_group RPC (added by 20260715180000_ledger_groups_rebuild.sql;
@@ -62,6 +63,7 @@ interface CartItemRow {
   student_id: string | null;
   student_name: string | null;
   price_cents: number;
+  charge_timing: string | null;
   class: JoinedClass | JoinedClass[] | null;
 }
 
@@ -136,7 +138,7 @@ export async function POST(req: Request) {
         .from("enrollment_cart_items")
         .select(
           `
-          id, class_id, student_id, student_name, price_cents,
+          id, class_id, student_id, student_name, price_cents, charge_timing,
           class:classes(
             id, name, day_of_week, start_time, end_time, room, enrolled_count, location_id,
             teacher:profiles!teacher_id(first_name, last_name)
@@ -220,7 +222,9 @@ export async function POST(req: Request) {
             status: "active",
             enrollment_type: "paid",
             stripe_payment_intent_id: paymentIntentId,
-            amount_paid_cents: item.priceCents,
+            // Tuition is SCHEDULED (drawn on the 15th), not paid at checkout — only the
+            // registration fee is charged now. So nothing of the tuition is paid yet.
+            amount_paid_cents: 0,
           })
           .select("id")
           .single();
@@ -260,43 +264,105 @@ export async function POST(req: Request) {
         );
       }
 
-      // ── Post balanced double-entry ledger groups via the RPC (Fable §3: R1 finalize + R2
-      // payment). The WRITE PATH is post_ledger_group(): it inserts group + legs atomically in
-      // one transaction and dedupes on UNIQUE(tenant_id, posting_key) via ON CONFLICT DO NOTHING,
-      // so a redelivered/concurrent webhook no-ops (no check-then-insert race). The DB's deferred
-      // constraint trigger enforces Σdebits=Σcredits at commit; we also assert here before the
-      // call. Posted for ALL cart items once enrollments are in place. Payment/enrollment STATE
-      // lives on their own rows, never the ledger.
-      const groups = buildCheckoutPostingGroups({
-        paymentIntentId,
-        familyId,
+      // ── Authorization checkout finalize (AUTHORIZATION_CHECKOUT.md §4.6):
+      //    (a) post the IMMEDIATE lines (registration fee) as direct_sale_captured,
+      //    (b) record SCHEDULED tuition as pending_setup intents (no charge now),
+      //    (c) persist the vaulted card to the family.
+      const { data: settingsRow } = await supabase
+        .from("studio_settings")
+        .select("registration_fee_cents")
+        .limit(1)
+        .maybeSingle();
+      const registrationFeeCents =
+        (settingsRow?.registration_fee_cents as number | undefined) ?? 0;
+
+      const { immediate, scheduled } = splitCheckoutLines({
         items: checkoutItems.map((c) => ({
           classId: c.classId,
           studentId: c.studentId,
+          studentName: c.row.student_name,
           priceCents: c.priceCents,
-          locationId: c.locationId,
+          chargeTiming: (c.row.charge_timing as "immediate" | "scheduled") ?? "scheduled",
         })),
+        registrationFeeCents,
       });
 
-      const rpc = supabase.rpc.bind(supabase) as unknown as RpcFn;
-      for (const group of groups) {
-        assertBalanced(group); // defense-in-depth ahead of the DB trigger
+      // (a) Immediate lines → one balanced direct_sale_captured group via the RPC. Idempotent on
+      //     UNIQUE(tenant_id, posting_key) (ON CONFLICT DO NOTHING) — a retry no-ops.
+      const saleGroup = buildDirectSaleGroup({
+        paymentIntentId,
+        familyId,
+        lines: immediate.map((l) => ({
+          account: l.account,
+          amountCents: l.amountCents,
+          familyId,
+          studentId: l.studentId,
+          classId: l.classId,
+        })),
+      });
+      if (saleGroup) {
+        assertBalanced(saleGroup); // defense-in-depth ahead of the DB trigger
+        const rpc = supabase.rpc.bind(supabase) as unknown as RpcFn;
         const { error: postErr } = await rpc("post_ledger_group", {
           p_tenant: tenantId,
-          p_posting_key: group.postingKey,
-          p_event_type: group.eventType,
+          p_posting_key: saleGroup.postingKey,
+          p_event_type: saleGroup.eventType,
           p_occurred_at: occurredAt,
-          p_source_system: group.sourceSystem,
-          p_source_ref: group.sourceRef,
-          p_legs: group.legs,
+          p_source_system: saleGroup.sourceSystem,
+          p_source_ref: saleGroup.sourceRef,
+          p_legs: saleGroup.legs,
           p_reversal_of: null,
         });
         if (postErr) {
-          console.error("[enrollment:webhook] ledger posting failed", group.eventType, postErr);
-          return NextResponse.json(
-            { error: "Ledger posting failed", group: group.eventType },
-            { status: 500 }
-          );
+          console.error("[enrollment:webhook] ledger posting failed", postErr);
+          return NextResponse.json({ error: "Ledger posting failed" }, { status: 500 });
+        }
+      }
+
+      // (b) Scheduled tuition intents → pending_setup rows (no charge). Idempotent per
+      //     (payment_intent, class, student) so a webhook retry doesn't duplicate.
+      for (const s of scheduled) {
+        let dupQ = supabase
+          .from("tuition_schedule_intent")
+          .select("id")
+          .eq("source_ref", paymentIntentId)
+          .eq("class_id", s.classId);
+        dupQ = s.studentId ? dupQ.eq("student_id", s.studentId) : dupQ.is("student_id", null);
+        const { data: dup } = await dupQ.maybeSingle();
+        if (dup) continue;
+
+        const { error: intentErr } = await supabase.from("tuition_schedule_intent").insert({
+          tenant_id: tenantId,
+          family_id: familyId,
+          student_id: s.studentId,
+          class_id: s.classId,
+          monthly_amount_cents: s.monthlyAmountCents,
+          anchor_day: s.anchorDay,
+          status: "pending_setup",
+          source_ref: paymentIntentId,
+        });
+        if (intentErr) {
+          console.error("[enrollment:webhook] tuition intent insert failed", s.classId, intentErr);
+          return NextResponse.json({ error: "Intent recording failed" }, { status: 500 });
+        }
+      }
+
+      // (c) Persist the vaulted card (payment method) to the family for later off-session draws.
+      if (familyId) {
+        try {
+          const pi = await getStripe().paymentIntents.retrieve(paymentIntentId);
+          const pmId =
+            typeof pi.payment_method === "string"
+              ? pi.payment_method
+              : pi.payment_method?.id ?? null;
+          if (pmId) {
+            await supabase
+              .from("families")
+              .update({ stripe_payment_method_id: pmId })
+              .eq("id", familyId);
+          }
+        } catch (err) {
+          console.error("[enrollment:webhook] failed to persist payment method (non-fatal)", err);
         }
       }
 
