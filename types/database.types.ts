@@ -3222,6 +3222,75 @@ export type Database = {
           },
         ]
       }
+      family_contacts: {
+        Row: {
+          contact_type: string
+          created_at: string
+          created_by: string | null
+          email: string | null
+          family_id: string
+          first_name: string
+          id: string
+          is_primary: boolean
+          last_name: string
+          notify_via_email: boolean
+          notify_via_sms: boolean
+          phone: string | null
+          relationship: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          contact_type: string
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          family_id: string
+          first_name: string
+          id?: string
+          is_primary?: boolean
+          last_name: string
+          notify_via_email?: boolean
+          notify_via_sms?: boolean
+          phone?: string | null
+          relationship?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          contact_type?: string
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          family_id?: string
+          first_name?: string
+          id?: string
+          is_primary?: boolean
+          last_name?: string
+          notify_via_email?: boolean
+          notify_via_sms?: boolean
+          phone?: string | null
+          relationship?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "family_contacts_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "family_contacts_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       family_documents: {
         Row: {
           admin_notes: string | null
