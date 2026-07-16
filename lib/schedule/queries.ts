@@ -29,7 +29,7 @@ export async function getScheduleClasses(filters?: {
       `id, tenant_id, full_name, simple_name, short_name, display_name, name,
        class_type, program_division, levels, min_age, max_age,
        start_date, end_date, room, lead_teacher_id, assistant_teacher_ids,
-       max_enrollment, min_enrollment, enrollment_count, production_id,
+       max_enrollment, min_enrollment, enrolled_count, production_id,
        status, is_published, is_open_enrollment, trial_eligible,
        trial_requires_approval, trial_max_per_class, back_to_back_class_ids,
        color_code, created_at`
@@ -65,7 +65,7 @@ export async function getScheduleClasses(filters?: {
 
   return (classes ?? []).map((c) => ({
     ...c,
-    enrollment_count: c.enrollment_count ?? 0,
+    enrollment_count: c.enrolled_count ?? 0,
     teacherName: c.lead_teacher_id ? (teacherNames[c.lead_teacher_id] ?? null) : null,
   }));
 }
@@ -92,7 +92,7 @@ export async function getScheduleClassById(classId: string): Promise<ScheduleCla
     if (p) teacherName = [p.first_name, p.last_name].filter(Boolean).join(" ");
   }
 
-  return { ...data, enrollment_count: data.enrollment_count ?? 0, teacherName };
+  return { ...data, enrollment_count: data.enrolled_count ?? 0, teacherName };
 }
 
 export async function getRecurrenceRules(classId: string) {
@@ -139,7 +139,7 @@ export async function getClassSessions(filters: {
   const classIds = [...new Set(sessions.map((s) => s.class_id))];
   const { data: classes } = await supabase
     .from("classes")
-    .select("id, simple_name, full_name, name, class_type, enrollment_count")
+    .select("id, simple_name, full_name, name, class_type, enrolled_count")
     .in("id", classIds);
 
   const classMap: Record<string, { name: string; classType: string; enrollmentCount: number }> = {};
@@ -147,7 +147,7 @@ export async function getClassSessions(filters: {
     classMap[c.id] = {
       name: c.simple_name ?? c.full_name ?? c.name,
       classType: c.class_type ?? "regular",
-      enrollmentCount: c.enrollment_count ?? 0,
+      enrollmentCount: c.enrolled_count ?? 0,
     };
   }
 
@@ -213,7 +213,7 @@ export async function getSessionById(sessionId: string): Promise<ClassSession | 
   // Get class info
   const { data: cls } = await supabase
     .from("classes")
-    .select("simple_name, full_name, name, class_type, enrollment_count, back_to_back_class_ids")
+    .select("simple_name, full_name, name, class_type, enrolled_count, back_to_back_class_ids")
     .eq("id", data.class_id)
     .single();
 
@@ -239,7 +239,7 @@ export async function getSessionById(sessionId: string): Promise<ClassSession | 
     teacherName,
     teacherInitials,
     subTeacherName: null,
-    enrollmentCount: cls?.enrollment_count ?? 0,
+    enrollmentCount: cls?.enrolled_count ?? 0,
   };
 }
 

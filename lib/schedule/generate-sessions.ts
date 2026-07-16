@@ -283,12 +283,12 @@ export async function checkClassAtRisk(
 
   const { data: cls } = await supabase
     .from("classes")
-    .select("id, simple_name, full_name, enrollment_count, min_enrollment, status")
+    .select("id, simple_name, full_name, enrolled_count, min_enrollment, status")
     .eq("id", classId)
     .single();
 
   if (!cls || cls.status !== "active") return;
-  if (!cls.min_enrollment || (cls.enrollment_count ?? 0) >= cls.min_enrollment) return;
+  if (!cls.min_enrollment || (cls.enrolled_count ?? 0) >= cls.min_enrollment) return;
 
   // Check if open task already exists
   const { data: existing } = await supabase
@@ -307,7 +307,7 @@ export async function checkClassAtRisk(
     tenant_id: tenantId,
     task_type: "class_at_risk",
     title: `⚠️ ${className} below minimum enrollment`,
-    description: `${cls.enrollment_count ?? 0} enrolled, minimum is ${cls.min_enrollment}. Consider outreach or cancellation.`,
+    description: `${cls.enrolled_count ?? 0} enrolled, minimum is ${cls.min_enrollment}. Consider outreach or cancellation.`,
     priority: "normal",
     related_class_id: classId,
   });

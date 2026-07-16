@@ -367,14 +367,14 @@ export async function adminEnrollStudent(formData: FormData) {
   // Check class capacity
   const { data: cls } = await supabase
     .from("classes")
-    .select("id, max_enrollment, enrollment_count")
+    .select("id, max_enrollment, enrolled_count")
     .eq("id", parsed.data.class_id)
     .single();
 
   if (!cls) return { error: "Class not found" };
 
   const isFull =
-    cls.max_enrollment && (cls.enrollment_count ?? 0) >= cls.max_enrollment;
+    cls.max_enrollment && (cls.enrolled_count ?? 0) >= cls.max_enrollment;
   const status =
     parsed.data.enrollment_type === "trial"
       ? "trial"
@@ -407,7 +407,7 @@ export async function adminEnrollStudent(formData: FormData) {
   if (status === "active" || status === "trial") {
     await supabase
       .from("classes")
-      .update({ enrollment_count: (cls.enrollment_count ?? 0) + 1 })
+      .update({ enrolled_count: (cls.enrolled_count ?? 0) + 1 })
       .eq("id", parsed.data.class_id);
   }
 
@@ -463,7 +463,7 @@ export async function adminDropStudent(formData: FormData) {
   if (wasActive) {
     const { data: cls } = await supabase
       .from("classes")
-      .select("enrollment_count")
+      .select("enrolled_count")
       .eq("id", enrollment.class_id)
       .single();
 
@@ -471,7 +471,7 @@ export async function adminDropStudent(formData: FormData) {
       await supabase
         .from("classes")
         .update({
-          enrollment_count: Math.max(0, (cls.enrollment_count ?? 1) - 1),
+          enrolled_count: Math.max(0, (cls.enrolled_count ?? 1) - 1),
         })
         .eq("id", enrollment.class_id);
     }

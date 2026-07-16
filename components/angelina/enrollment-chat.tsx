@@ -230,7 +230,7 @@ export function EnrollmentChat() {
       const { data: classData } = await supabase
         .from("classes")
         .select(
-          "id, name, description, day_of_week, start_time, age_min, age_max, max_enrollment, enrollment_count, monthly_price"
+          "id, name, description, day_of_week, start_time, age_min, age_max, max_enrollment, enrolled_count, monthly_price"
         )
         .gte("age_max", student.age)
         .lte("age_min", student.age)
@@ -244,11 +244,11 @@ export function EnrollmentChat() {
         ageRange: `Ages ${c.age_min}-${c.age_max}`,
         spotsRemaining: Math.max(
           0,
-          ((c.max_enrollment as number) || 20) - ((c.enrollment_count as number) || 0)
+          ((c.max_enrollment as number) || 20) - ((c.enrolled_count as number) || 0)
         ),
         price: (c.monthly_price as number) || 0,
         isFull:
-          ((c.enrollment_count as number) || 0) >=
+          ((c.enrolled_count as number) || 0) >=
           ((c.max_enrollment as number) || 20),
       }));
 

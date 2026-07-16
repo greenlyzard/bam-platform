@@ -155,14 +155,14 @@ export async function completeRegistration(data: {
   for (const classId of parsed.data.class_ids) {
     const { data: cls } = await supabase
       .from("classes")
-      .select("id, max_enrollment, enrollment_count")
+      .select("id, max_enrollment, enrolled_count")
       .eq("id", classId)
       .single();
 
     if (!cls) continue;
 
     const isFull =
-      cls.max_enrollment && (cls.enrollment_count ?? 0) >= cls.max_enrollment;
+      cls.max_enrollment && (cls.enrolled_count ?? 0) >= cls.max_enrollment;
     const status = isFull ? "waitlist" : "active";
 
     const { error: enrollError } = await supabase.from("enrollments").insert({
@@ -178,7 +178,7 @@ export async function completeRegistration(data: {
     if (!enrollError && (status === "active")) {
       await supabase
         .from("classes")
-        .update({ enrollment_count: (cls.enrollment_count ?? 0) + 1 })
+        .update({ enrolled_count: (cls.enrolled_count ?? 0) + 1 })
         .eq("id", classId);
     }
 
