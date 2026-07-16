@@ -152,6 +152,9 @@ export async function POST(req: Request) {
     // (Stripe rejects passing both `customer` and `customer_email`.)
     const checkoutSession = await stripe.checkout.sessions.create({
       mode: "payment",
+      // Card + ACH Direct Debit. ACH (us_bank_account) settles asynchronously — the webhook
+      // finalizes on checkout.session.async_payment_succeeded, not on session completion.
+      payment_method_types: ["card", "us_bank_account"],
       line_items: lineItems,
       success_url: `${appUrl}/enroll/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/enroll/cart`,
@@ -161,6 +164,7 @@ export async function POST(req: Request) {
       metadata: {
         cart_id: cart.id,
         tenant_id: cart.tenant_id,
+        family_id: cart.family_id ?? "",
       },
     });
 

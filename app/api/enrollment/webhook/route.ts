@@ -93,8 +93,25 @@ export async function POST(req: Request) {
   const supabase = createAdminClient();
 
   switch (event.type) {
+    // Card captures synchronously (payment_status='paid' at completion); ACH Direct Debit
+    // settles asynchronously — the session completes with payment_status='unpaid', then
+    // checkout.session.async_payment_succeeded fires on settlement. Finalize (create
+    // enrollments + post the ledger) only when the money is actually there; both success
+    // signals share this body.
+    case "checkout.session.async_payment_succeeded":
     case "checkout.session.completed": {
       const session = event.data.object as Stripe.Checkout.Session;
+
+      // ACH pending: completed but not yet paid → wait for async_payment_succeeded. Never post
+      // the ledger for money that hasn't settled.
+      if (event.type === "checkout.session.completed" && session.payment_status === "unpaid") {
+        console.log(
+          "[enrollment:webhook] checkout completed, ACH payment pending — awaiting settlement",
+          session.id
+        );
+        return NextResponse.json({ received: true, pending: true });
+      }
+
       const cartId = session.metadata?.cart_id;
       const tenantId = session.metadata?.tenant_id;
 
@@ -310,6 +327,18 @@ export async function POST(req: Request) {
         `${enrolledClasses.length} new enrollment(s), ${existingKeys.size} pre-existing`
       );
       return NextResponse.json({ received: true, created: enrolledClasses.length });
+    }
+
+    case "checkout.session.async_payment_failed": {
+      const session = event.data.object as Stripe.Checkout.Session;
+      console.warn(
+        "[enrollment:webhook] async (ACH) payment failed — not finalizing",
+        session.id,
+        session.metadata?.cart_id
+      );
+      // No dedicated cart status without a schema change (status CHECK lacks 'payment_failed');
+      // leaving the cart as-is and logging. See judgment calls.
+      return NextResponse.json({ received: true, failed: true });
     }
 
     case "checkout.session.expired": {
