@@ -162,7 +162,13 @@ export async function getFamilyContacts(familyId: string) {
     .order("first_name");
 
   if (error) {
-    console.error("[families:getFamilyContacts]", error);
+    // Log the Supabase error fields explicitly — the bare object serializes to "{}".
+    console.error("[families:getFamilyContacts]", {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    });
     return [];
   }
 
