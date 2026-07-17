@@ -36,7 +36,9 @@ export interface OccurrenceRow {
   start_time: string | null;
   end_time: string | null;
   event_type: "class";
-  status: "scheduled" | "cancelled";
+  // 'published' (active occurrence) / 'cancelled' (closure). These are the only values the live
+  // schedule_instances_status_check allows for generated rows — see the status CHECK constraint.
+  status: "published" | "cancelled";
   cancellation_reason: string | null;
 }
 
@@ -58,7 +60,7 @@ const minISO = (a: string, b: string) => (a <= b ? a : b);
  *
  * Iterates `day_of_week` from `max(start_date, windowStart)` through
  * `min(end_date ?? windowEnd, windowEnd)`. A date on a studio closure → `status: 'cancelled'` with
- * the closure reason; otherwise `status: 'scheduled'`. Returns `[]` when the class has no
+ * the closure reason; otherwise `status: 'published'`. Returns `[]` when the class has no
  * `day_of_week`/`start_date`, or the effective range is empty.
  */
 export function generateOccurrencesForClass(
@@ -96,7 +98,7 @@ export function generateOccurrencesForClass(
       start_time: cls.start_time,
       end_time: cls.end_time,
       event_type: "class",
-      status: isClosed ? "cancelled" : "scheduled",
+      status: isClosed ? "cancelled" : "published",
       cancellation_reason: isClosed ? (closures[eventDate] || "Studio closure") : null,
     });
   }

@@ -156,7 +156,7 @@ export async function regenerateClassOccurrences(
 /**
  * Extend/reconcile occurrences for every active teaching class (daily cron). Re-running the
  * generation also reconciles closures: upserting flips `status` both directions on FUTURE rows
- * (new closure → cancelled, removed closure → scheduled), leaving past rows untouched.
+ * (new closure → cancelled, removed closure → published), leaving past rows untouched.
  */
 export async function extendAllActiveClasses(): Promise<{
   classes: number;

@@ -224,6 +224,12 @@ depends on the **schedule occurrence generator (P0 task 19 in `docs/_INDEX.md`)*
 `day_of_week` occurrences in the window minus `studio_closures` on those dates. The `proration` blob
 records which `source` was used.
 
+**Deliverable = `schedule_instances.status = 'published'`.** The generator writes `'published'` for
+active occurrences and `'cancelled'` for closure dates (these are the values the live
+`schedule_instances_status_check` permits). Proration counts **only** `'published'` rows —
+`'cancelled'` (closure) rows are excluded, which is exactly how closures drop out of the deliverable
+count.
+
 ### 4.3 Rounding & bounds
 - `Math.round` to whole cents (consistent with `dollarsToPriceCents`).
 - Clamp to `[0, full_month_tuition_cents]`.
