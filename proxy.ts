@@ -33,6 +33,22 @@ const ROLE_HOME: Record<string, string> = {
   super_admin: "/admin/dashboard",
 };
 
+/**
+ * Build a redirect that carries the refreshed Supabase session cookies.
+ *
+ * getUser() may rotate the access/refresh tokens and write them onto `response`. A bare
+ * NextResponse.redirect() drops those Set-Cookie headers, so the rotated (already-consumed) refresh
+ * token gets replayed on the next request and Supabase revokes the whole session — the /login
+ * bounce loop. Copy the cookies onto the redirect so the rotation persists.
+ */
+function redirectWithSession(url: URL, response: NextResponse): NextResponse {
+  const redirect = NextResponse.redirect(url);
+  for (const cookie of response.cookies.getAll()) {
+    redirect.cookies.set(cookie);
+  }
+  return redirect;
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -84,26 +100,36 @@ export async function proxy(request: NextRequest) {
   if (isProtected && !user) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(loginUrl);
+    return redirectWithSession(loginUrl, response);
   }
 
-  // Role-based route protection
+  // Role-based route protection. Roles live in profile_roles keyed on user_id — profiles.role is
+  // unreliable (CLAUDE.md §4). Fall back to profiles.role only when a user has no active role rows.
   if (isProtected && user) {
-    const { data: profile } = await supabase
-      .from("profiles")
+    const { data: roleRows } = await supabase
+      .from("profile_roles")
       .select("role")
-      .eq("id", user.id)
-      .single();
+      .eq("user_id", user.id)
+      .eq("is_active", true);
 
-    const role = profile?.role ?? "parent";
-    const allowedPrefixes = ROLE_ROUTES[role] ?? ["/portal"];
+    let roles: string[] = (roleRows ?? []).map((r) => r.role as string);
+    if (roles.length === 0) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+      roles = [profile?.role ?? "parent"];
+    }
 
-    const hasAccess = allowedPrefixes.some((prefix) =>
+    // Allow when ANY active role grants access to this prefix (multi-role users).
+    const allowedPrefixes = new Set(roles.flatMap((role) => ROLE_ROUTES[role] ?? []));
+    const hasAccess = [...allowedPrefixes].some((prefix) =>
       pathname.startsWith(prefix)
     );
 
     if (!hasAccess) {
-      return NextResponse.redirect(new URL("/unauthorized", request.url));
+      return redirectWithSession(new URL("/unauthorized", request.url), response);
     }
   }
 
