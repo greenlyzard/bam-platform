@@ -43,6 +43,9 @@ export function EnrollmentCartView() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             class_id: item.classInfo.id,
+            // Real student when a returning family enrolled an existing dancer;
+            // omitted for a new dancer (server accepts student_name only).
+            ...(item.studentId ? { student_id: item.studentId } : {}),
             student_name: item.childName,
             price_cents:
               (item.classInfo.monthlyTuitionCents ?? 0) +

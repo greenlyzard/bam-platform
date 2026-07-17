@@ -1,8 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { EnrollmentChat } from "@/components/assistant/enrollment-chat";
 import { EnrollmentWizard } from "./enrollment-wizard";
+import { ClassCatalog } from "./classes/class-catalog";
+import {
+  StudentSelectionCard,
+  type StudentOption,
+} from "@/components/assistant/enrollment-cards/student-selection-card";
+import { useCart } from "@/lib/cart-context";
 import type { AssistantConfig } from "@/lib/assistant/config";
 
 interface EnrollPageClientProps {
@@ -10,6 +17,8 @@ interface EnrollPageClientProps {
   config: AssistantConfig;
   studioName: string;
   tenantId: string;
+  /** Signed-in parent's existing active students (empty for guests/new families). */
+  initialStudents?: StudentOption[];
 }
 
 const STEPS = [
@@ -23,8 +32,84 @@ const STEPS = [
   "Confirmation",
 ];
 
-export function EnrollPageClient({ classes, config, studioName, tenantId }: EnrollPageClientProps) {
+export function EnrollPageClient({
+  classes,
+  config,
+  studioName,
+  tenantId,
+  initialStudents = [],
+}: EnrollPageClientProps) {
   const [preferForm, setPreferForm] = useState(false);
+  // Returning-family fork: hoisted above the chat/wizard split so a signed-in
+  // parent picks an existing dancer first, then adds classes straight to the
+  // Slice-1 cart. "Add a new dancer" drops back into the normal chat/wizard.
+  const [addingNewDancer, setAddingNewDancer] = useState(false);
+  const [pickedStudent, setPickedStudent] = useState<{ id: string; name: string } | null>(null);
+  const cart = useCart();
+
+  const showReturningFamily = initialStudents.length > 0 && !addingNewDancer;
+
+  function addExistingStudentClass(classId: string) {
+    if (!pickedStudent) return;
+    const cls = classes.find((c) => c.id === classId);
+    if (!cls) return;
+    cart.addItem({
+      classInfo: cls,
+      childName: pickedStudent.name,
+      childAge: null,
+      studentId: pickedStudent.id,
+      type: cls.isFull ? "waitlist" : "enroll",
+    });
+  }
+
+  if (showReturningFamily) {
+    // Step 1: pick which existing dancer to enroll.
+    if (!pickedStudent) {
+      return (
+        <div className="mx-auto max-w-md">
+          <StudentSelectionCard
+            config={config}
+            students={initialStudents}
+            onSelect={(studentId) => {
+              const s = initialStudents.find((x) => x.id === studentId);
+              if (s) setPickedStudent({ id: s.id, name: `${s.firstName} ${s.lastName}` });
+            }}
+            onAddNew={() => setAddingNewDancer(true)}
+          />
+        </div>
+      );
+    }
+
+    // Step 2: pick classes for that dancer — reuse the /enroll/classes catalog in
+    // add-to-cart mode. The cart hands off to Slice-1 consent/checkout unchanged.
+    return (
+      <div className="space-y-5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="font-heading text-xl font-semibold text-charcoal">
+              Enrolling {pickedStudent.name}
+            </h2>
+            <button
+              type="button"
+              onClick={() => setPickedStudent(null)}
+              style={{ color: config.primaryColor }}
+              className="text-sm hover:underline"
+            >
+              &larr; Choose a different dancer
+            </button>
+          </div>
+          <Link
+            href="/enroll/cart"
+            className="h-10 shrink-0 rounded-lg bg-lavender hover:bg-lavender-dark text-white text-sm font-semibold px-5 flex items-center transition-colors"
+          >
+            View cart{cart.itemCount > 0 ? ` (${cart.itemCount})` : ""} &rarr;
+          </Link>
+        </div>
+
+        <ClassCatalog classes={classes} onEnroll={addExistingStudentClass} />
+      </div>
+    );
+  }
 
   if (preferForm) {
     return (

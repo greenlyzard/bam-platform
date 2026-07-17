@@ -27,6 +27,11 @@ export interface CartItem {
   classInfo: ClassInfo;
   childName: string;
   childAge: number | null;
+  /**
+   * Real students.id when enrolling an existing dancer (returning-family flow);
+   * null for a not-yet-created new dancer (the item carries only childName).
+   */
+  studentId?: string | null;
   /** "waitlist" if class is full */
   type: "enroll" | "waitlist" | "trial";
 }

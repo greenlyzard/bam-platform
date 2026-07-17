@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { AssistantConfig } from "@/lib/assistant/config";
 
-interface StudentOption {
+export interface StudentOption {
   id: string;
   firstName: string;
   lastName: string;

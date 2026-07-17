@@ -56,7 +56,18 @@ function formatTime(t: string) {
   return `${h12}:${m} ${ampm}`;
 }
 
-export function ClassCatalog({ classes }: { classes: ClassInfo[] }) {
+export function ClassCatalog({
+  classes,
+  onEnroll,
+}: {
+  classes: ClassInfo[];
+  /**
+   * When provided (returning-family flow), the Enroll/Waitlist button adds the
+   * class to the cart via this callback instead of linking to /enroll?class=…
+   * When omitted (the standalone catalog page), it links out as before.
+   */
+  onEnroll?: (classId: string) => void;
+}) {
   const [styleFilter, setStyleFilter] = useState("");
   const [dayFilter, setDayFilter] = useState<number | null>(null);
   const [locationFilter, setLocationFilter] = useState("");
@@ -227,12 +238,22 @@ export function ClassCatalog({ classes }: { classes: ClassInfo[] }) {
                       {cls.spotsRemaining !== 1 ? "s" : ""}
                     </span>
                   )}
-                  <a
-                    href={`/enroll?class=${cls.id}`}
-                    className="h-9 rounded-lg bg-lavender hover:bg-lavender-dark text-white text-xs font-semibold px-4 flex items-center transition-colors"
-                  >
-                    {cls.isFull ? "Waitlist" : "Enroll"}
-                  </a>
+                  {onEnroll ? (
+                    <button
+                      type="button"
+                      onClick={() => onEnroll(cls.id)}
+                      className="h-9 rounded-lg bg-lavender hover:bg-lavender-dark text-white text-xs font-semibold px-4 flex items-center transition-colors"
+                    >
+                      {cls.isFull ? "Waitlist" : "Add to Cart"}
+                    </button>
+                  ) : (
+                    <a
+                      href={`/enroll?class=${cls.id}`}
+                      className="h-9 rounded-lg bg-lavender hover:bg-lavender-dark text-white text-xs font-semibold px-4 flex items-center transition-colors"
+                    >
+                      {cls.isFull ? "Waitlist" : "Enroll"}
+                    </a>
+                  )}
                 </div>
               </div>
             ))}

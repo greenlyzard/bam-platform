@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { getMyFamily } from "@/lib/queries/portal";
 import { z } from "zod";
 
 const CART_COOKIE = "bam_cart_token";
@@ -134,6 +135,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Class not found or inactive" }, { status: 404 });
     }
 
+    // Link the cart to the signed-in parent's family so Slice-1 checkout can tie
+    // the enrollment to the right family. Anonymous (signed-out) carts stay null.
+    const familyId = (await getMyFamily())?.id ?? null;
+
     // Get or create cart
     const cookieStore = await cookies();
     let sessionToken = cookieStore.get(CART_COOKIE)?.value;
@@ -142,7 +147,7 @@ export async function POST(req: Request) {
     if (sessionToken) {
       const { data: existingCart } = await supabase
         .from("enrollment_carts")
-        .select("id, status, expires_at")
+        .select("id, status, expires_at, family_id")
         .eq("session_token", sessionToken)
         .eq("status", "active")
         .gt("expires_at", new Date().toISOString())
@@ -150,6 +155,14 @@ export async function POST(req: Request) {
 
       if (existingCart) {
         cartId = existingCart.id;
+        // Backfill family_id on a stale cart created before the parent signed in
+        // (e.g. an anonymous cart left over from an earlier visit this session).
+        if (familyId && !existingCart.family_id) {
+          await supabase
+            .from("enrollment_carts")
+            .update({ family_id: familyId, updated_at: new Date().toISOString() })
+            .eq("id", cartId);
+        }
       } else {
         // Cart expired or checked out — create new
         sessionToken = crypto.randomUUID();
@@ -158,6 +171,7 @@ export async function POST(req: Request) {
           .insert({
             tenant_id: tenantId,
             session_token: sessionToken,
+            family_id: familyId,
             expires_at: new Date(Date.now() + CART_TTL_MS).toISOString(),
           })
           .select("id")
@@ -176,6 +190,7 @@ export async function POST(req: Request) {
         .insert({
           tenant_id: tenantId,
           session_token: sessionToken,
+          family_id: familyId,
           expires_at: new Date(Date.now() + CART_TTL_MS).toISOString(),
         })
         .select("id")

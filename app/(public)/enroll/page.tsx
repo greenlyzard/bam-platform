@@ -1,8 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getClassCatalog } from "@/lib/queries/enroll";
+import { getMyStudents } from "@/lib/queries/portal";
 import { getAssistantConfig } from "@/lib/assistant/config";
 import { EnrollPageClient } from "./enroll-page-client";
+import type { StudentOption } from "@/components/assistant/enrollment-cards/student-selection-card";
 
 export const metadata = {
   title: "Enroll — Ballet Academy and Movement",
@@ -12,10 +14,20 @@ export const metadata = {
 
 export default async function EnrollPage() {
   const tenantId = "84d98f72-c82f-414f-8b17-172b802f6993";
-  const [classes, config] = await Promise.all([
+  const [classes, config, myStudents] = await Promise.all([
     getClassCatalog(),
     getAssistantConfig(tenantId),
+    getMyStudents(), // [] for guests; drives the returning-family fork
   ]);
+
+  const initialStudents: StudentOption[] = myStudents.map((s) => ({
+    id: s.id,
+    firstName: s.first_name,
+    lastName: s.last_name,
+    avatarUrl: s.avatar_url ?? null,
+    currentLevel: s.current_level ?? null,
+    enrolledClasses: [],
+  }));
 
   const supabase = await createClient();
   const { data: tenant } = await supabase
@@ -71,7 +83,13 @@ export default async function EnrollPage() {
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-8">
-        <EnrollPageClient classes={classes} config={config} studioName={studioName} tenantId={tenantId} />
+        <EnrollPageClient
+          classes={classes}
+          config={config}
+          studioName={studioName}
+          tenantId={tenantId}
+          initialStudents={initialStudents}
+        />
       </main>
 
       {/* Footer */}
