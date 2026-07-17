@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { getMyFamily } from "@/lib/queries/portal";
+import { resolveClassPriceCents } from "@/lib/billing/resolve-price";
 import { z } from "zod";
 
 const CART_COOKIE = "bam_cart_token";
@@ -98,11 +99,13 @@ export async function GET() {
 /**
  * POST — add item to cart
  */
+// price_cents is intentionally NOT accepted from the client — tuition is resolved server-side
+// from the class's price (class_pricing_rules → classes.fee_cents). Trusting a client price would
+// let the browser set any amount.
 const addItemSchema = z.object({
   class_id: z.string().uuid(),
   student_id: z.string().uuid().optional(),
   student_name: z.string().optional(),
-  price_cents: z.number().int().min(0),
 });
 
 export async function POST(req: Request) {
@@ -133,6 +136,19 @@ export async function POST(req: Request) {
 
     if (!cls || !cls.is_active) {
       return NextResponse.json({ error: "Class not found or inactive" }, { status: 404 });
+    }
+
+    // Resolve tuition server-side (service role — pricing rules are authenticated-only under RLS).
+    // An unpriced class must not be purchasable.
+    const priceCents = await resolveClassPriceCents(parsed.data.class_id);
+    if (priceCents == null) {
+      return NextResponse.json(
+        {
+          error:
+            "This class doesn't have a price set yet, so it can't be added to the cart. Please contact the studio.",
+        },
+        { status: 409 }
+      );
     }
 
     // Link the cart to the signed-in parent's family so Slice-1 checkout can tie
@@ -222,7 +238,7 @@ export async function POST(req: Request) {
       class_id: parsed.data.class_id,
       student_id: parsed.data.student_id ?? null,
       student_name: parsed.data.student_name ?? null,
-      price_cents: parsed.data.price_cents,
+      price_cents: priceCents,
     });
 
     if (itemErr) {

@@ -346,8 +346,7 @@ function SuccessView() {
 type CheckoutStep = "info" | "payment" | "success";
 
 export function CheckoutFlow() {
-  const { items, totalCents, registrationTotalCents, itemCount, clearCart } =
-    useCart();
+  const { items, totalCents, itemCount, clearCart } = useCart();
   const [step, setStep] = useState<CheckoutStep>("info");
   const [clientSecret, setClientSecret] = useState("");
   const [amount, setAmount] = useState(0);
@@ -382,7 +381,9 @@ export function CheckoutFlow() {
               className: item.classInfo.name,
               childName: item.childName,
               monthlyTuitionCents: item.classInfo.monthlyTuitionCents ?? 0,
-              registrationFeeCents: item.classInfo.registrationFeeCents ?? 0,
+              // Registration is a studio-level fee, not per class/item — this legacy payment-intent
+              // path leaves it at 0 (it was already 0 here via the removed null per-item field).
+              registrationFeeCents: 0,
             })),
             parentEmail: parentInfo.email,
             parentName: `${parentInfo.firstName} ${parentInfo.lastName}`,
@@ -498,7 +499,7 @@ export function CheckoutFlow() {
                 {itemCount} class{itemCount !== 1 ? "es" : ""} selected
               </span>
               <span className="font-semibold text-charcoal">
-                {formatCurrency(totalCents + registrationTotalCents)} due today
+                {formatCurrency(totalCents)} due today
               </span>
             </div>
           </div>

@@ -1,11 +1,23 @@
 import { EnrollmentCartView } from "./cart-view";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const metadata = {
   title: "Your Cart — Ballet Academy and Movement",
   description: "Review your selected classes and proceed to checkout.",
 };
 
-export default function CartPage() {
+export default async function CartPage() {
+  // Studio-level registration fee (one-time, due today). Service role: studio_settings RLS is
+  // authenticated-only and this cart is reachable by anonymous enrollees.
+  const admin = createAdminClient();
+  const { data: settings } = await admin
+    .from("studio_settings")
+    .select("registration_fee_cents")
+    .limit(1)
+    .maybeSingle();
+  const registrationFeeCents =
+    (settings?.registration_fee_cents as number | undefined) ?? 0;
+
   return (
     <div className="min-h-screen bg-cream">
       <header className="bg-lavender py-6">
@@ -22,7 +34,7 @@ export default function CartPage() {
       </header>
 
       <main className="mx-auto max-w-3xl px-4 py-8">
-        <EnrollmentCartView />
+        <EnrollmentCartView registrationFeeCents={registrationFeeCents} />
       </main>
 
       <footer className="border-t border-silver py-6 text-center">

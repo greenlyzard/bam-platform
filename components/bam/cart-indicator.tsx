@@ -4,15 +4,15 @@ import Link from "next/link";
 import { useCart } from "@/lib/cart-context";
 
 export function CartIndicator() {
-  const { itemCount, totalCents, registrationTotalCents } = useCart();
+  const { itemCount, totalCents } = useCart();
 
   if (itemCount === 0) return null;
 
-  const grandTotal = totalCents + registrationTotalCents;
+  // Tuition subtotal only; the studio-level registration fee is shown at the cart/checkout step.
   const formatted = new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-  }).format(grandTotal / 100);
+  }).format(totalCents / 100);
 
   return (
     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-full max-w-md px-4">

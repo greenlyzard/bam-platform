@@ -23,9 +23,13 @@ function formatTime(t: string) {
   return `${h12}:${m} ${ampm}`;
 }
 
-export function EnrollmentCartView() {
-  const { items, removeItem, totalCents, registrationTotalCents, itemCount } =
-    useCart();
+export function EnrollmentCartView({
+  registrationFeeCents,
+}: {
+  /** Studio-level one-time registration fee in cents, resolved server-side (cart/page.tsx). */
+  registrationFeeCents: number;
+}) {
+  const { items, removeItem, totalCents, itemCount } = useCart();
   const [checkingOut, setCheckingOut] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
   // Open-authorization consent (card-on-file + ACH mandate) — AUTHORIZATION_CHECKOUT.md §6.
@@ -36,7 +40,8 @@ export function EnrollmentCartView() {
     setCheckoutError("");
 
     try {
-      // Sync cart to server first
+      // Sync cart to server first. Price is resolved server-side from the class — the client
+      // no longer computes or sends price_cents.
       for (const item of items) {
         await fetch("/api/enrollment/cart", {
           method: "POST",
@@ -47,9 +52,6 @@ export function EnrollmentCartView() {
             // omitted for a new dancer (server accepts student_name only).
             ...(item.studentId ? { student_id: item.studentId } : {}),
             student_name: item.childName,
-            price_cents:
-              (item.classInfo.monthlyTuitionCents ?? 0) +
-              (item.classInfo.registrationFeeCents ?? 0),
           }),
         });
       }
@@ -112,7 +114,7 @@ export function EnrollmentCartView() {
     );
   }
 
-  const grandTotal = totalCents + registrationTotalCents;
+  const grandTotal = totalCents + registrationFeeCents;
 
   return (
     <div className="space-y-6">
@@ -192,11 +194,11 @@ export function EnrollmentCartView() {
             {formatCurrency(totalCents)}
           </span>
         </div>
-        {registrationTotalCents > 0 && (
+        {registrationFeeCents > 0 && (
           <div className="flex items-center justify-between text-sm">
             <span className="text-slate">Registration fee (one-time)</span>
             <span className="font-medium text-charcoal">
-              {formatCurrency(registrationTotalCents)}
+              {formatCurrency(registrationFeeCents)}
             </span>
           </div>
         )}

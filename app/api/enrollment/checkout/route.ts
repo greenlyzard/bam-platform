@@ -9,6 +9,7 @@ import {
   buildAuthorizationSessionParams,
   type CartLineInput,
 } from "@/lib/billing/checkout-lines";
+import { resolveClassPriceCents } from "@/lib/billing/resolve-price";
 
 const CART_COOKIE = "bam_cart_token";
 
@@ -47,7 +48,7 @@ export async function POST(req: Request) {
 
     const { data: itemRows } = await admin
       .from("enrollment_cart_items")
-      .select("class_id, student_id, student_name, price_cents, charge_timing")
+      .select("class_id, student_id, student_name, charge_timing")
       .eq("cart_id", cart.id);
 
     if (!itemRows || itemRows.length === 0) {
@@ -105,12 +106,32 @@ export async function POST(req: Request) {
       .maybeSingle();
     const registrationFeeCents = (settings?.registration_fee_cents as number | undefined) ?? 0;
 
+    // Re-resolve tuition per class at checkout time (do NOT trust the stored cart price_cents).
+    // Registration stays a separate, server-derived studio-level input (above).
+    const resolved = await Promise.all(
+      (itemRows as Array<Record<string, unknown>>).map(async (r) => ({
+        row: r,
+        priceCents: await resolveClassPriceCents(r.class_id as string, admin),
+      }))
+    );
+
+    // An unpriced class must not be purchasable — refuse the whole checkout.
+    if (resolved.some((x) => x.priceCents == null)) {
+      return NextResponse.json(
+        {
+          error:
+            "One or more classes in your cart no longer have a price set. Please remove them or contact the studio.",
+        },
+        { status: 409 }
+      );
+    }
+
     // Split immediate (charge now) vs scheduled (record intent, drawn on the 15th later).
-    const lineInputs: CartLineInput[] = (itemRows as Array<Record<string, unknown>>).map((r) => ({
+    const lineInputs: CartLineInput[] = resolved.map(({ row: r, priceCents }) => ({
       classId: r.class_id as string,
       studentId: (r.student_id as string | null) ?? null,
       studentName: (r.student_name as string | null) ?? null,
-      priceCents: (r.price_cents as number) ?? 0,
+      priceCents: priceCents as number,
       chargeTiming: (r.charge_timing as "immediate" | "scheduled") ?? "scheduled",
     }));
     const { immediate, scheduled } = splitCheckoutLines({ items: lineInputs, registrationFeeCents });

@@ -25,7 +25,6 @@ interface ClassInfo {
   spotsRemaining: number;
   isFull: boolean;
   monthlyTuitionCents: number | null;
-  registrationFeeCents: number | null;
 }
 
 interface ChildData {

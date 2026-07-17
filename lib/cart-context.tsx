@@ -18,8 +18,6 @@ interface CartContextValue {
   itemCount: number;
   /** Total monthly tuition in cents */
   totalCents: number;
-  /** Total registration fees in cents */
-  registrationTotalCents: number;
   hasClass: (classId: string) => boolean;
 }
 
@@ -56,15 +54,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
     [items]
   );
 
-  const registrationTotalCents = useMemo(
-    () =>
-      items.reduce(
-        (sum, item) => sum + (item.classInfo.registrationFeeCents ?? 0),
-        0
-      ),
-    [items]
-  );
-
   return (
     <CartContext.Provider
       value={{
@@ -74,7 +63,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
         clearCart,
         itemCount: items.length,
         totalCents,
-        registrationTotalCents,
         hasClass,
       }}
     >

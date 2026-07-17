@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { dollarsToPriceCents } from "@/lib/billing/resolve-price";
 
 /** Get all active classes with enrollment counts and teacher names */
 export async function getClassCatalog(filters?: {
@@ -50,6 +52,27 @@ export async function getClassCatalog(filters?: {
     for (const l of locs ?? []) locationNames[l.id] = l.name;
   }
 
+  // Monthly tuition per class. Source of truth = the base-price row in class_pricing_rules
+  // (DOLLARS); legacy fallback = classes.fee_cents (cents). Batched: one query for all catalog
+  // classes, via the service-role client because class_pricing_rules RLS is authenticated-only
+  // and this catalog is served to anonymous enrollees. Conversion goes through the single
+  // dollarsToPriceCents helper.
+  const classIds = (data ?? []).map((c) => c.id as string);
+  const priceByClass: Record<string, number> = {};
+  if (classIds.length > 0) {
+    const admin = createAdminClient();
+    const { data: rules } = await admin
+      .from("class_pricing_rules")
+      .select("class_id, amount")
+      .in("class_id", classIds)
+      .eq("is_base_price", true);
+    for (const r of rules ?? []) {
+      if (r.amount != null) {
+        priceByClass[r.class_id as string] = dollarsToPriceCents(r.amount as number);
+      }
+    }
+  }
+
   return (data ?? []).map((cls) => {
     const enrollments = cls.enrollments as { id: string; status: string }[];
     const activeCount = enrollments.filter(
@@ -88,8 +111,8 @@ export async function getClassCatalog(filters?: {
       waitlistCount,
       spotsRemaining: Math.max(0, (cls.max_students as number) - activeCount),
       isFull: activeCount >= (cls.max_students as number),
-      monthlyTuitionCents: (cls.monthly_tuition_cents as number | null) ?? null,
-      registrationFeeCents: (cls.registration_fee_cents as number | null) ?? null,
+      monthlyTuitionCents:
+        priceByClass[cls.id as string] ?? (cls.fee_cents as number | null) ?? null,
       trialEligible: (cls.trial_eligible as boolean | null) ?? false,
     };
   });

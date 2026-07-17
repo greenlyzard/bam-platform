@@ -17,10 +17,8 @@ export interface ClassInfo {
   activeCount: number;
   spotsRemaining: number;
   isFull: boolean;
-  /** Monthly tuition in cents */
+  /** Monthly tuition in cents (resolved server-side; null = unpriced) */
   monthlyTuitionCents: number | null;
-  /** Registration fee in cents */
-  registrationFeeCents: number | null;
 }
 
 export interface CartItem {
