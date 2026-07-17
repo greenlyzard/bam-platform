@@ -36,6 +36,14 @@ const ROLE_HOME: Record<string, string> = {
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Machine-to-machine routes must never be session-touched: the Stripe webhook reads a raw body
+  // and verifies a signature, and cron routes authenticate via a bearer secret, not cookies.
+  // These are already excluded by `matcher` (the blanket `api/` exclusion) — this early-return is
+  // defense-in-depth so a future matcher change that opens up API routes can't expose them.
+  if (pathname.startsWith("/api/cron") || pathname === "/api/enrollment/webhook") {
+    return NextResponse.next();
+  }
+
   // Skip auth check for public paths (callback, login, signup, etc.)
   if (PUBLIC_PATHS.some((path) => pathname.startsWith(path))) {
     return NextResponse.next();
@@ -109,9 +117,9 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization)
      * - favicon.ico
-     * - public assets
-     * - API routes (handled by their own auth)
+     * - brand/ + public asset files (images, fonts)
+     * - API routes (handled by their own auth; also protects the Stripe webhook + cron)
      */
-    "/((?!_next/static|_next/image|favicon.ico|brand/|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|brand/|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?|ttf|otf)$).*)",
   ],
 };
