@@ -24,6 +24,8 @@ interface ClassInfo {
   activeCount: number;
   spotsRemaining: number;
   isFull: boolean;
+  startDate: string | null;
+  endDate: string | null;
   monthlyTuitionCents: number | null;
 }
 

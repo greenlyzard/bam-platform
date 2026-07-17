@@ -10,6 +10,10 @@ export async function getClassCatalog(filters?: {
 }) {
   const supabase = await createClient();
 
+  // Public default: hide classes whose term has already ended. Ongoing/open-ended classes
+  // (end_date null) always stay visible. Local calendar date (studio-local), day granularity.
+  const today = new Date().toISOString().slice(0, 10);
+
   let query = supabase
     .from("classes")
     .select(
@@ -23,6 +27,7 @@ export async function getClassCatalog(filters?: {
     .eq("is_hidden", false)
     .eq("is_rehearsal", false)
     .eq("is_performance", false)
+    .or(`end_date.is.null,end_date.gte.${today}`)
     .order("day_of_week")
     .order("start_time");
 
@@ -99,6 +104,8 @@ export async function getClassCatalog(filters?: {
       dayOfWeek: cls.day_of_week as number,
       startTime: cls.start_time as string,
       endTime: cls.end_time as string,
+      startDate: (cls.start_date as string | null) ?? null,
+      endDate: (cls.end_date as string | null) ?? null,
       room: cls.room as string | null,
       locationId: (cls.location_id as string | null) ?? null,
       locationName: cls.location_id

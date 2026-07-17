@@ -12,6 +12,10 @@ export interface ClassInfo {
   dayOfWeek: number;
   startTime: string;
   endTime: string;
+  /** Class term start (ISO date, YYYY-MM-DD); null = open-ended/ongoing */
+  startDate: string | null;
+  /** Class term end (ISO date, YYYY-MM-DD); null = open-ended/ongoing */
+  endDate: string | null;
   room: string | null;
   teacherName: string | null;
   activeCount: number;

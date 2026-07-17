@@ -18,6 +18,7 @@ interface ClassInfo {
   dayOfWeek: number;
   startTime: string;
   endTime: string;
+  startDate: string | null;
   room: string | null;
   locationId: string | null;
   locationName: string | null;
@@ -54,6 +55,22 @@ function formatTime(t: string) {
   const ampm = hour >= 12 ? "PM" : "AM";
   const h12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
   return `${h12}:${m} ${ampm}`;
+}
+
+/** True when a class's term starts after today (upcoming, not yet begun). */
+function isFutureStart(startDate: string | null): boolean {
+  if (!startDate) return false;
+  const today = new Date().toISOString().slice(0, 10);
+  return startDate > today;
+}
+
+/** "August 14" from an ISO date; parsed as local to avoid a timezone off-by-one. */
+function formatStartDate(startDate: string): string {
+  const [y, m, d] = startDate.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+  });
 }
 
 export function ClassCatalog({
@@ -215,13 +232,18 @@ export function ClassCatalog({
                 className="rounded-xl border border-silver bg-white p-4 flex items-center justify-between gap-4"
               >
                 <div className="space-y-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <h4 className="text-sm font-semibold text-charcoal">
                       {cls.name}
                     </h4>
                     <span className="text-xs bg-lavender/10 text-lavender-dark px-2 py-0.5 rounded-full">
                       {STYLE_LABELS[cls.style] ?? cls.style}
                     </span>
+                    {isFutureStart(cls.startDate) && (
+                      <span className="text-xs bg-lavender text-white px-2 py-0.5 rounded-full font-semibold">
+                        Starts {formatStartDate(cls.startDate!)}
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-slate">
                     {formatTime(cls.startTime)}–{formatTime(cls.endTime)}
