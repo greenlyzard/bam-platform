@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { deriveClassStatus } from "@/lib/classes/status";
 
 // ── Enrollment Stats ──────────────────────────────────
 
@@ -45,13 +46,14 @@ export async function getAllClasses() {
       id,
       name,
       style,
-      level,
       day_of_week,
       start_time,
       end_time,
       room,
       max_students,
       is_active,
+      start_date,
+      end_date,
       teacher_id,
       age_min,
       age_max
@@ -61,7 +63,13 @@ export async function getAllClasses() {
     .order("start_time");
 
   if (error) {
-    console.error("[admin:getAllClasses]", error);
+    // Log the actual PostgrestError fields — the bare object serializes to "{}".
+    console.error("[admin:getAllClasses]", {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+    });
     return [];
   }
 
@@ -231,7 +239,9 @@ export async function getCompetitors() {
 
 export async function getCapacitySummary() {
   const classes = await getAllClasses();
-  const active = classes.filter((c) => c.is_active);
+  // "Active" here means derived-active (running now) — not merely is_active. An is_active class
+  // whose term ended (end_date < today) is 'ended', so it no longer inflates the headline count.
+  const active = classes.filter((c) => deriveClassStatus(c) === "active");
   const atCapacity = active.filter(
     (c) => c.enrolledCount >= c.max_students
   );

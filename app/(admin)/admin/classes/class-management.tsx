@@ -3,6 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SimpleSelect } from "@/components/ui/select";
 import { matchesLocationFilter } from "@/lib/locations/validate";
+import {
+  deriveClassStatus,
+  CLASS_STATUS_LABEL,
+  CLASS_STATUS_BADGE,
+} from "@/lib/classes/status";
 import { createClient } from "@/lib/supabase/client";
 import {
   DndContext,
@@ -326,8 +331,10 @@ export function ClassManagement({
   const [filterDiscipline, setFilterDiscipline] = useState("");
   const [filterDay, setFilterDay] = useState("");
   const [filterType, setFilterType] = useState("");
-  const [filterStatus, setFilterStatus] = useState("active");
+  const [filterStatus, setFilterStatus] = useState("");
   const [filterMyClasses, setFilterMyClasses] = useState(false);
+  // Derived-status default: hide ended (past) classes until the admin opts to see them.
+  const [showPast, setShowPast] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [drawerClass, setDrawerClass] = useState<ClassRecord | null>(null);
@@ -441,6 +448,12 @@ export function ClassManagement({
   }, []);
 
   // ── Filtering ────────────────────────────────────────
+  // Derived-active classes (running now) — the honest basis for headline counts & open spots,
+  // matching getCapacitySummary. Excludes scheduled / ended / inactive.
+  const derivedActiveClasses = classes.filter(
+    (c) => deriveClassStatus(c) === "active"
+  );
+
   const filtered = classes.filter((c) => {
     if (search && !c.name.toLowerCase().includes(search.toLowerCase()))
       return false;
@@ -473,10 +486,25 @@ export function ClassManagement({
     if (filterType === "performance" && !c.is_performance) return false;
     if (filterType === "class" && (c.is_rehearsal || c.is_performance))
       return false;
-    if (filterStatus === "active" && (!c.is_active || c.is_hidden))
+    // Status filter is derived-aware: scheduled/active/ended/inactive match deriveClassStatus;
+    // 'hidden' stays a flag filter (orthogonal to lifecycle).
+    if (
+      (filterStatus === "scheduled" ||
+        filterStatus === "active" ||
+        filterStatus === "ended" ||
+        filterStatus === "inactive") &&
+      deriveClassStatus(c) !== filterStatus
+    )
       return false;
     if (filterStatus === "hidden" && !c.is_hidden) return false;
-    if (filterStatus === "inactive" && c.is_active) return false;
+    // Derived-status default: hide 'ended' (past) classes unless "Show past classes" is on — but
+    // never hide them when the admin has explicitly filtered to 'ended'.
+    if (
+      !showPast &&
+      filterStatus !== "ended" &&
+      deriveClassStatus(c) === "ended"
+    )
+      return false;
     if (filterMyClasses && myClassIds.length > 0 && !myClassIds.includes(c.id))
       return false;
     return true;
@@ -1322,8 +1350,8 @@ ${(byDay[d] ?? [])
             Schedule
           </h1>
           <p className="mt-1 text-sm text-slate">
-            {classes.filter((c) => c.is_active).length} active ·{" "}
-            {classes.filter((c) => !c.is_active).length} inactive
+            {derivedActiveClasses.length} active ·{" "}
+            {classes.filter((c) => deriveClassStatus(c) === "inactive").length} inactive
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -1346,7 +1374,7 @@ ${(byDay[d] ?? [])
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard
           label="Active Classes"
-          value={classes.filter((c) => c.is_active && !c.is_hidden).length}
+          value={derivedActiveClasses.filter((c) => !c.is_hidden).length}
         />
         <StatCard
           label="Total Enrolled"
@@ -1355,26 +1383,23 @@ ${(byDay[d] ?? [])
         <StatCard
           label="At Capacity"
           value={
-            classes.filter(
+            derivedActiveClasses.filter(
               (c) =>
-                c.is_active &&
                 c.enrolledCount >= (c.max_enrollment ?? c.max_students)
             ).length
           }
         />
         <StatCard
           label="Open Spots"
-          value={classes
-            .filter((c) => c.is_active)
-            .reduce(
-              (s, c) =>
-                s +
-                Math.max(
-                  0,
-                  (c.max_enrollment ?? c.max_students) - c.enrolledCount
-                ),
-              0
-            )}
+          value={derivedActiveClasses.reduce(
+            (s, c) =>
+              s +
+              Math.max(
+                0,
+                (c.max_enrollment ?? c.max_students) - c.enrolledCount
+              ),
+            0
+          )}
         />
       </div>
 
@@ -1472,6 +1497,16 @@ ${(byDay[d] ?? [])
               My Classes
             </button>
           )}
+          <button
+            onClick={() => setShowPast(!showPast)}
+            className={`h-9 rounded-lg px-3 text-xs font-medium transition-colors inline-flex items-center gap-1.5 ${
+              showPast
+                ? "bg-lavender text-white"
+                : "border border-silver bg-white text-slate hover:border-lavender"
+            }`}
+          >
+            Show past classes
+          </button>
         </div>
 
         {/* Mobile filter drawer */}
@@ -1703,7 +1738,7 @@ ${(byDay[d] ?? [])
                 function renderCell(col: ColumnConfig, c: ClassRecord) {
                   const maxEnroll = c.max_enrollment ?? c.max_students;
                   const isFull = c.enrolledCount >= maxEnroll;
-                  const seasonName = seasons.find((s) => s.id === c.season_id)?.name ?? c.season ?? "—";
+                  const seasonName = seasons.find((s) => s.id === c.season_id)?.name ?? c.season ?? "Year-Round";
 
                   // Special-case columns that need joins or custom rendering
                   switch (col.key) {
@@ -1759,22 +1794,23 @@ ${(byDay[d] ?? [])
                           </span>
                         </td>
                       );
-                    case "status":
+                    case "status": {
+                      // Derived lifecycle status (Scheduled / Active / Ended / Inactive) leads;
+                      // capacity ('Full') and the orthogonal flags follow.
+                      const derived = deriveClassStatus(c);
                       return (
                         <td key={col.key} className="px-3 py-2 text-center">
                           <div className="flex items-center justify-center gap-1 flex-wrap">
-                            {c.status === "active" && <span className="inline-flex items-center rounded-full bg-success/10 px-1.5 py-0.5 text-[10px] font-medium text-success">Active</span>}
-                            {c.status === "archived" && <span className="inline-flex items-center rounded-full bg-cloud px-1.5 py-0.5 text-[10px] font-medium text-slate">Archived</span>}
-                            {c.status === "draft" && <span className="inline-flex items-center rounded-full bg-gold/10 px-1.5 py-0.5 text-[10px] font-medium text-gold-dark">Draft</span>}
+                            <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${CLASS_STATUS_BADGE[derived]}`}>{CLASS_STATUS_LABEL[derived]}</span>
                             {c.status === "full" && <span className="inline-flex items-center rounded-full bg-error/10 px-1.5 py-0.5 text-[10px] font-medium text-error">Full</span>}
                             {c.is_new && <span className="inline-flex items-center rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700">NEW</span>}
                             {c.is_hidden && <span className="inline-flex items-center rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600">HIDDEN</span>}
                             {c.is_rehearsal && <span className="inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">REHEARSAL</span>}
                             {c.is_performance && <span className="inline-flex items-center rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-medium text-rose-700">PERFORMANCE</span>}
-                            {!c.is_new && !c.is_hidden && !c.is_rehearsal && !c.is_performance && <span className="text-xs text-mist">—</span>}
                           </div>
                         </td>
                       );
+                    }
                     case "onlinereg":
                       return (
                         <td key={col.key} className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
@@ -2170,7 +2206,7 @@ function FilterSelects({
       <SimpleSelect value={filterDiscipline || "__all__"} onValueChange={(val) => setFilterDiscipline(val === "__all__" ? "" : val)} options={[{ value: "__all__", label: "All Disciplines" }, ...disciplines.map((d) => ({ value: d.id, label: d.name }))]} placeholder="All Disciplines" className={cls} />
       <SimpleSelect value={filterDay || "__all__"} onValueChange={(val) => setFilterDay(val === "__all__" ? "" : val)} options={[{ value: "__all__", label: "All Days" }, ...[1, 2, 3, 4, 5, 6, 0].map((d) => ({ value: String(d), label: DAY_NAMES_FULL[d] }))]} placeholder="All Days" className={cls} />
       <SimpleSelect value={filterType || "__all__"} onValueChange={(val) => setFilterType(val === "__all__" ? "" : val)} options={[{ value: "__all__", label: "All Types" }, { value: "class", label: "Class" }, { value: "rehearsal", label: "Rehearsal" }, { value: "performance", label: "Performance" }]} placeholder="All Types" className={cls} />
-      <SimpleSelect value={filterStatus || "__all__"} onValueChange={(val) => setFilterStatus(val === "__all__" ? "" : val)} options={[{ value: "__all__", label: "All Status" }, { value: "active", label: "Active" }, { value: "hidden", label: "Hidden" }, { value: "inactive", label: "Inactive" }]} placeholder="All Status" className={cls} />
+      <SimpleSelect value={filterStatus || "__all__"} onValueChange={(val) => setFilterStatus(val === "__all__" ? "" : val)} options={[{ value: "__all__", label: "All Status" }, { value: "scheduled", label: "Scheduled" }, { value: "active", label: "Active" }, { value: "ended", label: "Ended" }, { value: "inactive", label: "Inactive" }, { value: "hidden", label: "Hidden" }]} placeholder="All Status" className={cls} />
     </>
   );
 }
