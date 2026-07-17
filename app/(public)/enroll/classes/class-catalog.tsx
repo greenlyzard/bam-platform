@@ -59,6 +59,7 @@ function formatTime(t: string) {
 export function ClassCatalog({
   classes,
   onEnroll,
+  isInCart,
 }: {
   classes: ClassInfo[];
   /**
@@ -67,6 +68,8 @@ export function ClassCatalog({
    * When omitted (the standalone catalog page), it links out as before.
    */
   onEnroll?: (classId: string) => void;
+  /** In add-to-cart mode, whether a class is already in the cart (shows "Added ✓"). */
+  isInCart?: (classId: string) => boolean;
 }) {
   const [styleFilter, setStyleFilter] = useState("");
   const [dayFilter, setDayFilter] = useState<number | null>(null);
@@ -239,13 +242,22 @@ export function ClassCatalog({
                     </span>
                   )}
                   {onEnroll ? (
-                    <button
-                      type="button"
-                      onClick={() => onEnroll(cls.id)}
-                      className="h-9 rounded-lg bg-lavender hover:bg-lavender-dark text-white text-xs font-semibold px-4 flex items-center transition-colors"
-                    >
-                      {cls.isFull ? "Waitlist" : "Add to Cart"}
-                    </button>
+                    isInCart?.(cls.id) ? (
+                      <span className="h-9 rounded-lg bg-success/10 text-success text-xs font-semibold px-4 flex items-center gap-1">
+                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        Added
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => onEnroll(cls.id)}
+                        className="h-9 rounded-lg bg-lavender hover:bg-lavender-dark text-white text-xs font-semibold px-4 flex items-center transition-colors"
+                      >
+                        {cls.isFull ? "Join Waitlist" : "Add to Cart"}
+                      </button>
+                    )
                   ) : (
                     <a
                       href={`/enroll?class=${cls.id}`}

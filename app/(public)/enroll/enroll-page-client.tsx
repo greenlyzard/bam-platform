@@ -106,7 +106,11 @@ export function EnrollPageClient({
           </Link>
         </div>
 
-        <ClassCatalog classes={classes} onEnroll={addExistingStudentClass} />
+        <ClassCatalog
+          classes={classes}
+          onEnroll={addExistingStudentClass}
+          isInCart={(id) => cart.hasClass(id)}
+        />
       </div>
     );
   }
