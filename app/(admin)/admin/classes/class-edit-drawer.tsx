@@ -543,6 +543,14 @@ export function ClassEditDrawer({
       });
     }
 
+    // Materialize this class's schedule occurrences (task 19). Server-side, best-effort —
+    // never block or fail the save on generation.
+    void fetch("/api/admin/classes/generate-occurrences", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ classId }),
+    }).catch(() => {});
+
     setSaving(false);
   }
 
