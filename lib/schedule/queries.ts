@@ -44,7 +44,12 @@ export async function getScheduleClasses(filters?: {
   const { data: classes, error } = await query;
 
   if (error) {
-    console.error("[schedule:getClasses]", error);
+    console.error("[schedule:getClasses]", {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    });
     return [];
   }
 
@@ -129,7 +134,12 @@ export async function getClassSessions(filters: {
   const { data: sessions, error } = await query;
 
   if (error) {
-    console.error("[schedule:getSessions]", error);
+    console.error("[schedule:getSessions]", {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    });
     return [];
   }
 
@@ -265,7 +275,12 @@ export async function getAdminTasks(filters?: {
   const { data: tasks, error } = await query;
 
   if (error) {
-    console.error("[schedule:getTasks]", error);
+    console.error("[schedule:getTasks]", {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    });
     return [];
   }
 
@@ -382,7 +397,12 @@ export async function getScheduleInstances(filters: {
   const { data: instances, error } = await query;
 
   if (error) {
-    console.error("[schedule:getInstances]", error);
+    console.error("[schedule:getInstances]", {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    });
     return [];
   }
 
@@ -499,7 +519,12 @@ export async function getClassesAsScheduleInstances(filters: {
     .order("day_of_week")
     .order("start_time");
   if (error || !classes) {
-    console.error("[schedule:classesAsInstances]", error);
+    console.error("[schedule:classesAsInstances]", {
+      code: error?.code,
+      message: error?.message,
+      details: error?.details,
+      hint: error?.hint,
+    });
     return [];
   }
 
