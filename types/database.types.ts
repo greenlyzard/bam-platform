@@ -1427,7 +1427,7 @@ export type Database = {
           start_date: string | null
           start_time: string | null
           status: string
-          style: string
+          style: string | null
           teacher_id: string | null
           trial_eligible: boolean
           updated_at: string | null
@@ -1478,7 +1478,7 @@ export type Database = {
           start_date?: string | null
           start_time?: string | null
           status?: string
-          style: string
+          style?: string | null
           teacher_id?: string | null
           trial_eligible?: boolean
           updated_at?: string | null
@@ -1529,7 +1529,7 @@ export type Database = {
           start_date?: string | null
           start_time?: string | null
           status?: string
-          style?: string
+          style?: string | null
           teacher_id?: string | null
           trial_eligible?: boolean
           updated_at?: string | null

@@ -403,9 +403,20 @@ export function ClassEditDrawer({
     let classId: string;
 
     if (isNew) {
+      // style is required-ish for legacy consumers; derive it from the first
+      // selected discipline on create only (never recompute on edit, so an
+      // intentional style is never clobbered). Null when no discipline chosen.
+      const insertPayload = {
+        ...classPayload,
+        style:
+          selectedDisciplines.length > 0
+            ? (disciplines.find((d) => d.id === selectedDisciplines[0])?.name ??
+              null)
+            : null,
+      };
       const { data, error: insertError } = await supabase
         .from("classes")
-        .insert(classPayload)
+        .insert(insertPayload)
         .select()
         .single();
 
