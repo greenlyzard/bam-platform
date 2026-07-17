@@ -120,6 +120,8 @@ which supersedes this gap note with the reconciliation + build sequence. Pending
 | Topic | Canonical | Notes |
 |---|---|---|
 | Commerce & billing (payments, ledger, pricing, credits) | `docs/COMMERCE_AND_BILLING.md` | ✅ Canonical *(Draft)* — supersedes `BILLING_AND_CREDITS.md` |
+| Enrollment approval, charging & monthly tuition draw | `docs/BILLING_APPROVAL_AND_DRAW.md` | ✅ Canonical *(Draft, 2026-07-17)* — vault-only checkout, admin-approval charge gate, proration, 15th draw engine, refund-ready data model. Supersedes the charge-at-checkout direction of `AUTHORIZATION_CHECKOUT.md` |
+| Vaulting rails (card-on-file + ACH mandate) | `docs/AUTHORIZATION_CHECKOUT.md` | Subordinate — vault/ACH mechanics only; charge-at-checkout + auto-activate **superseded** by `BILLING_APPROVAL_AND_DRAW.md` |
 | FSA/HSA invoice PDF | `docs/INVOICE_PDF.md` | Subordinate — downstream renderer; reads from `ledger_entries` |
 | Performance/competition costs | `docs/PERFORMANCE_COMPETITION_COSTS.md` | |
 
@@ -200,7 +202,9 @@ which supersedes this gap note with the reconciliation + build sequence. Pending
 | `ANGELINA_SPEC_V2.md` | ✅ | Angelina/AI | angelina_conversations, angelina_feedback | api/angelina/chat, lib/angelina/context | Angelina architecture: context, skills, streaming, security |
 | `APP_STORE_SETUP.md` | 📖 | Ops | — | capacitor.config, ios/, android/ | Capacitor native iOS/Android wrapper setup |
 | `ATTENDANCE.md` | 🟠 | Students | attendance_records, timesheet_alerts, timesheet_entries, sessions⚠ | api/attendance, cron/generate-sessions | Attendance tracking + overpayment alerts (legacy `sessions`/`user_profiles`) |
+| `AUTHORIZATION_CHECKOUT.md` | ✅sub | Commerce & Billing | enrollment_carts, families, tuition_schedule_intent, ledger_entries | api/enrollment/checkout, api/enrollment/webhook | Vault card-on-file + ACH mandate at checkout. **Charge-at-checkout + auto-activate direction superseded by `BILLING_APPROVAL_AND_DRAW.md`**; vaulting mechanics still valid |
 | `BALLET_DOMAIN.md` | 📖 | Brand/Domain | — | lib/ai prompts | Ballet vocab, curriculum, skill/badge taxonomy reference |
+| `BILLING_APPROVAL_AND_DRAW.md` | ✅ *(Draft)* | Commerce & Billing | enrollments, enrollment_charge_items (new), charges (new), refunds (new), tuition_schedule_intent, ledger_entries, studio_settings | api/enrollment/checkout, api/enrollment/webhook, api/cron/tuition-draw (new), admin/enrollment/approvals (new) | Vault-only checkout → pending enrollment → admin approval charge gate; first-month proration; 15th off-session tuition draw engine (state machine, idempotency, dunning); refund-ready charge/refund data model. **Canonical for enrollment approval + draw**; supersedes charge-at-checkout in `AUTHORIZATION_CHECKOUT.md` |
 | `BILLING_AND_CREDITS.md` | 🔴 | Billing | credit_accounts, credit_transactions, invoices⚠, billing_charges⚠ | admin/billing, portal/billing | (dep) credit/point + `billing_charges` engine — **superseded by `COMMERCE_AND_BILLING.md`** (credit concept → bounded credit layer §8.5; `billing_charges` L2 → `ledger_entries`) |
 | `BRAND.md` | ✅ | Brand | — | tailwind, UI_STYLE_DIRECTIVES | Studio identity, voice, colors, typography |
 | `CALENDAR_AND_SCHEDULING.md` | 🔴 | Scheduling | schedule_instances, schedule_templates, rooms, calendar_subscriptions, approval_tasks | admin/calendar, widget/schedule | (dep) calendar/scheduling approvals + sync |

@@ -1,5 +1,20 @@
 # Authorization Checkout — Spec (Slice 1 of the Enrollment→Payment Bridge)
 
+> ⚠️ **PARTIALLY SUPERSEDED (2026-07-17) — do not implement the charge-at-checkout / auto-activate
+> direction from this doc.** The canonical architecture is now
+> **[`docs/BILLING_APPROVAL_AND_DRAW.md`](./BILLING_APPROVAL_AND_DRAW.md)**. Under that spec:
+> - Checkout is **vault-only** (Stripe `setup` mode) — **nothing is charged at checkout except
+>   merchandise**. The "charge **immediate** lines now (registration fee)" direction in **§1 (bullet
+>   c), §2 In #3** below is **superseded** — registration is charged at **admin approval**, not checkout.
+> - Enrollment is created **`pending`**, not `active`; an **admin approval** gate now sits between
+>   checkout and any charge (this doc's §2 "Out" items — approval queue, 15th draw, off-session
+>   charges — are specified in full there).
+>
+> **Still valid here:** the card-vaulting / ACH-mandate rails (`setup_future_usage: 'off_session'`,
+> `us_bank_account` mandate), persisting the method to `families.stripe_customer_id`, and the
+> `charge_timing` concept. Read this doc only for those mechanics; read `BILLING_APPROVAL_AND_DRAW.md`
+> for the flow, states, charging, proration, draw engine, and refund-ready data model.
+
 **Status:** Draft for build. **Depends on:** committed ledger foundation (`post_ledger_group`, `direct_sale_captured`), `app/api/enrollment/checkout/route.ts` (orphan — to be wired), `families.stripe_customer_id`.
 **Supersedes:** the `/enroll` step-7 placeholder payment screen.
 
