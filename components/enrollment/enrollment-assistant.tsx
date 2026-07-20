@@ -15,7 +15,6 @@ const STEP_MESSAGES: Record<string, string> = {
   "/enroll": "Hi! I'm here to help you find the perfect class. What questions do you have?",
   "/enroll/classes": "Need help choosing a class? I can help narrow it down by age or style.",
   "/enroll/cart": "Have questions about pricing or scheduling? I'm here to help!",
-  "/enroll/checkout": "Questions before you complete enrollment? Call or text us.",
   "/enroll/confirmation": "You're all set! We'll be in touch soon. Any questions?",
 };
 
