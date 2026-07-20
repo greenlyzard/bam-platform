@@ -602,6 +602,56 @@ export type Database = {
           },
         ]
       }
+      billing_tasks: {
+        Row: {
+          created_at: string
+          enrollment_id: string | null
+          family_id: string | null
+          id: string
+          intent_id: string | null
+          payload: Json | null
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+          tenant_id: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          enrollment_id?: string | null
+          family_id?: string | null
+          id?: string
+          intent_id?: string | null
+          payload?: Json | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          tenant_id: string
+          type: string
+        }
+        Update: {
+          created_at?: string
+          enrollment_id?: string | null
+          family_id?: string | null
+          id?: string
+          intent_id?: string | null
+          payload?: Json | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          tenant_id?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_tasks_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bundle_configs: {
         Row: {
           created_at: string | null
@@ -1079,6 +1129,150 @@ export type Database = {
             columns: ["pinned_post_id"]
             isOneToOne: false
             referencedRelation: "channel_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      charge_item_adjustments: {
+        Row: {
+          adjustment_type: string
+          admin_id: string | null
+          approved_cents: number | null
+          charge_item_id: string
+          created_at: string
+          id: string
+          reason: string
+          recommended_cents: number | null
+          tenant_id: string
+          value: number
+        }
+        Insert: {
+          adjustment_type: string
+          admin_id?: string | null
+          approved_cents?: number | null
+          charge_item_id: string
+          created_at?: string
+          id?: string
+          reason: string
+          recommended_cents?: number | null
+          tenant_id: string
+          value: number
+        }
+        Update: {
+          adjustment_type?: string
+          admin_id?: string | null
+          approved_cents?: number | null
+          charge_item_id?: string
+          created_at?: string
+          id?: string
+          reason?: string
+          recommended_cents?: number | null
+          tenant_id?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "charge_item_adjustments_charge_item_id_fkey"
+            columns: ["charge_item_id"]
+            isOneToOne: false
+            referencedRelation: "enrollment_charge_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "charge_item_adjustments_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      charges: {
+        Row: {
+          amount_cents: number
+          billing_period: string | null
+          captured_at: string | null
+          class_id: string | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          enrollment_id: string | null
+          family_id: string
+          id: string
+          intent_id: string | null
+          kind: string
+          ledger_posting_key: string | null
+          metadata: Json | null
+          refunded_total_cents: number
+          source: string
+          status: string
+          stripe_charge_id: string | null
+          stripe_payment_intent_id: string | null
+          student_id: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount_cents: number
+          billing_period?: string | null
+          captured_at?: string | null
+          class_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          enrollment_id?: string | null
+          family_id: string
+          id?: string
+          intent_id?: string | null
+          kind: string
+          ledger_posting_key?: string | null
+          metadata?: Json | null
+          refunded_total_cents?: number
+          source: string
+          status?: string
+          stripe_charge_id?: string | null
+          stripe_payment_intent_id?: string | null
+          student_id?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount_cents?: number
+          billing_period?: string | null
+          captured_at?: string | null
+          class_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          enrollment_id?: string | null
+          family_id?: string
+          id?: string
+          intent_id?: string | null
+          kind?: string
+          ledger_posting_key?: string | null
+          metadata?: Json | null
+          refunded_total_cents?: number
+          source?: string
+          status?: string
+          stripe_charge_id?: string | null
+          stripe_payment_intent_id?: string | null
+          student_id?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "charges_intent_id_fkey"
+            columns: ["intent_id"]
+            isOneToOne: false
+            referencedRelation: "tuition_schedule_intent"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "charges_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -2472,6 +2666,47 @@ export type Database = {
           },
         ]
       }
+      draw_runs: {
+        Row: {
+          anchor_date: string | null
+          billing_period: string
+          created_at: string
+          executed_at: string | null
+          executed_by: string | null
+          id: string
+          status: string
+          tenant_id: string
+        }
+        Insert: {
+          anchor_date?: string | null
+          billing_period: string
+          created_at?: string
+          executed_at?: string | null
+          executed_by?: string | null
+          id?: string
+          status?: string
+          tenant_id: string
+        }
+        Update: {
+          anchor_date?: string | null
+          billing_period?: string
+          created_at?: string
+          executed_at?: string | null
+          executed_by?: string | null
+          id?: string
+          status?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "draw_runs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_templates: {
         Row: {
           body_html: string
@@ -2646,6 +2881,85 @@ export type Database = {
           },
         ]
       }
+      enrollment_charge_items: {
+        Row: {
+          approved_amount_cents: number | null
+          charge_id: string | null
+          charge_timing: string | null
+          class_id: string | null
+          created_at: string
+          enrollment_id: string
+          family_id: string | null
+          id: string
+          item_type: string
+          proration: Json | null
+          recommended_amount_cents: number
+          recurrence_type: string
+          status: string
+          student_id: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          approved_amount_cents?: number | null
+          charge_id?: string | null
+          charge_timing?: string | null
+          class_id?: string | null
+          created_at?: string
+          enrollment_id: string
+          family_id?: string | null
+          id?: string
+          item_type: string
+          proration?: Json | null
+          recommended_amount_cents: number
+          recurrence_type: string
+          status?: string
+          student_id?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          approved_amount_cents?: number | null
+          charge_id?: string | null
+          charge_timing?: string | null
+          class_id?: string | null
+          created_at?: string
+          enrollment_id?: string
+          family_id?: string | null
+          id?: string
+          item_type?: string
+          proration?: Json | null
+          recommended_amount_cents?: number
+          recurrence_type?: string
+          status?: string
+          student_id?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enrollment_charge_items_charge_id_fkey"
+            columns: ["charge_id"]
+            isOneToOne: false
+            referencedRelation: "charges"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrollment_charge_items_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrollment_charge_items_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       enrollment_recommendations: {
         Row: {
           bundle_config_id: string | null
@@ -2691,17 +3005,27 @@ export type Database = {
       enrollments: {
         Row: {
           amount_paid_cents: number | null
+          approved_at: string | null
+          approved_by: string | null
           billing_override: boolean
           billing_plan_type: string | null
           cancelled_at: string | null
+          checkout_session_id: string | null
           class_id: string
           created_at: string | null
+          declined_at: string | null
+          declined_reason: string | null
           dropped_at: string | null
           enrolled_at: string | null
           enrolled_by: string | null
           enrollment_type: string
           family_id: string | null
+          hold_expires_at: string | null
+          hold_extended_count: number
+          hold_last_extended_at: string | null
+          hold_last_extended_by: string | null
           id: string
+          last_charge_error: string | null
           override_amount: number | null
           override_by: string | null
           override_reason: string | null
@@ -2709,6 +3033,7 @@ export type Database = {
           proration_method: string | null
           status: string
           stripe_payment_intent_id: string | null
+          stripe_setup_intent_id: string | null
           student_id: string
           suppress_onboarding: boolean
           tenant_id: string | null
@@ -2717,17 +3042,27 @@ export type Database = {
         }
         Insert: {
           amount_paid_cents?: number | null
+          approved_at?: string | null
+          approved_by?: string | null
           billing_override?: boolean
           billing_plan_type?: string | null
           cancelled_at?: string | null
+          checkout_session_id?: string | null
           class_id: string
           created_at?: string | null
+          declined_at?: string | null
+          declined_reason?: string | null
           dropped_at?: string | null
           enrolled_at?: string | null
           enrolled_by?: string | null
           enrollment_type?: string
           family_id?: string | null
+          hold_expires_at?: string | null
+          hold_extended_count?: number
+          hold_last_extended_at?: string | null
+          hold_last_extended_by?: string | null
           id?: string
+          last_charge_error?: string | null
           override_amount?: number | null
           override_by?: string | null
           override_reason?: string | null
@@ -2735,6 +3070,7 @@ export type Database = {
           proration_method?: string | null
           status?: string
           stripe_payment_intent_id?: string | null
+          stripe_setup_intent_id?: string | null
           student_id: string
           suppress_onboarding?: boolean
           tenant_id?: string | null
@@ -2743,17 +3079,27 @@ export type Database = {
         }
         Update: {
           amount_paid_cents?: number | null
+          approved_at?: string | null
+          approved_by?: string | null
           billing_override?: boolean
           billing_plan_type?: string | null
           cancelled_at?: string | null
+          checkout_session_id?: string | null
           class_id?: string
           created_at?: string | null
+          declined_at?: string | null
+          declined_reason?: string | null
           dropped_at?: string | null
           enrolled_at?: string | null
           enrolled_by?: string | null
           enrollment_type?: string
           family_id?: string | null
+          hold_expires_at?: string | null
+          hold_extended_count?: number
+          hold_last_extended_at?: string | null
+          hold_last_extended_by?: string | null
           id?: string
+          last_charge_error?: string | null
           override_amount?: number | null
           override_by?: string | null
           override_reason?: string | null
@@ -2761,6 +3107,7 @@ export type Database = {
           proration_method?: string | null
           status?: string
           stripe_payment_intent_id?: string | null
+          stripe_setup_intent_id?: string | null
           student_id?: string
           suppress_onboarding?: boolean
           tenant_id?: string | null
@@ -5484,6 +5831,111 @@ export type Database = {
           },
         ]
       }
+      refund_reasons: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          is_default: boolean
+          label: string
+          sort_order: number
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          label: string
+          sort_order?: number
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          label?: string
+          sort_order?: number
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "refund_reasons_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      refunds: {
+        Row: {
+          amount_cents: number
+          charge_id: string
+          created_at: string
+          id: string
+          ledger_reversal_posting_key: string | null
+          reason_id: string
+          reason_note: string | null
+          refunded_by: string | null
+          status: string
+          stripe_refund_id: string | null
+          tenant_id: string
+        }
+        Insert: {
+          amount_cents: number
+          charge_id: string
+          created_at?: string
+          id?: string
+          ledger_reversal_posting_key?: string | null
+          reason_id: string
+          reason_note?: string | null
+          refunded_by?: string | null
+          status?: string
+          stripe_refund_id?: string | null
+          tenant_id: string
+        }
+        Update: {
+          amount_cents?: number
+          charge_id?: string
+          created_at?: string
+          id?: string
+          ledger_reversal_posting_key?: string | null
+          reason_id?: string
+          reason_note?: string | null
+          refunded_by?: string | null
+          status?: string
+          stripe_refund_id?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "refunds_charge_id_fkey"
+            columns: ["charge_id"]
+            isOneToOne: false
+            referencedRelation: "charges"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refunds_reason_id_fkey"
+            columns: ["reason_id"]
+            isOneToOne: false
+            referencedRelation: "refund_reasons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refunds_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rehearsal_attendance: {
         Row: {
           created_at: string
@@ -8195,16 +8647,22 @@ export type Database = {
           email: string | null
           favicon_url: string | null
           heading_font: string
+          hold_expiry_days: number
           id: string
           logo_dark_url: string | null
           logo_light_url: string | null
           logo_url: string | null
           phone: string | null
+          proration_method: string
+          refund_policy_enabled: boolean
+          refund_window_days: number | null
           registration_fee_cents: number
+          registration_stated_refundable: boolean
           student_term_plural: string | null
           student_term_singular: string | null
           studio_name: string
           theme_preset: string
+          tuition_anchor_day: number
           updated_at: string
           updated_by: string | null
         }
@@ -8215,16 +8673,22 @@ export type Database = {
           email?: string | null
           favicon_url?: string | null
           heading_font?: string
+          hold_expiry_days?: number
           id?: string
           logo_dark_url?: string | null
           logo_light_url?: string | null
           logo_url?: string | null
           phone?: string | null
+          proration_method?: string
+          refund_policy_enabled?: boolean
+          refund_window_days?: number | null
           registration_fee_cents?: number
+          registration_stated_refundable?: boolean
           student_term_plural?: string | null
           student_term_singular?: string | null
           studio_name?: string
           theme_preset?: string
+          tuition_anchor_day?: number
           updated_at?: string
           updated_by?: string | null
         }
@@ -8235,16 +8699,22 @@ export type Database = {
           email?: string | null
           favicon_url?: string | null
           heading_font?: string
+          hold_expiry_days?: number
           id?: string
           logo_dark_url?: string | null
           logo_light_url?: string | null
           logo_url?: string | null
           phone?: string | null
+          proration_method?: string
+          refund_policy_enabled?: boolean
+          refund_window_days?: number | null
           registration_fee_cents?: number
+          registration_stated_refundable?: boolean
           student_term_plural?: string | null
           student_term_singular?: string | null
           studio_name?: string
           theme_preset?: string
+          tuition_anchor_day?: number
           updated_at?: string
           updated_by?: string | null
         }
@@ -9329,6 +9799,41 @@ export type Database = {
           },
         ]
       }
+      tenant_communication_modes: {
+        Row: {
+          comm_type: string
+          created_at: string
+          id: string
+          mode: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          comm_type: string
+          created_at?: string
+          id?: string
+          mode?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          comm_type?: string
+          created_at?: string
+          id?: string
+          mode?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_communication_modes_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenant_program_types: {
         Row: {
           color: string
@@ -9850,11 +10355,19 @@ export type Database = {
       tuition_schedule_intent: {
         Row: {
           anchor_day: number
+          canceled_at: string | null
           class_id: string | null
           created_at: string
+          deferred_addition_cents: number
+          enrollment_id: string | null
+          failure_count: number
           family_id: string | null
           id: string
+          last_drawn_period: string | null
+          last_failure_at: string | null
+          last_failure_code: string | null
           monthly_amount_cents: number
+          next_draw_at: string | null
           source_ref: string | null
           status: string
           student_id: string | null
@@ -9863,11 +10376,19 @@ export type Database = {
         }
         Insert: {
           anchor_day?: number
+          canceled_at?: string | null
           class_id?: string | null
           created_at?: string
+          deferred_addition_cents?: number
+          enrollment_id?: string | null
+          failure_count?: number
           family_id?: string | null
           id?: string
+          last_drawn_period?: string | null
+          last_failure_at?: string | null
+          last_failure_code?: string | null
           monthly_amount_cents: number
+          next_draw_at?: string | null
           source_ref?: string | null
           status?: string
           student_id?: string | null
@@ -9876,11 +10397,19 @@ export type Database = {
         }
         Update: {
           anchor_day?: number
+          canceled_at?: string | null
           class_id?: string | null
           created_at?: string
+          deferred_addition_cents?: number
+          enrollment_id?: string | null
+          failure_count?: number
           family_id?: string | null
           id?: string
+          last_drawn_period?: string | null
+          last_failure_at?: string | null
+          last_failure_code?: string | null
           monthly_amount_cents?: number
+          next_draw_at?: string | null
           source_ref?: string | null
           status?: string
           student_id?: string | null
@@ -9893,6 +10422,13 @@ export type Database = {
             columns: ["class_id"]
             isOneToOne: false
             referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tuition_schedule_intent_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "enrollments"
             referencedColumns: ["id"]
           },
           {
