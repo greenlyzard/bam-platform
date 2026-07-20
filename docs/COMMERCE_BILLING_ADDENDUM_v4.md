@@ -1,6 +1,13 @@
 # Commerce & Billing — Addendum v4
 
-**Status:** Addendum to `docs/COMMERCE_BILLING_ARCHITECTURE.md` (v3.1). Not yet merged.
+> ## ⛔ SUPERSEDED — 2026-07-20. DO NOT IMPLEMENT FROM THIS DOC.
+> This addendum extends the now-superseded `docs/COMMERCE_BILLING_ARCHITECTURE.md`. The canonical
+> specs are **`docs/COMMERCE_AND_BILLING.md`** and **`docs/BILLING_APPROVAL_AND_DRAW.md`**.
+> The Layer-3 canonical tables it describes as "in progress" (invoices / invoice_line_items /
+> payments / payment_allocations / refunds), created by `20260715140000_billing_canonical_tables.sql`,
+> were **dropped by migration `20260720100000_retire_legacy_billing_family.sql`**. Retained for history only.
+
+**Status:** ⛔ SUPERSEDED 2026-07-20 — was: Addendum to `docs/COMMERCE_BILLING_ARCHITECTURE.md` (v3.1). Not yet merged.
 **Purpose:** Captures decisions + new scope from the pricing/ops session. Extends or supersedes specific v3.1 sections as noted.
 
 > **MERGE INSTRUCTION (do this, don't let it drift):** This file is a staging document. The final step is to fold these sections into the canonical `COMMERCE_BILLING_ARCHITECTURE.md` (bumping it to v4) via Claude Code, then delete or mark this addendum "MERGED". Do not maintain two living docs — the doc-drift we already hit is exactly what this avoids. Until merged, the canonical doc + this addendum together are the spec, with this addendum winning on any conflict.

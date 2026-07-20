@@ -1,6 +1,14 @@
 # Commerce & Billing Architecture
 
-**Status:** Draft spec — not yet implemented
+> ## ⛔ SUPERSEDED — 2026-07-20. DO NOT IMPLEMENT FROM THIS DOC.
+> This draft's money model (the invoices / invoice_line_items / payments / payment_allocations /
+> refunds family) has been superseded. The canonical specs are **`docs/COMMERCE_AND_BILLING.md`**
+> (ledger_entries spine) and **`docs/BILLING_APPROVAL_AND_DRAW.md`** (charges-based money record +
+> refunds). Neither uses the payments/invoices table family described here.
+> Its Layer-3 tables (§4.1–4.5), created by `20260715140000_billing_canonical_tables.sql`, were
+> **dropped by migration `20260720100000_retire_legacy_billing_family.sql`**. Retained for history only.
+
+**Status:** ⛔ SUPERSEDED 2026-07-20 — was: Draft spec — not yet implemented
 **Owner:** Derek Shaw (Green Lyzard)
 **Version:** v3.1 — adds standard ACH Direct Debit as the preferred tuition rail (async settlement + return handling) and generalizes fee recovery to per-tender dual pricing. (v3: recurring monthly tuition, commitment terms, awards/scholarship engine, points, per-item costumes, tax, CA-compliant fee recovery.)
 
