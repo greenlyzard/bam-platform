@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useCart } from "@/lib/cart-context";
 import { formatCurrency } from "@/lib/utils";
+import { splitCheckoutLines, immediateTotalCents } from "@/lib/billing/checkout-lines";
 import Link from "next/link";
 
 const DAYS = [
@@ -29,7 +30,7 @@ export function EnrollmentCartView({
   /** Studio-level one-time registration fee in cents, resolved server-side (cart/page.tsx). */
   registrationFeeCents: number;
 }) {
-  const { items, removeItem, totalCents, itemCount } = useCart();
+  const { items, removeItem, itemCount } = useCart();
   const [checkingOut, setCheckingOut] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
   // Open-authorization consent (card-on-file + ACH mandate) — AUTHORIZATION_CHECKOUT.md §6.
@@ -114,7 +115,23 @@ export function EnrollmentCartView({
     );
   }
 
-  const grandTotal = totalCents + registrationFeeCents;
+  // Mirror the checkout route's immediate-vs-scheduled split (lib/billing/checkout-lines.ts) so the
+  // cart states honestly what is charged NOW vs drawn later. The admin `charge_timing` flip lives on
+  // enrollment_cart_items (server-side, synced only at checkout) and is not available to this client
+  // cart, so every line is treated as 'scheduled' — the route's own default. Net effect: only the
+  // one-time registration fee is "due today"; all monthly tuition is scheduled for the 15th draw.
+  const { immediate, scheduled } = splitCheckoutLines({
+    items: items.map((item) => ({
+      classId: item.classInfo.id,
+      studentId: item.studentId ?? null,
+      studentName: item.childName ?? null,
+      priceCents: item.classInfo.monthlyTuitionCents ?? 0,
+      chargeTiming: "scheduled" as const,
+    })),
+    registrationFeeCents,
+  });
+  const dueTodayCents = immediateTotalCents(immediate);
+  const scheduledMonthlyCents = scheduled.reduce((s, l) => s + l.monthlyAmountCents, 0);
 
   return (
     <div className="space-y-6">
@@ -186,14 +203,6 @@ export function EnrollmentCartView({
 
       {/* Summary */}
       <div className="rounded-xl border border-silver bg-white p-5 space-y-3">
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-slate">
-            Monthly tuition ({itemCount} class{itemCount !== 1 ? "es" : ""})
-          </span>
-          <span className="font-medium text-charcoal">
-            {formatCurrency(totalCents)}
-          </span>
-        </div>
         {registrationFeeCents > 0 && (
           <div className="flex items-center justify-between text-sm">
             <span className="text-slate">Registration fee (one-time)</span>
@@ -202,19 +211,30 @@ export function EnrollmentCartView({
             </span>
           </div>
         )}
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-slate">
+            Monthly tuition ({itemCount} class{itemCount !== 1 ? "es" : ""}) &middot; from the 15th
+          </span>
+          <span className="font-medium text-charcoal">
+            {formatCurrency(scheduledMonthlyCents)}/mo
+          </span>
+        </div>
         <hr className="border-silver" />
         <div className="flex items-center justify-between">
           <span className="text-sm font-semibold text-charcoal">
             Due today
           </span>
           <span className="text-lg font-semibold text-charcoal">
-            {formatCurrency(grandTotal)}
+            {dueTodayCents > 0 ? formatCurrency(dueTodayCents) : "Nothing due today"}
           </span>
         </div>
         <p className="text-xs text-mist">
-          First month&apos;s tuition + registration. Your first class is always
-          a free trial — if it&apos;s not the right fit, we&apos;ll refund in
-          full.
+          {dueTodayCents > 0
+            ? "Due today is your one-time registration fee. "
+            : "Nothing is charged today. "}
+          Monthly tuition begins on the 15th and is drawn automatically each month. Your
+          first class is always a free trial — if it&apos;s not the right fit, we&apos;ll
+          refund in full.
         </p>
       </div>
 
