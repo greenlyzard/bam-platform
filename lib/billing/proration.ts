@@ -28,6 +28,8 @@ export interface ProrationBlob {
   deliverable_meetings_in_window: number;
   start_date: string; // 'YYYY-MM-DD'
   next_anchor_date: string; // 'YYYY-MM-DD'
+  /** Set only when the meeting counters could not be resolved and a fallback amount was used. */
+  note?: string;
 }
 
 export interface ProrationResult {

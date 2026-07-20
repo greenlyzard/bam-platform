@@ -39,6 +39,31 @@ export function selectUnprocessedItems<T extends CheckoutItem>(
   );
 }
 
+/**
+ * Idempotency key for an enrollment_charge_item — one per (enrollment, item_type, class).
+ * Registration items carry a null class_id (studio-level), so their key is unique per enrollment.
+ */
+export function chargeItemDedupeKey(
+  enrollmentId: string,
+  itemType: string,
+  classId: string | null
+): string {
+  return `${enrollmentId}|${itemType}|${classId ?? "null"}`;
+}
+
+/**
+ * Given planned charge-item rows and the keys that ALREADY exist, return only the rows still
+ * needing insertion. A webhook retry re-derives the same planned rows; a full existing-set → [] →
+ * no double-insert. Mirrors selectUnprocessedItems for the charge-item layer.
+ */
+export function selectMissingChargeItems<
+  T extends { enrollment_id: string; item_type: string; class_id: string | null }
+>(rows: T[], existingKeys: ReadonlySet<string>): T[] {
+  return rows.filter(
+    (r) => !existingKeys.has(chargeItemDedupeKey(r.enrollment_id, r.item_type, r.class_id))
+  );
+}
+
 /** Accounting period 'YYYY-MM' (UTC) for the ledger `period` dimension. */
 export function currentPeriod(now: Date): string {
   const y = now.getUTCFullYear();
