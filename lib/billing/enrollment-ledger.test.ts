@@ -5,9 +5,41 @@ import {
   selectUnprocessedItems,
   chargeItemDedupeKey,
   selectMissingChargeItems,
+  shouldAttachRegistration,
+  FAMILY_REG_KEY,
   currentPeriod,
   type CheckoutItem,
+  type RegistrationFeeMode,
 } from "./enrollment-ledger.ts";
+
+/**
+ * Walk a session's enrollments (stable order) through shouldAttachRegistration exactly as the
+ * webhook does — seeding + growing the registeredKeys set — and return the enrollmentIds that get a
+ * registration item. Mirrors the webhook's incremental attach loop so the modes are testable.
+ */
+function attachTargets(args: {
+  mode: RegistrationFeeMode;
+  registrationFeeCents: number;
+  enrollments: { enrollmentId: string; studentKey: string }[];
+  seed?: Set<string>;
+}): string[] {
+  const registered = new Set(args.seed ?? []);
+  const targets: string[] = [];
+  for (const e of args.enrollments) {
+    if (
+      shouldAttachRegistration({
+        mode: args.mode,
+        registrationFeeCents: args.registrationFeeCents,
+        studentKey: e.studentKey,
+        registeredKeys: registered,
+      })
+    ) {
+      targets.push(e.enrollmentId);
+      registered.add(args.mode === "per_family" ? FAMILY_REG_KEY : e.studentKey);
+    }
+  }
+  return targets;
+}
 
 // Canonical vault-only anchor is the Stripe Checkout Session id (§1.2, decision 1) — setup mode has
 // no PaymentIntent.
@@ -108,6 +140,65 @@ test("idempotent re-run: same checkout_session_id yields no new enrollments or c
     plannedChargeRows.map((r) => chargeItemDedupeKey(r.enrollment_id, r.item_type, r.class_id))
   );
   assert.deepEqual(selectMissingChargeItems(plannedChargeRows, existingChargeKeys), []);
+});
+
+// ── registration cardinality (§2; per_student vs per_family) ─────────────────────────
+
+test("registration per_student: two students → two registrations (first enrollment of each)", () => {
+  // Student A in cls-a (enr-1) + cls-b (enr-2); Student B in cls-c (enr-3).
+  const targets = attachTargets({
+    mode: "per_student",
+    registrationFeeCents: 5000,
+    enrollments: [
+      { enrollmentId: "enr-1", studentKey: "A" },
+      { enrollmentId: "enr-2", studentKey: "A" },
+      { enrollmentId: "enr-3", studentKey: "B" },
+    ],
+  });
+  assert.deepEqual(targets, ["enr-1", "enr-3"]); // A's first + B's first; NOT enr-2
+});
+
+test("registration per_family: many enrollments → exactly one registration (the first)", () => {
+  const targets = attachTargets({
+    mode: "per_family",
+    registrationFeeCents: 5000,
+    enrollments: [
+      { enrollmentId: "enr-1", studentKey: "A" },
+      { enrollmentId: "enr-2", studentKey: "A" },
+      { enrollmentId: "enr-3", studentKey: "B" },
+    ],
+  });
+  assert.deepEqual(targets, ["enr-1"]);
+});
+
+test("registration: zero fee → no registration in either mode", () => {
+  const base = [{ enrollmentId: "enr-1", studentKey: "A" }];
+  assert.deepEqual(attachTargets({ mode: "per_student", registrationFeeCents: 0, enrollments: base }), []);
+  assert.deepEqual(attachTargets({ mode: "per_family", registrationFeeCents: 0, enrollments: base }), []);
+});
+
+test("registration partial-retry: per_student, student A already registered → only B gets one", () => {
+  // Retry: A's registration exists (seed {A}); the run must not re-attach it to A.
+  const targets = attachTargets({
+    mode: "per_student",
+    registrationFeeCents: 5000,
+    enrollments: [
+      { enrollmentId: "enr-1", studentKey: "A" },
+      { enrollmentId: "enr-3", studentKey: "B" },
+    ],
+    seed: new Set(["A"]),
+  });
+  assert.deepEqual(targets, ["enr-3"]);
+});
+
+test("registration partial-retry: per_family, one already exists → none added", () => {
+  const targets = attachTargets({
+    mode: "per_family",
+    registrationFeeCents: 5000,
+    enrollments: [{ enrollmentId: "enr-1", studentKey: "A" }],
+    seed: new Set([FAMILY_REG_KEY]),
+  });
+  assert.deepEqual(targets, []);
 });
 
 test("currentPeriod: YYYY-MM in UTC", () => {

@@ -89,9 +89,9 @@ test("session params: SETUP mode — vaults the card, charges nothing (no line_i
 
 // ── buildPendingChargeItems (§2 approval-queue manifest) ─────────────────────────────
 
-test("charge items: registration (one_time) + first_tuition (recurring, with proration)", () => {
+test("charge items: registration (one_time, attributed to student) + first_tuition (recurring)", () => {
   const items = buildPendingChargeItems({
-    registrationFeeCents: 5000,
+    registration: { amountCents: 5000, studentId: "stu-1" },
     firstTuition: [
       { classId: "cls-a", studentId: "stu-1", recommendedCents: 7500, proration: BLOB },
     ],
@@ -104,6 +104,7 @@ test("charge items: registration (one_time) + first_tuition (recurring, with pro
   assert.equal(reg.recommended_amount_cents, 5000);
   assert.equal(reg.charge_timing, "charge_now");
   assert.equal(reg.class_id, null);
+  assert.equal(reg.student_id, "stu-1"); // attributed to the student (per_student mode)
   assert.equal(reg.proration, null);
 
   const tui = items.find((i) => i.item_type === "first_tuition")!;
@@ -115,20 +116,34 @@ test("charge items: registration (one_time) + first_tuition (recurring, with pro
   assert.equal(tui.proration, BLOB); // the recommendation's provenance rides on the item
 });
 
-test("charge items: zero registration fee → no registration line, only first_tuition", () => {
+test("charge items: per_family registration carries a null student_id", () => {
   const items = buildPendingChargeItems({
-    registrationFeeCents: 0,
-    firstTuition: [
-      { classId: "cls-a", studentId: "stu-1", recommendedCents: 7500, proration: BLOB },
-    ],
+    registration: { amountCents: 5000, studentId: null },
+    firstTuition: [{ classId: "cls-a", studentId: "stu-1", recommendedCents: 7500, proration: BLOB }],
   });
-  assert.equal(items.length, 1);
-  assert.equal(items[0].item_type, "first_tuition");
+  const reg = items.find((i) => i.item_type === "registration")!;
+  assert.equal(reg.student_id, null);
+});
+
+test("charge items: no registration (null or zero) → only first_tuition", () => {
+  const none = buildPendingChargeItems({
+    registration: null,
+    firstTuition: [{ classId: "cls-a", studentId: "stu-1", recommendedCents: 7500, proration: BLOB }],
+  });
+  assert.equal(none.length, 1);
+  assert.equal(none[0].item_type, "first_tuition");
+
+  const zero = buildPendingChargeItems({
+    registration: { amountCents: 0, studentId: "stu-1" },
+    firstTuition: [{ classId: "cls-a", studentId: "stu-1", recommendedCents: 7500, proration: BLOB }],
+  });
+  assert.equal(zero.length, 1);
+  assert.equal(zero[0].item_type, "first_tuition");
 });
 
 test("charge items: one first_tuition line per class", () => {
   const items = buildPendingChargeItems({
-    registrationFeeCents: 5000,
+    registration: { amountCents: 5000, studentId: "stu-1" },
     firstTuition: [
       { classId: "cls-a", studentId: "stu-1", recommendedCents: 7500, proration: BLOB },
       { classId: "cls-b", studentId: "stu-1", recommendedCents: 6000, proration: BLOB },

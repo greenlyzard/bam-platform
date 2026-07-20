@@ -129,13 +129,16 @@ export interface PendingChargeItemInput {
 }
 
 /**
- * Build the pending charge items an admin will approve (§2). Registration is a one-time charge-now
- * line (only when the studio fee > 0); each class's first tuition is a recurring charge-now line
- * carrying its proration blob (the recommendation the admin sees). Pure — the webhook does the DB
- * insert and computes each first-tuition recommendation via lib/billing/proration.ts.
+ * Build the pending charge items an admin will approve (§2). Registration, when present, is a
+ * one-time charge-now line — its `studentId` attributes it to a student in `per_student` mode
+ * (null in `per_family` mode). Each class's first tuition is a recurring charge-now line carrying
+ * its proration blob (the recommendation the admin sees). The CALLER (webhook) decides whether/how
+ * to attach registration per the tenant's registration_fee_mode; this function just shapes rows.
+ * Pure — the webhook does the DB insert and computes each first-tuition recommendation via
+ * lib/billing/proration.ts.
  */
 export function buildPendingChargeItems(args: {
-  registrationFeeCents: number;
+  registration?: { amountCents: number; studentId: string | null } | null;
   firstTuition: {
     classId: string;
     studentId: string | null;
@@ -145,14 +148,14 @@ export function buildPendingChargeItems(args: {
 }): PendingChargeItemInput[] {
   const items: PendingChargeItemInput[] = [];
 
-  if (args.registrationFeeCents > 0) {
+  if (args.registration && args.registration.amountCents > 0) {
     items.push({
       item_type: "registration",
       recurrence_type: "one_time",
-      recommended_amount_cents: args.registrationFeeCents,
+      recommended_amount_cents: args.registration.amountCents,
       charge_timing: "charge_now",
       class_id: null,
-      student_id: null,
+      student_id: args.registration.studentId,
       proration: null,
     });
   }

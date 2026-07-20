@@ -64,6 +64,36 @@ export function selectMissingChargeItems<
   );
 }
 
+/** Registration fee cardinality (studio_settings.registration_fee_mode; §2). */
+export type RegistrationFeeMode = "per_student" | "per_family";
+
+/** Sentinel studentKey for `per_family` mode — one registration per family/checkout. */
+export const FAMILY_REG_KEY = "__family__";
+
+/**
+ * Decide whether the CURRENT enrollment should carry a registration charge item (§2).
+ *
+ * `registeredKeys` is the running set of keys already covered by a registration item —
+ * per_student: studentKeys (student_id, or a name-derived key for an unsaved new dancer);
+ * per_family: contains FAMILY_REG_KEY once any registration exists. The webhook seeds it from the
+ * pre-loaded existing charge items and adds to it as it inserts, so this is idempotent under a
+ * partial retry: a student/family already covered is never charged registration twice.
+ *
+ * Per-student dedupe is per-checkout-session only. Cross-checkout, season-aware dedupe (a returning
+ * family that already paid registration this season) is a Phase-2 approval-time concern; every
+ * registration recommendation is admin-reviewed before any charge.
+ */
+export function shouldAttachRegistration(args: {
+  mode: RegistrationFeeMode;
+  registrationFeeCents: number;
+  studentKey: string;
+  registeredKeys: ReadonlySet<string>;
+}): boolean {
+  if (args.registrationFeeCents <= 0) return false;
+  const key = args.mode === "per_family" ? FAMILY_REG_KEY : args.studentKey;
+  return !args.registeredKeys.has(key);
+}
+
 /** Accounting period 'YYYY-MM' (UTC) for the ledger `period` dimension. */
 export function currentPeriod(now: Date): string {
   const y = now.getUTCFullYear();

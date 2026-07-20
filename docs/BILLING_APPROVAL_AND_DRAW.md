@@ -121,6 +121,17 @@ carry no proration blob. The **recurring** monthly tuition itself is *not* a cha
 `tuition_schedule_intent` (§5), armed only after approval of the `first_tuition` (recurring) item.
 Promo codes are a **future** layer that will ride the same adjustments rails (§3.2); out of scope here.
 
+**Registration cardinality is tenant-configurable** — `studio_settings.registration_fee_mode`
+(migration `20260720130000`): **`per_student`** (BAM default — Amanda's rule: each dancer owes a
+registration fee, with admin-discretionary discounts at approval) vs **`per_family`** (once per
+family per checkout). In `per_student` the webhook attaches one `registration` item to **each
+student's first enrollment** in the session (the item's `student_id` attributes it); in `per_family`,
+one item on the first enrollment (`student_id` null). **Per-student dedupe is per-checkout-session
+only** — a returning family that already paid registration this season is *not* auto-detected here;
+**cross-checkout, season-aware dedupe is a Phase-2 approval-time concern**. Every registration
+recommendation is **admin-reviewed before any charge** (waivable per §3.2), so a season-duplicate or a
+rare partial-retry duplicate for an unsaved new dancer is caught at approval.
+
 ---
 
 ## 3. Admin approval queue

@@ -5,6 +5,9 @@ import {
   enrollmentDedupeKey,
   chargeItemDedupeKey,
   selectMissingChargeItems,
+  shouldAttachRegistration,
+  FAMILY_REG_KEY,
+  type RegistrationFeeMode,
 } from "@/lib/billing/enrollment-ledger";
 import { buildPendingChargeItems } from "@/lib/billing/checkout-lines";
 import {
@@ -198,13 +201,17 @@ export async function POST(req: Request) {
       // Tenant billing config (never hardcoded): hold window + registration fee + proration inputs.
       const { data: settings } = await supabase
         .from("studio_settings")
-        .select("registration_fee_cents, hold_expiry_days, tuition_anchor_day, proration_method")
+        .select(
+          "registration_fee_cents, hold_expiry_days, tuition_anchor_day, proration_method, registration_fee_mode"
+        )
         .limit(1)
         .maybeSingle();
       const registrationFeeCents = (settings?.registration_fee_cents as number | null) ?? 0;
       const holdDays = (settings?.hold_expiry_days as number | null) ?? 5; // default only if null
       const anchorDay = (settings?.tuition_anchor_day as number | null) ?? 15;
       const method = ((settings?.proration_method as string | null) ?? "meeting") as ProrationMethod;
+      const registrationMode = ((settings?.registration_fee_mode as string | null) ??
+        "per_student") as RegistrationFeeMode;
       const holdExpiresAt = new Date(Date.now() + holdDays * 86_400_000).toISOString();
       const todayYmd = new Date().toISOString().slice(0, 10);
 
@@ -219,18 +226,29 @@ export async function POST(req: Request) {
       }
 
       const existingChargeKeys = new Set<string>();
-      let registrationExists = false;
+      // Keys already covered by a registration item (§2): studentKeys (per_student) or the
+      // FAMILY_REG_KEY sentinel (per_family). Seeds the idempotent attach guard so a partial retry
+      // never charges a student/family registration twice.
+      const registeredKeys = new Set<string>();
       const existingEnrIds = [...existingByKey.values()];
       if (existingEnrIds.length > 0) {
         const { data: existingItems } = await supabase
           .from("enrollment_charge_items")
-          .select("enrollment_id, item_type, class_id")
+          .select("enrollment_id, item_type, class_id, student_id")
           .in("enrollment_id", existingEnrIds);
         for (const it of existingItems ?? []) {
           existingChargeKeys.add(
             chargeItemDedupeKey(it.enrollment_id as string, it.item_type as string, it.class_id as string | null)
           );
-          if (it.item_type === "registration") registrationExists = true;
+          if (it.item_type === "registration") {
+            if (registrationMode === "per_family") {
+              registeredKeys.add(FAMILY_REG_KEY);
+            } else if (it.student_id) {
+              registeredKeys.add(it.student_id as string);
+            }
+            // per_student new-dancer (null student_id): the name-key can't be reconstructed here;
+            // the per-enrollment existingChargeKeys guard + admin review cover that rare retry edge.
+          }
         }
       }
 
@@ -328,12 +346,24 @@ export async function POST(req: Request) {
           ];
         }
 
-        // Registration is one-time per SESSION: attach it here only if none exists yet anywhere in
-        // this checkout (guards against re-attaching to a different enrollment on a partial retry).
-        const attachRegistration = !registrationExists && registrationFeeCents > 0;
+        // Registration (§2): per_student attaches to each student's first enrollment; per_family
+        // once per checkout. Idempotent under partial retry via registeredKeys (seeded above, grown
+        // as we insert). studentKey falls back to a name-key for an unsaved new dancer.
+        const studentKey = item.student_id ?? `name:${item.student_name ?? ""}`;
+        const attachRegistration = shouldAttachRegistration({
+          mode: registrationMode,
+          registrationFeeCents,
+          studentKey,
+          registeredKeys,
+        });
 
         const plannedRows = buildPendingChargeItems({
-          registrationFeeCents: attachRegistration ? registrationFeeCents : 0,
+          registration: attachRegistration
+            ? {
+                amountCents: registrationFeeCents,
+                studentId: registrationMode === "per_family" ? null : item.student_id,
+              }
+            : null,
           firstTuition,
         }).map((ci) => ({ ...ci, enrollment_id: enrollmentId as string }));
 
@@ -357,7 +387,9 @@ export async function POST(req: Request) {
             continue;
           }
           existingChargeKeys.add(chargeItemDedupeKey(m.enrollment_id, m.item_type, m.class_id));
-          if (m.item_type === "registration") registrationExists = true;
+          if (m.item_type === "registration") {
+            registeredKeys.add(registrationMode === "per_family" ? FAMILY_REG_KEY : studentKey);
+          }
         }
 
         // tuition_schedule_intent → pending_setup (armed → active only at approval, §3.2.4).
