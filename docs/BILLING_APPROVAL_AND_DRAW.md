@@ -213,8 +213,20 @@ recommended_first_draw_cents =
 - `next_anchor_date` — the next occurrence of the tenant's `anchor_day` (default 15) on/after
   `start_date`.
 
-**Future-start classes are the same rule — no special case** (§10 decision 7): a class starting next
-month simply has its window run from that start date to the following anchor.
+**Start-on-anchor is INCLUSIVE (implemented resolution, `lib/billing/proration.ts` `nextAnchorDate`).**
+"On/after" includes the start date: when `start_date` falls exactly on the (clamped) `anchor_day`,
+`next_anchor_date = start_date`, so the window `[start, next_anchor)` is **empty** and the first-draw
+recommendation is **$0**. This is correct only if the recurring cycle then begins on that same start
+date — otherwise the family gets a free month. The strictly-after alternative was rejected because it
+would prorate a full extra month *and* draw again a month later (a double charge).
+
+> **⚠️ Phase 2 requirement (arming logic, §3.2.4 / §5):** for a start-on-anchor enrollment, arming the
+> `tuition_schedule_intent` **MUST** set `next_draw_at` to the anchor **on the start date itself** (the
+> cycle beginning that day), **not** the following month's anchor. If arming skips the start-date
+> anchor, the $0 first draw + a next-month first real draw = **one free month**. The draw engine's
+> "not already drawn this period" guard (§5.3) keys on `billing_period`, so drawing on the start-date
+> anchor is safe. Cover this with a Phase 2 test: start_date == anchor ⇒ first real draw occurs in the
+> start-date billing period.
 
 ### 4.2 Dependency — deliverable meeting dates (P0 task 19)
 
