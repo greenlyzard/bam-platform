@@ -8657,6 +8657,7 @@ export type Database = {
           refund_policy_enabled: boolean
           refund_window_days: number | null
           registration_fee_cents: number
+          registration_fee_mode: string
           registration_stated_refundable: boolean
           student_term_plural: string | null
           student_term_singular: string | null
@@ -8683,6 +8684,7 @@ export type Database = {
           refund_policy_enabled?: boolean
           refund_window_days?: number | null
           registration_fee_cents?: number
+          registration_fee_mode?: string
           registration_stated_refundable?: boolean
           student_term_plural?: string | null
           student_term_singular?: string | null
@@ -8709,6 +8711,7 @@ export type Database = {
           refund_policy_enabled?: boolean
           refund_window_days?: number | null
           registration_fee_cents?: number
+          registration_fee_mode?: string
           registration_stated_refundable?: boolean
           student_term_plural?: string | null
           student_term_singular?: string | null
