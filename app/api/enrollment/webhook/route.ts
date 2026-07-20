@@ -59,11 +59,16 @@ function firstOrSelf<T>(v: T | T[] | null): T | null {
   return Array.isArray(v) ? (v[0] ?? null) : v;
 }
 
-/** Run a side-effect (email / notification) without letting its failure fail the webhook. */
-function fireAndForget(p: Promise<unknown>, label: string): void {
-  void p.catch((e) =>
-    console.error(`[enrollment:webhook] ${label} failed (non-fatal)`, e)
-  );
+/**
+ * Await a side-effect (email / notification) but never let its failure fail the webhook. Awaited
+ * (not detached) so it actually completes in the serverless request before the response returns.
+ */
+async function safeSideEffect(p: Promise<unknown>, label: string): Promise<void> {
+  try {
+    await p;
+  } catch (e) {
+    console.error(`[enrollment:webhook] ${label} failed (non-fatal)`, e);
+  }
 }
 
 /** The student's start date: the class start date if it is still in the future, else today (UTC). */
@@ -446,11 +451,11 @@ export async function POST(req: Request) {
       if (newEnrollments.length > 0) {
         const customerEmail = session.customer_details?.email ?? session.customer_email ?? null;
         const parentName = session.customer_details?.name ?? null;
-        fireAndForget(
+        await safeSideEffect(
           sendEnrollmentReceived({ to: customerEmail, parentName, classes: newEnrollments }),
           "received email"
         );
-        fireAndForget(
+        await safeSideEffect(
           notifyAdminsNewPendingEnrollment({ tenantId, familyId, classes: newEnrollments }),
           "admin notify"
         );

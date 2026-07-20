@@ -59,9 +59,7 @@ export function SuccessView() {
     return (
       <div className="text-center py-16">
         <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-lavender border-t-transparent" />
-        <p className="mt-4 text-sm text-slate">
-          Confirming your enrollment...
-        </p>
+        <p className="mt-4 text-sm text-slate">Loading your enrollment...</p>
       </div>
     );
   }
@@ -86,14 +84,15 @@ export function SuccessView() {
       </div>
 
       <h2 className="font-heading text-2xl font-semibold text-charcoal">
-        You&apos;re enrolled!
+        Enrollment received
       </h2>
 
       <p className="text-sm text-slate max-w-md mx-auto">
-        Your enrollment is confirmed and payment has been processed.
+        We&apos;ve received your enrollment and the studio will review it shortly. Your card was
+        securely saved — <span className="font-medium text-charcoal">nothing has been charged yet</span>.
       </p>
 
-      {/* Enrolled classes */}
+      {/* Requested classes */}
       {classes.length > 0 && (
         <div className="text-left max-w-md mx-auto space-y-2">
           {classes.map((cls, i) => (
@@ -123,16 +122,16 @@ export function SuccessView() {
         <ul className="space-y-2 text-sm text-slate">
           <li className="flex gap-2">
             <span className="text-lavender shrink-0">&#10003;</span>
-            You&apos;ll receive a confirmation email shortly
+            You&apos;ll get an email confirming we received your enrollment
           </li>
           <li className="flex gap-2">
             <span className="text-lavender shrink-0">&#10003;</span>
-            Class details and schedule are in your parent portal
+            Once the studio approves, we charge your registration fee and prorated first month
           </li>
           <li className="flex gap-2">
             <span className="text-lavender shrink-0">&#10003;</span>
-            Your first class is a free trial &mdash; full refund if it&apos;s
-            not the right fit
+            Monthly tuition then draws on the 15th; your first class is a free trial &mdash; full
+            refund if it&apos;s not the right fit
           </li>
         </ul>
       </div>

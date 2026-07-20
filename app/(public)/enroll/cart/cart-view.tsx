@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useCart } from "@/lib/cart-context";
 import { formatCurrency } from "@/lib/utils";
-import { splitCheckoutLines, immediateTotalCents } from "@/lib/billing/checkout-lines";
 import Link from "next/link";
 
 const DAYS = [
@@ -115,23 +114,14 @@ export function EnrollmentCartView({
     );
   }
 
-  // Mirror the checkout route's immediate-vs-scheduled split (lib/billing/checkout-lines.ts) so the
-  // cart states honestly what is charged NOW vs drawn later. The admin `charge_timing` flip lives on
-  // enrollment_cart_items (server-side, synced only at checkout) and is not available to this client
-  // cart, so every line is treated as 'scheduled' — the route's own default. Net effect: only the
-  // one-time registration fee is "due today"; all monthly tuition is scheduled for the 15th draw.
-  const { immediate, scheduled } = splitCheckoutLines({
-    items: items.map((item) => ({
-      classId: item.classInfo.id,
-      studentId: item.studentId ?? null,
-      studentName: item.childName ?? null,
-      priceCents: item.classInfo.monthlyTuitionCents ?? 0,
-      chargeTiming: "scheduled" as const,
-    })),
-    registrationFeeCents,
-  });
-  const dueTodayCents = immediateTotalCents(immediate);
-  const scheduledMonthlyCents = scheduled.reduce((s, l) => s + l.monthlyAmountCents, 0);
+  // Vault-only checkout (BILLING_APPROVAL_AND_DRAW.md §1.2): the card is SAVED, and NOTHING is
+  // charged at checkout — not even registration. The registration fee and the prorated first month
+  // are charged only after the studio approves; ongoing tuition draws on the 15th. So "due today" is
+  // always nothing; the amounts below are what will be charged after review.
+  const monthlyTuitionCents = items.reduce(
+    (sum, item) => sum + (item.classInfo.monthlyTuitionCents ?? 0),
+    0
+  );
 
   return (
     <div className="space-y-6">
@@ -201,7 +191,7 @@ export function EnrollmentCartView({
         ))}
       </div>
 
-      {/* Summary */}
+      {/* Summary — vault-only: nothing is charged today; these are charged after studio review. */}
       <div className="rounded-xl border border-silver bg-white p-5 space-y-3">
         {registrationFeeCents > 0 && (
           <div className="flex items-center justify-between text-sm">
@@ -216,25 +206,19 @@ export function EnrollmentCartView({
             Monthly tuition ({itemCount} class{itemCount !== 1 ? "es" : ""}) &middot; from the 15th
           </span>
           <span className="font-medium text-charcoal">
-            {formatCurrency(scheduledMonthlyCents)}/mo
+            {formatCurrency(monthlyTuitionCents)}/mo
           </span>
         </div>
         <hr className="border-silver" />
         <div className="flex items-center justify-between">
-          <span className="text-sm font-semibold text-charcoal">
-            Due today
-          </span>
-          <span className="text-lg font-semibold text-charcoal">
-            {dueTodayCents > 0 ? formatCurrency(dueTodayCents) : "Nothing due today"}
-          </span>
+          <span className="text-sm font-semibold text-charcoal">Due today</span>
+          <span className="text-lg font-semibold text-charcoal">Nothing</span>
         </div>
         <p className="text-xs text-mist">
-          {dueTodayCents > 0
-            ? "Due today is your one-time registration fee. "
-            : "Nothing is charged today. "}
-          Monthly tuition begins on the 15th and is drawn automatically each month. Your
-          first class is always a free trial — if it&apos;s not the right fit, we&apos;ll
-          refund in full.
+          Your card is securely saved &mdash; nothing is charged today. After the studio reviews your
+          enrollment, we charge the registration fee and your prorated first month; monthly tuition
+          then draws on the 15th. Your first class is always a free trial &mdash; if it&apos;s not the
+          right fit, we&apos;ll refund in full.
         </p>
       </div>
 
