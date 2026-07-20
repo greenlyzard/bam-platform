@@ -7,22 +7,23 @@ export interface CheckoutItem {
 }
 
 /**
- * Idempotency key — one enrollment per (payment intent, student, class).
- * Keyed on the Stripe payment intent so a webhook retry maps to the same rows.
- * Includes studentId so two children enrolled in the SAME class in one checkout
- * remain distinct entries.
+ * Idempotency key — one enrollment per (checkout session, student, class).
+ * Keyed on the Stripe Checkout Session id — the canonical vault-only anchor (§1.2, decision 1):
+ * setup mode has NO PaymentIntent, so the session id (not a payment intent) is what a webhook retry
+ * maps back to. Includes studentId so two children enrolled in the SAME class in one checkout remain
+ * distinct entries.
  */
 export function enrollmentDedupeKey(
-  paymentIntentId: string,
+  checkoutSessionId: string,
   studentId: string | null,
   classId: string
 ): string {
-  return `${paymentIntentId}|${studentId ?? "null"}|${classId}`;
+  return `${checkoutSessionId}|${studentId ?? "null"}|${classId}`;
 }
 
 /**
  * Given the checkout's items and the set of enrollment keys that ALREADY exist
- * for this payment intent, return only the items still needing finalization.
+ * for this checkout session, return only the items still needing finalization.
  * A webhook retry after full success passes a complete existing-set → returns []
  * → no double-create. A retry after partial/total failure returns just the
  * remainder.
@@ -30,11 +31,11 @@ export function enrollmentDedupeKey(
 export function selectUnprocessedItems<T extends CheckoutItem>(
   items: T[],
   existingKeys: ReadonlySet<string>,
-  paymentIntentId: string
+  checkoutSessionId: string
 ): T[] {
   return items.filter(
     (it) =>
-      !existingKeys.has(enrollmentDedupeKey(paymentIntentId, it.studentId, it.classId))
+      !existingKeys.has(enrollmentDedupeKey(checkoutSessionId, it.studentId, it.classId))
   );
 }
 
