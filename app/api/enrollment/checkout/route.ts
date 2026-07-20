@@ -3,12 +3,7 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/stripe";
-import {
-  splitCheckoutLines,
-  immediateTotalCents,
-  buildAuthorizationSessionParams,
-  type CartLineInput,
-} from "@/lib/billing/checkout-lines";
+import { buildAuthorizationSessionParams } from "@/lib/billing/checkout-lines";
 import { resolveClassPriceCents } from "@/lib/billing/resolve-price";
 
 const CART_COOKIE = "bam_cart_token";
@@ -98,16 +93,9 @@ export async function POST(req: Request) {
       await admin.from("families").update({ stripe_customer_id: customerId }).eq("id", family.id);
     }
 
-    // Registration fee (studio-wide config; spec §1).
-    const { data: settings } = await admin
-      .from("studio_settings")
-      .select("registration_fee_cents")
-      .limit(1)
-      .maybeSingle();
-    const registrationFeeCents = (settings?.registration_fee_cents as number | undefined) ?? 0;
-
-    // Re-resolve tuition per class at checkout time (do NOT trust the stored cart price_cents).
-    // Registration stays a separate, server-derived studio-level input (above).
+    // Re-resolve tuition per class at checkout time (do NOT trust the stored cart price_cents) so an
+    // unpriced class can't be vaulted against. Charge items + proration are derived later by the
+    // webhook / at approval — the checkout route only validates prices and vaults the card.
     const resolved = await Promise.all(
       (itemRows as Array<Record<string, unknown>>).map(async (r) => ({
         row: r,
@@ -126,38 +114,21 @@ export async function POST(req: Request) {
       );
     }
 
-    // Split immediate (charge now) vs scheduled (record intent, drawn on the 15th later).
-    const lineInputs: CartLineInput[] = resolved.map(({ row: r, priceCents }) => ({
-      classId: r.class_id as string,
-      studentId: (r.student_id as string | null) ?? null,
-      studentName: (r.student_name as string | null) ?? null,
-      priceCents: priceCents as number,
-      chargeTiming: (r.charge_timing as "immediate" | "scheduled") ?? "scheduled",
-    }));
-    const { immediate, scheduled } = splitCheckoutLines({ items: lineInputs, registrationFeeCents });
-
-    if (immediateTotalCents(immediate) <= 0) {
-      return NextResponse.json(
-        { error: "Nothing to charge now (no registration fee or immediate lines configured)." },
-        { status: 400 }
-      );
-    }
-
     const appUrl =
       process.env.NEXT_PUBLIC_APP_URL ?? "https://portal.balletacademyandmovement.com";
 
-    // Card-only this slice; VAULTS the card (setup_future_usage='off_session'); charges only the
-    // immediate lines; metadata carries the scheduled tuition intents for provenance.
+    // Vault-only (setup mode): capture/save the card, charge NOTHING now (§1.2). Metadata carries
+    // only the anchors the webhook needs — it reloads cart items (incl. charge_timing) and computes
+    // charge items + proration itself. session.id (the Checkout Session id) is the canonical dedupe
+    // anchor persisted below.
     const checkoutSession = await stripe.checkout.sessions.create(
       buildAuthorizationSessionParams({
-        immediate,
         customerId,
         appUrl,
         metadata: {
           cart_id: cart.id,
           tenant_id: cart.tenant_id,
           family_id: cart.family_id,
-          scheduled_intents: JSON.stringify(scheduled),
         },
       })
     );

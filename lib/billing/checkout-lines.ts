@@ -99,16 +99,11 @@ export function immediateTotalCents(lines: ImmediateLine[]): number {
  * mode='setup' — capture/vault the card and charge NOTHING now (no line_items). The saved card is
  * used for off-session draws later; the registration fee + prorated first tuition become
  * enrollment_charge_items (§2), charged at admin approval (§3.2), never at checkout.
- *
- * `immediate` is no longer used here (setup mode has no line items) — it is retained on the arg type
- * as optional only so the existing route call still compiles during the migration; it is removed
- * when the checkout route is updated (Phase 1 step 4).
  */
 export function buildAuthorizationSessionParams(args: {
   customerId: string;
   appUrl: string;
   metadata: Record<string, string>;
-  immediate?: ImmediateLine[]; // deprecated / unused in setup mode; removed with the route update
 }): Stripe.Checkout.SessionCreateParams {
   return {
     mode: "setup",
