@@ -6,6 +6,7 @@ import {
   chargeItemDedupeKey,
   selectMissingChargeItems,
   shouldAttachRegistration,
+  enrollmentStatusForCapacity,
   FAMILY_REG_KEY,
   currentPeriod,
   type CheckoutItem,
@@ -199,6 +200,23 @@ test("registration partial-retry: per_family, one already exists → none added"
     seed: new Set([FAMILY_REG_KEY]),
   });
   assert.deepEqual(targets, []);
+});
+
+// ── capacity gate (§3.3; pending+active → waitlist) ──────────────────────────────────
+
+test("enrollmentStatusForCapacity: below cap → pending; at/over cap → waitlist", () => {
+  assert.equal(enrollmentStatusForCapacity({ pendingActiveCount: 8, maxStudents: 10 }), "pending");
+  assert.equal(enrollmentStatusForCapacity({ pendingActiveCount: 9, maxStudents: 10 }), "pending");
+  assert.equal(enrollmentStatusForCapacity({ pendingActiveCount: 10, maxStudents: 10 }), "waitlist");
+  assert.equal(enrollmentStatusForCapacity({ pendingActiveCount: 11, maxStudents: 10 }), "waitlist");
+});
+
+test("enrollmentStatusForCapacity: null max (no cap) → always pending", () => {
+  assert.equal(enrollmentStatusForCapacity({ pendingActiveCount: 999, maxStudents: null }), "pending");
+});
+
+test("enrollmentStatusForCapacity: zero-capacity class → waitlist even at count 0", () => {
+  assert.equal(enrollmentStatusForCapacity({ pendingActiveCount: 0, maxStudents: 0 }), "waitlist");
 });
 
 test("currentPeriod: YYYY-MM in UTC", () => {

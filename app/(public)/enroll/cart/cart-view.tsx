@@ -34,8 +34,11 @@ export function EnrollmentCartView({
   const [checkoutError, setCheckoutError] = useState("");
   // Open-authorization consent (card-on-file + ACH mandate) — AUTHORIZATION_CHECKOUT.md §6.
   const [agreed, setAgreed] = useState(false);
+  // Classes the studio reports as full (§3.3): completing checkout waitlists them. The parent must
+  // knowingly proceed (a `confirm` follow-up) before we create the session.
+  const [fullClasses, setFullClasses] = useState<{ class_id: string; name: string }[]>([]);
 
-  async function handleCheckout() {
+  async function handleCheckout(confirm = false) {
     setCheckingOut(true);
     setCheckoutError("");
 
@@ -56,17 +59,24 @@ export function EnrollmentCartView({
         });
       }
 
-      // Create Stripe Checkout Session
+      // Create Stripe Checkout Session (confirm=true acknowledges any waitlisted classes).
       const res = await fetch("/api/enrollment/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ confirm }),
       });
 
       const data = await res.json();
 
       if (data.error) {
         setCheckoutError(data.error);
+        setCheckingOut(false);
+        return;
+      }
+
+      // Some classes are full — show the waitlist notice and let the parent proceed knowingly.
+      if (data.requiresConfirm) {
+        setFullClasses(data.fullClasses ?? []);
         setCheckingOut(false);
         return;
       }
@@ -229,6 +239,22 @@ export function EnrollmentCartView({
         </div>
       )}
 
+      {/* Waitlist notice (§3.3) — one or more classes are full. */}
+      {fullClasses.length > 0 && (
+        <div className="rounded-lg bg-warning/10 border border-warning/30 px-4 py-3 text-sm text-charcoal">
+          <p className="font-semibold">
+            {fullClasses.map((c) => c.name).join(", ")}{" "}
+            {fullClasses.length === 1 ? "is" : "are"} currently full.
+          </p>
+          <p className="mt-1 text-xs text-slate">
+            Completing checkout adds you to the waitlist for{" "}
+            {fullClasses.length === 1 ? "that class" : "those classes"} — we&apos;ll notify you if a
+            spot opens. <span className="font-medium">Nothing is charged for waitlisted classes.</span>{" "}
+            Your other classes proceed to studio review as usual.
+          </p>
+        </div>
+      )}
+
       {/* Open-authorization consent (card-on-file + ACH mandate) — spec §6. Wording TBD by counsel. */}
       <label className="flex items-start gap-2 rounded-lg border border-silver/60 bg-white/60 px-4 py-3 text-xs text-slate">
         <input
@@ -250,11 +276,15 @@ export function EnrollmentCartView({
       <div className="space-y-3">
         <button
           type="button"
-          onClick={handleCheckout}
+          onClick={() => handleCheckout(fullClasses.length > 0)}
           disabled={checkingOut || !agreed}
           className="flex h-12 items-center justify-center rounded-lg bg-lavender hover:bg-lavender-dark text-white font-semibold text-sm transition-colors w-full disabled:opacity-40"
         >
-          {checkingOut ? "Redirecting to payment..." : "Proceed to Checkout"}
+          {checkingOut
+            ? "Redirecting to payment..."
+            : fullClasses.length > 0
+              ? "Add to waitlist & continue"
+              : "Proceed to Checkout"}
         </button>
         <Link
           href="/enroll"

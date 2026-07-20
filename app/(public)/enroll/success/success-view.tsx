@@ -29,6 +29,7 @@ interface EnrolledClass {
   start_time: string;
   end_time: string;
   teacher_name: string | null;
+  waitlisted?: boolean;
 }
 
 export function SuccessView() {
@@ -100,15 +101,28 @@ export function SuccessView() {
               key={i}
               className="rounded-xl border border-silver bg-white p-4"
             >
-              <p className="text-sm font-semibold text-charcoal">
-                {cls.class_name}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold text-charcoal">
+                  {cls.class_name}
+                </p>
+                {cls.waitlisted && (
+                  <span className="text-xs bg-warning/10 text-warning px-2 py-0.5 rounded-full font-medium shrink-0">
+                    Waitlist
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-slate mt-1">
                 {DAYS[cls.day_of_week]}s &middot;{" "}
                 {formatTime(cls.start_time)}&ndash;
                 {formatTime(cls.end_time)}
                 {cls.teacher_name && ` · ${cls.teacher_name}`}
               </p>
+              {cls.waitlisted && (
+                <p className="text-xs text-mist mt-1">
+                  This class is full — you&apos;re on the waitlist. Nothing is charged unless a spot
+                  opens and you&apos;re enrolled.
+                </p>
+              )}
             </div>
           ))}
         </div>

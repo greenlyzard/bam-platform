@@ -64,6 +64,20 @@ export function selectMissingChargeItems<
   );
 }
 
+/**
+ * Capacity gate (§3.3): a new enrollment WAITLISTS when pending+active already fills the class.
+ * Capacity counts `pending + active` (a pending hold occupies a spot); `enrolled_count` is not used
+ * here. A null `maxStudents` means no cap → always `pending`. Waitlisted enrollments owe nothing and
+ * hold no spot until an admin promotes them (Phase 2).
+ */
+export function enrollmentStatusForCapacity(args: {
+  pendingActiveCount: number;
+  maxStudents: number | null;
+}): "pending" | "waitlist" {
+  if (args.maxStudents != null && args.pendingActiveCount >= args.maxStudents) return "waitlist";
+  return "pending";
+}
+
 /** Registration fee cardinality (studio_settings.registration_fee_mode; §2). */
 export type RegistrationFeeMode = "per_student" | "per_family";
 

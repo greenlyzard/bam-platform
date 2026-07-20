@@ -6,6 +6,7 @@ import {
   chargeItemDedupeKey,
   selectMissingChargeItems,
   shouldAttachRegistration,
+  enrollmentStatusForCapacity,
   FAMILY_REG_KEY,
   type RegistrationFeeMode,
 } from "@/lib/billing/enrollment-ledger";
@@ -35,6 +36,7 @@ interface JoinedClass {
   id: string;
   name: string | null;
   start_date: string | null;
+  max_students: number | null;
   day_of_week: number | null;
   start_time: string | null;
   end_time: string | null;
@@ -177,7 +179,7 @@ export async function POST(req: Request) {
           `
           id, class_id, student_id, student_name, price_cents, charge_timing,
           class:classes(
-            id, name, start_date, day_of_week, start_time, end_time, room,
+            id, name, start_date, max_students, day_of_week, start_time, end_time, room,
             teacher:profiles!teacher_id(first_name, last_name)
           )
         `
@@ -223,11 +225,14 @@ export async function POST(req: Request) {
       // ── Pre-load existing state for idempotency (all keyed on this session) ──
       const { data: existingEnr } = await supabase
         .from("enrollments")
-        .select("id, student_id, class_id")
+        .select("id, student_id, class_id, status")
         .eq("checkout_session_id", sessionId);
-      const existingByKey = new Map<string, string>();
+      const existingByKey = new Map<string, { id: string; status: string }>();
       for (const e of existingEnr ?? []) {
-        existingByKey.set(enrollmentDedupeKey(sessionId, e.student_id, e.class_id), e.id as string);
+        existingByKey.set(enrollmentDedupeKey(sessionId, e.student_id, e.class_id), {
+          id: e.id as string,
+          status: e.status as string,
+        });
       }
 
       const existingChargeKeys = new Set<string>();
@@ -235,7 +240,7 @@ export async function POST(req: Request) {
       // FAMILY_REG_KEY sentinel (per_family). Seeds the idempotent attach guard so a partial retry
       // never charges a student/family registration twice.
       const registeredKeys = new Set<string>();
-      const existingEnrIds = [...existingByKey.values()];
+      const existingEnrIds = [...existingByKey.values()].map((v) => v.id);
       if (existingEnrIds.length > 0) {
         const { data: existingItems } = await supabase
           .from("enrollment_charge_items")
@@ -280,6 +285,7 @@ export async function POST(req: Request) {
         endTime: string;
         room: string | null;
         teacherName: string | null;
+        waitlisted: boolean;
       }[] = [];
       const errors: string[] = [];
 
@@ -287,9 +293,26 @@ export async function POST(req: Request) {
       for (const item of sorted) {
         const cls = firstOrSelf(item.class);
         const ekey = enrollmentDedupeKey(sessionId, item.student_id, item.class_id);
-        let enrollmentId = existingByKey.get(ekey);
+        const existing = existingByKey.get(ekey);
+        let enrollmentId: string;
+        let enrollmentStatus: string;
 
-        if (!enrollmentId) {
+        if (existing) {
+          enrollmentId = existing.id;
+          enrollmentStatus = existing.status;
+        } else {
+          // Capacity gate (§3.3): a pending hold occupies a spot, so count pending+active. Full →
+          // waitlist (no hold, no charge items, no intent; card stays vaulted, promoted in Phase 2).
+          const { count: pendingActiveCount } = await supabase
+            .from("enrollments")
+            .select("id", { count: "exact", head: true })
+            .eq("class_id", item.class_id)
+            .in("status", ["pending", "active"]);
+          enrollmentStatus = enrollmentStatusForCapacity({
+            pendingActiveCount: pendingActiveCount ?? 0,
+            maxStudents: (cls?.max_students as number | null) ?? null,
+          });
+
           const { data: enr, error: enrollErr } = await supabase
             .from("enrollments")
             .insert({
@@ -297,11 +320,12 @@ export async function POST(req: Request) {
               family_id: familyId,
               student_id: item.student_id,
               class_id: item.class_id,
-              status: "pending", // vault-only: awaits admin approval (§8.1)
+              status: enrollmentStatus, // 'pending' (awaits approval, §8.1) or 'waitlist' if full
               enrollment_type: "paid",
               checkout_session_id: sessionId,
               stripe_setup_intent_id: setupIntentId,
-              hold_expires_at: holdExpiresAt, // capacity hold (§3.3), from studio_settings
+              // Only pending holds a spot; waitlist has no hold (§3.3).
+              hold_expires_at: enrollmentStatus === "waitlist" ? null : holdExpiresAt,
               amount_paid_cents: 0, // nothing charged at checkout
             })
             .select("id")
@@ -312,7 +336,7 @@ export async function POST(req: Request) {
             continue; // do NOT bump enrolled_count — capacity is pending+active at read time (§3.3)
           }
           enrollmentId = enr.id as string;
-          existingByKey.set(ekey, enrollmentId);
+          existingByKey.set(ekey, { id: enrollmentId, status: enrollmentStatus });
 
           const teacher = firstOrSelf(cls?.teacher ?? null);
           newEnrollments.push({
@@ -322,8 +346,13 @@ export async function POST(req: Request) {
             endTime: cls?.end_time ?? "",
             room: cls?.room ?? null,
             teacherName: teacher ? `${teacher.first_name} ${teacher.last_name}` : null,
+            waitlisted: enrollmentStatus === "waitlist",
           });
         }
+
+        // Waitlisted enrollments owe nothing and hold no spot: no charge items, no intent (§3.3).
+        // Charges are generated when an admin promotes waitlist → pending (Phase 2 requirement).
+        if (enrollmentStatus === "waitlist") continue;
 
         // Charge items for this enrollment (§2): a first_tuition per class, plus the one-time
         // registration attached to the first enrollment of the session. Only compute proration when
@@ -452,7 +481,11 @@ export async function POST(req: Request) {
         const customerEmail = session.customer_details?.email ?? session.customer_email ?? null;
         const parentName = session.customer_details?.name ?? null;
         await safeSideEffect(
-          sendEnrollmentReceived({ to: customerEmail, parentName, classes: newEnrollments }),
+          sendEnrollmentReceived({
+            to: customerEmail,
+            parentName,
+            classes: newEnrollments.map((c) => ({ name: c.name, waitlisted: c.waitlisted })),
+          }),
           "received email"
         );
         await safeSideEffect(

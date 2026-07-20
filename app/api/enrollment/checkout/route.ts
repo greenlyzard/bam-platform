@@ -114,6 +114,33 @@ export async function POST(req: Request) {
       );
     }
 
+    // Advisory capacity check (§3.3): which cart classes are already full (pending+active >= max)?
+    // Full classes still check out — the webhook waitlists them — but the parent must knowingly
+    // proceed (a `confirm: true` follow-up), so the UI can say what's full and that it's charge-free.
+    const classIds = [
+      ...new Set((itemRows as Array<Record<string, unknown>>).map((r) => r.class_id as string)),
+    ];
+    const { data: classRows } = await admin
+      .from("classes")
+      .select("id, name, max_students")
+      .in("id", classIds);
+    const fullClasses: { class_id: string; name: string }[] = [];
+    for (const c of classRows ?? []) {
+      const max = c.max_students as number | null;
+      if (max == null) continue;
+      const { count } = await admin
+        .from("enrollments")
+        .select("id", { count: "exact", head: true })
+        .eq("class_id", c.id as string)
+        .in("status", ["pending", "active"]);
+      if ((count ?? 0) >= max) {
+        fullClasses.push({ class_id: c.id as string, name: (c.name as string) ?? "This class" });
+      }
+    }
+    if (fullClasses.length > 0 && !body.confirm) {
+      return NextResponse.json({ requiresConfirm: true, fullClasses });
+    }
+
     const appUrl =
       process.env.NEXT_PUBLIC_APP_URL ?? "https://portal.balletacademyandmovement.com";
 

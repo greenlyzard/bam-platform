@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
- * GET — fetch enrolled class details after successful checkout
+ * GET — post-checkout class details for the success page, with per-class pending-vs-waitlist status.
+ * The session_id is the unguessable Stripe Checkout Session id (= enrollments.checkout_session_id),
+ * so we read enrollments directly (service role) to surface the true status (§3.3).
  */
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -12,32 +14,23 @@ export async function GET(req: Request) {
     return NextResponse.json({ classes: [] });
   }
 
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
-  // Find cart by Stripe session ID
-  const { data: cart } = await supabase
-    .from("enrollment_carts")
-    .select("id")
-    .eq("stripe_session_id", sessionId)
-    .single();
-
-  if (!cart) {
-    return NextResponse.json({ classes: [] });
-  }
-
-  // Get items with class details
-  const { data: items } = await supabase
-    .from("enrollment_cart_items")
-    .select(`
+  const { data: enrollments } = await supabase
+    .from("enrollments")
+    .select(
+      `
+      status,
       class:classes(
         name, day_of_week, start_time, end_time,
         teacher:profiles!teacher_id(first_name, last_name)
       )
-    `)
-    .eq("cart_id", cart.id);
+    `
+    )
+    .eq("checkout_session_id", sessionId);
 
-  const classes = (items ?? []).map((item) => {
-    const cls = item.class as unknown as Record<string, unknown> | null;
+  const classes = (enrollments ?? []).map((e) => {
+    const cls = e.class as unknown as Record<string, unknown> | null;
     const teacherRaw = cls?.teacher as unknown;
     const teacher = (Array.isArray(teacherRaw) ? teacherRaw[0] : teacherRaw) as {
       first_name: string;
@@ -50,6 +43,7 @@ export async function GET(req: Request) {
       start_time: (cls?.start_time as string) ?? "",
       end_time: (cls?.end_time as string) ?? "",
       teacher_name: teacher ? `${teacher.first_name} ${teacher.last_name}` : null,
+      waitlisted: e.status === "waitlist",
     };
   });
 

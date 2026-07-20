@@ -199,6 +199,22 @@ and approval, which would force declines the studio can't honor).
 - If a class is **full of pending holds**, new enrollees go to **waitlist** (existing `waitlist`
   status), not a second pending hold.
 
+**Waitlist mechanics (implemented — webhook `checkout.session.completed`).** The capacity gate runs
+at enrollment creation: `count(enrollments WHERE class_id AND status IN ('pending','active')) >=
+classes.max_students` → the enrollment is inserted as **`status = 'waitlist'`** with **no
+`hold_expires_at`, no `enrollment_charge_items`, and no `tuition_schedule_intent`** — a waitlisted
+student owes nothing and holds no spot. The card is still vaulted (family-level SetupIntent). The
+checkout route also runs an **advisory** version of the same count and returns the full classes so
+the cart can require the parent to knowingly proceed ("added to the waitlist; nothing charged"). The
+success page and the "received" email render waitlisted classes distinctly and promise no charge.
+
+> **⚠️ Phase 2 requirement (promotion):** because waitlisted enrollments have **no charge items or
+> intent**, the admin **waitlist → pending** promotion flow **MUST generate** the pending charge
+> items (registration per `registration_fee_mode` + prorated first tuition, §2/§4) and the
+> `pending_setup` intent at promotion time — the webhook does not. Until that flow exists, a promoted
+> waitlist enrollment would have nothing to approve/charge. Cover with a test: promote a waitlisted
+> enrollment ⇒ charge items + intent are created exactly as a fresh pending enrollment would have.
+
 ---
 
 ## 4. Proration (prorated first draw: start date → next anchor)
