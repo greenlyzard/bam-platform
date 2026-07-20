@@ -4,6 +4,7 @@
 // No DB, no Stripe calls — the route/webhook consume these shapes.
 
 import type Stripe from "stripe";
+import type { ProrationBlob } from "./proration.ts";
 
 export type ChargeTiming = "immediate" | "scheduled";
 
@@ -94,32 +95,84 @@ export function immediateTotalCents(lines: ImmediateLine[]): number {
 }
 
 /**
- * Build the Stripe Checkout Session params for the authorization checkout:
- * mode=payment, card-only (this slice), VAULT the card (setup_future_usage='off_session'),
- * customer attached, line items = the immediate lines, metadata carries family/tenant/cart +
- * the scheduled intents (for provenance).
+ * Build the Stripe Checkout Session params for the VAULT-ONLY authorization checkout (§1.2):
+ * mode='setup' — capture/vault the card and charge NOTHING now (no line_items). The saved card is
+ * used for off-session draws later; the registration fee + prorated first tuition become
+ * enrollment_charge_items (§2), charged at admin approval (§3.2), never at checkout.
+ *
+ * `immediate` is no longer used here (setup mode has no line items) — it is retained on the arg type
+ * as optional only so the existing route call still compiles during the migration; it is removed
+ * when the checkout route is updated (Phase 1 step 4).
  */
 export function buildAuthorizationSessionParams(args: {
-  immediate: ImmediateLine[];
   customerId: string;
   appUrl: string;
   metadata: Record<string, string>;
+  immediate?: ImmediateLine[]; // deprecated / unused in setup mode; removed with the route update
 }): Stripe.Checkout.SessionCreateParams {
   return {
-    mode: "payment",
-    payment_method_types: ["card"], // card-only this slice; ACH authorization is a later slice
+    mode: "setup",
+    payment_method_types: ["card"], // card-only this slice; ACH mandate is a later slice
     customer: args.customerId,
-    payment_intent_data: { setup_future_usage: "off_session" }, // vault the card for reuse
-    line_items: args.immediate.map((l) => ({
-      quantity: 1,
-      price_data: {
-        currency: "usd",
-        unit_amount: l.amountCents,
-        product_data: { name: l.label },
-      },
-    })),
+    // Vault the card; carry cart/tenant/family provenance on the SetupIntent itself.
+    setup_intent_data: { metadata: args.metadata },
     success_url: `${args.appUrl}/enroll/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${args.appUrl}/enroll/cart`,
     metadata: args.metadata,
   };
+}
+
+/** A pending enrollment_charge_item to insert at webhook time (§2, §9.1). Pure shape — no DB. */
+export interface PendingChargeItemInput {
+  item_type: "registration" | "first_tuition" | "one_time_fee" | "private_pack";
+  recurrence_type: "recurring" | "one_time";
+  recommended_amount_cents: number;
+  charge_timing: "charge_now" | "deferred";
+  class_id: string | null;
+  student_id: string | null;
+  proration: ProrationBlob | null;
+}
+
+/**
+ * Build the pending charge items an admin will approve (§2). Registration is a one-time charge-now
+ * line (only when the studio fee > 0); each class's first tuition is a recurring charge-now line
+ * carrying its proration blob (the recommendation the admin sees). Pure — the webhook does the DB
+ * insert and computes each first-tuition recommendation via lib/billing/proration.ts.
+ */
+export function buildPendingChargeItems(args: {
+  registrationFeeCents: number;
+  firstTuition: {
+    classId: string;
+    studentId: string | null;
+    recommendedCents: number;
+    proration: ProrationBlob;
+  }[];
+}): PendingChargeItemInput[] {
+  const items: PendingChargeItemInput[] = [];
+
+  if (args.registrationFeeCents > 0) {
+    items.push({
+      item_type: "registration",
+      recurrence_type: "one_time",
+      recommended_amount_cents: args.registrationFeeCents,
+      charge_timing: "charge_now",
+      class_id: null,
+      student_id: null,
+      proration: null,
+    });
+  }
+
+  for (const t of args.firstTuition) {
+    items.push({
+      item_type: "first_tuition",
+      recurrence_type: "recurring",
+      recommended_amount_cents: t.recommendedCents,
+      charge_timing: "charge_now", // default recommendation; admin may DEFER at approval (§3.2)
+      class_id: t.classId,
+      student_id: t.studentId,
+      proration: t.proration,
+    });
+  }
+
+  return items;
 }

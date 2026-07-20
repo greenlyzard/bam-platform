@@ -4,8 +4,10 @@ import {
   splitCheckoutLines,
   immediateTotalCents,
   buildAuthorizationSessionParams,
+  buildPendingChargeItems,
   type CartLineInput,
 } from "./checkout-lines.ts";
+import type { ProrationBlob } from "./proration.ts";
 
 const TUITION_ITEM: CartLineInput = {
   classId: "cls-a",
@@ -13,6 +15,16 @@ const TUITION_ITEM: CartLineInput = {
   studentName: "Ada",
   priceCents: 15000,
   chargeTiming: "scheduled",
+};
+
+const BLOB: ProrationBlob = {
+  method: "meeting",
+  source: "schedule_instances",
+  full_month_cents: 15000,
+  meetings_in_cycle: 4,
+  deliverable_meetings_in_window: 2,
+  start_date: "2026-09-01",
+  next_anchor_date: "2026-09-15",
 };
 
 test("split: registration → immediate; class tuition → scheduled (the §7 shape)", () => {
@@ -55,22 +67,73 @@ test("split: zero registration fee → no registration immediate line", () => {
   assert.equal(immediate.length, 0);
 });
 
-test("session params: card-only + vaults the card + immediate line items + metadata + customer", () => {
-  const { immediate } = splitCheckoutLines({ items: [TUITION_ITEM], registrationFeeCents: 5000 });
+test("session params: SETUP mode — vaults the card, charges nothing (no line_items), carries metadata", () => {
   const params = buildAuthorizationSessionParams({
-    immediate,
     customerId: "cus_123",
     appUrl: "http://localhost:3000",
-    metadata: { cart_id: "cart-1", tenant_id: "ten-1", family_id: "fam-1", scheduled_intents: "[]" },
+    metadata: { cart_id: "cart-1", tenant_id: "ten-1", family_id: "fam-1" },
   });
 
-  assert.equal(params.mode, "payment");
-  assert.deepEqual(params.payment_method_types, ["card"]);
+  // Vault-only: setup mode is the load-bearing assertion — no money moves at checkout (§1.2).
+  assert.equal(params.mode, "setup");
+  assert.deepEqual(params.payment_method_types, ["card"]); // ACH mandate is a later slice
   assert.equal(params.customer, "cus_123");
-  // VAULTING flag is the load-bearing assertion for the authorization model.
-  assert.equal(params.payment_intent_data?.setup_future_usage, "off_session");
-  assert.equal(params.line_items?.length, 1); // only the immediate registration line
-  assert.equal(params.line_items?.[0].price_data?.unit_amount, 5000);
+  // Setup mode has NO line items and NO payment_intent_data — nothing is charged now.
+  assert.equal(params.line_items, undefined);
+  assert.equal(params.payment_intent_data, undefined);
+  // The SetupIntent carries provenance; top-level metadata mirrors it.
+  assert.equal(params.setup_intent_data?.metadata?.family_id, "fam-1");
   assert.equal(params.metadata?.family_id, "fam-1");
   assert.ok(params.success_url?.includes("/enroll/success"));
+});
+
+// ── buildPendingChargeItems (§2 approval-queue manifest) ─────────────────────────────
+
+test("charge items: registration (one_time) + first_tuition (recurring, with proration)", () => {
+  const items = buildPendingChargeItems({
+    registrationFeeCents: 5000,
+    firstTuition: [
+      { classId: "cls-a", studentId: "stu-1", recommendedCents: 7500, proration: BLOB },
+    ],
+  });
+
+  assert.equal(items.length, 2);
+
+  const reg = items.find((i) => i.item_type === "registration")!;
+  assert.equal(reg.recurrence_type, "one_time");
+  assert.equal(reg.recommended_amount_cents, 5000);
+  assert.equal(reg.charge_timing, "charge_now");
+  assert.equal(reg.class_id, null);
+  assert.equal(reg.proration, null);
+
+  const tui = items.find((i) => i.item_type === "first_tuition")!;
+  assert.equal(tui.recurrence_type, "recurring");
+  assert.equal(tui.recommended_amount_cents, 7500);
+  assert.equal(tui.charge_timing, "charge_now"); // default recommendation; admin may DEFER (§3.2)
+  assert.equal(tui.class_id, "cls-a");
+  assert.equal(tui.student_id, "stu-1");
+  assert.equal(tui.proration, BLOB); // the recommendation's provenance rides on the item
+});
+
+test("charge items: zero registration fee → no registration line, only first_tuition", () => {
+  const items = buildPendingChargeItems({
+    registrationFeeCents: 0,
+    firstTuition: [
+      { classId: "cls-a", studentId: "stu-1", recommendedCents: 7500, proration: BLOB },
+    ],
+  });
+  assert.equal(items.length, 1);
+  assert.equal(items[0].item_type, "first_tuition");
+});
+
+test("charge items: one first_tuition line per class", () => {
+  const items = buildPendingChargeItems({
+    registrationFeeCents: 5000,
+    firstTuition: [
+      { classId: "cls-a", studentId: "stu-1", recommendedCents: 7500, proration: BLOB },
+      { classId: "cls-b", studentId: "stu-1", recommendedCents: 6000, proration: BLOB },
+    ],
+  });
+  assert.equal(items.filter((i) => i.item_type === "first_tuition").length, 2);
+  assert.equal(items.filter((i) => i.item_type === "registration").length, 1);
 });
