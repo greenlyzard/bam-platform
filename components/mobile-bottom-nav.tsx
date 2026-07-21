@@ -88,8 +88,8 @@ export function MobileBottomNav({ variant }: MobileBottomNavProps) {
       const { count: notifCount } = await supabase
         .from("notifications")
         .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .eq("read", false);
+        .eq("recipient_id", user.id)
+        .eq("is_read", false);
 
       setUnreadNotifications(notifCount ?? 0);
 
@@ -97,9 +97,9 @@ export function MobileBottomNav({ variant }: MobileBottomNavProps) {
       const { count: msgCount } = await supabase
         .from("notifications")
         .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .eq("read", false)
-        .in("type", ["channel_message", "direct_message"]);
+        .eq("recipient_id", user.id)
+        .eq("is_read", false)
+        .in("notification_type", ["channel_message", "direct_message"]);
 
       setUnreadMessages(msgCount ?? 0);
     }
