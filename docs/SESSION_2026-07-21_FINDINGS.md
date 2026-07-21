@@ -105,6 +105,9 @@ end_date / status filter so parents can't request enrollment into a finished cla
   Phase-2 approval-time concern).
 - **`charges.ledger_posting_key` backfill** — the approval engine posts the ledger group but leaves
   `charges.ledger_posting_key` null; populate the back-reference for reporting joins.
+- **Verify/author admin-read RLS policies for §9 billing tables** (`charges`, `enrollment_charge_items`,
+  `charge_item_adjustments`, `tuition_schedule_intent`, `billing_tasks`) — approvals page currently
+  reads via service role.
 
 ---
 
