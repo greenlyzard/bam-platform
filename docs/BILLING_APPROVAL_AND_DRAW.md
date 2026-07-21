@@ -345,6 +345,15 @@ Draw an intent when **all** hold:
   integration point for an admin **task center** (out of scope here). **The system never cancels the
   enrollment** (§10 decision 13).
 
+> **Second `billing_tasks` emitter (approval post-charge repair — implemented Phase 2 slice 2).**
+> `billing_tasks` is not only for dunning exhaustion. After an approval's off-session charge
+> **succeeds** (the point of no return, §3.2.4), each subsequent write (charges→succeeded, ledger
+> post, intent arming, charge-item backref, activation, count) is individually isolated; a failure
+> writes a `billing_tasks` row with **`type = 'approval_post_charge_repair'`**, `status = 'open'`,
+> `payload = { step, error, payment_intent_id, charge_ids }`, and the remaining steps still run. This
+> keeps money/state integrity recoverable without rolling back a captured charge. (Notification
+> failures are **not** repair tasks — they are logged only.)
+
 ### 5.6 Cancellation, withdrawals, and drop credits — all **manual**
 - **The system never auto-cancels.** A **manual** admin cancel/withdraw sets
   `enrollments.status → canceled`/`withdrawn`, which **must** set every linked
@@ -552,11 +561,22 @@ Also records **withdrawal/drop credits** (§5.6). Immutable.
 ('YYYY-MM'), anchor_date, status ('scheduled'|'held'|'executed'), executed_at, executed_by (admin |
 'system'), created_at }`. Admin actions: **run now**, **hold/delay**.
 
-**`billing_tasks`** — structured task records emitted on dunning exhaustion (§5.5, §10 decision 12).
-`{ id, tenant_id, type ('dunning_exhausted'|…), intent_id, enrollment_id, family_id, status
-('open'|'resolved'), payload jsonb, created_at, resolved_at, resolved_by }`. Future admin **task
-center** consumes these (out of scope here). Note: **resolving the task and releasing the spot are
-distinct operations** (§10 decision 13).
+**`billing_tasks`** — structured task records. Two emitters: (1) **dunning exhaustion** (§5.5, §10
+decision 12); (2) **approval post-charge repair** (§5.5 note, Phase 2 slice 2) —
+`type = 'approval_post_charge_repair'`.
+`{ id, tenant_id, type ('dunning_exhausted'|'approval_post_charge_repair'|…), intent_id,
+enrollment_id, family_id, status ('open'|'resolved'), payload jsonb, created_at, resolved_at,
+resolved_by }`. Future admin **task center** consumes these (out of scope here). Note: **resolving the
+task and releasing the spot are distinct operations** (§10 decision 13).
+
+> **Tracked open item (Phase 2.x — retry stuck approval).** The approval idempotency guard aborts
+> when a non-failed approval charge already exists (double-click safety, §3.2.4). An approval that
+> inserts `charges` rows as `'created'` and then dies **before** the Stripe call leaves those rows
+> `'created'` with a null `stripe_payment_intent_id` — the action returns
+> `{ status: 'already_processed', stuck: true }` so the queue UI can flag "needs manual retry." A
+> dedicated **retry-stuck-approval** action (re-attempting the PI under the same
+> `approval:{enrollmentId}` idempotency key, or voiding the orphaned `'created'` rows) is **not built
+> yet** — tracked here.
 
 ### 9.2 Column additions
 
