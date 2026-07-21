@@ -11,6 +11,7 @@ import {
   type RegistrationFeeMode,
 } from "@/lib/billing/enrollment-ledger";
 import { buildPendingChargeItems } from "@/lib/billing/checkout-lines";
+import { buildPendingIntent } from "@/lib/billing/charges";
 import {
   computeFirstDrawProrationFromDb,
   nextAnchorDate,
@@ -429,17 +430,18 @@ export async function POST(req: Request) {
         // tuition_schedule_intent → pending_setup (armed → active only at approval, §3.2.4).
         const ikey = `${item.class_id}|${item.student_id ?? "null"}`;
         if (!existingIntentKeys.has(ikey)) {
-          const { error: intentErr } = await supabase.from("tuition_schedule_intent").insert({
-            tenant_id: tenantId,
-            family_id: familyId,
-            student_id: item.student_id,
-            class_id: item.class_id,
-            monthly_amount_cents: item.price_cents,
-            anchor_day: anchorDay,
-            status: "pending_setup",
-            source_ref: sessionId,
-            enrollment_id: enrollmentId,
-          });
+          const { error: intentErr } = await supabase.from("tuition_schedule_intent").insert(
+            buildPendingIntent({
+              tenantId,
+              familyId,
+              studentId: item.student_id,
+              classId: item.class_id,
+              monthlyAmountCents: item.price_cents,
+              anchorDay,
+              sourceRef: sessionId,
+              enrollmentId,
+            })
+          );
           if (intentErr) {
             console.error("[enrollment:webhook] tuition intent insert failed", item.class_id, intentErr);
             errors.push(`intent:${item.class_id}`);

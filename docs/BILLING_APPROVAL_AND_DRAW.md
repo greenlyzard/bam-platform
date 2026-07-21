@@ -310,9 +310,18 @@ count.
 ### 5.3 Selection (per run, per tenant)
 Draw an intent when **all** hold:
 - `status = 'active'`
-- **anchor matches today:** `effective_anchor_day(anchor_day, today) = day_of_month(today)`, clamped
-  to month length (anchor 31 in Feb → 28/29; 15 always 15).
+- **due for draw (catch-up, not equality):** `next_draw_at <= now` — **never** an exact anchor-day
+  equality match. See the ⚠ requirement below.
 - **not already drawn this period:** no `charges` row for `(intent_id, billing_period = 'YYYY-MM')`.
+
+> **⚠ Phase 3 requirement (late-approval catch-up, arming edge from §4.1 / §3.2.4).** Arming sets
+> `next_draw_at` to the **start-date anchor** even when that anchor is already in the past (an admin
+> may approve an enrollment *after* its `next_anchor_date` has passed). The draw engine **MUST**
+> therefore select on `next_draw_at <= now` (catch-up semantics), **not** an anchor-day *equality*
+> test — otherwise a past-armed intent is skipped until the following month, leaving one month
+> uncharged. The `(intent_id, billing_period)` guard (above) keeps this idempotent: a catch-up draw
+> and the normal anchor draw for the same period can never double. Cover with a Phase 3 test: an
+> intent armed with a past `next_draw_at` draws on the **next run**, in the correct billing period.
 
 ### 5.4 Charge
 - Off-session `paymentIntents.create({ amount, currency, customer: family.stripe_customer_id,
