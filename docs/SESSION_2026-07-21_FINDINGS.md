@@ -135,6 +135,10 @@ Full teardown of today's E2E test data before/at go-live prep:
 
 **Do not run any teardown yet** — this is the checklist only.
 
+- **Ledger group `73d58c74…` (test $112.50 entry) intentionally retained** — ledger is append-only by
+  trigger; test-mode entries are identifiable by test-mode PI ids in posting keys. Before live launch,
+  decide whether to start the ledger clean via superuser migration.
+
 ---
 
 *Generated 2026-07-21. E2E harness: `scripts/e2e-approve.ts` (uncommitted, test-key guarded).*
