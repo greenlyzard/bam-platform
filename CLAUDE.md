@@ -366,6 +366,13 @@ Known column name traps from past bugs:
 
 ---
 
+## Pre-Session Verification (run before any session >4h after the last, or whenever unpushed work exists)
+1. Regular Terminal: `cd /Users/derekshaw/bam-platform && git status && git log --oneline origin/main..HEAD | head -15` — must match the pickup note's claimed state (clean tree, expected ahead-count, expected HEAD commit). Any mismatch → stop and investigate before doing anything else.
+2. Regular Terminal (migration days only): `npx supabase migration list` — confirm connection and that the last local migration matches remote.
+3. Claude Code: start fresh (`/clear` or relaunch) — never resume a stale session; stale context repeats outdated claims. Rebuild context from the pickup note + CLAUDE.md + skills.
+
+---
+
 ## 15. Workflow Rules
 
 - Do not enter plan mode for simple execution requests like commits, pushes, or running commands. Only plan for multi-step feature work.
