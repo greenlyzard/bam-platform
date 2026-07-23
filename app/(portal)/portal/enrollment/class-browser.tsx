@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { SimpleSelect } from "@/components/ui/select";
+import { usePortalCart } from "@/lib/portal-cart-context";
 import { requestEnrollment } from "./actions";
 
 interface ClassInfo {
@@ -88,6 +90,8 @@ export function ClassBrowser({
   initialStudentId?: string;
   initialType?: "trial";
 }) {
+  const router = useRouter();
+  const cart = usePortalCart();
   const cleanInitialId = initialStudentId?.trim();
   const [selectedStudent, setSelectedStudent] = useState<string>(
     (cleanInitialId && students.some((s) => s.id === cleanInitialId) ? cleanInitialId : students[0]?.id) ?? ""
@@ -133,6 +137,28 @@ export function ClassBrowser({
   // Get unique styles for filter
   const availableStyles = [...new Set(classes.map((c) => c.style))].sort();
 
+  // Add a class to the shared server cart (same spine the public /enroll flow checks out through).
+  // Student is carried from the "Enrolling for" picker so it isn't re-asked.
+  async function handleAddToCart(classId: string) {
+    if (!selectedStudent) {
+      setMessage({ type: "error", text: "Please select a student first." });
+      return;
+    }
+    setSubmitting(`add-${classId}`);
+    setMessage(null);
+    const result = await cart.addClass(classId, selectedStudent);
+    setSubmitting(null);
+    if (!result.ok) {
+      setMessage({ type: "error", text: result.error ?? "Could not add to cart." });
+    } else {
+      setMessage({
+        type: "success",
+        text: "Added to your cart. Review your classes and check out when you're ready.",
+      });
+    }
+  }
+
+  // Trial requests still go through the legacy request path (trial policy pending Amanda).
   async function handleRequest(
     classId: string,
     requestType: "enrollment_request" | "trial_request"
@@ -358,19 +384,26 @@ export function ClassBrowser({
 
               {students.length > 0 && (
                 <div className="flex gap-2 pt-1">
-                  <button
-                    onClick={() =>
-                      handleRequest(cls.id, "enrollment_request")
-                    }
-                    disabled={submitting !== null || (requiresAssessment(cls) && !isPlaced)}
-                    className="flex-1 h-9 rounded-lg bg-lavender hover:bg-lavender-dark text-white text-sm font-semibold transition-colors disabled:opacity-50"
-                  >
-                    {submitting === `${cls.id}-enrollment_request`
-                      ? "Submitting..."
-                      : cls.isFull
-                        ? "Join Waitlist"
-                        : "Request Enrollment"}
-                  </button>
+                  {cart.hasClass(cls.id) ? (
+                    <button
+                      onClick={() => router.push("/portal/enrollment/cart")}
+                      className="flex-1 h-9 rounded-lg border border-success bg-success/10 text-success text-sm font-semibold transition-colors"
+                    >
+                      In Cart ✓
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleAddToCart(cls.id)}
+                      disabled={submitting !== null || (requiresAssessment(cls) && !isPlaced)}
+                      className="flex-1 h-9 rounded-lg bg-lavender hover:bg-lavender-dark text-white text-sm font-semibold transition-colors disabled:opacity-50"
+                    >
+                      {submitting === `add-${cls.id}`
+                        ? "Adding..."
+                        : cls.isFull
+                          ? "Add to Waitlist"
+                          : "Add to Cart"}
+                    </button>
+                  )}
                   {cls.trialEligible && !student?.trial_used && !(requiresAssessment(cls) && !isPlaced) && (
                     <button
                       onClick={() =>

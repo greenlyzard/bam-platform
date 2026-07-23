@@ -14,6 +14,12 @@ const requestSchema = z.object({
 
 /**
  * Submit an enrollment or trial request that goes to the admin task queue.
+ *
+ * NOTE: the `enrollment_request` branch is deprecated — Browse Classes now adds classes to the
+ * vault-checkout cart (POST /api/enrollment/cart) instead of calling this, and the webhook notifies
+ * admins on the resulting pending enrollment. Only the Trial button still calls this
+ * (`trial_request`), pending Amanda's trial-policy decision. The admin_tasks insert below is a
+ * known dead path (table does not exist) carried over for trials; revisit with the trial slice.
  */
 export async function requestEnrollment(formData: FormData) {
   const supabase = await createClient();
@@ -71,13 +77,15 @@ export async function requestEnrollment(formData: FormData) {
 
   if (!cls) return { error: "Class not found." };
 
-  // Check if already enrolled or request pending
+  // Check if already enrolled or request pending. 'pending' is the vault-checkout hold awaiting
+  // approval (§3.3) — a parent with one in-flight shouldn't re-request/trial the same class.
+  // 'pending_payment' was never a real status; dropped.
   const { data: existing } = await supabaseAdmin
     .from("enrollments")
     .select("id, status")
     .eq("student_id", parsed.data.studentId)
     .eq("class_id", parsed.data.classId)
-    .in("status", ["active", "trial", "waitlist", "pending_payment"])
+    .in("status", ["active", "pending", "trial", "waitlist"])
     .single();
 
   if (existing) {

@@ -351,13 +351,15 @@ export async function adminEnrollStudent(formData: FormData) {
   const tenantId = await getTenantId();
   if (!tenantId) return { error: "Tenant not found" };
 
-  // Check for existing active enrollment
+  // Check for existing active/in-flight enrollment. 'pending' (vault hold awaiting approval, §3.3)
+  // counts as in-flight — don't let an admin double-enroll over it. 'pending_payment' was never a
+  // real status; dropped.
   const { data: existing } = await supabase
     .from("enrollments")
     .select("id, status")
     .eq("student_id", parsed.data.student_id)
     .eq("class_id", parsed.data.class_id)
-    .in("status", ["active", "trial", "waitlist", "pending_payment"])
+    .in("status", ["active", "pending", "trial", "waitlist"])
     .single();
 
   if (existing) {

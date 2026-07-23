@@ -4,6 +4,8 @@ import { PortalUserMenu } from "@/components/layouts/portal-user-menu";
 import { AngelinaChat } from "@/components/angelina/AngelinaChat";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import { RoleProvider } from "@/context/RoleContext";
+import { PortalCartProvider } from "@/lib/portal-cart-context";
+import { PortalCartIndicator } from "@/components/bam/portal-cart-indicator";
 import { requireRole } from "@/lib/auth/requireRole";
 import { getStudioSettings } from "@/lib/queries/studio-settings";
 import { createClient } from "@/lib/supabase/server";
@@ -46,6 +48,7 @@ export default async function PortalLayout({
 
   return (
     <RoleProvider role={role} fullName={full_name}>
+      <PortalCartProvider>
       <div className="min-h-screen bg-cream pb-16 sm:pb-0">
         {/* Top header */}
         <header className="sticky top-0 z-40 border-b border-silver bg-white/80 backdrop-blur-sm">
@@ -97,8 +100,10 @@ export default async function PortalLayout({
 
         {/* Bottom tab bar (mobile) */}
         <MobileBottomNav variant="portal" />
+        <PortalCartIndicator />
         <AngelinaChat role="parent" mode="floating" enabled={angelinaEnabled} />
       </div>
+      </PortalCartProvider>
     </RoleProvider>
   );
 }

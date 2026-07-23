@@ -474,7 +474,9 @@ export async function getClassEnrollments(classId: string) {
     `
     )
     .eq("class_id", classId)
-    .in("status", ["active", "trial", "waitlist", "pending_payment"])
+    // Admin class roster: include 'pending' vault holds — a pending enrollment occupies a capacity
+    // spot (§3.3), so the roster must show it. 'pending_payment' was never a real status; dropped.
+    .in("status", ["active", "pending", "trial", "waitlist"])
     .order("enrolled_at", { ascending: true });
 
   if (error) {

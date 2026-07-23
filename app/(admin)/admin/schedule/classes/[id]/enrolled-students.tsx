@@ -31,8 +31,8 @@ interface EnrolledStudentsProps {
 const STATUS_COLORS: Record<string, string> = {
   active: "bg-[#5A9E6F]/10 text-[#5A9E6F]",
   trial: "bg-lavender/10 text-lavender-dark",
-  waitlist: "bg-[#D4A843]/10 text-[#D4A843]",
-  pending_payment: "bg-[#D4A843]/10 text-[#D4A843]",
+  waitlist: "bg-[#6B8FB5]/10 text-[#6B8FB5]",
+  pending: "bg-[#D4A843]/10 text-[#D4A843]",
 };
 
 export function EnrolledStudents({

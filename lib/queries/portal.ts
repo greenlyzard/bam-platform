@@ -159,8 +159,14 @@ export async function getStudentDetail(studentId: string) {
     `
     )
     .eq("student_id", studentId)
-    .in("status", ["active", "trial", "waitlist", "pending_payment"])
-    .order("enrolled_at", { ascending: false });
+    // In-flight + active enrollments a parent should see on the profile card. 'pending' is the
+    // vault-checkout hold awaiting admin approval (§3.3); 'pending_payment' was never a real status
+    // (not in the CHECK constraint) and is dropped. Terminal statuses (declined/canceled/dropped/
+    // withdrawn/expired/completed) are intentionally hidden here.
+    .in("status", ["active", "pending", "trial", "waitlist"])
+    // pending holds have no enrolled_at yet — fall back to created_at so they sort sensibly.
+    .order("enrolled_at", { ascending: false })
+    .order("created_at", { ascending: false });
 
   return { ...student, enrollments: enrollments ?? [] };
 }

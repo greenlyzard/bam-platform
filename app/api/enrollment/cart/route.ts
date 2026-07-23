@@ -3,6 +3,8 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { getMyFamily } from "@/lib/queries/portal";
 import { resolveClassPriceCents } from "@/lib/billing/resolve-price";
+import { resolvePortalCart } from "@/lib/queries/enrollment-cart";
+import { isClassOpenForEnrollment } from "@/lib/classes/status";
 import { z } from "zod";
 
 const CART_COOKIE = "bam_cart_token";
@@ -34,7 +36,7 @@ async function getCartWithItems(supabase: Awaited<ReturnType<typeof createClient
     .select(`
       *,
       class:classes(
-        id, name, style, level, day_of_week, start_time, end_time, room, season,
+        id, name, style, levels, day_of_week, start_time, end_time, room, season,
         teacher:profiles!teacher_id(first_name, last_name)
       )
     `)
@@ -62,7 +64,7 @@ async function getCartWithItems(supabase: Awaited<ReturnType<typeof createClient
         price_cents: item.price_cents,
         class_name: cls?.name ?? "",
         class_style: cls?.style ?? "",
-        class_level: cls?.level ?? "",
+        class_level: Array.isArray(cls?.levels) ? (cls.levels[0] ?? "") : "",
         day_of_week: cls?.day_of_week ?? 0,
         start_time: cls?.start_time ?? "",
         end_time: cls?.end_time ?? "",
@@ -80,17 +82,28 @@ async function getCartWithItems(supabase: Awaited<ReturnType<typeof createClient
  */
 export async function GET() {
   const cookieStore = await cookies();
-  const sessionToken = cookieStore.get(CART_COOKIE)?.value;
-
-  if (!sessionToken) {
-    return NextResponse.json({ cart: null, items: [], total_cents: 0 });
-  }
+  const sessionToken = cookieStore.get(CART_COOKIE)?.value ?? null;
 
   const supabase = await createClient();
-  const cart = await getCartWithItems(supabase, sessionToken);
+  // Signed-in parent → resolve/adopt the family's active cart even without a cookie (cookie lost,
+  // or a future admin-curated cart created server-side for the family). Anonymous → cookie only.
+  const familyId = (await getMyFamily())?.id ?? null;
+
+  const { cart, viaFamily } = await resolvePortalCart(supabase, { sessionToken, familyId });
 
   if (!cart) {
     return NextResponse.json({ cart: null, items: [], total_cents: 0 });
+  }
+
+  // Adopt a family-resolved cart into this browser so cookie-based checkout can find it.
+  if (viaFamily && cart.session_token) {
+    cookieStore.set(CART_COOKIE, cart.session_token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: CART_TTL_MS / 1000,
+      path: "/",
+    });
   }
 
   return NextResponse.json(cart);
@@ -130,12 +143,21 @@ export async function POST(req: Request) {
     // Validate class exists and has capacity
     const { data: cls } = await supabase
       .from("classes")
-      .select("id, name, max_students, is_active")
+      .select("id, name, max_students, is_active, end_date")
       .eq("id", parsed.data.class_id)
       .single();
 
     if (!cls || !cls.is_active) {
       return NextResponse.json({ error: "Class not found or inactive" }, { status: 404 });
+    }
+
+    // Date-eligibility guard (parity with checkout/enroll actions): don't let an ended class be
+    // added to the cart in the first place.
+    if (!isClassOpenForEnrollment(cls)) {
+      return NextResponse.json(
+        { error: "This class has ended and is no longer open for enrollment." },
+        { status: 409 }
+      );
     }
 
     // Resolve tuition server-side (service role — pricing rules are authenticated-only under RLS).

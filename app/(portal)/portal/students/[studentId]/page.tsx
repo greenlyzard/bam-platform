@@ -31,9 +31,17 @@ function formatDate(d: string | null) {
 
 const STATUS_COLORS: Record<string, string> = {
   active: "bg-success/10 text-success",
+  pending: "bg-gold/10 text-gold-dark",
+  waitlist: "bg-[#6B8FB5]/10 text-[#6B8FB5]",
   trial: "bg-lavender/10 text-lavender-dark",
-  waitlist: "bg-gold/10 text-gold-dark",
-  pending_payment: "bg-gold/10 text-gold-dark",
+};
+
+// Parent-facing labels for the enrollment states the card shows (getStudentDetail filters to these).
+const STATUS_LABELS: Record<string, string> = {
+  active: "Enrolled",
+  pending: "Under review",
+  waitlist: "Waitlisted",
+  trial: "Trial",
 };
 
 const TIER_COLORS: Record<string, string> = {
@@ -337,7 +345,7 @@ export default async function StudentProfilePage({
                       STATUS_COLORS[e.status] ?? "bg-cloud text-slate"
                     }`}
                   >
-                    {e.status.replace("_", " ")}
+                    {STATUS_LABELS[e.status] ?? e.status.replace("_", " ")}
                   </span>
                 </div>
               );
