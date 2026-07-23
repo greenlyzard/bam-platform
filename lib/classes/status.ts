@@ -28,6 +28,30 @@ export function deriveClassStatus(cls: DerivableClass, today?: string): ClassSta
   return "active";
 }
 
+/**
+ * Enrollment date-eligibility — the single source of the catalog's date rule.
+ *
+ * Mirrors the `getClassCatalog()` filter (`end_date.is.null,end_date.gte.today`):
+ * - open-ended (`end_date` null) → open
+ * - `end_date` today or later → open
+ * - `end_date` in the past → closed (the class has ended)
+ *
+ * Deliberately scoped to the date window ONLY. It does NOT check `is_active`,
+ * `is_hidden`, capacity, or age — callers gate those separately. Season labels do
+ * not bound dates by design (a class may legitimately run past its season's end),
+ * so `season` is intentionally not consulted here.
+ *
+ * `today` defaults to the local calendar date; pass it for testability.
+ */
+export function isClassOpenForEnrollment(
+  cls: { end_date: string | null },
+  today?: string
+): boolean {
+  const t = today ?? new Date().toISOString().slice(0, 10);
+  if (!cls.end_date) return true;
+  return cls.end_date >= t;
+}
+
 export const CLASS_STATUS_LABEL: Record<ClassStatus, string> = {
   scheduled: "Scheduled",
   active: "Active",

@@ -290,6 +290,12 @@ export async function POST(req: Request) {
       }[] = [];
       const errors: string[] = [];
 
+      // No date-eligibility re-check here by design: this handler only runs after
+      // checkout.session.completed, and the checkout route gates ended classes (isClassOpenForEnrollment)
+      // before ever creating the Stripe session — so an ended class cannot reach the webhook. The only
+      // residual window is a class whose end_date rolls into the past between the checkout gate and
+      // payment completion (day-granularity date, minutes-long checkout); admin approval (§8.1) reviews
+      // every pending enrollment before any charge, which covers that negligible edge.
       // ── Resumable per-item flow: enrollment → charge items → intent, each idempotent ──
       for (const item of sorted) {
         const cls = firstOrSelf(item.class);

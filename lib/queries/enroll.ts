@@ -12,6 +12,8 @@ export async function getClassCatalog(filters?: {
 
   // Public default: hide classes whose term has already ended. Ongoing/open-ended classes
   // (end_date null) always stay visible. Local calendar date (studio-local), day granularity.
+  // This DB `.or()` filter is the list-surface expression of the same rule enforced at the
+  // write paths by isClassOpenForEnrollment() (lib/classes/status.ts) — keep the two in sync.
   const today = new Date().toISOString().slice(0, 10);
 
   let query = supabase

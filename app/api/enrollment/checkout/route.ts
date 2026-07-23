@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/stripe";
 import { buildAuthorizationSessionParams } from "@/lib/billing/checkout-lines";
 import { resolveClassPriceCents } from "@/lib/billing/resolve-price";
+import { isClassOpenForEnrollment } from "@/lib/classes/status";
 
 const CART_COOKIE = "bam_cart_token";
 
@@ -122,8 +123,25 @@ export async function POST(req: Request) {
     ];
     const { data: classRows } = await admin
       .from("classes")
-      .select("id, name, max_students")
+      .select("id, name, max_students, end_date")
       .in("id", classIds);
+
+    // Date-eligibility gate (defense in depth — a cart can go stale between add-to-cart and
+    // checkout). An ended class must not be purchasable/vaulted against — refuse the whole
+    // checkout, mirroring the unpriced-class refusal above. Same date rule as the catalog filter.
+    const endedClasses = (classRows ?? []).filter(
+      (c) => !isClassOpenForEnrollment(c as { end_date: string | null })
+    );
+    if (endedClasses.length > 0) {
+      const names = endedClasses.map((c) => (c.name as string) ?? "a class").join(", ");
+      return NextResponse.json(
+        {
+          error: `One or more classes in your cart have ended and can no longer be enrolled: ${names}. Please remove them to continue.`,
+        },
+        { status: 409 }
+      );
+    }
+
     const fullClasses: { class_id: string; name: string }[] = [];
     for (const c of classRows ?? []) {
       const max = c.max_students as number | null;

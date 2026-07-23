@@ -63,9 +63,29 @@ the dead `admin_tasks` path above; the re-enroll chat (`/portal/enroll`) uses a 
 `/api/enroll/create-payment-intent` path and can only bounce the parent out to public `/enroll`.
 Net: a logged-in parent cannot reach the spine we built directly.
 
-### P1 — Ended classes visible in catalog
-Ended/past classes still appear in the Browse Classes catalog (`getClassCatalog`) — needs an
-end_date / status filter so parents can't request enrollment into a finished class.
+### Ended classes visible in catalog — RESOLVED (not a defect)
+Re-investigated 2026-07-23. The catalog filter (`getClassCatalog`, `lib/queries/enroll.ts`) is
+**correct** and behaves as designed — it already hides classes whose `end_date` is in the past
+(`end_date.is.null,end_date.gte.today`). The one flagged class ("Beginning Hip Hop and Pom") was
+**deliberately extended** to `end_date = 2026-12-05` and is genuinely live, so it correctly shows.
+**Season labels do not bound dates by design** — a `2025/2026`-tagged class may legitimately run past
+June; do not treat the season label as a date boundary.
+
+**Hardening added** (the real gap): the date-eligibility rule was **list-only**. It is now enforced
+server-side at the write paths via a shared helper `isClassOpenForEnrollment()`
+(`lib/classes/status.ts`, unit-tested):
+- `app/(public)/enroll/actions.ts` — `completeRegistration` (pre-flight, before any writes) and
+  `enrollStudent` now reject ended classes with "This class has ended…".
+- `app/api/enrollment/checkout/route.ts` — refuses the whole checkout (409) if any cart class has
+  ended (defense in depth: carts go stale).
+- Webhook (`app/api/enrollment/webhook/route.ts`) needs **no** separate guard — it only runs after
+  `checkout.session.completed`, and checkout gates ended classes before the Stripe session exists, so
+  an ended class can't reach it (documented in-code).
+
+**Note:** `seasons.is_active` is currently **stale but inert** — it still flags the concluded
+`2025/2026` season, but nothing reads it for enrollment eligibility, so it causes no bug. Do **not**
+build eligibility on `seasons.is_active` (or `classes.status`, also unmaintained — all rows are
+`'active'`) without first assigning a lifecycle owner to keep it accurate.
 
 ---
 

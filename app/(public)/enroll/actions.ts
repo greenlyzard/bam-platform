@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { isClassOpenForEnrollment } from "@/lib/classes/status";
 
 // ── Complete Registration (family-centric) ───────────────────
 
@@ -55,6 +56,19 @@ export async function completeRegistration(data: {
   const parsed = registrationSchema.safeParse(data);
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  // Date-eligibility gate (defense in depth — the catalog hides ended classes, but a stale
+  // class_id could still be POSTed here). Reject before creating any family/student/enrollment
+  // records so the whole request fails atomically. Same date rule as the catalog filter.
+  const { data: dateRows } = await supabase
+    .from("classes")
+    .select("id, name, end_date")
+    .in("id", parsed.data.class_ids);
+  const endedClasses = (dateRows ?? []).filter((c) => !isClassOpenForEnrollment(c));
+  if (endedClasses.length > 0) {
+    const names = endedClasses.map((c) => c.name ?? "a class").join(", ");
+    return { error: `This class has ended and is no longer open for enrollment: ${names}` };
   }
 
   // Get tenant
@@ -254,11 +268,17 @@ export async function enrollStudent(formData: FormData) {
   // Get class capacity
   const { data: cls } = await supabase
     .from("classes")
-    .select("id, max_students, name, age_min, age_max")
+    .select("id, max_students, name, age_min, age_max, end_date")
     .eq("id", parsed.data.classId)
     .single();
 
   if (!cls) return { error: "Class not found." };
+
+  // Date-eligibility gate (defense in depth): an ended class must not be enrollable by id,
+  // even though the catalog already hides it. Same date rule as the catalog filter.
+  if (!isClassOpenForEnrollment(cls)) {
+    return { error: "This class has ended and is no longer open for enrollment." };
+  }
 
   // Check age eligibility (soft warning, not hard block)
   const dob = new Date(student.date_of_birth);
