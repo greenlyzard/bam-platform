@@ -192,16 +192,23 @@ Full teardown of today's E2E test data before/at go-live prep:
 
 ---
 
-## 8. Intake pending (not yet in repo)
+## 8. Announcements/Communications module — spec landed, build deferred
 
-- **Announcements/Communications module spec** — an externally-drafted spec + build prompt were
-  described for intake (`docs/ANNOUNCEMENT_MODULE_SPEC.md`, `docs/ANNOUNCEMENT_MODULE_BUILD_PROMPT.md`)
-  but are **not present in the repo** as of 2026-07-23; nothing was committed against them. Sequenced
-  after Phase 3; do not act on the build prompt. Once the files land, log the open product questions
-  (module-vs-Klaviyo newsletter overlap — Amanda; Quo carrier-registration status; casting phase
-  needs a teams/productions schema that doesn't exist yet). An announcements feature already exists
+- **Spec + build prompt landed 2026-07-23** — `docs/ANNOUNCEMENT_MODULE_SPEC.md` and
+  `docs/ANNOUNCEMENT_MODULE_BUILD_PROMPT.md` are now in the repo (externally drafted).
+  **Sequenced after Phase 3; do not act on the build prompt yet** — it's queued for a dedicated
+  future session.
+- **Not greenfield — must reconcile with existing code.** An announcements feature already exists
   partially in *code* (`components/communications/AnnouncementForm.tsx`,
-  `app/api/communications/announcements`, `lib/communications/send-announcement.ts`).
+  `app/api/communications/announcements`, `lib/communications/send-announcement.ts`, and the
+  `…_add_sender_name_to_announcements` migration). The future discovery stage must **reconcile the
+  spec against this partial implementation**, not build from scratch.
+- **Open product questions (carry into that session):**
+  - **Module vs Klaviyo overlap for newsletters** — Amanda decision (do announcements/newsletters
+    live here or in Klaviyo, and where's the boundary).
+  - **Quo carrier-registration status** — unknown; confirm before relying on SMS send.
+  - **Casting phase needs a teams/productions schema that doesn't exist yet** — blocker for that part
+    of the spec; scope the schema first.
 
 ---
 

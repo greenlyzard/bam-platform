@@ -47,8 +47,10 @@ Do these **before** pushing (the deployed webhook + envs must be right before li
 - **Admin-placement billing mode** — how billing is initiated when an admin places a student directly
   (charge items + intent outside the parent-checkout webhook path).
 - _(Deferred, not active this session:)_ announcement-module vs **Klaviyo newsletter overlap** —
-  logged under `SESSION_2026-07-21_FINDINGS.md` §8 (Intake pending); revisit once the announcement
-  spec files land in `docs/`, sequenced after Phase 3.
+  logged under `SESSION_2026-07-21_FINDINGS.md` §8. The spec + build prompt have now landed in
+  `docs/` (`ANNOUNCEMENT_MODULE_SPEC.md`, `ANNOUNCEMENT_MODULE_BUILD_PROMPT.md`); the build is
+  sequenced **after Phase 3** and must reconcile with the partial announcements code already present,
+  not build greenfield. Revisit the Klaviyo-overlap + Quo + casting-schema questions then.
 
 ## After push — next build priority
 
