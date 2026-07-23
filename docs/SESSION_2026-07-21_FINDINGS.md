@@ -42,7 +42,13 @@ Stripe charge: `ch_3TvjLtQiqOLzH3So1sWPL6aB`.
 
 ## 2. Defects
 
-### P1 — Dead "Browse Classes" request path (phantom `admin_tasks`)
+### P1 — Dead "Browse Classes" request path (phantom `admin_tasks`) — RESOLVED (5228e73)
+**Resolved 2026-07-23.** Browse Classes now "Add to Cart" → the vault-checkout cart
+(`POST /api/enrollment/cart`), not the phantom `admin_tasks` path; admins are notified via the webhook
+on the resulting pending enrollment. `requestEnrollment`'s enrollment branch is deprecated (Trial
+button only, pending Amanda), and the `pending_payment`→real `'pending'` duplicate-guard drift was
+fixed across the four affected queries in the same slice. Original finding retained below for record.
+
 `/portal/enrollment` "Request Enrollment" → `requestEnrollment`
 (`app/(portal)/portal/enrollment/actions.ts`) inserts into **`admin_tasks`**, a table that **does not
 exist** in the live DB (only `approval_tasks` / `billing_tasks` exist). The insert is wrapped in a
@@ -55,7 +61,12 @@ Secondary drift in the same action: duplicate-guard checks
 reads `classes.max_enrollment`/`enrolled_count` (verify vs the `max_students` the Phase-1 capacity
 gate uses).
 
-### P1 — Portal has no route into the vault checkout spine
+### P1 — Portal has no route into the vault checkout spine — RESOLVED (5228e73, building on f9645f9)
+**Resolved 2026-07-23.** The parent portal now reaches the spine directly: add-to-cart on Browse
+Classes → `/portal/enrollment/cart` → `/api/enrollment/checkout` (same setup-session + webhook flow),
+with a global portal cart indicator and cookie→`family_id` cart resolution. Write-path date-eligibility
+guards (`isClassOpenForEnrollment`) landed first in **f9645f9**. Original finding retained below.
+
 The Phase-1 cart → `mode:"setup"` session → webhook flow is reachable **only from the public route
 group** (`app/(public)/enroll` → `/enroll/cart` → `/api/enrollment/checkout`, cart link from
 `CartIndicator` in the public layout). The authenticated parent portal's "Browse Classes" leads into
@@ -109,6 +120,12 @@ build eligibility on `seasons.is_active` (or `classes.status`, also unmaintained
 - **Student photo upload** on the student profile (parent-side).
 - **Empty-state enroll CTA** — when a family has no enrollments, surface a clear call-to-action into
   the (correct, once fixed) enrollment flow instead of a blank state.
+- **Cosmetic (post-5228e73 sweep):**
+  - *Portal cart lines don't show the student.* Browse add-to-cart sends `student_id` but not
+    `student_name`, and the cart view only renders "For: …" when `student_name` is set — so each line
+    shows no dancer. Resolve the name from `student_id` (or send `student_name`) so lines are labeled.
+  - *Browse-page subtitle is stale.* `/portal/enrollment` still reads "…request enrollment or a
+    trial"; update the copy to reflect add-to-cart.
 
 ---
 
@@ -158,6 +175,33 @@ Full teardown of today's E2E test data before/at go-live prep:
 - **Ledger group `73d58c74…` (test $112.50 entry) intentionally retained** — ledger is append-only by
   trigger; test-mode entries are identifiable by test-mode PI ids in posting keys. Before live launch,
   decide whether to start the ledger clean via superuser migration.
+
+---
+
+## 7. Schema landmines
+
+- **`classes.level` does not exist — the column is `levels` (text[]).** Selecting `level` in a
+  PostgREST embed does not error loudly; it makes the *whole embedded sub-select* return null, so a
+  join silently yields **empty rows**. This caused today's cart bug: `/api/enrollment/cart`'s
+  response builder embedded `class:classes(…, level, …)`, so `POST` returned an empty `items` array
+  while the DB row existed — the Add-to-Cart button never flipped and the indicator never appeared
+  (fixed in 5228e73: `level`→`levels`, and the client re-reads via GET). Same family as the known
+  `profiles.full_name` (use `first_name`+`last_name`) and `enrollments.pending_payment` (not a real
+  status — use `pending`) traps. **Rule:** verify every embedded column against
+  `types/database.types.ts` before shipping a join.
+
+---
+
+## 8. Intake pending (not yet in repo)
+
+- **Announcements/Communications module spec** — an externally-drafted spec + build prompt were
+  described for intake (`docs/ANNOUNCEMENT_MODULE_SPEC.md`, `docs/ANNOUNCEMENT_MODULE_BUILD_PROMPT.md`)
+  but are **not present in the repo** as of 2026-07-23; nothing was committed against them. Sequenced
+  after Phase 3; do not act on the build prompt. Once the files land, log the open product questions
+  (module-vs-Klaviyo newsletter overlap — Amanda; Quo carrier-registration status; casting phase
+  needs a teams/productions schema that doesn't exist yet). An announcements feature already exists
+  partially in *code* (`components/communications/AnnouncementForm.tsx`,
+  `app/api/communications/announcements`, `lib/communications/send-announcement.ts`).
 
 ---
 
