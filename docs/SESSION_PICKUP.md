@@ -7,7 +7,8 @@ _Last updated: 2026-07-23 (end of session)._
 
 ## Repo state to verify
 
-- **21 commits ahead of `origin/main`; nothing pushed.** HEAD = this `docs: pickup note …` commit.
+- **23 commits ahead of `origin/main`; nothing pushed.** HEAD = the `docs: reconcile pickup note
+  ahead-count (23)` commit.
   Clean working tree except two intentionally-untracked E2E scripts (`scripts/e2e-approve.ts`,
   `scripts/e2e-teardown.ts` — test-key guarded, do not commit).
 - All work is **E2E- and click-verified** locally (portal add-to-cart → In Cart ✓ + indicator, cart
