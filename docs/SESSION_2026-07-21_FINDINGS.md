@@ -163,6 +163,16 @@ build eligibility on `seasons.is_active` (or `classes.status`, also unmaintained
   resolution path. **Warn-only by design** (leaving early / split attendance is legitimate).
   v1 = weekly day/time comparison; occurrence-aware later (depends on P0 task 19 occurrence
   generator).
+- **Payment provider abstraction (founding SaaS requirement)** — the vault spine is Stripe-native at
+  four seams: card vaulting (Checkout Session setup mode), off-session charging (PaymentIntents),
+  refunds, and webhook event shapes; plus `families.stripe_customer_id` /
+  `families.stripe_payment_method_id`. Pluggability = a `PaymentProvider` interface at those seams
+  with Stripe as the first adapter (Authorize.net, Square, PayPal later), a provider-agnostic column
+  strategy for vault references, and per-tenant provider config. **Note:** per-tenant Stripe is
+  Stripe Connect territory (each studio's own account) — its own sub-project. The
+  ledger/charge-items/approval engine/intents are already provider-agnostic; only the edges speak
+  Stripe. **Spec AFTER single-tenant Stripe is proven with live money** — don't abstract an interface
+  implemented once.
 
 ---
 
