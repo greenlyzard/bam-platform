@@ -2783,10 +2783,13 @@ export type Database = {
         Row: {
           cart_id: string
           charge_timing: string
-          class_id: string
+          class_id: string | null
           created_at: string
+          description: string | null
           id: string
+          item_type: string
           price_cents: number
+          reference_id: string | null
           student_id: string | null
           student_name: string | null
           tenant_id: string
@@ -2794,10 +2797,13 @@ export type Database = {
         Insert: {
           cart_id: string
           charge_timing?: string
-          class_id: string
+          class_id?: string | null
           created_at?: string
+          description?: string | null
           id?: string
+          item_type?: string
           price_cents: number
+          reference_id?: string | null
           student_id?: string | null
           student_name?: string | null
           tenant_id: string
@@ -2805,10 +2811,13 @@ export type Database = {
         Update: {
           cart_id?: string
           charge_timing?: string
-          class_id?: string
+          class_id?: string | null
           created_at?: string
+          description?: string | null
           id?: string
+          item_type?: string
           price_cents?: number
+          reference_id?: string | null
           student_id?: string | null
           student_name?: string | null
           tenant_id?: string
@@ -2888,7 +2897,8 @@ export type Database = {
           charge_timing: string | null
           class_id: string | null
           created_at: string
-          enrollment_id: string
+          description: string | null
+          enrollment_id: string | null
           family_id: string | null
           id: string
           item_type: string
@@ -2906,7 +2916,8 @@ export type Database = {
           charge_timing?: string | null
           class_id?: string | null
           created_at?: string
-          enrollment_id: string
+          description?: string | null
+          enrollment_id?: string | null
           family_id?: string | null
           id?: string
           item_type: string
@@ -2924,7 +2935,8 @@ export type Database = {
           charge_timing?: string | null
           class_id?: string | null
           created_at?: string
-          enrollment_id?: string
+          description?: string | null
+          enrollment_id?: string | null
           family_id?: string | null
           id?: string
           item_type?: string
@@ -2945,10 +2957,31 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "enrollment_charge_items_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "enrollment_charge_items_enrollment_id_fkey"
             columns: ["enrollment_id"]
             isOneToOne: false
             referencedRelation: "enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrollment_charge_items_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrollment_charge_items_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
             referencedColumns: ["id"]
           },
           {
@@ -4040,12 +4073,9 @@ export type Database = {
           event_id: string | null
           family_id: string | null
           id: string
-          invoice_id: string | null
           jurisdiction_code: string | null
-          line_item_id: string | null
           location_id: string | null
           occurred_at: string
-          payment_id: string | null
           product_id: string | null
           student_id: string | null
           tax_rate_bps: number | null
@@ -4065,12 +4095,9 @@ export type Database = {
           event_id?: string | null
           family_id?: string | null
           id?: string
-          invoice_id?: string | null
           jurisdiction_code?: string | null
-          line_item_id?: string | null
           location_id?: string | null
           occurred_at: string
-          payment_id?: string | null
           product_id?: string | null
           student_id?: string | null
           tax_rate_bps?: number | null
@@ -4090,12 +4117,9 @@ export type Database = {
           event_id?: string | null
           family_id?: string | null
           id?: string
-          invoice_id?: string | null
           jurisdiction_code?: string | null
-          line_item_id?: string | null
           location_id?: string | null
           occurred_at?: string
-          payment_id?: string | null
           product_id?: string | null
           student_id?: string | null
           tax_rate_bps?: number | null
@@ -5517,6 +5541,7 @@ export type Database = {
           production_type: string
           season: string | null
           start_time: string | null
+          tenant_id: string
           updated_at: string
           venue_address: string | null
           venue_directions: string | null
@@ -5539,6 +5564,7 @@ export type Database = {
           production_type?: string
           season?: string | null
           start_time?: string | null
+          tenant_id: string
           updated_at?: string
           venue_address?: string | null
           venue_directions?: string | null
@@ -5561,6 +5587,7 @@ export type Database = {
           production_type?: string
           season?: string | null
           start_time?: string | null
+          tenant_id?: string
           updated_at?: string
           venue_address?: string | null
           venue_directions?: string | null
@@ -5579,6 +5606,13 @@ export type Database = {
             columns: ["approved_by"]
             isOneToOne: false
             referencedRelation: "teacher_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "productions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -10118,6 +10152,13 @@ export type Database = {
             columns: ["class_id"]
             isOneToOne: false
             referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timesheet_entries_production_id_fkey"
+            columns: ["production_id"]
+            isOneToOne: false
+            referencedRelation: "productions"
             referencedColumns: ["id"]
           },
           {
