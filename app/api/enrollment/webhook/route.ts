@@ -7,7 +7,11 @@ import {
   selectMissingChargeItems,
   shouldAttachRegistration,
   enrollmentStatusForCapacity,
+  studentClassKey,
+  duplicateSkipFor,
+  shouldNotifyNewPendingEnrollment,
   FAMILY_REG_KEY,
+  type BlockingEnrollment,
   type RegistrationFeeMode,
 } from "@/lib/billing/enrollment-ledger";
 import { buildPendingChargeItems } from "@/lib/billing/checkout-lines";
@@ -263,6 +267,38 @@ export async function POST(req: Request) {
         }
       }
 
+      // ── Pre-existing enrollments from ANY path (the 23505 guard) ──
+      // `enrollments_student_id_class_id_key` is UNIQUE (student_id, class_id) with no session or
+      // status scoping, so a row created by admin placement, an earlier checkout, or a trial blocks
+      // our insert outright — and existingByKey above cannot see it (wrong session). Preload every
+      // existing row for this cart's pairs, any status, and skip those items instead of 500-looping
+      // Stripe forever on a collision that will never resolve itself.
+      const cartStudentIds = [
+        ...new Set(items.map((i) => i.student_id).filter((s): s is string => !!s)),
+      ];
+      const cartClassIds = [...new Set(items.map((i) => i.class_id))];
+      const priorByPair = new Map<string, BlockingEnrollment>();
+      if (cartStudentIds.length > 0) {
+        const { data: priorEnr, error: priorErr } = await supabase
+          .from("enrollments")
+          .select("id, student_id, class_id, status")
+          .in("student_id", cartStudentIds)
+          .in("class_id", cartClassIds);
+        if (priorErr) {
+          console.error("[enrollment:webhook] Failed to preload existing enrollments", priorErr);
+          return NextResponse.json({ error: "Failed to preload enrollments" }, { status: 500 });
+        }
+        for (const e of priorEnr ?? []) {
+          // Rows THIS session created are resumable-retry state, not duplicates — existingByKey
+          // owns them and the loop reuses them rather than skipping.
+          if (existingByKey.has(enrollmentDedupeKey(sessionId, e.student_id, e.class_id))) continue;
+          priorByPair.set(
+            studentClassKey(e.student_id as string | null, e.class_id as string),
+            { id: e.id as string, status: e.status as string }
+          );
+        }
+      }
+
       const { data: existingIntents } = await supabase
         .from("tuition_schedule_intent")
         .select("class_id, student_id")
@@ -289,6 +325,7 @@ export async function POST(req: Request) {
         waitlisted: boolean;
       }[] = [];
       const errors: string[] = [];
+      const skipped: { classId: string; enrollmentId: string; status: string }[] = [];
 
       // No date-eligibility re-check here by design: this handler only runs after
       // checkout.session.completed, and the checkout route gates ended classes (isClassOpenForEnrollment)
@@ -303,6 +340,24 @@ export async function POST(req: Request) {
         const existing = existingByKey.get(ekey);
         let enrollmentId: string;
         let enrollmentStatus: string;
+
+        // Duplicate from another path/session: skip the entire item — no enrollment, no charge
+        // items, no intent. Not an error; there is genuinely nothing to create for this class.
+        if (!existing) {
+          const blockedBy = duplicateSkipFor(item, priorByPair);
+          if (blockedBy) {
+            console.log(
+              `[enrollment:webhook] skipped duplicate: student already has enrollment ${blockedBy.id} status ${blockedBy.status}`,
+              { cartId, classId: item.class_id, studentId: item.student_id }
+            );
+            skipped.push({
+              classId: item.class_id,
+              enrollmentId: blockedBy.id,
+              status: blockedBy.status,
+            });
+            continue;
+          }
+        }
 
         if (existing) {
           enrollmentId = existing.id;
@@ -338,6 +393,30 @@ export async function POST(req: Request) {
             .select("id")
             .single();
           if (enrollErr || !enr) {
+            // Race fallback: another writer created the (student, class) row between our preload
+            // and this insert. 23505 on the global unique constraint is the same "already
+            // enrolled" outcome as the preload skip, so treat it identically — an error here would
+            // 500 and make Stripe retry a collision that can never clear.
+            if (enrollErr?.code === "23505") {
+              const { data: raced } = await supabase
+                .from("enrollments")
+                .select("id, status")
+                .eq("student_id", item.student_id as string)
+                .eq("class_id", item.class_id)
+                .maybeSingle();
+              const racedId = (raced?.id as string | undefined) ?? "unknown";
+              const racedStatus = (raced?.status as string | undefined) ?? "unknown";
+              console.log(
+                `[enrollment:webhook] skipped duplicate: student already has enrollment ${racedId} status ${racedStatus}`,
+                { cartId, classId: item.class_id, studentId: item.student_id, race: true }
+              );
+              skipped.push({
+                classId: item.class_id,
+                enrollmentId: racedId,
+                status: racedStatus,
+              });
+              continue;
+            }
             console.error("[enrollment:webhook] enrollment insert failed", item.class_id, enrollErr);
             errors.push(`enrollment:${item.class_id}`);
             continue; // do NOT bump enrolled_count — capacity is pending+active at read time (§3.3)
@@ -485,7 +564,7 @@ export async function POST(req: Request) {
 
       // Notify — fire-and-forget (a notification failure must never fail the webhook). Only on new
       // enrollments (skips on a pure retry). Real impls land in step 6.
-      if (newEnrollments.length > 0) {
+      if (shouldNotifyNewPendingEnrollment(newEnrollments.length)) {
         const customerEmail = session.customer_details?.email ?? session.customer_email ?? null;
         const parentName = session.customer_details?.name ?? null;
         await safeSideEffect(
@@ -502,12 +581,21 @@ export async function POST(req: Request) {
         );
       }
 
+      // An all-skipped cart is a fully processed event (nothing left to create), so it reports 200
+      // and the cart is completed above — Stripe must not retry it.
       console.log(
         "[enrollment:webhook] Vault-only checkout finalized:",
         cartId,
-        `${newEnrollments.length} new pending enrollment(s)`
+        `${newEnrollments.length} new pending enrollment(s), ${skipped.length} skipped as duplicate` +
+          (newEnrollments.length === 0 && skipped.length > 0
+            ? " (nothing to create — every item was already enrolled)"
+            : "")
       );
-      return NextResponse.json({ received: true, created: newEnrollments.length });
+      return NextResponse.json({
+        received: true,
+        created: newEnrollments.length,
+        skipped: skipped.length,
+      });
     }
 
     case "checkout.session.expired": {

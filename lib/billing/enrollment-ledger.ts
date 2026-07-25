@@ -78,6 +78,85 @@ export function enrollmentStatusForCapacity(args: {
   return "pending";
 }
 
+/**
+ * Key for the GLOBAL uniqueness the DB actually enforces: `enrollments_student_id_class_id_key` is
+ * UNIQUE (student_id, class_id) with no session, season, or status scoping. This is deliberately
+ * NOT the same key as `enrollmentDedupeKey` — that one is session-scoped and only recognises rows
+ * this checkout created (resumable retry). A row created by ANY other path — admin placement, an
+ * earlier checkout, a trial — is invisible to it and collides at insert time with 23505.
+ */
+export function studentClassKey(studentId: string | null, classId: string): string {
+  return `${studentId ?? "null"}|${classId}`;
+}
+
+/**
+ * Statuses that count as "already enrolled or in flight" for the add-to-cart guard. Matches the
+ * corrected convention from the pending_payment sweep — `pending_payment` was never a real status.
+ * Deliberately NARROWER than the webhook's skip rule: the webhook must treat ANY existing row as
+ * blocking (the unique constraint ignores status), while the cart only blocks a parent on a class
+ * their student is genuinely still in. A declined/canceled row therefore passes the cart guard but
+ * is still skipped by the webhook — the residue of the global constraint, tracked in §4 backlog
+ * (partial unique index scoped to in-flight statuses).
+ */
+export const BLOCKING_ENROLLMENT_STATUSES = [
+  "active",
+  "pending",
+  "trial",
+  "waitlist",
+] as const;
+
+/** An existing enrollment that blocks creating another row for the same (student, class). */
+export interface BlockingEnrollment {
+  id: string;
+  status: string;
+}
+
+/**
+ * Decide whether a cart item must be SKIPPED because the student already has an enrollment in that
+ * class (any status). Returns the blocking row, or null when the item should proceed.
+ *
+ * A null studentId never collides: Postgres treats NULLs as distinct in a unique constraint, so
+ * multiple unsaved-dancer rows for one class are allowed and must not be skipped.
+ */
+export function duplicateSkipFor<T extends { class_id: string; student_id: string | null }>(
+  item: T,
+  priorByPair: ReadonlyMap<string, BlockingEnrollment>
+): BlockingEnrollment | null {
+  if (!item.student_id) return null;
+  return priorByPair.get(studentClassKey(item.student_id, item.class_id)) ?? null;
+}
+
+/**
+ * Split checkout items into those to create and those to skip as pre-existing duplicates (§3.3
+ * companion rule). Partial overlap is normal and fine: the skipped items simply produce no
+ * enrollment, no charge items and no intent, while the rest finalize as usual. An all-skipped cart
+ * is a fully processed event, not a failure — the caller returns 200 so Stripe stops retrying.
+ */
+export function planEnrollmentCreation<
+  T extends { class_id: string; student_id: string | null }
+>(
+  items: T[],
+  priorByPair: ReadonlyMap<string, BlockingEnrollment>
+): { create: T[]; skipped: { item: T; blockedBy: BlockingEnrollment }[] } {
+  const create: T[] = [];
+  const skipped: { item: T; blockedBy: BlockingEnrollment }[] = [];
+  for (const item of items) {
+    const blockedBy = duplicateSkipFor(item, priorByPair);
+    if (blockedBy) skipped.push({ item, blockedBy });
+    else create.push(item);
+  }
+  return { create, skipped };
+}
+
+/**
+ * The admin "new pending enrollment" notification fires only when the webhook actually created
+ * enrollments. An all-duplicate checkout created nothing, so there is nothing to review — notifying
+ * would page an admin about a no-op.
+ */
+export function shouldNotifyNewPendingEnrollment(createdCount: number): boolean {
+  return createdCount > 0;
+}
+
 /** Registration fee cardinality (studio_settings.registration_fee_mode; §2). */
 export type RegistrationFeeMode = "per_student" | "per_family";
 

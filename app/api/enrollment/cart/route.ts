@@ -5,6 +5,8 @@ import { getMyFamily } from "@/lib/queries/portal";
 import { resolveClassPriceCents } from "@/lib/billing/resolve-price";
 import { resolvePortalCart } from "@/lib/queries/enrollment-cart";
 import { isClassOpenForEnrollment } from "@/lib/classes/status";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { BLOCKING_ENROLLMENT_STATUSES } from "@/lib/billing/enrollment-ledger";
 import { z } from "zod";
 
 const CART_COOKIE = "bam_cart_token";
@@ -158,6 +160,28 @@ export async function POST(req: Request) {
         { error: "This class has ended and is no longer open for enrollment." },
         { status: 409 }
       );
+    }
+
+    // Duplicate-enrollment guard: the DB enforces a global unique (student_id, class_id), so a
+    // student already in this class can never get a second row. Reject at add-to-cart rather than
+    // letting the parent check out and the webhook silently skip the item. Service-role read — the
+    // anon/RLS client would fail OPEN on an anonymous cart and wave the duplicate straight through.
+    // Status set matches the corrected in-flight convention (pending_payment was never real).
+    if (parsed.data.student_id) {
+      const { data: priorEnrollment } = await createAdminClient()
+        .from("enrollments")
+        .select("id")
+        .eq("student_id", parsed.data.student_id)
+        .eq("class_id", parsed.data.class_id)
+        .in("status", [...BLOCKING_ENROLLMENT_STATUSES])
+        .maybeSingle();
+
+      if (priorEnrollment) {
+        return NextResponse.json(
+          { error: "This student is already enrolled or has a pending request for this class." },
+          { status: 409 }
+        );
+      }
     }
 
     // Resolve tuition server-side (service role — pricing rules are authenticated-only under RLS).

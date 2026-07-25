@@ -7,8 +7,14 @@ import {
   selectMissingChargeItems,
   shouldAttachRegistration,
   enrollmentStatusForCapacity,
+  studentClassKey,
+  duplicateSkipFor,
+  planEnrollmentCreation,
+  shouldNotifyNewPendingEnrollment,
+  BLOCKING_ENROLLMENT_STATUSES,
   FAMILY_REG_KEY,
   currentPeriod,
+  type BlockingEnrollment,
   type CheckoutItem,
   type RegistrationFeeMode,
 } from "./enrollment-ledger.ts";
@@ -223,4 +229,149 @@ test("currentPeriod: YYYY-MM in UTC", () => {
   assert.equal(currentPeriod(new Date("2026-08-03T00:00:00Z")), "2026-08");
   assert.equal(currentPeriod(new Date("2026-01-31T23:59:59Z")), "2026-01");
   assert.equal(currentPeriod(new Date("2026-12-01T12:00:00Z")), "2026-12");
+});
+
+// ── duplicate (student, class) skip — the 23505 root cause ───────────────────────────
+// enrollments_student_id_class_id_key is UNIQUE (student_id, class_id) with no session/status
+// scoping, so any pre-existing row blocks the insert. The webhook must SKIP those items, not 500.
+
+const STUDENT_A = "1664c01f-c4f3-45b1-9395-6d93f09cfa8c";
+const STUDENT_B = "2775d12f-d5e4-46c2-a4a6-7e04f10dfb9d";
+const CLASS_X = "9e8ea976-0885-47fa-92f2-606eed55b374";
+const CLASS_Y = "aa11bb22-cc33-44dd-88ee-99ff00112233";
+
+function priorMap(
+  entries: [string, string, BlockingEnrollment][]
+): Map<string, BlockingEnrollment> {
+  return new Map(entries.map(([s, c, v]) => [studentClassKey(s, c), v]));
+}
+
+test("studentClassKey: global (student, class) key, null student distinct from a real id", () => {
+  assert.equal(studentClassKey(STUDENT_A, CLASS_X), `${STUDENT_A}|${CLASS_X}`);
+  assert.equal(studentClassKey(null, CLASS_X), `null|${CLASS_X}`);
+  assert.notEqual(studentClassKey(null, CLASS_X), studentClassKey(STUDENT_A, CLASS_X));
+});
+
+test("duplicateSkipFor: returns the blocking enrollment regardless of its status", () => {
+  // The constraint ignores status, so every status blocks — including terminal ones.
+  for (const status of ["active", "pending", "trial", "waitlist", "declined", "canceled"]) {
+    const prior = priorMap([[STUDENT_A, CLASS_X, { id: "enr-1", status }]]);
+    const hit = duplicateSkipFor({ class_id: CLASS_X, student_id: STUDENT_A }, prior);
+    assert.deepEqual(hit, { id: "enr-1", status }, `status ${status} must block`);
+  }
+});
+
+test("duplicateSkipFor: no prior row, different class, or different student → proceed", () => {
+  const prior = priorMap([[STUDENT_A, CLASS_X, { id: "enr-1", status: "active" }]]);
+  assert.equal(duplicateSkipFor({ class_id: CLASS_Y, student_id: STUDENT_A }, prior), null);
+  assert.equal(duplicateSkipFor({ class_id: CLASS_X, student_id: STUDENT_B }, prior), null);
+  assert.equal(duplicateSkipFor({ class_id: CLASS_X, student_id: STUDENT_A }, new Map()), null);
+});
+
+test("duplicateSkipFor: null student_id never skips (NULLs are distinct in a unique constraint)", () => {
+  // An unsaved new dancer has no student_id — two such rows on one class cannot collide, so
+  // skipping them would silently drop a legitimate enrollment.
+  const prior = priorMap([[STUDENT_A, CLASS_X, { id: "enr-1", status: "active" }]]);
+  assert.equal(duplicateSkipFor({ class_id: CLASS_X, student_id: null }, prior), null);
+});
+
+test("planEnrollmentCreation: single-item duplicate cart → nothing created, one skip", () => {
+  // The production failure: one item, student already enrolled. Must yield zero creates so the
+  // handler returns 200 (cart completed, Stripe stops retrying) instead of looping on 23505.
+  const items = [{ class_id: CLASS_X, student_id: STUDENT_A }];
+  const prior = priorMap([[STUDENT_A, CLASS_X, { id: "2fb3d183", status: "active" }]]);
+
+  const plan = planEnrollmentCreation(items, prior);
+
+  assert.equal(plan.create.length, 0);
+  assert.equal(plan.skipped.length, 1);
+  assert.deepEqual(plan.skipped[0].blockedBy, { id: "2fb3d183", status: "active" });
+  // Zero created ⇒ no admin notification for a no-op event.
+  assert.equal(shouldNotifyNewPendingEnrollment(plan.create.length), false);
+});
+
+test("planEnrollmentCreation: mixed cart → duplicates skipped, the rest still created", () => {
+  const items = [
+    { class_id: CLASS_X, student_id: STUDENT_A }, // duplicate
+    { class_id: CLASS_Y, student_id: STUDENT_A }, // new
+    { class_id: CLASS_X, student_id: STUDENT_B }, // new (different student, same class)
+  ];
+  const prior = priorMap([[STUDENT_A, CLASS_X, { id: "enr-dup", status: "pending" }]]);
+
+  const plan = planEnrollmentCreation(items, prior);
+
+  assert.equal(plan.create.length, 2);
+  assert.deepEqual(
+    plan.create.map((i) => [i.student_id, i.class_id]),
+    [
+      [STUDENT_A, CLASS_Y],
+      [STUDENT_B, CLASS_X],
+    ]
+  );
+  assert.equal(plan.skipped.length, 1);
+  assert.equal(plan.skipped[0].item.class_id, CLASS_X);
+  assert.equal(plan.skipped[0].item.student_id, STUDENT_A);
+  // Partial creation still notifies — there IS something for an admin to review.
+  assert.equal(shouldNotifyNewPendingEnrollment(plan.create.length), true);
+});
+
+test("planEnrollmentCreation: no duplicates → every item proceeds, order preserved", () => {
+  const items = [
+    { class_id: CLASS_X, student_id: STUDENT_A },
+    { class_id: CLASS_Y, student_id: STUDENT_B },
+  ];
+  const plan = planEnrollmentCreation(items, new Map());
+  assert.deepEqual(plan.create, items);
+  assert.equal(plan.skipped.length, 0);
+});
+
+test("planEnrollmentCreation: all items duplicate → empty create, no notification", () => {
+  const items = [
+    { class_id: CLASS_X, student_id: STUDENT_A },
+    { class_id: CLASS_Y, student_id: STUDENT_B },
+  ];
+  const prior = priorMap([
+    [STUDENT_A, CLASS_X, { id: "enr-1", status: "active" }],
+    [STUDENT_B, CLASS_Y, { id: "enr-2", status: "waitlist" }],
+  ]);
+
+  const plan = planEnrollmentCreation(items, prior);
+
+  assert.equal(plan.create.length, 0);
+  assert.equal(plan.skipped.length, 2);
+  assert.equal(shouldNotifyNewPendingEnrollment(0), false);
+});
+
+test("shouldNotifyNewPendingEnrollment: fires only on a non-zero created count", () => {
+  assert.equal(shouldNotifyNewPendingEnrollment(0), false);
+  assert.equal(shouldNotifyNewPendingEnrollment(1), true);
+  assert.equal(shouldNotifyNewPendingEnrollment(5), true);
+});
+
+// ── add-to-cart duplicate guard ──────────────────────────────────────────────────────
+
+test("BLOCKING_ENROLLMENT_STATUSES: matches the corrected sweep convention", () => {
+  // pending_payment was never a real status and must not reappear; 'pending' is the vault-checkout
+  // hold awaiting approval and DOES block a re-add.
+  assert.deepEqual([...BLOCKING_ENROLLMENT_STATUSES], [
+    "active",
+    "pending",
+    "trial",
+    "waitlist",
+  ]);
+  assert.equal(BLOCKING_ENROLLMENT_STATUSES.includes("pending_payment" as never), false);
+});
+
+test("cart guard rejects an in-flight status and allows a terminal one", () => {
+  // Mirrors the route's .in("status", BLOCKING_ENROLLMENT_STATUSES) filter.
+  const blocks = (status: string) => BLOCKING_ENROLLMENT_STATUSES.includes(status as never);
+
+  for (const status of ["active", "pending", "trial", "waitlist"]) {
+    assert.equal(blocks(status), true, `${status} must reject the add`);
+  }
+  // Terminal rows don't block the cart — but the webhook still skips them (global constraint),
+  // which is exactly the drift the partial-unique-index backlog item resolves.
+  for (const status of ["declined", "canceled", "completed"]) {
+    assert.equal(blocks(status), false, `${status} must not reject the add`);
+  }
 });

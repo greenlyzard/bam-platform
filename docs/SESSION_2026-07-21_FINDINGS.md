@@ -141,6 +141,28 @@ build eligibility on `seasons.is_active` (or `classes.status`, also unmaintained
   BAM's actual policy — hers becomes the first configured tenant, the defaults get designed for
   tenant #2. Today's copy removal (§3) is step zero (the current hardcoded promise is the
   anti-pattern this replaces).
+- **Schema: `enrollments` unique `(student_id, class_id)` is GLOBAL** — blocks legitimate
+  re-enrollment after `declined` / `canceled` / `completed` rows; needs a partial unique index scoped
+  to in-flight/active statuses (migration + design decision). This is the constraint behind the
+  2026-07-24 prod webhook 500 (`23505` loop): the webhook now skips pre-existing pairs instead of
+  failing, but a family that legitimately wants to re-enroll after a decline still cannot until the
+  index is narrowed. Note the resulting asymmetry until then — the add-to-cart guard only blocks
+  `BLOCKING_ENROLLMENT_STATUSES` (`active`/`pending`/`trial`/`waitlist`), so a terminal-status row
+  passes the cart but is still skipped by the webhook.
+- **Email template slug mismatch:** code requests `enrollment_confirmation`
+  (`lib/email/enrollment-confirmation.ts:64`), DB has `enrollment_confirmed` — so the template path
+  always misses and it falls through to the hardcoded HTML. Either rename the DB row or fix the
+  lookup; until then the DB-editable template is dead for that email.
+- **`sendRawEmail` uses the cookie-based `createClient` in webhook context** (`lib/email/send.ts`) —
+  no session, so logo/template reads run as anon under RLS. Harmless today (calls are wrapped in
+  `safeSideEffect`) but it should take the admin client, or an explicit client argument, on
+  server-to-server paths.
+- **Schedule-conflict warnings (spec item)** — non-blocking warning when a cart class overlaps in
+  time with another cart item OR the student's active/pending enrollments. Soft notice at
+  add-to-cart + a persistent banner on the cart line naming the overlap, with Remove as the
+  resolution path. **Warn-only by design** (leaving early / split attendance is legitimate).
+  v1 = weekly day/time comparison; occurrence-aware later (depends on P0 task 19 occurrence
+  generator).
 
 ---
 
@@ -204,6 +226,11 @@ Full teardown of today's E2E test data before/at go-live prep:
   `profiles.full_name` (use `first_name`+`last_name`) and `enrollments.pending_payment` (not a real
   status — use `pending`) traps. **Rule:** verify every embedded column against
   `types/database.types.ts` before shipping a join.
+- **`enrollments_student_id_class_id_key` is UNIQUE `(student_id, class_id)` — global, not scoped to
+  session, season, or status.** Any pre-existing row (admin placement, prior checkout, trial) makes a
+  second insert fail with `23505` regardless of status, and a session-scoped dedupe map cannot see it.
+  Note NULL `student_id` rows never collide (Postgres treats NULLs as distinct), so unsaved-dancer
+  items must not be skipped. Full write-up and the partial-index fix are in the §4 backlog.
 
 ---
 
