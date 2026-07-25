@@ -144,8 +144,7 @@ export function SuccessView() {
           </li>
           <li className="flex gap-2">
             <span className="text-lavender shrink-0">&#10003;</span>
-            Monthly tuition then draws on the 15th; your first class is a free trial &mdash; full
-            refund if it&apos;s not the right fit
+            Monthly tuition then draws on the 15th
           </li>
         </ul>
       </div>

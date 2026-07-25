@@ -102,11 +102,17 @@ build eligibility on `seasons.is_active` (or `classes.status`, also unmaintained
 
 ## 3. Copy / Policy — pending Amanda
 
-- **Trial + refund promise appears on 3 surfaces** but the system is configured
-  `refund_policy_enabled = false` (pure admin-discretion, no window) and registration is
-  **stated non-refundable**. Reconcile the parent-facing copy with the actual policy on all three
-  surfaces (enroll flow, success page, received email) — do not promise a refund window the system
-  doesn't enforce.
+- **Trial + refund promise — RESOLVED BY REMOVAL (2026-07-24).** The promise was live in production
+  against `refund_policy_enabled = false` (pure admin-discretion, no window) with registration
+  **stated non-refundable**, and was never approved by Amanda. It has been removed outright from all
+  four surfaces that carried it — public cart (`app/(public)/enroll/cart/cart-view.tsx`), checkout
+  success page (`app/(public)/enroll/success/success-view.tsx`), enrollment-received email
+  (`lib/email/enrollment-received.ts`), and enrollment-confirmation email
+  (`lib/email/enrollment-confirmation.ts`). The vault explanation (card saved, nothing charged today,
+  registration + prorated first month at approval, tuition draws on the 15th) is unchanged. The
+  **policy discussion with Amanda remains open** — what, if anything, replaces it is undecided; the
+  replacement mechanism is the tenant policy engine (§4), not conditional copy. Nothing goes back on
+  a parent-facing surface until Amanda defines the policy.
 - **Trial copy must be conditional on `students.trial_used`** — don't offer a "free trial" to a
   student who has already used one (the request action already blocks it server-side, but the copy
   still advertises it).
@@ -126,6 +132,15 @@ build eligibility on `seasons.is_active` (or `classes.status`, also unmaintained
     shows no dancer. Resolve the name from `student_id` (or send `student_name`) so lines are labeled.
   - *Browse-page subtitle is stale.* `/portal/enrollment` still reads "…request enrollment or a
     trial"; update the copy to reflect add-to-cart.
+- **Tenant policy engine (Shopify-style)** — refund/trial/registration policies as tenant-editable
+  structured settings with platform-provided safe defaults: a new tenant gets conservative default
+  policy copy out of the box; admins edit policy text/parameters in settings (building on existing
+  `studio_settings` flags: `refund_policy_enabled`, `refund_window_days`,
+  `registration_stated_refundable`, plus a to-be-modeled trial policy); all checkout/cart/success/
+  email surfaces render from settings automatically, never hardcoded. Spec after Amanda defines
+  BAM's actual policy — hers becomes the first configured tenant, the defaults get designed for
+  tenant #2. Today's copy removal (§3) is step zero (the current hardcoded promise is the
+  anti-pattern this replaces).
 
 ---
 

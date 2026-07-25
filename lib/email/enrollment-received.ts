@@ -43,7 +43,6 @@ export async function sendEnrollmentReceived(args: EnrollmentReceivedArgs): Prom
         <li>Our team reviews your enrollment.</li>
         <li>Once approved, we charge your one-time registration fee and your prorated first month.</li>
         <li>Ongoing monthly tuition draws on the 15th.</li>
-        <li>Your first class is always a free trial — full refund if it&apos;s not the right fit.</li>
       </ul>`
     : `<ul style="margin:0 0 16px 0;padding-left:20px;color:#6B6B7B;font-size:14px;line-height:1.7;">
         <li>We&apos;ll notify you as soon as a spot opens in your waitlisted class(es).</li>

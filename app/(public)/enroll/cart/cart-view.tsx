@@ -227,8 +227,7 @@ export function EnrollmentCartView({
         <p className="text-xs text-mist">
           Your card is securely saved &mdash; nothing is charged today. After the studio reviews your
           enrollment, we charge the registration fee and your prorated first month; monthly tuition
-          then draws on the 15th. Your first class is always a free trial &mdash; if it&apos;s not the
-          right fit, we&apos;ll refund in full.
+          then draws on the 15th.
         </p>
       </div>
 

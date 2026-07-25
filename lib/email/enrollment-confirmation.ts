@@ -78,7 +78,6 @@ export async function sendEnrollmentConfirmation({
     </table>
     <p style="margin: 24px 0 8px 0; font-weight: 600; color: #2C2C2C;">What happens next:</p>
     <ul style="margin: 0; padding-left: 20px; color: #6B6B7B; font-size: 14px; line-height: 1.8;">
-      <li>Your first class is always a free trial &mdash; if it&apos;s not the right fit, we&apos;ll refund in full.</li>
       <li>Class details and your schedule are in your <a href="${escapeHtml(appUrl)}/portal/dashboard" style="color: #9C8BBF; text-decoration: none; font-weight: 500;">parent portal</a>.</li>
       <li>Questions? Reply to this email or call us at (949) 229-0846.</li>
     </ul>
