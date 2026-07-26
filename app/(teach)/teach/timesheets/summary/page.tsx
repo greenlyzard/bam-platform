@@ -40,16 +40,48 @@ export default async function TimesheetSummaryPage() {
     );
   }
 
-  // Fetch timesheet
-  const { data: timesheet } = await supabase
-    .from("timesheets")
-    .select("id, status, total_hours")
-    .eq("teacher_id", teacherProfile.id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  // Resolve the current pay period exactly as /teach/timesheets and
+  // getOrCreateTimesheet do (tenant + month + year), so both pages always
+  // resolve the same timesheet and cannot drift apart.
+  const { data: payPeriod } = user.tenantId
+    ? await supabase
+        .from("pay_periods")
+        .select("id")
+        .eq("tenant_id", user.tenantId)
+        .eq("period_month", now.getMonth() + 1)
+        .eq("period_year", now.getFullYear())
+        .maybeSingle()
+    : { data: null };
 
-  if (!timesheet || timesheet.status !== "draft") {
+  // Fetch this teacher's timesheet for the CURRENT pay period only. Scoping by
+  // period — rather than newest-by-created_at — stops an older approved
+  // timesheet from being mistaken for this period's work.
+  const { data: timesheet } = payPeriod
+    ? await supabase
+        .from("timesheets")
+        .select("id, status, total_hours")
+        .eq("teacher_id", teacherProfile.id)
+        .eq("pay_period_id", payPeriod.id)
+        .maybeSingle()
+    : { data: null };
+
+  // Fetch entries grouped by type
+  const { data: entries } = timesheet
+    ? await supabase
+        .from("timesheet_entries")
+        .select("id, date, entry_type, total_hours, description")
+        .eq("timesheet_id", timesheet.id)
+        .order("date", { ascending: true })
+    : { data: null };
+
+  const allEntries = entries ?? [];
+
+  // Nothing to review — no timesheet for this period, one already submitted, or
+  // a draft with no entries yet. All three send the teacher back to
+  // /teach/timesheets instead of rendering an empty summary.
+  const alreadySubmitted = !!timesheet && timesheet.status !== "draft";
+
+  if (!timesheet || alreadySubmitted || allEntries.length === 0) {
     return (
       <div className="space-y-6">
         <div>
@@ -60,26 +92,26 @@ export default async function TimesheetSummaryPage() {
             &larr; Back to Timesheets
           </a>
           <h1 className="mt-2 text-2xl font-heading font-semibold text-charcoal">
-            Timesheet Summary
+            Timesheet Summary — {monthLabel}
           </h1>
         </div>
-        <div className="rounded-xl border border-dashed border-silver bg-white p-8 text-center text-sm text-mist">
-          {timesheet
-            ? "This timesheet has already been submitted."
-            : "No timesheet found for the current period."}
+        <div className="rounded-xl border border-dashed border-silver bg-white p-8 text-center space-y-4">
+          <p className="text-sm text-mist">
+            {alreadySubmitted
+              ? `Your ${monthLabel} timesheet has already been submitted.`
+              : `No hours logged for ${monthLabel} yet.`}
+          </p>
+          <a
+            href="/teach/timesheets"
+            className="inline-flex items-center h-11 rounded-lg bg-lavender hover:bg-lavender-dark text-white font-semibold text-sm px-6 transition-colors"
+          >
+            {alreadySubmitted ? "View Timesheet" : "Add Hours"}
+          </a>
         </div>
       </div>
     );
   }
 
-  // Fetch entries grouped by type
-  const { data: entries } = await supabase
-    .from("timesheet_entries")
-    .select("id, date, entry_type, total_hours, description")
-    .eq("timesheet_id", timesheet.id)
-    .order("date", { ascending: true });
-
-  const allEntries = entries ?? [];
   const totalHours = allEntries.reduce(
     (sum, e) => sum + (e.total_hours ?? 0),
     0
