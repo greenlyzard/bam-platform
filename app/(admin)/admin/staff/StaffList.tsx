@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { SimpleSelect } from "@/components/ui/select";
 import { addStaffMember, updateStaffOrder, resetStaffOrder } from "./staff-actions";
+import { EMPLOYMENT_TYPE_OPTIONS } from "@/lib/timesheets/employment";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -86,7 +87,7 @@ export function StaffList({ staff: initialStaff, allDisciplines, tenantId, isSup
   const [roleFilter, setRoleFilter] = useState<string[]>([]);
   const [discFilter, setDiscFilter] = useState<string[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [addForm, setAddForm] = useState({ firstName: "", lastName: "", email: "", role: "teacher", employmentType: "w2", sendWelcome: true });
+  const [addForm, setAddForm] = useState({ firstName: "", lastName: "", email: "", role: "teacher", employmentType: "", sendWelcome: true });
   const [addError, setAddError] = useState("");
   const [toast, setToast] = useState("");
 
@@ -337,7 +338,16 @@ export function StaffList({ staff: initialStaff, allDisciplines, tenantId, isSup
             </div>
             <input className="w-full h-9 rounded-md border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:outline-none" placeholder="Email *" type="email" value={addForm.email} onChange={e => setAddForm(f => ({ ...f, email: e.target.value }))} />
             <SimpleSelect value={addForm.role} onValueChange={v => setAddForm(f => ({ ...f, role: v }))} options={[{ value: "teacher", label: "Teacher" }, { value: "admin", label: "Admin" }, { value: "super_admin", label: "Studio Owner" }]} placeholder="Role" />
-            <SimpleSelect value={addForm.employmentType} onValueChange={v => setAddForm(f => ({ ...f, employmentType: v }))} options={[{ value: "w2", label: "Employee (W-2)" }, { value: "1099", label: "Contractor (1099)" }]} placeholder="Employment Type" />
+            {/* Employment type is a tax classification stored on the teachers
+                row, which is only created for teaching staff — so it is only
+                offered when the selected role is teacher. Optional: left blank,
+                they show as Unclassified in payroll until it is set. */}
+            {addForm.role === "teacher" && (
+              <div className="space-y-1">
+                <SimpleSelect value={addForm.employmentType} onValueChange={v => setAddForm(f => ({ ...f, employmentType: v }))} options={EMPLOYMENT_TYPE_OPTIONS} placeholder="Employment Type (optional)" />
+                <p className="text-xs text-mist">How they are paid. Can be set later from their staff profile.</p>
+              </div>
+            )}
             <label className="flex items-center gap-2 text-sm text-charcoal cursor-pointer">
               <input type="checkbox" checked={addForm.sendWelcome} onChange={e => setAddForm(f => ({ ...f, sendWelcome: e.target.checked }))} className="h-4 w-4 rounded border-silver text-lavender" />
               Send welcome email with login link
@@ -358,9 +368,15 @@ export function StaffList({ staff: initialStaff, allDisciplines, tenantId, isSup
                   fd.set("tenantId", tenantId);
                   startTransition(async () => {
                     const res = await addStaffMember(fd);
-                    if (res.error) { setAddError(res.error); return; }
+                    if (res.error) {
+                      setAddError(res.error);
+                      // A partial failure still created the account — refresh so
+                      // the list reflects reality while the error stays visible.
+                      if ("id" in res && res.id) router.refresh();
+                      return;
+                    }
                     setShowAddModal(false);
-                    setAddForm({ firstName: "", lastName: "", email: "", role: "teacher", employmentType: "w2", sendWelcome: true });
+                    setAddForm({ firstName: "", lastName: "", email: "", role: "teacher", employmentType: "", sendWelcome: true });
                     setToast(`${addForm.firstName} has been added to your team`);
                     setTimeout(() => setToast(""), 3000);
                     router.refresh();
