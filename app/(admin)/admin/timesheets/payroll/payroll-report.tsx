@@ -4,6 +4,11 @@ import { useState } from "react";
 import Link from "next/link";
 import { SimpleSelect } from "@/components/ui/select";
 import { markEntriesAsPaid } from "../actions";
+import {
+  EMPLOYMENT_FILTER_OPTIONS,
+  PAYROLL_CLASS_LABELS,
+  type PayrollClass,
+} from "@/lib/timesheets/employment";
 
 /** Wraps SimpleSelect with a hidden input for native form submission */
 function FormSelect({
@@ -36,6 +41,7 @@ interface TeacherPayroll {
   name: string;
   email: string;
   employmentType: string;
+  payrollClass: PayrollClass;
   rates: { class: number; private: number; rehearsal: number; admin: number } | null;
   hours: {
     class: number;
@@ -67,8 +73,10 @@ interface PayrollReportProps {
   dateTo: string;
   w2Teachers: TeacherPayroll[];
   contractorTeachers: TeacherPayroll[];
+  unclassifiedTeachers: TeacherPayroll[];
   totalW2Owed: number;
   total1099Owed: number;
+  totalUnclassifiedOwed: number;
   totalHours: number;
   missingRatesCount: number;
   teacherList: { id: string; name: string }[];
@@ -121,8 +129,10 @@ export function PayrollReport({
   dateTo,
   w2Teachers,
   contractorTeachers,
+  unclassifiedTeachers,
   totalW2Owed,
   total1099Owed,
+  totalUnclassifiedOwed,
   totalHours,
   missingRatesCount,
   teacherList,
@@ -132,8 +142,13 @@ export function PayrollReport({
   filterEmpType,
   filterStatus,
 }: PayrollReportProps) {
-  const allTeachers = [...w2Teachers, ...contractorTeachers];
+  const allTeachers = [
+    ...w2Teachers,
+    ...contractorTeachers,
+    ...unclassifiedTeachers,
+  ];
   const totalTeachers = allTeachers.filter((t) => t.entries.length > 0).length;
+  const combinedOwed = totalW2Owed + total1099Owed + totalUnclassifiedOwed;
 
   function handleExportCsv() {
     const escape = (v: string) =>
@@ -164,7 +179,7 @@ export function PayrollReport({
       .map((t) => [
         escape(t.name),
         escape(t.email),
-        t.employmentType === "1099" ? "1099 Contractor" : "W-2 Employee",
+        PAYROLL_CLASS_LABELS[t.payrollClass],
         t.hours.class.toFixed(2),
         t.hours.private.toFixed(2),
         t.hours.rehearsal.toFixed(2),
@@ -196,7 +211,7 @@ export function PayrollReport({
     const detailRows = allTeachers.flatMap((t) =>
       t.entries.map((e) => [
         escape(t.name),
-        t.employmentType === "1099" ? "1099" : "W-2",
+        PAYROLL_CLASS_LABELS[t.payrollClass],
         e.date,
         ENTRY_TYPE_LABELS[e.entry_type] ?? e.entry_type,
         e.total_hours.toFixed(2),
@@ -337,10 +352,7 @@ export function PayrollReport({
             <FormSelect
               name="empType"
               defaultValue={filterEmpType}
-              options={[
-                { value: "w2", label: "W-2 Employees" },
-                { value: "1099", label: "1099 Contractors" },
-              ]}
+              options={EMPLOYMENT_FILTER_OPTIONS}
               placeholder="All"
             />
           </div>
@@ -433,12 +445,29 @@ export function PayrollReport({
         />
       )}
 
+      {/* Section C — Unclassified. Only rendered when someone actually lands
+          here, so a correctly-classified studio never sees an empty section. */}
+      {(!filterEmpType || filterEmpType === "unclassified") &&
+        unclassifiedTeachers.some((t) => t.entries.length > 0) && (
+          <PayrollSection
+            title="Unclassified"
+            teachers={unclassifiedTeachers}
+            totalOwed={totalUnclassifiedOwed}
+            note="These teachers have hours but no W-2/1099 classification on their staff record. Set their employment type before running payroll — their hours are counted in the totals below but cannot be filed correctly."
+            warn
+          />
+        )}
+
       {/* Summary Bar */}
       <div className="rounded-xl border border-silver bg-charcoal text-white p-5">
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
           <SummaryStat
             label="Total Teachers"
-            value={`${totalTeachers} (W-2: ${w2Teachers.filter((t) => t.entries.length > 0).length}, 1099: ${contractorTeachers.filter((t) => t.entries.length > 0).length})`}
+            value={`${totalTeachers} (W-2: ${w2Teachers.filter((t) => t.entries.length > 0).length}, 1099: ${contractorTeachers.filter((t) => t.entries.length > 0).length}${
+              unclassifiedTeachers.some((t) => t.entries.length > 0)
+                ? `, Unclassified: ${unclassifiedTeachers.filter((t) => t.entries.length > 0).length}`
+                : ""
+            })`}
           />
           <SummaryStat
             label="Total Hours"
@@ -454,7 +483,7 @@ export function PayrollReport({
           />
           <SummaryStat
             label="Combined Total"
-            value={formatCurrency(totalW2Owed + total1099Owed)}
+            value={formatCurrency(combinedOwed)}
             highlight
           />
           {missingRatesCount > 0 && (
@@ -475,11 +504,13 @@ function PayrollSection({
   teachers,
   totalOwed,
   note,
+  warn,
 }: {
   title: string;
   teachers: TeacherPayroll[];
   totalOwed: number;
   note?: string;
+  warn?: boolean;
 }) {
   const activeTeachers = teachers.filter((t) => t.entries.length > 0);
 
@@ -496,7 +527,13 @@ function PayrollSection({
       </div>
 
       {note && (
-        <p className="text-xs text-slate bg-cloud/50 rounded-lg px-3 py-2 italic">
+        <p
+          className={
+            warn
+              ? "text-xs text-warning bg-warning/10 border border-warning/20 rounded-lg px-3 py-2"
+              : "text-xs text-slate bg-cloud/50 rounded-lg px-3 py-2 italic"
+          }
+        >
           {note}
         </p>
       )}
@@ -557,7 +594,10 @@ function PayrollSection({
 function TeacherRow({ teacher }: { teacher: TeacherPayroll }) {
   const [expanded, setExpanded] = useState(false);
 
-  const rateInfo = teacher.rates
+  // A teacher row can exist with a rates object whose values are all zero (a
+  // `teachers` row with NULL rate columns). Joining those yields "", which is
+  // not nullish — so check length rather than relying on ?? to catch it.
+  const rateParts = teacher.rates
     ? [
         teacher.rates.class > 0 ? `Class $${teacher.rates.class}` : null,
         teacher.rates.private > 0 ? `Private $${teacher.rates.private}` : null,
@@ -565,10 +605,9 @@ function TeacherRow({ teacher }: { teacher: TeacherPayroll }) {
           ? `Rehearsal $${teacher.rates.rehearsal}`
           : null,
         teacher.rates.admin > 0 ? `Admin $${teacher.rates.admin}` : null,
-      ]
-        .filter(Boolean)
-        .join(" / ")
-    : null;
+      ].filter(Boolean)
+    : [];
+  const rateInfo = rateParts.length > 0 ? rateParts.join(" / ") : null;
 
   return (
     <>
@@ -605,18 +644,19 @@ function TeacherRow({ teacher }: { teacher: TeacherPayroll }) {
           {teacher.hours.total.toFixed(1)}
         </td>
         <td className="px-4 py-3 text-xs text-slate max-w-[180px] truncate">
-          {rateInfo ?? (
-            <span className="text-warning">
-              — ⚠️
-            </span>
-          )}
+          {rateInfo ?? <span className="text-warning">No rates set ⚠️</span>}
         </td>
+        {/* Always show a figure. A teacher who worked must never be rendered as
+            a blank or a dash — an incomplete row beats a silently missing one. */}
         <td className="px-4 py-3 text-right font-semibold text-charcoal">
-          {teacher.hasMissingRates ? (
-            <span className="text-warning">⚠️ —</span>
-          ) : (
-            formatCurrency(teacher.totalOwed)
-          )}
+          <div className="flex flex-col items-end leading-tight">
+            <span>{formatCurrency(teacher.totalOwed)}</span>
+            {teacher.hasMissingRates && (
+              <span className="text-[10px] font-normal text-warning">
+                ⚠️ rates missing
+              </span>
+            )}
+          </div>
         </td>
       </tr>
       {expanded && (

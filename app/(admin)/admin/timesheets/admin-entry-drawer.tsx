@@ -3,11 +3,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SimpleSelect } from "@/components/ui/select";
 import { adminAddEntry, adminUpdateEntry, adminDeleteEntry, submitTimesheetEntry, approveTimesheetEntry } from "./actions";
+import {
+  PAYROLL_CLASS_LABELS,
+  type PayrollClass,
+} from "@/lib/timesheets/employment";
 
 interface Teacher {
   id: string;
   name: string;
   employmentType: string;
+  payrollClass: PayrollClass;
 }
 
 interface Production {
@@ -641,9 +646,7 @@ function EntryDrawer({
                 Employment Type
               </label>
               <div className="h-10 rounded-lg border border-silver bg-cloud/50 px-3 flex items-center text-sm text-slate">
-                {teacher.employmentType === "1099"
-                  ? "1099 Contractor"
-                  : "W-2 Employee"}
+                {PAYROLL_CLASS_LABELS[teacher.payrollClass]}
               </div>
             </div>
           )}

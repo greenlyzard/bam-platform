@@ -5,6 +5,10 @@ import Link from "next/link";
 import { SimpleSelect } from "@/components/ui/select";
 import { bulkApproveTimesheets } from "./actions";
 import {
+  EMPLOYMENT_FILTER_OPTIONS,
+  type PayrollClass,
+} from "@/lib/timesheets/employment";
+import {
   AdminAddEntryButton,
   AdminEditEntryButton,
   AdminDeleteEntryButton,
@@ -22,6 +26,7 @@ interface Teacher {
   id: string;
   name: string;
   employmentType: string;
+  payrollClass: PayrollClass;
 }
 
 interface Production {
@@ -39,7 +44,7 @@ interface TimesheetRow {
   teacherId: string;
   teacherName: string;
   teacherEmail: string;
-  employmentType: string;
+  payrollClass: PayrollClass;
 }
 
 interface ChangeLogEntry {
@@ -674,10 +679,7 @@ export function TimesheetsClient({
                 <FormSelect
                   name="empType"
                   defaultValue={filterEmpType}
-                  options={[
-                    { value: "w2", label: "W-2" },
-                    { value: "1099", label: "1099" },
-                  ]}
+                  options={EMPLOYMENT_FILTER_OPTIONS}
                   placeholder="All"
                 />
               </div>

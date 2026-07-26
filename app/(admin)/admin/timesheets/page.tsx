@@ -3,6 +3,10 @@ import { createClient } from "@/lib/supabase/server";
 import { canViewPayRates, canExportPayroll } from "@/lib/rbac/permissions";
 import { ExportCsvButton } from "./export-csv";
 import { TimesheetsClient } from "./timesheets-client";
+import {
+  classifyEmployment,
+  PAYROLL_CLASS_LABELS,
+} from "@/lib/timesheets/employment";
 import Link from "next/link";
 
 const ENTRY_TYPE_LABELS: Record<string, string> = {
@@ -62,10 +66,13 @@ export default async function AdminTimesheetsPage({
 
   const { data: teacherProfiles } = await teacherQuery.order("first_name");
 
+  // employment_type is never literally 'w2'/'1099' — map it once here so the
+  // filter, CSV, and client all agree. See lib/timesheets/employment.ts.
   const teachers = (teacherProfiles ?? []).map((tp) => ({
     id: tp.id,
     name: [tp.first_name, tp.last_name].filter(Boolean).join(" ") || "Unknown",
     employmentType: tp.employment_type,
+    payrollClass: classifyEmployment(tp.employment_type),
   }));
 
   const teacherMap = new Map(teachers.map((t) => [t.id, t]));
@@ -197,7 +204,9 @@ export default async function AdminTimesheetsPage({
       teacherLastName: prof?.last_name ?? "",
       teacherFirstName: prof?.first_name ?? "",
       email: prof?.email ?? "",
-      employmentType: teacher?.employmentType ?? "",
+      employmentType: teacher
+        ? PAYROLL_CLASS_LABELS[teacher.payrollClass]
+        : "",
       date: e.date,
       type: e.entry_type,
       hours: e.total_hours,
@@ -241,7 +250,7 @@ export default async function AdminTimesheetsPage({
           const tsJoin = (e as Record<string, unknown>).timesheets as {
             teacher_id: string;
           } | null;
-          const et = tsJoin?.teacher_id ? teacherMap.get(tsJoin.teacher_id)?.employmentType : undefined;
+          const et = tsJoin?.teacher_id ? teacherMap.get(tsJoin.teacher_id)?.payrollClass : undefined;
           if (et !== params.empType) return false;
         }
         return true;
@@ -300,7 +309,7 @@ export default async function AdminTimesheetsPage({
           teacherId: ts.teacher_id,
           teacherName: [prof?.first_name, prof?.last_name].filter(Boolean).join(" ") || "Unknown",
           teacherEmail: prof?.email ?? "",
-          employmentType: teacher?.employmentType ?? "w2",
+          payrollClass: teacher?.payrollClass ?? "unclassified",
         };
       })}
       entries={(allEntries ?? []).map((e) => ({

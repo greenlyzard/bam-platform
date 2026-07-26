@@ -1,6 +1,10 @@
 import { requireRole } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { PayrollReport } from "./payroll-report";
+import {
+  classifyEmployment,
+  type PayrollClass,
+} from "@/lib/timesheets/employment";
 
 export default async function PayrollPage({
   searchParams,
@@ -138,6 +142,7 @@ export default async function PayrollPage({
     name: string;
     email: string;
     employmentType: string;
+    payrollClass: PayrollClass;
     rates: { class: number; private: number; rehearsal: number; admin: number } | null;
     hours: {
       class: number;
@@ -161,6 +166,7 @@ export default async function PayrollPage({
       name: [tp.first_name, tp.last_name].filter(Boolean).join(" ") || "Unknown",
       email: tp.email ?? "",
       employmentType: tp.employment_type,
+      payrollClass: classifyEmployment(tp.employment_type),
       rates,
       hours: { class: 0, private: 0, rehearsal: 0, admin: 0, other: 0, total: 0 },
       totalOwed: 0,
@@ -177,7 +183,7 @@ export default async function PayrollPage({
     const teacher = teacherMap.get(entry.teacher_profile_id);
     if (!teacher) continue;
     if (filterTeacher && teacher.id !== filterTeacher) continue;
-    if (filterEmpType && teacher.employmentType !== filterEmpType) continue;
+    if (filterEmpType && teacher.payrollClass !== filterEmpType) continue;
 
     teacher.entries.push(entry);
 
@@ -220,16 +226,25 @@ export default async function PayrollPage({
     allTeachers = allTeachers.filter((t) => t.id === filterTeacher);
   }
   if (filterEmpType) {
-    allTeachers = allTeachers.filter((t) => t.employmentType === filterEmpType);
+    allTeachers = allTeachers.filter((t) => t.payrollClass === filterEmpType);
   }
 
-  const w2Teachers = allTeachers.filter((t) => t.employmentType === "w2");
-  const contractorTeachers = allTeachers.filter((t) => t.employmentType === "1099");
+  // Every teacher lands in exactly one bucket — a teacher with hours must never
+  // vanish from the report just because their classification is unmapped.
+  const w2Teachers = allTeachers.filter((t) => t.payrollClass === "w2");
+  const contractorTeachers = allTeachers.filter((t) => t.payrollClass === "1099");
+  const unclassifiedTeachers = allTeachers.filter(
+    (t) => t.payrollClass === "unclassified"
+  );
 
   const missingRatesCount = allTeachers.filter((t) => t.hasMissingRates && t.entries.length > 0).length;
 
   const totalW2Owed = w2Teachers.reduce((s, t) => s + t.totalOwed, 0);
   const total1099Owed = contractorTeachers.reduce((s, t) => s + t.totalOwed, 0);
+  const totalUnclassifiedOwed = unclassifiedTeachers.reduce(
+    (s, t) => s + t.totalOwed,
+    0
+  );
   const totalHours = allTeachers.reduce((s, t) => s + t.hours.total, 0);
 
   const productions = (productionRows ?? []).map((p) => ({
@@ -248,8 +263,10 @@ export default async function PayrollPage({
       dateTo={dateTo}
       w2Teachers={w2Teachers}
       contractorTeachers={contractorTeachers}
+      unclassifiedTeachers={unclassifiedTeachers}
       totalW2Owed={totalW2Owed}
       total1099Owed={total1099Owed}
+      totalUnclassifiedOwed={totalUnclassifiedOwed}
       totalHours={totalHours}
       missingRatesCount={missingRatesCount}
       teacherList={teacherList}
