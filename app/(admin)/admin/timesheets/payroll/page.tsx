@@ -233,14 +233,21 @@ export default async function PayrollPage({
   // vanish from the report just because their classification is unmapped.
   const w2Teachers = allTeachers.filter((t) => t.payrollClass === "w2");
   const contractorTeachers = allTeachers.filter((t) => t.payrollClass === "1099");
+  const ownerTeachers = allTeachers.filter(
+    (t) => t.payrollClass === "owner_draw"
+  );
   const unclassifiedTeachers = allTeachers.filter(
     (t) => t.payrollClass === "unclassified"
   );
 
   const missingRatesCount = allTeachers.filter((t) => t.hasMissingRates && t.entries.length > 0).length;
 
+  // Owner value is computed and displayed but is EXCLUDED from both wage
+  // totals — an owner's draw is an equity distribution, not payroll expense.
+  // Folding it into either total would misstate labor cost.
   const totalW2Owed = w2Teachers.reduce((s, t) => s + t.totalOwed, 0);
   const total1099Owed = contractorTeachers.reduce((s, t) => s + t.totalOwed, 0);
+  const totalOwnerDraw = ownerTeachers.reduce((s, t) => s + t.totalOwed, 0);
   const totalUnclassifiedOwed = unclassifiedTeachers.reduce(
     (s, t) => s + t.totalOwed,
     0
@@ -263,9 +270,11 @@ export default async function PayrollPage({
       dateTo={dateTo}
       w2Teachers={w2Teachers}
       contractorTeachers={contractorTeachers}
+      ownerTeachers={ownerTeachers}
       unclassifiedTeachers={unclassifiedTeachers}
       totalW2Owed={totalW2Owed}
       total1099Owed={total1099Owed}
+      totalOwnerDraw={totalOwnerDraw}
       totalUnclassifiedOwed={totalUnclassifiedOwed}
       totalHours={totalHours}
       missingRatesCount={missingRatesCount}

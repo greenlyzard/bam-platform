@@ -14,11 +14,18 @@
  * No server imports — safe to use from client components.
  */
 
-export type PayrollClass = "w2" | "1099" | "unclassified";
+/**
+ * `owner_draw` is NOT a payroll bucket. An owner still logs timesheets — those
+ * hours reconcile against private billing whether or not a draw is taken — but
+ * payments to them are equity distributions, not wages. Owner hours and value
+ * must never be folded into wage expense, W-2 totals, or 1099 totals.
+ */
+export type PayrollClass = "w2" | "1099" | "owner_draw" | "unclassified";
 
 export const PAYROLL_CLASS_LABELS: Record<PayrollClass, string> = {
   w2: "W-2 Employee",
   "1099": "1099 Contractor",
+  owner_draw: "Owner Draw",
   unclassified: "Unclassified",
 };
 
@@ -27,6 +34,7 @@ export const EMPLOYMENT_FILTER_OPTIONS: { value: PayrollClass; label: string }[]
   [
     { value: "w2", label: "W-2 Employees" },
     { value: "1099", label: "1099 Contractors" },
+    { value: "owner_draw", label: "Owner Draws" },
     { value: "unclassified", label: "Unclassified" },
   ];
 
@@ -41,6 +49,8 @@ export function classifyEmployment(
     case "contract":
     case "contractor_1099":
       return "1099";
+    case "owner":
+      return "owner_draw";
     default:
       // pending_classification, null, or any value added to the CHECK
       // constraint later. Never drop or mislabel the teacher — surface them

@@ -73,9 +73,11 @@ interface PayrollReportProps {
   dateTo: string;
   w2Teachers: TeacherPayroll[];
   contractorTeachers: TeacherPayroll[];
+  ownerTeachers: TeacherPayroll[];
   unclassifiedTeachers: TeacherPayroll[];
   totalW2Owed: number;
   total1099Owed: number;
+  totalOwnerDraw: number;
   totalUnclassifiedOwed: number;
   totalHours: number;
   missingRatesCount: number;
@@ -129,9 +131,11 @@ export function PayrollReport({
   dateTo,
   w2Teachers,
   contractorTeachers,
+  ownerTeachers,
   unclassifiedTeachers,
   totalW2Owed,
   total1099Owed,
+  totalOwnerDraw,
   totalUnclassifiedOwed,
   totalHours,
   missingRatesCount,
@@ -145,10 +149,26 @@ export function PayrollReport({
   const allTeachers = [
     ...w2Teachers,
     ...contractorTeachers,
+    ...ownerTeachers,
     ...unclassifiedTeachers,
   ];
   const totalTeachers = allTeachers.filter((t) => t.entries.length > 0).length;
+  // Owner draws are equity, not payroll expense — deliberately excluded from
+  // the combined payroll total and reported on their own line instead.
   const combinedOwed = totalW2Owed + total1099Owed + totalUnclassifiedOwed;
+  const activeOwners = ownerTeachers.filter((t) => t.entries.length > 0).length;
+  const activeUnclassified = unclassifiedTeachers.filter(
+    (t) => t.entries.length > 0
+  ).length;
+
+  // Owners and unclassified are counted on their own lines, never merged into
+  // the W-2 or 1099 counts.
+  const teacherBreakdown = [
+    `W-2: ${w2Teachers.filter((t) => t.entries.length > 0).length}`,
+    `1099: ${contractorTeachers.filter((t) => t.entries.length > 0).length}`,
+    ...(activeOwners > 0 ? [`Owner: ${activeOwners}`] : []),
+    ...(activeUnclassified > 0 ? [`Unclassified: ${activeUnclassified}`] : []),
+  ].join(", ");
 
   function handleExportCsv() {
     const escape = (v: string) =>
@@ -445,7 +465,21 @@ export function PayrollReport({
         />
       )}
 
-      {/* Section C — Unclassified. Only rendered when someone actually lands
+      {/* Section C — Owner Draws. Hours and computed value are both shown: the
+          value is meaningful for reconciliation even when no draw is taken.
+          Neither figure feeds the W-2/1099 totals or the combined payroll
+          total. Only rendered when someone actually lands here. */}
+      {(!filterEmpType || filterEmpType === "owner_draw") &&
+        activeOwners > 0 && (
+          <PayrollSection
+            title="Owner Draws"
+            teachers={ownerTeachers}
+            totalOwed={totalOwnerDraw}
+            note="Payments to an owner are equity distributions, not wages. They are not subject to payroll tax withholding and are not reported on a W-2 or 1099. Hours are logged for reconciliation against private billing; the value shown is not a payroll liability and is excluded from the combined payroll total."
+          />
+        )}
+
+      {/* Section D — Unclassified. Only rendered when someone actually lands
           here, so a correctly-classified studio never sees an empty section. */}
       {(!filterEmpType || filterEmpType === "unclassified") &&
         unclassifiedTeachers.some((t) => t.entries.length > 0) && (
@@ -463,11 +497,7 @@ export function PayrollReport({
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
           <SummaryStat
             label="Total Teachers"
-            value={`${totalTeachers} (W-2: ${w2Teachers.filter((t) => t.entries.length > 0).length}, 1099: ${contractorTeachers.filter((t) => t.entries.length > 0).length}${
-              unclassifiedTeachers.some((t) => t.entries.length > 0)
-                ? `, Unclassified: ${unclassifiedTeachers.filter((t) => t.entries.length > 0).length}`
-                : ""
-            })`}
+            value={`${totalTeachers} (${teacherBreakdown})`}
           />
           <SummaryStat
             label="Total Hours"
@@ -486,6 +516,13 @@ export function PayrollReport({
             value={formatCurrency(combinedOwed)}
             highlight
           />
+          {/* Reported outside Combined Total on purpose — equity, not payroll. */}
+          {activeOwners > 0 && (
+            <SummaryStat
+              label="Owner Draws (equity)"
+              value={formatCurrency(totalOwnerDraw)}
+            />
+          )}
           {missingRatesCount > 0 && (
             <SummaryStat
               label="Missing Rates"
