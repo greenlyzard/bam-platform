@@ -74,13 +74,28 @@ export async function getTeacherContext(supabase: SupabaseClient) {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
+  // teacher_profiles VIEW uses `id` (= profiles.id), not `user_id`,
+  // and has no `tenant_id` — get that from profile_roles
   const { data: tp } = await supabase
     .from("teacher_profiles")
-    .select("id, tenant_id")
-    .eq("user_id", user.id)
+    .select("id")
+    .eq("id", user.id)
     .single();
 
-  return tp;
+  if (!tp) return null;
+
+  // Array query — user may hold multiple active roles (e.g. super_admin + teacher)
+  const { data: roles } = await supabase
+    .from("profile_roles")
+    .select("tenant_id")
+    .eq("user_id", user.id)
+    .eq("is_active", true)
+    .limit(1);
+
+  const tenantId = roles?.[0]?.tenant_id;
+  if (!tenantId) return null;
+
+  return { id: tp.id, tenant_id: tenantId };
 }
 
 /** Compute decimal hours from HH:MM time strings */

@@ -31,22 +31,23 @@ export default async function PayrollPage({
   const dateTo = params.to || defaultTo;
 
   // Fetch all teacher profiles with pay rates from teachers table
+  // teacher_profiles VIEW has no `user_id` — its `id` IS profiles.id
   const { data: teacherProfiles } = await supabase
     .from("teacher_profiles")
-    .select("id, first_name, last_name, email, employment_type, user_id, is_active")
+    .select("id, first_name, last_name, email, employment_type, is_active")
     .eq("is_active", true)
     .order("first_name");
 
-  // Fetch legacy pay rates from teachers table (keyed by user_id = profiles.id)
-  const userIds = (teacherProfiles ?? []).map((tp) => tp.user_id);
+  // Fetch legacy pay rates from teachers table (teachers.id = profiles.id = teacher_profiles.id)
+  const teacherIds = (teacherProfiles ?? []).map((tp) => tp.id);
   const { data: teacherRates } =
-    userIds.length > 0
+    teacherIds.length > 0
       ? await supabase
           .from("teachers")
           .select(
             "id, class_rate_cents, private_rate_cents, rehearsal_rate_cents, admin_rate_cents"
           )
-          .in("id", userIds)
+          .in("id", teacherIds)
       : { data: [] };
 
   const rateMap: Record<
@@ -154,8 +155,8 @@ export default async function PayrollPage({
   const teacherMap = new Map<string, TeacherPayroll>();
 
   for (const tp of teacherProfiles ?? []) {
-    const rates = rateMap[tp.user_id] ?? null;
-    teacherMap.set(tp.user_id, {
+    const rates = rateMap[tp.id] ?? null;
+    teacherMap.set(tp.id, {
       id: tp.id,
       name: [tp.first_name, tp.last_name].filter(Boolean).join(" ") || "Unknown",
       email: tp.email ?? "",

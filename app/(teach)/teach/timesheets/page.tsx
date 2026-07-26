@@ -34,16 +34,32 @@ export default async function TimesheetsPage() {
     name: p.name,
   }));
 
-  // Fetch the current timesheet (any status)
-  const { data: timesheet } = teacherProfile
+  // Resolve the current pay period the same way getOrCreateTimesheet does
+  // (tenant + month + year) so the page and the add-entry action always agree.
+  const { data: payPeriod } = user.tenantId
     ? await supabase
-        .from("timesheets")
-        .select("id, status, total_hours, submitted_at")
-        .eq("teacher_id", teacherProfile.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
+        .from("pay_periods")
+        .select("id")
+        .eq("tenant_id", user.tenantId)
+        .eq("period_month", now.getMonth() + 1)
+        .eq("period_year", now.getFullYear())
         .maybeSingle()
     : { data: null };
+
+  // Fetch this teacher's timesheet for the CURRENT pay period only (any status).
+  // Scoping by period — rather than newest-by-created_at — is what lets a teacher
+  // start a new period after a previous timesheet has been approved. When no
+  // timesheet (or no pay period) exists yet, both stay null, isDraft stays true,
+  // and AddEntryForm renders so the first entry creates them.
+  const { data: timesheet } =
+    teacherProfile && payPeriod
+      ? await supabase
+          .from("timesheets")
+          .select("id, status, total_hours, submitted_at")
+          .eq("teacher_id", teacherProfile.id)
+          .eq("pay_period_id", payPeriod.id)
+          .maybeSingle()
+      : { data: null };
 
   // Fetch entries with new fields
   const { data: entries } = timesheet
