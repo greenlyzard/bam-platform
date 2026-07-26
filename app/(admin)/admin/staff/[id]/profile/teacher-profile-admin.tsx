@@ -7,7 +7,13 @@ import { createClient } from "@/lib/supabase/client";
 import {
   updateTeacherBasics, toggleTeacherActive, addSpecialty, removeSpecialty,
   updateSpecialtyOrder, upsertRateCard, updateCompliance, updateSubEligibility,
+  updateEmploymentType,
 } from "./actions";
+import {
+  EMPLOYMENT_TYPE_OPTIONS,
+  PAYROLL_CLASS_LABELS,
+  classifyEmployment,
+} from "@/lib/timesheets/employment";
 import {
   updateEnhancedBio, addDiscipline, removeDiscipline, reorderDisciplines,
   addAffiliation, removeAffiliation, reorderAffiliations,
@@ -34,6 +40,8 @@ interface Teacher {
   years_experience?: number | null; education?: string | null;
   social_instagram?: string | null; social_linkedin?: string | null;
   isActive: boolean;
+  employment_type?: string | null;
+  hasTeacherRecord?: boolean;
 }
 interface IconItem { id: string; name: string; image_url: string | null; category: string | null; sort_order: number }
 interface Discipline { id: string; teacher_id: string; icon_id: string | null; name: string; is_certified: boolean; sort_order: number; icon_library?: IconItem | null }
@@ -170,6 +178,9 @@ export function TeacherProfileAdmin({
   });
   const [newSpec, setNewSpec] = useState("");
 
+  // Employment type (tax classification on `teachers`, not a platform role)
+  const [empType, setEmpType] = useState(teacher.employment_type ?? "");
+
   // Compliance form
   const [compForm, setCompForm] = useState({
     background_check_status: comp?.background_check_status ?? "",
@@ -249,6 +260,19 @@ export function TeacherProfileAdmin({
       setTeacher(t => ({ ...t, ...infoForm, phone: infoForm.phone || null }));
       setEditingInfo(false);
       flash("Teacher info updated");
+    });
+  }
+
+  // ── Employment type (tax classification) ──
+  function saveEmploymentType() {
+    const fd = new FormData();
+    fd.set("teacherId", teacher.id);
+    fd.set("employmentType", empType);
+    startTransition(async () => {
+      const res = await updateEmploymentType(fd);
+      if (res.error) return flash(res.error);
+      setTeacher(t => ({ ...t, employment_type: empType }));
+      flash("Employment type updated");
     });
   }
 
@@ -586,6 +610,10 @@ export function TeacherProfileAdmin({
       {/* N. Role & Access */}
       <div className={cardCls}>
         <h2 className={headingCls}>Role & Access</h2>
+        <p className="text-xs text-slate">
+          What this person can <strong>do</strong> in the platform. Separate from
+          Employment Type below, which is how they are <strong>paid</strong>.
+        </p>
         <div className="flex flex-wrap gap-2">
           {staffRoles.map((r) => (
             <span key={r.role} className="inline-flex items-center gap-1.5 rounded-full bg-lavender/10 text-lavender-dark px-3 py-1 text-sm font-medium">
@@ -614,6 +642,71 @@ export function TeacherProfileAdmin({
             <button className={btnPrimary} onClick={handleAddRole} disabled={isPending}>Add</button>
             <button className={btnSecondary} onClick={() => setAddRoleOpen(false)}>Cancel</button>
           </div>
+        )}
+      </div>
+
+      {/* Employment Type — TAX classification. Deliberately its own card
+          directly under Role & Access so the two are visibly distinct: roles
+          govern platform access, this governs payroll treatment. */}
+      <div className={cardCls}>
+        <h2 className={headingCls}>Employment Type</h2>
+        <p className="text-xs text-slate">
+          How this person is <strong>paid</strong> — their tax classification for
+          payroll. This is not a platform role: it decides which section of the
+          payroll report their hours appear under, and is never used for access
+          control.
+        </p>
+
+        {teacher.hasTeacherRecord === false ? (
+          <p className="text-xs text-warning bg-warning/10 border border-warning/20 rounded-lg px-3 py-2">
+            No staff pay record exists for this person yet, so an employment type
+            cannot be set. They will not appear in timesheets or payroll until one
+            is created.
+          </p>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-end gap-3">
+              <div>
+                <span className="block text-xs text-slate mb-1">Classification</span>
+                <SimpleSelect
+                  value={empType}
+                  onValueChange={setEmpType}
+                  options={EMPLOYMENT_TYPE_OPTIONS}
+                  placeholder="Not set"
+                  className="w-56"
+                />
+              </div>
+              <button
+                className={btnPrimary}
+                onClick={saveEmploymentType}
+                disabled={
+                  isPending ||
+                  !empType ||
+                  empType === (teacher.employment_type ?? "")
+                }
+              >
+                Save
+              </button>
+            </div>
+            <p className="text-xs text-slate">
+              Payroll treatment:{" "}
+              <span className="font-medium text-charcoal">
+                &rarr; {PAYROLL_CLASS_LABELS[classifyEmployment(empType || null)]}
+              </span>
+              {classifyEmployment(empType || null) === "owner_draw" && (
+                <span className="text-mist">
+                  {" "}
+                  — paid as an equity distribution, excluded from wage totals
+                </span>
+              )}
+              {classifyEmployment(empType || null) === "unclassified" && (
+                <span className="text-warning">
+                  {" "}
+                  — hours will not be filed under W-2 or 1099 until this is set
+                </span>
+              )}
+            </p>
+          </>
         )}
       </div>
 

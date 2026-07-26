@@ -47,6 +47,14 @@ export default async function AdminStaffProfilePage({
 
   const isActive = roles?.some((r) => r.is_active) ?? true;
 
+  // Tax classification lives on `teachers`, not `profiles`. A staff member may
+  // have no teachers row yet (see addStaffMember), so this is nullable.
+  const { data: teacherRecord } = await supabase
+    .from("teachers")
+    .select("employment_type")
+    .eq("id", teacherId)
+    .maybeSingle();
+
   console.log("[StaffProfilePage] roles:", roles?.map((r) => r.role).join(", ") || "none");
 
   // Safe fetch helpers — never throw
@@ -100,7 +108,12 @@ export default async function AdminStaffProfilePage({
     })
     .filter((x: any): x is NonNullable<typeof x> => x != null);
 
-  const teacher = { ...profile, isActive };
+  const teacher = {
+    ...profile,
+    isActive,
+    employment_type: teacherRecord?.employment_type ?? null,
+    hasTeacherRecord: !!teacherRecord,
+  };
 
   return (
     <div className="space-y-6">

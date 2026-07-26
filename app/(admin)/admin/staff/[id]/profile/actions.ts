@@ -2,6 +2,8 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
+import { EMPLOYMENT_TYPE_VALUES } from "@/lib/timesheets/employment";
 
 // ---------------------------------------------------------------------------
 // 1. Update teacher basics (profiles table)
@@ -284,5 +286,47 @@ export async function updateSubEligibility(formData: FormData) {
   if (error) return { error: error.message };
 
   revalidatePath("/admin/staff");
+  return {};
+}
+
+// ---------------------------------------------------------------------------
+// 9. Update employment type (teachers table) — TAX classification.
+//
+// Distinct from profile_roles, which controls platform access. This column
+// drives payroll bucketing only (see lib/timesheets/employment.ts).
+//
+// The enum is built from EMPLOYMENT_TYPE_VALUES so it cannot drift from the
+// DB CHECK constraint. Anything outside the set is rejected here rather than
+// sent to Postgres to fail on the constraint with an opaque error.
+// ---------------------------------------------------------------------------
+const employmentTypeSchema = z.object({
+  teacherId: z.string().uuid("Invalid teacher id"),
+  employmentType: z.enum(EMPLOYMENT_TYPE_VALUES),
+});
+
+export async function updateEmploymentType(formData: FormData) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const parsed = employmentTypeSchema.safeParse({
+    teacherId: formData.get("teacherId"),
+    employmentType: formData.get("employmentType"),
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid employment type" };
+  }
+
+  const { error } = await supabase
+    .from("teachers")
+    .update({ employment_type: parsed.data.employmentType })
+    .eq("id", parsed.data.teacherId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/staff");
+  revalidatePath("/admin/timesheets");
+  revalidatePath("/admin/timesheets/payroll");
   return {};
 }

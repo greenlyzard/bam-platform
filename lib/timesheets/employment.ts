@@ -29,6 +29,35 @@ export const PAYROLL_CLASS_LABELS: Record<PayrollClass, string> = {
   unclassified: "Unclassified",
 };
 
+/**
+ * The raw `teachers.employment_type` vocabulary — every value permitted by the
+ * CHECK constraint, in the order an admin should see them. This is the single
+ * source for any control that *writes* the column; the PayrollClass values
+ * above are the derived read-side buckets and must never be written to the DB.
+ */
+export const EMPLOYMENT_TYPE_VALUES = [
+  "employee",
+  "full_time",
+  "part_time",
+  "contract",
+  "contractor_1099",
+  "owner",
+  "pending_classification",
+] as const;
+
+export type EmploymentType = (typeof EMPLOYMENT_TYPE_VALUES)[number];
+
+export const EMPLOYMENT_TYPE_OPTIONS: { value: EmploymentType; label: string }[] =
+  [
+    { value: "employee", label: "Employee" },
+    { value: "full_time", label: "Full Time" },
+    { value: "part_time", label: "Part Time" },
+    { value: "contract", label: "Contract" },
+    { value: "contractor_1099", label: "Contractor (1099)" },
+    { value: "owner", label: "Owner" },
+    { value: "pending_classification", label: "Pending Classification" },
+  ];
+
 /** Shared option list for every employment-type filter dropdown. */
 export const EMPLOYMENT_FILTER_OPTIONS: { value: PayrollClass; label: string }[] =
   [
