@@ -65,6 +65,11 @@ export default async function AdminStaffProfilePage({
     try { const r = await query; return r.data ?? null; } catch { return null; }
   }
 
+  // Resolved before the fetch block so rate cards are never even queried for a
+  // non-finance admin — the data must not reach the client payload at all,
+  // hiding the card alone would still ship the rates in the RSC stream.
+  const showPayRates = await canViewPayRates(user.id);
+
   const [
     disciplines, affiliations, photos, iconLibrary,
     specialties, rateCards, compliance, subEligibility,
@@ -75,7 +80,9 @@ export default async function AdminStaffProfilePage({
     safeFetchArray(supabase.from("teacher_photos").select("*").eq("teacher_id", teacherId).eq("is_active", true).order("sort_order")),
     safeFetchArray(supabase.from("icon_library").select("*").eq("is_active", true).order("sort_order")),
     safeFetchArray(supabase.from("teacher_specialties").select("id, specialty, sort_order").eq("teacher_id", teacherId).order("sort_order")),
-    safeFetchArray(supabase.from("teacher_rate_cards").select("*").eq("teacher_id", teacherId)),
+    showPayRates
+      ? safeFetchArray(supabase.from("teacher_rate_cards").select("*").eq("teacher_id", teacherId))
+      : Promise.resolve([]),
     safeFetchSingle(supabase.from("teacher_compliance").select("*").eq("teacher_id", teacherId).maybeSingle()),
     safeFetchSingle(supabase.from("teacher_sub_eligibility").select("*").eq("teacher_id", teacherId).maybeSingle()),
     safeFetchArray(supabase.from("class_teachers").select("class_id, classes(id, name, day_of_week, start_time, end_time, levels, max_enrollment, max_students)").eq("teacher_id", teacherId)),
@@ -128,7 +135,7 @@ export default async function AdminStaffProfilePage({
         availabilityCount={availabilityResult?.count ?? 0} privateCount={privateResult?.count ?? 0}
         tenantId={user.tenantId!} disciplines={disciplines} affiliations={affiliations}
         photos={photos} iconLibrary={iconLibrary}
-        canViewPayRates={await canViewPayRates(user.id)}
+        canViewPayRates={showPayRates}
       />
     </div>
   );

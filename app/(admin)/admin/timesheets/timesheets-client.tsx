@@ -331,7 +331,9 @@ export function TimesheetsClient({
           >
             Payroll Report →
           </Link>
-          {csvRows.length > 0 && canExport && <ExportCsvButton rows={csvRows} />}
+          {csvRows.length > 0 && canExport && (
+            <ExportCsvButton rows={csvRows} includeRates={canViewRates} />
+          )}
         </div>
       </div>
 

@@ -1,4 +1,4 @@
-import { requireRole } from "@/lib/auth/guards";
+import { requireFinance } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { PayrollReport } from "./payroll-report";
 import {
@@ -18,7 +18,9 @@ export default async function PayrollPage({
     status?: string;
   }>;
 }) {
-  await requireRole("finance_admin", "admin", "super_admin");
+  // The entire page is a compensation report — every row, total, and export
+  // is a pay figure. Guarded at the page boundary rather than per-element.
+  await requireFinance();
   const supabase = await createClient();
   const params = await searchParams;
 

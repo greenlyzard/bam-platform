@@ -1,5 +1,6 @@
 "use server";
 
+import { requireAdmin, requireFinance } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -9,9 +10,8 @@ import { EMPLOYMENT_TYPE_VALUES } from "@/lib/timesheets/employment";
 // 1. Update teacher basics (profiles table)
 // ---------------------------------------------------------------------------
 export async function updateTeacherBasics(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
 
   const teacherId = formData.get("teacherId") as string;
   if (!teacherId) return { error: "Missing teacherId" };
@@ -36,9 +36,8 @@ export async function updateTeacherBasics(formData: FormData) {
 // 2. Toggle teacher active status (profile_roles table)
 // ---------------------------------------------------------------------------
 export async function toggleTeacherActive(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
 
   const teacherId = formData.get("teacherId") as string;
   if (!teacherId) return { error: "Missing teacherId" };
@@ -61,9 +60,8 @@ export async function toggleTeacherActive(formData: FormData) {
 // 3. Add specialty
 // ---------------------------------------------------------------------------
 export async function addSpecialty(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
 
   const tenantId = formData.get("tenantId") as string;
   const teacherId = formData.get("teacherId") as string;
@@ -102,9 +100,8 @@ export async function addSpecialty(formData: FormData) {
 // 4. Remove specialty
 // ---------------------------------------------------------------------------
 export async function removeSpecialty(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
 
   const specialtyId = formData.get("specialtyId") as string;
   if (!specialtyId) return { error: "Missing specialtyId" };
@@ -124,9 +121,8 @@ export async function removeSpecialty(formData: FormData) {
 // 5. Update specialty sort order
 // ---------------------------------------------------------------------------
 export async function updateSpecialtyOrder(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
 
   const specialtyId = formData.get("specialtyId") as string;
   const sortOrder = Number(formData.get("sortOrder"));
@@ -150,9 +146,9 @@ export async function updateSpecialtyOrder(formData: FormData) {
 // 6. Upsert rate card
 // ---------------------------------------------------------------------------
 export async function upsertRateCard(formData: FormData) {
+  // Compensation write — finance-level only, NOT plain admin.
+  await requireFinance();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
 
   const tenantId = formData.get("tenantId") as string;
   const teacherId = formData.get("teacherId") as string;
@@ -198,9 +194,8 @@ export async function upsertRateCard(formData: FormData) {
 // 7. Update compliance
 // ---------------------------------------------------------------------------
 export async function updateCompliance(formData: FormData) {
+  const user = await requireAdmin();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
 
   const teacherId = formData.get("teacherId") as string;
   if (!teacherId) return { error: "Missing teacherId" };
@@ -241,9 +236,8 @@ export async function updateCompliance(formData: FormData) {
 // 8. Update sub eligibility
 // ---------------------------------------------------------------------------
 export async function updateSubEligibility(formData: FormData) {
+  const user = await requireAdmin();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
 
   const teacherId = formData.get("teacherId") as string;
   if (!teacherId) return { error: "Missing teacherId" };
@@ -305,9 +299,8 @@ const employmentTypeSchema = z.object({
 });
 
 export async function updateEmploymentType(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
 
   const parsed = employmentTypeSchema.safeParse({
     teacherId: formData.get("teacherId"),

@@ -189,6 +189,12 @@ export default async function AdminTimesheetsPage({
       : { data: [] };
 
   // Build CSV data
+  // Resolved before the CSV is built. The rate columns are stripped server-side
+  // for non-finance users rather than hidden in the client — the export runs in
+  // the browser, so anything left in csvRows is already in their hands.
+  const canViewRates = await canViewPayRates(currentUser.id);
+  const canExport = await canExportPayroll(currentUser.id);
+
   const csvRows = (allEntries ?? []).map((e) => {
     const ts = allTimesheets.find((t) => t.id === e.timesheet_id);
     const prof = ts?.profiles as unknown as {
@@ -210,11 +216,18 @@ export default async function AdminTimesheetsPage({
       date: e.date,
       type: e.entry_type,
       hours: e.total_hours,
-      rate: (e as Record<string, unknown>).rate_amount as number | null ?? null,
-      totalPay: (e as Record<string, unknown>).rate_amount != null ? e.total_hours * ((e as Record<string, unknown>).rate_amount as number) : null,
+      rate: canViewRates
+        ? ((e as Record<string, unknown>).rate_amount as number | null ?? null)
+        : null,
+      totalPay:
+        canViewRates && (e as Record<string, unknown>).rate_amount != null
+          ? e.total_hours * ((e as Record<string, unknown>).rate_amount as number)
+          : null,
       description: e.description ?? "",
       status: e.status ?? ts?.status ?? "",
-      rateOverride: (e as Record<string, unknown>).rate_override as boolean ?? false,
+      rateOverride: canViewRates
+        ? ((e as Record<string, unknown>).rate_override as boolean ?? false)
+        : false,
       notes: e.notes ?? "",
       productionTag: e.production_name ?? e.event_tag ?? "",
       isSubstitute: e.entry_type === "substitute",
@@ -340,8 +353,8 @@ export default async function AdminTimesheetsPage({
       entryTypeLabels={ENTRY_TYPE_LABELS}
       isTeacherOnly={isTeacherOnly}
       isAdmin={currentUser.roles.some((r) => ["finance_admin", "admin", "super_admin"].includes(r))}
-      canViewRates={await canViewPayRates(currentUser.id)}
-      canExport={await canExportPayroll(currentUser.id)}
+      canViewRates={canViewRates}
+      canExport={canExport}
       billingRecords={billingRecords}
     />
   );

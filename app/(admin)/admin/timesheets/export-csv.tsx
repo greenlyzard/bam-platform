@@ -30,10 +30,19 @@ function escapeCsv(val: string): string {
   return val;
 }
 
-export function ExportCsvButton({ rows }: { rows: CsvRow[] }) {
+export function ExportCsvButton({
+  rows,
+  includeRates = false,
+}: {
+  rows: CsvRow[];
+  includeRates?: boolean;
+}) {
   const [isPending, startTransition] = useTransition();
 
   function handleExport() {
+    // Rate columns are omitted entirely for non-finance users. The server has
+    // already nulled the values in `rows`; dropping the headers too keeps the
+    // export from advertising figures the reader is not entitled to.
     const headers = [
       "Last Name",
       "First Name",
@@ -42,9 +51,7 @@ export function ExportCsvButton({ rows }: { rows: CsvRow[] }) {
       "Entry Type",
       "Description",
       "Hours",
-      "Rate",
-      "Total Pay",
-      "Rate Override",
+      ...(includeRates ? ["Rate", "Total Pay", "Rate Override"] : []),
       "Notes",
       "Production/Competition",
       "Is Substitute",
@@ -62,9 +69,13 @@ export function ExportCsvButton({ rows }: { rows: CsvRow[] }) {
           r.type,
           escapeCsv(r.description),
           r.hours.toFixed(2),
-          r.rate != null ? r.rate.toFixed(2) : "",
-          r.totalPay != null ? r.totalPay.toFixed(2) : "",
-          r.rateOverride ? "Yes" : "No",
+          ...(includeRates
+            ? [
+                r.rate != null ? r.rate.toFixed(2) : "",
+                r.totalPay != null ? r.totalPay.toFixed(2) : "",
+                r.rateOverride ? "Yes" : "No",
+              ]
+            : []),
           escapeCsv(r.notes ?? ""),
           escapeCsv(r.productionTag ?? ""),
           r.isSubstitute ? "Yes" : "No",

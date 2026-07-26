@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(
@@ -135,10 +136,19 @@ export async function POST(
         updates.employment_type = "pending_classification";
       }
 
-      await supabase
+      // Service-role write. `teachers_update_own` was removed so that teachers
+      // cannot set their own pay rates or tax classification; this counter and
+      // the 1099 threshold reclassification are server-computed, never
+      // user-supplied, so they are applied with the admin client and still
+      // scoped to the authenticated user's own row.
+      const { error: counterErr } = await createAdminClient()
         .from("teachers")
         .update(updates)
         .eq("id", user.id);
+
+      if (counterErr) {
+        console.error("[substitute-alerts:respond] teacher counter update failed:", counterErr.message);
+      }
     }
   }
 

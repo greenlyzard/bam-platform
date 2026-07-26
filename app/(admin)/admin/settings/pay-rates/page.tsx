@@ -1,9 +1,9 @@
-import { requireRole } from "@/lib/auth/guards";
+import { requireFinance } from "@/lib/auth/guards";
 import { getAllTeachers } from "@/lib/queries/admin";
 import { PayRateEditor } from "./pay-rate-editor";
 
 export default async function PayRatesPage() {
-  await requireRole("finance_admin", "admin", "super_admin");
+  await requireFinance();
 
   const teachers = await getAllTeachers();
 

@@ -121,6 +121,19 @@ export async function requireAdmin(): Promise<AuthUser> {
 }
 
 /**
+ * Require finance-level access: finance_admin or super_admin only.
+ *
+ * Deliberately NARROWER than requireAdmin() — use this for anything that
+ * reads or writes compensation (pay rates, rate cards, payroll figures).
+ * A plain `admin` runs the studio but does not see or set what people are
+ * paid. Mirrors canViewPayRates() in lib/rbac/permissions.ts and
+ * has_finance_role() in the database.
+ */
+export async function requireFinance(): Promise<AuthUser> {
+  return requireRole("finance_admin", "super_admin");
+}
+
+/**
  * Require teacher, admin, or super_admin role.
  */
 export async function requireTeacher(): Promise<AuthUser> {

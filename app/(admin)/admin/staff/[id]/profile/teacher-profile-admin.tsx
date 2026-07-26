@@ -777,16 +777,20 @@ export function TeacherProfileAdmin({
         )}
       </div>
 
-      {/* D. Rate Cards */}
-      <div className={cardCls}>
-        <h2 className={headingCls}>Rate Cards</h2>
-        <div className="space-y-3">
-          {SESSION_TYPES.map(type => {
-            const existing = rates.find(r => r.session_type === type);
-            return <RateCardRow key={type} type={type} existing={existing ?? null} onSave={vals => saveRate(type, vals)} isPending={isPending} />;
-          })}
+      {/* D. Rate Cards — compensation, finance-level only. The server action
+          behind this (upsertRateCard) is guarded by requireFinance(), so
+          hiding the card is presentation, not the protection itself. */}
+      {canViewPayRates && (
+        <div className={cardCls}>
+          <h2 className={headingCls}>Rate Cards</h2>
+          <div className="space-y-3">
+            {SESSION_TYPES.map(type => {
+              const existing = rates.find(r => r.session_type === type);
+              return <RateCardRow key={type} type={type} existing={existing ?? null} onSave={vals => saveRate(type, vals)} isPending={isPending} />;
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* E. Compliance */}
       <div className={cardCls}>
