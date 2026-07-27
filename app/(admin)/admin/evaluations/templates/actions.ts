@@ -1,5 +1,7 @@
 "use server";
 
+import { requireAdmin } from "@/lib/auth/guards";
+
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
@@ -24,6 +26,7 @@ const REVALIDATE_PATH = "/admin/evaluations/templates";
 // ---------------------------------------------------------------------------
 
 export async function createTemplate(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const {
     data: { user },
@@ -62,6 +65,7 @@ export async function createTemplate(formData: FormData) {
 // ---------------------------------------------------------------------------
 
 export async function updateTemplateSettings(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const {
     data: { user },
@@ -105,6 +109,7 @@ export async function updateTemplateSettings(formData: FormData) {
 // ---------------------------------------------------------------------------
 
 export async function toggleTemplateActive(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const {
     data: { user },
@@ -137,6 +142,7 @@ export async function toggleTemplateActive(formData: FormData) {
 // ---------------------------------------------------------------------------
 
 export async function duplicateTemplate(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const {
     data: { user },
@@ -246,6 +252,7 @@ export async function duplicateTemplate(formData: FormData) {
 // ---------------------------------------------------------------------------
 
 export async function addSection(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const {
     data: { user },
@@ -300,6 +307,7 @@ export async function addSection(formData: FormData) {
 // ---------------------------------------------------------------------------
 
 export async function updateSection(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const {
     data: { user },
@@ -338,6 +346,7 @@ export async function updateSection(formData: FormData) {
 // ---------------------------------------------------------------------------
 
 export async function deleteSection(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const {
     data: { user },
@@ -366,6 +375,7 @@ export async function deleteSection(formData: FormData) {
 // ---------------------------------------------------------------------------
 
 export async function reorderSections(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const {
     data: { user },
@@ -407,6 +417,7 @@ export async function reorderSections(formData: FormData) {
 // ---------------------------------------------------------------------------
 
 export async function addQuestionToSection(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const {
     data: { user },
@@ -496,6 +507,7 @@ export async function addQuestionToSection(formData: FormData) {
 // ---------------------------------------------------------------------------
 
 export async function removeQuestion(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const {
     data: { user },
@@ -524,6 +536,7 @@ export async function removeQuestion(formData: FormData) {
 // ---------------------------------------------------------------------------
 
 export async function updateQuestion(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const {
     data: { user },
@@ -562,6 +575,7 @@ export async function updateQuestion(formData: FormData) {
 // ---------------------------------------------------------------------------
 
 export async function reorderQuestions(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const {
     data: { user },
@@ -603,6 +617,7 @@ export async function reorderQuestions(formData: FormData) {
 // ---------------------------------------------------------------------------
 
 export async function createCustomQuestion(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const {
     data: { user },

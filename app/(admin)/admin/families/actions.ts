@@ -1,5 +1,7 @@
 "use server";
 
+import { requireAdmin } from "@/lib/auth/guards";
+
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -80,6 +82,7 @@ async function getTenantId() {
 // ── Actions ──────────────────────────────────────────────────
 
 export async function createFamily(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const {
     data: { user },
@@ -124,6 +127,7 @@ export async function createFamily(formData: FormData) {
 }
 
 export async function updateFamily(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
 
   const parsed = updateFamilySchema.safeParse({
@@ -159,6 +163,7 @@ export async function updateFamily(formData: FormData) {
 }
 
 export async function addStudentToFamily(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
 
   const parsed = addStudentSchema.safeParse({
@@ -221,6 +226,7 @@ export async function addStudentToFamily(formData: FormData) {
 }
 
 export async function addFamilyContact(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const {
     data: { user },
@@ -272,6 +278,7 @@ export async function addFamilyContact(formData: FormData) {
 }
 
 export async function updateFamilyContact(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
 
   const id = formData.get("id") as string;
@@ -304,6 +311,7 @@ export async function updateFamilyContact(formData: FormData) {
 }
 
 export async function removeFamilyContact(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
 
   const id = formData.get("id") as string;
@@ -326,6 +334,7 @@ export async function removeFamilyContact(formData: FormData) {
 }
 
 export async function adminEnrollStudent(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const {
     data: { user },
@@ -419,6 +428,7 @@ export async function adminEnrollStudent(formData: FormData) {
 }
 
 export async function adminDropStudent(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const {
     data: { user },
@@ -507,6 +517,7 @@ const updateGuardianSchema = z.object({
 // ── Guardian Actions ────────────────────────────────────────
 
 export async function addGuardian(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const {
     data: { user },
@@ -550,6 +561,7 @@ export async function addGuardian(formData: FormData) {
 }
 
 export async function updateGuardian(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
 
   const parsed = updateGuardianSchema.safeParse({
@@ -586,6 +598,7 @@ export async function updateGuardian(formData: FormData) {
 }
 
 export async function removeGuardian(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
 
   const id = formData.get("id") as string;
@@ -610,6 +623,7 @@ export async function removeGuardian(formData: FormData) {
  * Used in the Add Family flow when no existing profile is found.
  */
 export async function createProfileAndLinkGuardian(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const {
     data: { user },
@@ -675,6 +689,7 @@ export async function createProfileAndLinkGuardian(formData: FormData) {
 
 // ── Search students for linking ─────────────────────────────
 export async function searchStudentsForLinking(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const query = (formData.get("query") as string ?? "").trim();
   if (query.length < 2) return { students: [] };
@@ -704,6 +719,7 @@ export async function searchStudentsForLinking(formData: FormData) {
 
 // ── Link existing student to family ─────────────────────────
 export async function linkStudentToFamily(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const studentId = formData.get("studentId") as string;
   const familyId = formData.get("familyId") as string;
@@ -734,6 +750,7 @@ export async function linkStudentToFamily(formData: FormData) {
 
 // ── Remove student from family ──────────────────────────────
 export async function unlinkStudentFromFamily(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const studentId = formData.get("studentId") as string;
   const familyId = formData.get("familyId") as string;

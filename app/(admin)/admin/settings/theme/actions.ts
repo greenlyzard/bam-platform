@@ -1,5 +1,7 @@
 "use server";
 
+import { requireAdmin } from "@/lib/auth/guards";
+
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
 
@@ -15,6 +17,7 @@ const schema = z.object({
 });
 
 export async function updateThemeSettings(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
 
   const {

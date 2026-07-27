@@ -1,5 +1,7 @@
 "use server";
 
+import { requireAdmin } from "@/lib/auth/guards";
+
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -28,6 +30,7 @@ const productionSchema = z.object({
 });
 
 export async function createProduction(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -66,6 +69,7 @@ export async function createProduction(formData: FormData) {
 }
 
 export async function updateProduction(id: string, formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -106,6 +110,7 @@ export async function updateApprovalStatus(
   id: string,
   status: "draft" | "pending_review" | "approved" | "published"
 ) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -134,6 +139,7 @@ export async function updateApprovalStatus(
 }
 
 export async function deleteProduction(id: string) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -161,6 +167,7 @@ const danceSchema = z.object({
 });
 
 export async function createDance(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -208,6 +215,7 @@ const prodDanceSchema = z.object({
 });
 
 export async function addDanceToProduction(productionId: string, formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -243,6 +251,7 @@ export async function addDanceToProduction(productionId: string, formData: FormD
 }
 
 export async function removeDanceFromProduction(productionId: string, prodDanceId: string) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -267,6 +276,7 @@ export async function assignCasting(
   role: string = "ensemble",
   isAlternate: boolean = false
 ) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -289,6 +299,7 @@ export async function assignCasting(
 }
 
 export async function removeCasting(productionId: string, castingId: string) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -320,6 +331,7 @@ const rehearsalSchema = z.object({
 });
 
 export async function createRehearsal(productionId: string, formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -355,6 +367,7 @@ export async function updateRehearsalApproval(
   rehearsalId: string,
   status: "draft" | "pending_review" | "approved"
 ) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -377,6 +390,7 @@ export async function updateRehearsalApproval(
 }
 
 export async function deleteRehearsal(productionId: string, rehearsalId: string) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };

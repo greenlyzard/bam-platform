@@ -1,11 +1,14 @@
 "use server";
 
+import { requireAdmin } from "@/lib/auth/guards";
+
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { sendEmail } from "@/lib/resend/emails";
 import { renderEmailHtml, DEFAULT_LOGO_URL } from "@/lib/email/layout";
 
 export async function inviteTeamMember(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
@@ -97,6 +100,7 @@ export async function inviteTeamMember(formData: FormData) {
 }
 
 export async function approveTeacher(profileId: string) {
+  await requireAdmin();
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
@@ -166,6 +170,7 @@ export async function approveTeacher(profileId: string) {
 }
 
 export async function rejectTeacher(profileId: string) {
+  await requireAdmin();
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();

@@ -1,5 +1,7 @@
 "use server";
 
+import { requireAdmin } from "@/lib/auth/guards";
+
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
@@ -18,6 +20,7 @@ function slugify(name: string): string {
 // 1. Create Icon
 // ---------------------------------------------------------------------------
 export async function createIcon(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const {
     data: { user },
@@ -68,6 +71,7 @@ export async function createIcon(formData: FormData) {
 // 2. Update Icon
 // ---------------------------------------------------------------------------
 export async function updateIcon(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const {
     data: { user },
@@ -106,6 +110,7 @@ export async function updateIcon(formData: FormData) {
 // 3. Toggle Icon Active
 // ---------------------------------------------------------------------------
 export async function toggleIconActive(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const {
     data: { user },
@@ -132,6 +137,7 @@ export async function toggleIconActive(formData: FormData) {
 // 4. Upload Icon to Storage
 // ---------------------------------------------------------------------------
 export async function uploadIconToStorage(formData: FormData): Promise<{ url: string | null; slug: string | null; error?: string }> {
+  await requireAdmin();
   const file = formData.get("file") as File;
   if (!file) return { url: null, slug: null, error: "No file" };
   if (file.size > 2 * 1024 * 1024) return { url: null, slug: null, error: "File too large (max 2MB)" };
@@ -160,6 +166,7 @@ export async function uploadIconToStorage(formData: FormData): Promise<{ url: st
 // 5. Delete Icon
 // ---------------------------------------------------------------------------
 export async function deleteIcon(id: string): Promise<{ error?: string; success?: boolean }> {
+  await requireAdmin();
   const { createAdminClient } = await import("@/lib/supabase/admin");
   const admin = createAdminClient();
 
@@ -194,6 +201,7 @@ export async function deleteIcon(id: string): Promise<{ error?: string; success?
 // 6. Save Icons to Library (batch)
 // ---------------------------------------------------------------------------
 export async function saveIconsToLibrary(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };

@@ -1,5 +1,7 @@
 "use server";
 
+import { requireAdmin } from "@/lib/auth/guards";
+
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -19,6 +21,7 @@ const updateTemplateSchema = z.object({
 });
 
 export async function updateEmailTemplate(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
 
   const {

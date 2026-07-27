@@ -1,5 +1,7 @@
 "use server";
 
+import { requireAdmin } from "@/lib/auth/guards";
+
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -15,6 +17,7 @@ const seasonSchema = z.object({
 });
 
 export async function createSeason(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -68,6 +71,7 @@ export async function createSeason(formData: FormData) {
 }
 
 export async function updateSeason(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -116,6 +120,7 @@ export async function updateSeason(formData: FormData) {
 }
 
 export async function deleteSeason(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -148,6 +153,7 @@ export async function deleteSeason(formData: FormData) {
 }
 
 export async function toggleSeasonActive(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -170,6 +176,7 @@ export async function toggleSeasonActive(formData: FormData) {
 }
 
 export async function toggleRegistrationOpen(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -192,6 +199,7 @@ export async function toggleRegistrationOpen(formData: FormData) {
 }
 
 export async function updateSeasonPriority(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -216,6 +224,7 @@ export async function updateSeasonPriority(formData: FormData) {
 }
 
 export async function duplicateSeasonClasses(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };

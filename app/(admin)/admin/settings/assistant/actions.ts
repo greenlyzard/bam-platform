@@ -1,8 +1,11 @@
 "use server";
+
+import { requireAdmin } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
 export async function updateAssistantConfig(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };

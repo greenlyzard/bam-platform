@@ -1,5 +1,7 @@
 "use server";
 
+import { requireAdmin, requireTeacher } from "@/lib/auth/guards";
+
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { randomUUID } from "crypto";
@@ -362,6 +364,7 @@ async function createBillingForSession(
 // ---------------------------------------------------------------------------
 
 export async function createPrivateSession(formData: FormData) {
+  await requireTeacher();
   const supabase = await createClient();
   const {
     data: { user },
@@ -652,6 +655,7 @@ export async function createPrivateSession(formData: FormData) {
 // ---------------------------------------------------------------------------
 
 export async function cancelPrivateSession(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const {
     data: { user },
@@ -689,6 +693,7 @@ export async function cancelPrivateSession(formData: FormData) {
 // ---------------------------------------------------------------------------
 
 export async function checkStudentCredits(formData: FormData) {
+  await requireTeacher();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -738,6 +743,7 @@ export async function checkStudentCredits(formData: FormData) {
 // ---------------------------------------------------------------------------
 
 export async function updatePrivateSessionStatus(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const {
     data: { user },

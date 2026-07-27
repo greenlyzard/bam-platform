@@ -1,5 +1,7 @@
 "use server";
 
+import { requireAdmin } from "@/lib/auth/guards";
+
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
@@ -14,6 +16,7 @@ async function getTenantId() {
 }
 
 export async function updateStudent(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const {
     data: { user },
@@ -71,6 +74,7 @@ export async function updateStudent(formData: FormData) {
 }
 
 export async function addExtendedContact(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const {
     data: { user },
@@ -128,6 +132,7 @@ export async function addExtendedContact(formData: FormData) {
 }
 
 export async function removeExtendedContact(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
 
   const contactId = formData.get("contact_id") as string;

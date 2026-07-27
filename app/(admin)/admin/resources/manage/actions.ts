@@ -1,5 +1,7 @@
 "use server";
 
+import { requireAdmin } from "@/lib/auth/guards";
+
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -23,6 +25,7 @@ const resourceSchema = z.object({
 });
 
 export async function createResource(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -81,6 +84,7 @@ export async function createResource(formData: FormData) {
 }
 
 export async function updateResource(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -128,6 +132,7 @@ export async function updateResource(formData: FormData) {
 }
 
 export async function deleteResource(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -160,6 +165,7 @@ export async function deleteResource(formData: FormData) {
 }
 
 export async function toggleResourceActive(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -179,6 +185,7 @@ export async function toggleResourceActive(formData: FormData) {
 }
 
 export async function updateResourceOrder(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };

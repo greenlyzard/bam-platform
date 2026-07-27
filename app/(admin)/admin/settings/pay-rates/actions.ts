@@ -1,5 +1,7 @@
 "use server";
 
+import { requireFinance } from "@/lib/auth/guards";
+
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -15,6 +17,7 @@ const payRateSchema = z.object({
 });
 
 export async function updatePayRate(formData: FormData) {
+  await requireFinance();
   const supabase = await createClient();
 
   const {

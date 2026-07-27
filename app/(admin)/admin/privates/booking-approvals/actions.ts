@@ -1,5 +1,7 @@
 "use server";
 
+import { requireAdmin } from "@/lib/auth/guards";
+
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
@@ -18,6 +20,7 @@ async function getTenantId() {
 // ── Actions ──────────────────────────────────────────────────
 
 export async function createBookingApproval(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const {
     data: { user },
@@ -66,6 +69,7 @@ export async function createBookingApproval(formData: FormData) {
 }
 
 export async function toggleApprovalActive(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const {
     data: { user },
@@ -92,6 +96,7 @@ export async function toggleApprovalActive(formData: FormData) {
 }
 
 export async function deleteBookingApproval(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const {
     data: { user },

@@ -1,5 +1,7 @@
 "use server";
 
+import { requireAdmin, requireTeacher } from "@/lib/auth/guards";
+
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
@@ -464,6 +466,7 @@ const TEMPLATE_DEFS: TemplateDef[] = [
 // ---------------------------------------------------------------------------
 
 export async function seedDefaultTemplates(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const tenantId = formData.get("tenant_id") as string;
 
@@ -591,6 +594,7 @@ export async function seedDefaultTemplates(formData: FormData) {
 // ---------------------------------------------------------------------------
 
 export async function upsertEvaluationResponse(formData: FormData) {
+  await requireTeacher();
   const supabase = await createClient();
 
   const evaluationId = formData.get("evaluation_id") as string;
@@ -656,6 +660,7 @@ export async function upsertEvaluationResponse(formData: FormData) {
 // ---------------------------------------------------------------------------
 
 export async function submitEvaluation(formData: FormData) {
+  await requireTeacher();
   const supabase = await createClient();
 
   const evaluationId = formData.get("evaluation_id") as string;
@@ -695,6 +700,7 @@ export async function submitEvaluation(formData: FormData) {
 // ---------------------------------------------------------------------------
 
 export async function submitAllForClass(formData: FormData) {
+  await requireTeacher();
   const supabase = await createClient();
 
   const classId = formData.get("class_id") as string;
@@ -754,6 +760,7 @@ export async function submitAllForClass(formData: FormData) {
 // ---------------------------------------------------------------------------
 
 export async function requestChanges(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
 
   const evaluationId = formData.get("evaluation_id") as string;
@@ -794,6 +801,7 @@ export async function requestChanges(formData: FormData) {
 // ---------------------------------------------------------------------------
 
 export async function approveEvaluation(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
 
   const evaluationId = formData.get("evaluation_id") as string;
@@ -834,6 +842,7 @@ export async function approveEvaluation(formData: FormData) {
 // ---------------------------------------------------------------------------
 
 export async function publishEvaluation(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
 
   const evaluationId = formData.get("evaluation_id") as string;
@@ -873,6 +882,7 @@ export async function publishEvaluation(formData: FormData) {
 // ---------------------------------------------------------------------------
 
 export async function createEvaluationsForClass(formData: FormData) {
+  await requireTeacher();
   const supabase = await createClient();
 
   const classId = formData.get("class_id") as string;

@@ -1,5 +1,7 @@
 "use server";
 
+import { requireAdmin } from "@/lib/auth/guards";
+
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
@@ -7,6 +9,7 @@ import { revalidatePath } from "next/cache";
 // 1. Update student basics
 // ---------------------------------------------------------------------------
 export async function updateStudentBasics(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -36,6 +39,7 @@ export async function updateStudentBasics(formData: FormData) {
 // 2. Update student level
 // ---------------------------------------------------------------------------
 export async function updateStudentLevel(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -60,6 +64,7 @@ export async function updateStudentLevel(formData: FormData) {
 // 3. Toggle student active
 // ---------------------------------------------------------------------------
 export async function toggleStudentActive(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -83,6 +88,7 @@ export async function toggleStudentActive(formData: FormData) {
 // 4. Award badge
 // ---------------------------------------------------------------------------
 export async function awardBadge(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -113,6 +119,7 @@ export async function awardBadge(formData: FormData) {
 // 5. Revoke badge
 // ---------------------------------------------------------------------------
 export async function revokeBadge(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -135,6 +142,7 @@ export async function revokeBadge(formData: FormData) {
 // 6. Create evaluation
 // ---------------------------------------------------------------------------
 export async function createEvaluation(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -167,6 +175,7 @@ export async function createEvaluation(formData: FormData) {
 // 7. Delete evaluation
 // ---------------------------------------------------------------------------
 export async function deleteEvaluation(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -189,6 +198,7 @@ export async function deleteEvaluation(formData: FormData) {
 // 8. Create album
 // ---------------------------------------------------------------------------
 export async function createAlbum(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -218,6 +228,7 @@ export async function createAlbum(formData: FormData) {
 // 9. Update album
 // ---------------------------------------------------------------------------
 export async function updateAlbum(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -243,6 +254,7 @@ export async function updateAlbum(formData: FormData) {
 // 10. Delete album
 // ---------------------------------------------------------------------------
 export async function deleteAlbum(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -265,6 +277,7 @@ export async function deleteAlbum(formData: FormData) {
 // 11. Create relative
 // ---------------------------------------------------------------------------
 export async function createRelative(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -297,6 +310,7 @@ export async function createRelative(formData: FormData) {
 // 12. Update relative active status
 // ---------------------------------------------------------------------------
 export async function updateRelativeActive(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -320,6 +334,7 @@ export async function updateRelativeActive(formData: FormData) {
 // 13. Update share permission (upsert)
 // ---------------------------------------------------------------------------
 export async function updateSharePermission(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -354,6 +369,7 @@ export async function updateSharePermission(formData: FormData) {
 // 14. Enroll student in class
 // ---------------------------------------------------------------------------
 export async function enrollStudentInClass(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -455,6 +471,7 @@ export async function enrollStudentInClass(formData: FormData) {
 // 15. Check billing plan for enrollment
 // ---------------------------------------------------------------------------
 export async function checkBillingPlan(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
@@ -510,6 +527,7 @@ const SKILL_STATUSES: SkillStatus[] = [
 ];
 
 export async function setStudentSkillStatus(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const {
     data: { user },
