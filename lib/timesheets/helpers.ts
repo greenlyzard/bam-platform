@@ -1,6 +1,40 @@
 import { createClient } from "@/lib/supabase/server";
+import { tenantPayPeriod, tenantToday } from "@/lib/dates";
+import { getTenantTimezone } from "@/lib/tenant/timezone";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
+
+/**
+ * The submission deadline for a pay period: the 26th of the period's own month.
+ *
+ * Built as a string from the already-resolved year/month rather than via
+ * `new Date(year, month - 1, 26).toISOString()`. Once the period is known this
+ * is pure calendar arithmetic with no instant involved, so routing it through a
+ * Date only reintroduces a runtime zone that can shift the day.
+ */
+export function payPeriodDeadline(year: number, month: number): string {
+  return `${year}-${String(month).padStart(2, "0")}-26`;
+}
+
+/**
+ * Is the current pay period locked to teacher edits?
+ *
+ * Locks after the 26th **of the tenant's calendar day**, not the runtime's. The
+ * previous implementation used `new Date().getDate() > 26`, which on a UTC
+ * runtime engages at 5pm Pacific on the 26th rather than at midnight — teachers
+ * lost the last seven hours of their filing window.
+ *
+ * NOTE: this preserves the existing hardcoded-26 rule. It deliberately does not
+ * read `pay_periods.submission_deadline`, `teacher_edit_cutoff`, or `status`.
+ * `teacher_edit_cutoff` is null on every live row and `status` is `open` on
+ * every live row (including a four-month-stale March period), so switching to
+ * them would silently disable the lock. Changing the rule is a payroll policy
+ * decision, not a timezone fix. See docs/TENANT_TIMEZONE_SPEC.md §3.3.
+ */
+export function isPeriodLocked(timeZone: string): boolean {
+  const day = Number(tenantToday(timeZone).slice(8, 10));
+  return day > 26;
+}
 
 /** Get or create a draft timesheet for a teacher in the current pay period */
 export async function getOrCreateTimesheet(
@@ -19,9 +53,11 @@ export async function getOrCreateTimesheet(
 
   if (existing) return existing;
 
-  const now = new Date();
-  const month = now.getMonth() + 1;
-  const year = now.getFullYear();
+  // Pay period resolved in the TENANT's zone, not the runtime's. On a UTC
+  // runtime, after 5pm Pacific on the last day of a month, `now.getMonth()`
+  // returns the next month and the entry is filed to the wrong pay period.
+  const timeZone = await getTenantTimezone(supabase, tenantId);
+  const { month, year } = tenantPayPeriod(timeZone);
 
   let { data: payPeriod } = await supabase
     .from("pay_periods")
@@ -31,14 +67,13 @@ export async function getOrCreateTimesheet(
     .maybeSingle();
 
   if (!payPeriod) {
-    const deadline = new Date(year, month - 1, 26);
     const { data: created } = await supabase
       .from("pay_periods")
       .insert({
         tenant_id: tenantId,
         period_month: month,
         period_year: year,
-        submission_deadline: deadline.toISOString().split("T")[0],
+        submission_deadline: payPeriodDeadline(year, month),
         status: "open",
       })
       .select("id")

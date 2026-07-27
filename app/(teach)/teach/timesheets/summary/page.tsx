@@ -1,4 +1,5 @@
 import { requireRole } from "@/lib/auth/guards";
+import { tenantPayPeriod } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
 import { SubmitFromSummary } from "./submit-from-summary";
 
@@ -41,15 +42,16 @@ export default async function TimesheetSummaryPage() {
   }
 
   // Resolve the current pay period exactly as /teach/timesheets and
-  // getOrCreateTimesheet do (tenant + month + year), so both pages always
-  // resolve the same timesheet and cannot drift apart.
+  // getOrCreateTimesheet do (tenant + month + year, in the TENANT's zone), so
+  // both pages always resolve the same timesheet and cannot drift apart.
+  const currentPeriod = tenantPayPeriod(user.timezone);
   const { data: payPeriod } = user.tenantId
     ? await supabase
         .from("pay_periods")
         .select("id")
         .eq("tenant_id", user.tenantId)
-        .eq("period_month", now.getMonth() + 1)
-        .eq("period_year", now.getFullYear())
+        .eq("period_month", currentPeriod.month)
+        .eq("period_year", currentPeriod.year)
         .maybeSingle()
     : { data: null };
 

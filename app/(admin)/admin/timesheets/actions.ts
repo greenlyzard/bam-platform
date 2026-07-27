@@ -1,6 +1,9 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { tenantPayPeriod } from "@/lib/dates";
+import { getTenantTimezone } from "@/lib/tenant/timezone";
+import { payPeriodDeadline } from "@/lib/timesheets/helpers";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -633,9 +636,11 @@ async function getOrCreateTimesheetForTeacher(
   teacherProfileId: string,
   tenantId: string
 ): Promise<{ id: string; status: string } | { error: string }> {
-  const now = new Date();
-  const month = now.getMonth() + 1;
-  const year = now.getFullYear();
+  // Pay period resolved in the TENANT's zone, not the runtime's. On a UTC
+  // runtime, after 5pm Pacific on the last day of a month, `now.getMonth()`
+  // returns the next month and the entry is filed to the wrong pay period.
+  const timeZone = await getTenantTimezone(supabase, tenantId);
+  const { month, year } = tenantPayPeriod(timeZone);
 
   // Find or create pay period for this tenant + month
   let { data: payPeriod, error: ppFetchErr } = await supabase
@@ -652,14 +657,13 @@ async function getOrCreateTimesheetForTeacher(
   }
 
   if (!payPeriod) {
-    const deadline = new Date(year, month - 1, 26);
     const { data: created, error: ppErr } = await supabase
       .from("pay_periods")
       .insert({
         tenant_id: tenantId,
         period_month: month,
         period_year: year,
-        submission_deadline: deadline.toISOString().split("T")[0],
+        submission_deadline: payPeriodDeadline(year, month),
         status: "open",
       })
       .select("id")

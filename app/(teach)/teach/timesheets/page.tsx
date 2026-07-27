@@ -1,4 +1,6 @@
 import { requireRole } from "@/lib/auth/guards";
+import { tenantPayPeriod } from "@/lib/dates";
+import { isPeriodLocked } from "@/lib/timesheets/helpers";
 import { createClient } from "@/lib/supabase/server";
 import { AddEntryForm, EditEntryRow } from "./entry-form";
 import { FlagResponseForm } from "./flag-response";
@@ -12,7 +14,12 @@ export default async function TimesheetsPage() {
     month: "long",
     year: "numeric",
   });
-  const isLocked = now.getDate() > 26;
+
+  // Pay period + lock resolved in the tenant's zone, matching the server
+  // actions exactly. If these disagree with getOrCreateTimesheet the page reads
+  // one period while the add-entry action writes to another.
+  const currentPeriod = tenantPayPeriod(user.timezone);
+  const isLocked = isPeriodLocked(user.timezone);
 
   // Get teacher_profile — VIEW uses `id` (= profiles.id), not `user_id`
   const { data: teacherProfile } = await supabase
@@ -41,8 +48,8 @@ export default async function TimesheetsPage() {
         .from("pay_periods")
         .select("id")
         .eq("tenant_id", user.tenantId)
-        .eq("period_month", now.getMonth() + 1)
-        .eq("period_year", now.getFullYear())
+        .eq("period_month", currentPeriod.month)
+        .eq("period_year", currentPeriod.year)
         .maybeSingle()
     : { data: null };
 

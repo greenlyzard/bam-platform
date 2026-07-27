@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { DEFAULT_TENANT_TIMEZONE } from "@/lib/dates";
+import { getTenantTimezone } from "@/lib/tenant/timezone";
 import { redirect } from "next/navigation";
 
 export type UserRole = "super_admin" | "admin" | "studio_admin" | "finance_admin" | "studio_manager" | "front_desk" | "teacher" | "parent" | "student";
@@ -24,53 +24,6 @@ export interface AuthUser {
 }
 
 const BAM_TENANT_SLUG = "bam";
-
-/**
- * Process-local cache of tenant id → IANA timezone.
- *
- * `tenants` is not reachable from `profile_roles` via a PostgREST embed —
- * `profile_roles.tenant_id` has no FK to `tenants` (verified against
- * pg_constraint) — so resolving the zone is a genuine second round trip on top
- * of the profiles + profile_roles queries getUser() already makes. getUser()
- * runs more than once per request (layout guard, then page guard), so left
- * uncached this would add several Supabase round trips to every guarded page.
- *
- * A tenant's timezone changes approximately never, so a short TTL makes the
- * steady-state cost nil while still picking up an onboarding change within
- * five minutes. Only successful lookups are cached — a failure (e.g. the
- * migration not yet pushed) is retried on the next call so the fallback never
- * sticks.
- */
-const TENANT_TZ_TTL_MS = 5 * 60 * 1000;
-const tenantTimezoneCache = new Map<
-  string,
-  { timezone: string; expiresAt: number }
->();
-
-async function resolveTenantTimezone(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  tenantId: string | null
-): Promise<string> {
-  if (!tenantId) return DEFAULT_TENANT_TIMEZONE;
-
-  const cached = tenantTimezoneCache.get(tenantId);
-  if (cached && cached.expiresAt > Date.now()) return cached.timezone;
-
-  const { data, error } = await supabase
-    .from("tenants")
-    .select("timezone")
-    .eq("id", tenantId)
-    .single();
-
-  const timezone = (data as { timezone?: string | null } | null)?.timezone;
-  if (error || !timezone) return DEFAULT_TENANT_TIMEZONE;
-
-  tenantTimezoneCache.set(tenantId, {
-    timezone,
-    expiresAt: Date.now() + TENANT_TZ_TTL_MS,
-  });
-  return timezone;
-}
 
 /**
  * Get the authenticated user with their roles.
@@ -120,7 +73,7 @@ export async function getUser(): Promise<AuthUser | null> {
     roles = [primaryRole];
   }
 
-  const timezone = await resolveTenantTimezone(supabase, tenantId);
+  const timezone = await getTenantTimezone(supabase, tenantId);
 
   return {
     id: user.id,
