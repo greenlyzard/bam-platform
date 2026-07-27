@@ -196,3 +196,68 @@ Related: `settings/studio/actions.ts` hardcodes `TENANT_ID` and `STUDIO_SETTINGS
 | `docs/COMMUNICATIONS_HUB.md` | BAND replacement, partially built — **audit what shipped before building more** |
 
 **Not yet written:** tenant scoping remediation (P0), reporting + semantic layer, expense module, private packages, `ADMIN_TASK_CENTER`, rate-at-entry-time resolver.
+
+---
+
+## 8. Parent Billing Portal — named deliverable
+
+`/portal/billing` is a **"Coming soon" stub** in production today. It is the parent-facing counterpart to everything in `BILLING_GENERALIZATION_SPEC_V2.md`, and it is a go-live requirement: a parent with a vaulted card and no way to see what they owe or what they paid is not a shippable state.
+
+### 8.1 What the page must do
+
+| Capability | Depends on |
+|---|---|
+| Outstanding balance | `charge_items` with `payment_status` derived at read time (Phase A2) |
+| Payment history — card **and** offline | `payment_receipts` + `receipt_allocations` (Phase D) |
+| Manage payment methods — add, remove, set default | `payment_methods` table (Phase B) + processor-hosted elements (Phase E) |
+| Pay an outstanding balance now | Payment request flow — see §8.2 |
+| Per-payer scoping | RLS (Phase H) |
+
+**Why it is still a stub:** the data model underneath it does not exist yet. Vaulting is currently three `families.stripe_*` columns — one card per family — so there is literally nothing to "manage." There is no table recording offline payments, and no allocation layer to compute what is still owed.
+
+### 8.2 Payment request flow — belongs here
+
+V2 §9 deferred the "payment request page" as a processor-agnostic replacement for Stripe-hosted invoices. **This is its home.** A native page showing what is owed with a pay button that routes through the tenant's configured processor adapter.
+
+This is what makes **admin-placement "manual" mode actually collectable.** Today manual mode creates a charge item the family owes with no way for them to pay it online — an admin has to chase them. Without this page, manual mode is a spreadsheet with extra steps.
+
+### 8.3 Ship-order constraint — do not violate
+
+**Phase H (RLS) must land before or with this page, never after.**
+
+Divorced parents and grandparent payers each need to see their own splits and nothing else. Shipping a billing portal before payer-scoped RLS means one parent sees the other's card on file, their payment history, and their split amounts. That is the defect that generates a phone call to Amanda, and it is not recoverable by apologising.
+
+Concretely, before this page renders anything:
+- `payment_methods` visible only to `owner_profile_id` + admins
+- `charge_item_splits` visible only to `payer_profile_id` + admins
+- `payment_receipts` visible only to `payer_profile_id` + admins
+- Family-wide view gated on `family_payers.can_view_billing`
+
+### 8.4 Effective build order
+
+Parent billing is not a separate phase — it is the parent-facing render of B → C → D → E → H. Practical sequence:
+
+1. **B** — `payment_methods`, `family_payers`
+2. **C + H together** — splits and their RLS
+3. **D** — receipts and allocations
+4. **E** — processor-hosted card elements (the "manage" half of the page)
+5. **Portal billing page** — read surfaces first (balance, history), then the pay action
+6. **Payment request flow** — completes manual-mode collection
+
+### 8.5 Copy problem to resolve first
+
+The checkout consent text (v2 §1.2) currently promises charges for "registration, costumes, competitions, and adjustments" — two of which the platform cannot produce. That copy is live in production. A billing page that itemises charges will make the gap between promised and actual billing visible to parents on a screen built for scrutiny. **Amanda decision, and it should be settled before this page ships, not after.**
+
+---
+
+## 9. Standing principle — money surfaces
+
+Anything that touches money gets verified end to end in production before it is called done, and gets its authorization and RLS checked in the same pass as its UI. Tonight established why:
+
+- Every teacher was silently absent from payroll for months because a string comparison could never match
+- Any teacher could set their own pay rate through the API
+- Any signed-in user could write rate cards
+- Rate changes silently rewrite what past pay periods were worth
+- Attendance and timesheet dates were being written a day ahead every evening
+
+None of these threw an error. All of them looked fine on screen. **For money surfaces, "the page renders" is not evidence of anything.**
