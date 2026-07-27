@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
+import { toLocalDateStr } from "@/lib/dates";
 
 interface Student {
   id: string;
@@ -57,8 +58,8 @@ function buildInitialRecords(
 }
 
 export function AttendanceClient({ classId, className, students, existingRecords, tenantId, teacherId, preMarkedAbsences = {} }: Props) {
-  const today = new Date().toISOString().split("T")[0];
-  const minDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+  const today = toLocalDateStr();
+  const minDate = toLocalDateStr(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
 
   const [selectedDate, setSelectedDate] = useState(today);
   const [records, setRecords] = useState(() => buildInitialRecords(students, existingRecords));

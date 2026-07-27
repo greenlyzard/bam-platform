@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { logHours } from "./actions";
 import { SimpleSelect } from "@/components/ui/select";
+import { toLocalDateStr } from "@/lib/dates";
 
 interface LogHoursFormProps {
   classes: { id: string; name: string }[];
@@ -69,7 +70,7 @@ export function LogHoursForm({ classes }: LogHoursFormProps) {
               name="date"
               type="date"
               required
-              defaultValue={new Date().toISOString().split("T")[0]}
+              defaultValue={toLocalDateStr()}
               className="w-full h-11 rounded-lg border border-silver bg-white px-4 text-base text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
             />
           </div>

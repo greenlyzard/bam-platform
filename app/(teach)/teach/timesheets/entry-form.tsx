@@ -7,6 +7,7 @@ import {
   deleteTimesheetEntry,
 } from "./actions";
 import { SimpleSelect } from "@/components/ui/select";
+import { toLocalDateStr } from "@/lib/dates";
 
 const CATEGORIES = [
   { value: "class", label: "Class" },
@@ -344,9 +345,7 @@ function EntryFormCard({
               name="date"
               type="date"
               required
-              defaultValue={
-                entry?.date ?? new Date().toISOString().split("T")[0]
-              }
+              defaultValue={entry?.date ?? toLocalDateStr()}
               className="w-full h-10 rounded-lg border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
             />
           </div>

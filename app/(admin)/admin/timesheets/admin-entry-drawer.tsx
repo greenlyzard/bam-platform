@@ -7,6 +7,7 @@ import {
   PAYROLL_CLASS_LABELS,
   type PayrollClass,
 } from "@/lib/timesheets/employment";
+import { toLocalDateStr } from "@/lib/dates";
 
 interface Teacher {
   id: string;
@@ -421,7 +422,7 @@ function EntryDrawer({
     entry?.production_ids ?? (entry?.production_id ? [entry.production_id] : [])
   );
   const [currentDate, setCurrentDate] = useState(
-    entry?.date ?? new Date().toISOString().split("T")[0]
+    entry?.date ?? toLocalDateStr()
   );
   const [startTime, setStartTime] = useState(entry?.start_time ?? "");
   const [endTime, setEndTime] = useState(entry?.end_time ?? "");
@@ -546,7 +547,7 @@ function EntryDrawer({
 
         const nextDate = new Date(currentDate + "T12:00:00");
         nextDate.setDate(nextDate.getDate() + 1);
-        setCurrentDate(nextDate.toISOString().split("T")[0]);
+        setCurrentDate(toLocalDateStr(nextDate));
 
         // Reset form fields but keep teacher and category
         setStartTime("");

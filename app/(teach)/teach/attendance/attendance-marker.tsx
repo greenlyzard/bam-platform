@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { markAttendance, logHoursFromAttendance } from "./actions";
 import type { AttendanceResult } from "./actions";
 import { SimpleSelect } from "@/components/ui/select";
+import { toLocalDateStr } from "@/lib/dates";
 
 interface ClassOption {
   id: string;
@@ -45,9 +46,7 @@ function formatTime12h(time: string): string {
 export function AttendanceMarker({ classes }: { classes: ClassOption[] }) {
   const router = useRouter();
   const [selectedClassId, setSelectedClassId] = useState("");
-  const [date, setDate] = useState(
-    new Date().toISOString().split("T")[0]
-  );
+  const [date, setDate] = useState(toLocalDateStr());
   const [roster, setRoster] = useState<RosterStudent[]>([]);
   const [attendance, setAttendance] = useState<
     Record<string, AttendanceStatus>

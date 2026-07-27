@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { bookPrivateSession } from "./actions";
 import Link from "next/link";
+import { toLocalDateStr } from "@/lib/dates";
 
 interface ApprovedTeacher {
   id: string; approvalId: string; name: string;
@@ -40,7 +41,7 @@ function nextDates(dow: number, n: number) {
   let gap = dow - today.getDay(); if (gap <= 0) gap += 7;
   for (let i = 0; i < n; i++) {
     const d = new Date(today); d.setDate(d.getDate() + gap + i * 7);
-    r.push(d.toISOString().slice(0, 10));
+    r.push(toLocalDateStr(d));
   } return r;
 }
 function badge(t: string) { return t === "pilates" ? "Pilates" : t === "any" ? "Any" : "Private"; }

@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { SimpleSelect } from "@/components/ui/select";
 import { createClient } from "@/lib/supabase/client";
 import { createPrivateSession, checkStudentCredits } from "@/app/(admin)/admin/privates/actions";
+import { toLocalDateStr } from "@/lib/dates";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription,
@@ -91,8 +92,7 @@ function addMinutes(time: string, mins: number): string {
 }
 
 function todayStr(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return toLocalDateStr();
 }
 
 // ---------------------------------------------------------------------------

@@ -22,6 +22,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { toLocalDateStr } from "@/lib/dates";
 
 // ── Helpers ───────────────────────────────────────────────────
 
@@ -55,7 +56,7 @@ function getWeekDates(weekStart: string): string[] {
     const d = new Date(monday);
     d.setDate(monday.getDate() + i);
     dates.push(
-      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+      toLocalDateStr(d)
     );
   }
   return dates;
@@ -64,7 +65,7 @@ function getWeekDates(weekStart: string): string[] {
 function shiftWeek(weekStart: string, direction: number): string {
   const d = new Date(weekStart + "T00:00:00");
   d.setDate(d.getDate() + direction * 7);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return toLocalDateStr(d);
 }
 
 function getThisWeekMonday(): string {
@@ -73,7 +74,7 @@ function getThisWeekMonday(): string {
   const diff = day === 0 ? -6 : 1 - day;
   const monday = new Date(now);
   monday.setDate(now.getDate() + diff);
-  return `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, "0")}-${String(monday.getDate()).padStart(2, "0")}`;
+  return toLocalDateStr(monday);
 }
 
 function getWeekLabel(weekStart: string): string {
@@ -90,7 +91,7 @@ function getWeekLabel(weekStart: string): string {
 
 function getTodayStr(): string {
   const n = new Date();
-  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+  return toLocalDateStr(n);
 }
 
 const DAY_OPTIONS = [

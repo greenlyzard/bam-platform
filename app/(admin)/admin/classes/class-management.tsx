@@ -27,6 +27,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { ClassEditDrawer } from "./class-edit-drawer";
+import { toLocalDateStr } from "@/lib/dates";
 
 // ── Types ────────────────────────────────────────────────
 export interface ClassRecord {
@@ -241,10 +242,6 @@ function formatTime(time: string): string {
   const ampm = hour >= 12 ? "PM" : "AM";
   const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
   return `${displayHour}:${m} ${ampm}`;
-}
-
-function toLocalDateStr(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
 function isThisWeek(dateStr: string): boolean {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toLocalDateStr } from "@/lib/dates";
 
 // ── Helpers ───────────────────────────────────────────────────
 
@@ -292,7 +293,7 @@ export function PortalScheduleView({
     for (let d = 1; d <= lastDay.getDate(); d++) {
       const dt = new Date(year, month, d);
       dates.push(
-        `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`
+        toLocalDateStr(dt)
       );
     }
 
@@ -311,7 +312,7 @@ export function PortalScheduleView({
     for (const d of dates) cells.push({ date: d });
     while (cells.length % 7 !== 0) cells.push({ date: null });
 
-    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const todayStr = toLocalDateStr(now);
 
     return (
       <div>
