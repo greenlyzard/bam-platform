@@ -129,13 +129,37 @@ A full studio management platform that serves BAM first, then white-labels as Sa
 |------------|---------|-------|
 | FK to profiles | `user_id` | `profile_id` |
 | Role check | Query `profile_roles` table | Query `profiles.role` |
-| Role values | Plain text strings | `::user_role` enum (DROPPED) |
+| Role values | Plain text strings (`profile_roles.role` is `text`) | Casting to `::user_role` in a role check |
 | Teacher view | `teacher_profiles` (VIEW) | Assumes it's a table |
 | Tenant filter | Only on tables with `tenant_id` | `classes` has no `tenant_id` |
 | View columns | Check actual columns | `teacher_profiles` has no `tenant_id` or `full_name` |
 
-### `user_role` enum is DROPPED
-Never use `::user_role` cast. Use plain text: `'teacher'`, `'admin'`, `'super_admin'`, `'parent'`, `'student'`, `'front_desk'`, `'finance_admin'`.
+### Never authorize off `profiles.role` — use `profile_roles`
+
+`profile_roles.role` is **plain `text`**. Use plain strings: `'teacher'`, `'admin'`,
+`'super_admin'`, `'parent'`, `'student'`, `'front_desk'`, `'finance_admin'`. Do not cast
+to `::user_role` in a role check — the enum cannot represent every live role (see below).
+
+**Why `profiles.role` is wrong, precisely:** it is a stale **single-role** field, and a person
+can hold several roles at once. It does not reflect the multi-role reality in `profile_roles`,
+and it is demonstrably out of date on live data:
+
+| Person | `profiles.role` says | Actual active roles in `profile_roles` |
+|---|---|---|
+| Cara Matchett | `parent` | **admin (primary), teacher** |
+| Katherine Thomas | `parent` | teacher (primary), parent |
+| Amanda Cobb | `super_admin` | super_admin (primary), admin, finance_admin, teacher |
+
+Verified against live data 2026-07-27: **5 of 23 profiles** have a `profiles.role` that
+disagrees with their primary role in `profile_roles`. Authorizing off it would give Cara a
+parent's access to the admin surface she runs.
+
+> The `user_role` enum **still exists** and `profiles.role` is still typed `user_role`
+> (verified 2026-07-27 — an earlier version of this file wrongly said the enum was dropped).
+> It is a dead end regardless: its labels are only `super_admin, admin, teacher, parent,
+> student, front_desk`, so it cannot express `finance_admin`, `studio_admin`, or
+> `studio_manager` — all of which are live roles that satisfy `is_admin()`. That is a second,
+> independent reason `profiles.role` cannot be the authorization source.
 
 ### RBAC Architecture
 Roles live in `profile_roles` table. `profiles.role` still exists but is unreliable — always use `profile_roles`.
@@ -153,10 +177,23 @@ SELECT 1 FROM profiles WHERE role = 'teacher'
 
 | Function | Use |
 |----------|-----|
-| `is_admin()` | Checks profile_roles for admin/super_admin |
+| `is_admin()` | Checks `profile_roles` for any admin-tier role: admin, super_admin, studio_admin, studio_manager, finance_admin. Must stay in sync with `ADMIN_TIER_ROLES` in `lib/auth/guards.ts` |
 | `is_teacher()` | Checks profile_roles for teacher |
 | `is_front_desk()` | Checks profile_roles for front_desk |
 | `get_user_role()` | Returns primary role text from profile_roles |
+| `has_permission(perm_key text)` | Checks a granular permission key by joining `profile_roles → role_permissions → permissions` on `permissions.key`. App-side mirror: `hasPermission()` in `lib/auth/guards.ts` |
+| `has_finance_role()` | **finance_admin + super_admin ONLY.** The guard for anything that reads or writes compensation — pay rates, rate cards, payroll figures. App-side mirror: `requireFinance()` in `lib/auth/guards.ts`. See the warning below |
+
+> ⚠️ **`has_finance_role()` is deliberately narrower than `is_admin()`, and the two are
+> overlapping, not nested.** `is_admin()` passes five admin-tier roles; `has_finance_role()`
+> passes only two. A `studio_manager` **passes `is_admin()` and fails `has_finance_role()`** —
+> neither function contains the other.
+>
+> It was added 2026-07-26 to close a hole where **every** admin-tier role could read and write
+> pay rates. A plain `admin` runs the studio but does not see or set what people are paid.
+>
+> **Never reach for `is_admin()` on a compensation surface** — doing so silently reopens that
+> hole. Compensation gets `has_finance_role()` in RLS and `requireFinance()` in the app.
 
 ### `teacher_profiles` View
 - Is a **VIEW** not a table

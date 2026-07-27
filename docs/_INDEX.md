@@ -4,7 +4,7 @@
 > this index to find the canonical doc for the topic. Subordinate docs are
 > read only when explicitly referenced from canonical.
 >
-> Last reconciled: 2026-04-29 (topical map) · 2026-07-09 (spec-manifest + drift pass)
+> Last reconciled: 2026-04-29 (topical map) · 2026-07-09 (spec-manifest + drift pass) · 2026-07-27 (3 specs added + DATABASE_SCHEMA staleness measured)
 > See `docs/_AUDIT_2026_04_29.md` for the audit that produced the topical map, and the
 > **Spec Manifest** + **Locations & Facilities** sections below (added 2026-07-09) for the
 > per-spec mapping and the open drift list.
@@ -20,7 +20,8 @@
 | Doc | Status |
 |---|---|
 | `/CLAUDE.md` | Canonical — session-start protocol |
-| `docs/DATABASE_SCHEMA.md` | Canonical — schema source of truth |
+| `docs/DATABASE_SCHEMA.md` | Canonical — schema source of truth · **🟠 stale, see task 14 + the note below** |
+| `docs/TENANT_TIMEZONE_SPEC.md` | Canonical — tenant timezone + server-side date correctness (cross-cutting) |
 | `docs/UI_STYLE_DIRECTIVES.md` | Canonical — portal styling (visual tokens) |
 | `docs/_INDEX.md` | This file |
 | `docs/_AUDIT_2026_04_29.md` | Reference — historical audit |
@@ -123,6 +124,7 @@ which supersedes this gap note with the reconciliation + build sequence. Pending
 | Enrollment approval, charging & monthly tuition draw | `docs/BILLING_APPROVAL_AND_DRAW.md` | ✅ Canonical *(Draft, 2026-07-17)* — vault-only checkout, admin-approval charge gate, proration, 15th draw engine, refund-ready data model. Supersedes the charge-at-checkout direction of `AUTHORIZATION_CHECKOUT.md` |
 | Vaulting rails (card-on-file + ACH mandate) | `docs/AUTHORIZATION_CHECKOUT.md` | Subordinate — vault/ACH mechanics only; charge-at-checkout + auto-activate **superseded** by `BILLING_APPROVAL_AND_DRAW.md` |
 | FSA/HSA invoice PDF | `docs/INVOICE_PDF.md` | Subordinate — downstream renderer; reads from `ledger_entries` |
+| Payers, splits, offline payments, tagging | `docs/BILLING_GENERALIZATION_SPEC_V2.md` | ✅ Canonical *(Draft, 2026-07-25)* — supersedes `BILLING_GENERALIZATION_SPEC.md` (v1, still unindexed) |
 | Performance/competition costs | `docs/PERFORMANCE_COMPETITION_COSTS.md` | |
 
 **Deprecated:** `TENANT_PAYMENT_CONFIG.md` (white-label feature deferred) · `BILLING_AND_CREDITS.md` (**superseded by `COMMERCE_AND_BILLING.md`** — its credit concept is absorbed as the bounded credit layer, `COMMERCE_AND_BILLING.md` §8.5; its `billing_charges` L2 spine is superseded by `ledger_entries`)
@@ -206,6 +208,7 @@ which supersedes this gap note with the reconciliation + build sequence. Pending
 | `BALLET_DOMAIN.md` | 📖 | Brand/Domain | — | lib/ai prompts | Ballet vocab, curriculum, skill/badge taxonomy reference |
 | `BILLING_APPROVAL_AND_DRAW.md` | ✅ *(Draft)* | Commerce & Billing | enrollments, enrollment_charge_items (new), charges (new), refunds (new), tuition_schedule_intent, ledger_entries, studio_settings | api/enrollment/checkout, api/enrollment/webhook, api/cron/tuition-draw (new), admin/enrollment/approvals (new) | Vault-only checkout → pending enrollment → admin approval charge gate; first-month proration; 15th off-session tuition draw engine (state machine, idempotency, dunning); refund-ready charge/refund data model. **Canonical for enrollment approval + draw**; supersedes charge-at-checkout in `AUTHORIZATION_CHECKOUT.md` |
 | `BILLING_AND_CREDITS.md` | 🔴 | Billing | credit_accounts, credit_transactions, invoices⚠, billing_charges⚠ | admin/billing, portal/billing | (dep) credit/point + `billing_charges` engine — **superseded by `COMMERCE_AND_BILLING.md`** (credit concept → bounded credit layer §8.5; `billing_charges` L2 → `ledger_entries`) |
+| `BILLING_GENERALIZATION_SPEC_V2.md` | ✅ *(Draft)* | Commerce & Billing | charge_item_splits (new), payment_receipts (new), receipt_allocations (new), undeposited_funds (new), ledger_entry_tags (new), payment_methods, enrollment_charge_items, ledger_entries | admin billing surfaces, api/enrollment | Multi-payer billing: per-item payer splits, offline/manual payments + undeposited funds, processor-hosted card entry only, ledger tagging, split-as-unit consequences, RLS as hard requirement. Schema verified against live DB 2026-07-25. Supersedes v1 (`BILLING_GENERALIZATION_SPEC.md`, `0233bc7`) |
 | `BRAND.md` | ✅ | Brand | — | tailwind, UI_STYLE_DIRECTIVES | Studio identity, voice, colors, typography |
 | `CALENDAR_AND_SCHEDULING.md` | 🔴 | Scheduling | schedule_instances, schedule_templates, rooms, calendar_subscriptions, approval_tasks | admin/calendar, widget/schedule | (dep) calendar/scheduling approvals + sync |
 | `CASTING_AND_REHEARSAL.md` | ✅ | Scheduling | productions, dances, production_dances, casting, rehearsals, rehearsal_attendance | admin/schedule, portal rehearsals | Casting/rehearsal/production schema + approvals |
@@ -233,7 +236,7 @@ which supersedes this gap note with the reconciliation + build sequence. Pending
 | `CURRENT_STATE.md` | 🟠 | Ops | seasons, schedule_instances, schedule_change_requests, approval_tasks, rooms, casting | api/admin/schedule-change-requests | Session snapshot (stale 2026-03-11) |
 | `CURRICULUM_AND_PROGRESSION.md` | ✅ | Students | curriculum_categories, curriculum_skills, season_curriculum, student_skill_records, evaluation_templates, evaluation_template_questions | ~admin/settings/curriculum | Skill/badge curriculum builder + level advancement |
 | `DATA_MODEL.md` | 🔴 | Ops | profiles, students, classes, enrollments, attendance, teachers | — | (stale, unmarked) legacy schema; uses dropped `user_role` enum |
-| `DATABASE_SCHEMA.md` | ✅ | Ops | profiles, profile_roles, teachers, students, classes, enrollments | types/database.types.ts | Canonical live schema ref — **stale (Mar 2026), needs refresh** |
+| `DATABASE_SCHEMA.md` | 🟠 | Ops | profiles, profile_roles, teachers, students, classes, enrollments | types/database.types.ts | Canonical live schema ref — **stale. Measured 2026-07-27: covers 30 of 164 live tables at column level; 13 of those 30 have column drift.** See task 14 |
 | `DOCUMENT_LIBRARY.md` | ✅ | Ops/Compliance | family_documents, enrollments, seasons, students, families, contract_templates⚠ | admin/documents, portal/documents, cron/document-expiry | Family/admin document store + parent to-do |
 | `EMAIL_TEMPLATES.md` | ✅ | Communications | email_templates | api/email-templates | Block-based email template editor (schema-drift: proposes 3 tables) |
 | `ENROLLMENT_AND_PLACEMENT.md` | 🟡 | Enrollment | bundle_configs, enrollment_carts, season_placements, season_placement_releases, enrollment_recommendations, cart_bundles⚠ | ~admin/seasons/placement, portal/enroll | Admin pre-placement + self-enroll + bundles (master TBD) |
@@ -272,6 +275,7 @@ which supersedes this gap note with the reconciliation + build sequence. Pending
 | `SCHEDULING_AND_LMS.md` | 🔵 | Scheduling | classes, productions, class_sessions⚠, session_attendance⚠, curriculum_stages⚠ | admin/schedule, teach/schedule | Scheduling + LMS vision (free-text room, single-location) |
 | `SEASONS_AND_ARCHIVAL.md` | ✅ | Classes | seasons, classes, enrollments, attendance, profiles | admin/seasons, lib/seasons/archive | Season lifecycle, class archival, re-registration |
 | `SECURITY.md` | ✅ | Ops/Security | mandated_reporter_incidents, students, attendance, student_content_progress, stream_access, live_sessions | RLS templates, api/* | Auth/RLS/COPPA/payment security (RLS examples stale) |
+| `SESSION_2026-07-25_FINDINGS.md` | 📖 | Ops | 41 tables lacking tenant_id, teacher_profiles (view), productions, attendance/attendance_records, enrollments | lib/queries, admin enrollment paths | Verified findings log: P0 missing `tenant_id` sweep, `teacher_profiles` hiding departed teachers from payroll, `cancelled`/`canceled` split across 6 tables, 4 vocabularies for payment state, 2 attendance tables, admin enrollment creating no billing artifacts. Companion to `SESSION_2026-07-21_FINDINGS.md` (still unindexed) |
 | `STACK.md` | ✅ | Ops | — | app/, lib/supabase, types | Tech stack, structure, env vars, conventions (says Next 15⚠) |
 | `STAFF_RESOURCE_LIBRARY.md` | 🔵 | Ops/Facilities | profiles, tenants, staff_library_folders⚠, staff_library_documents⚠ | admin/resources/library, teach/library | Internal staff document library (invents tables; live=studio_resources) |
 | `STREAMING_AUTH.md` | 🔵 | Media | live_sessions, stream_access, students, family_members⚠, guest_stream_tokens⚠ | lib/cloudflare/stream | Stream authorization, family access, guest tokens |
@@ -288,6 +292,7 @@ which supersedes this gap note with the reconciliation + build sequence. Pending
 | `TEACHER_SUBSTITUTE_COVERAGE.md` | ✅ | Teachers | absence_records, substitute_requests, substitute_alerts, substitute_authorizations, teacher_sub_eligibility, schedule_instances | ~admin coverage | Absence→substitute assignment workflow |
 | `TEACHER_TIME_ATTENDANCE.md` | ✅ | Teachers | timesheets, timesheet_entries, pay_periods, private_billing_records, private_billing_splits, productions | teacher timesheet, Square CSV | Timesheets + private billing splits + payroll export |
 | `TENANT_PAYMENT_CONFIG.md` | 🔴 | SaaS/Billing | tenants, tenant_payment_configs⚠ | ~api/payments/webhook, lib/payments | (dep) per-tenant payment-processor config |
+| `TENANT_TIMEZONE_SPEC.md` | ✅ *(Phase A built)* | Ops / cross-cutting | tenants (`timezone`) | lib/dates, lib/auth/guards, lib/auth/getSessionWithRole, lib/schedule/*, lib/billing/*, lib/timesheets/helpers | Server-side date correctness: every calendar date is derived in the runtime's zone (UTC on Vercel), so dates roll over ~5pm Pacific. Adds `tenants.timezone` + zone-aware helpers, then migrates ~99 UTC call sites across 67 files in phases B–G. **Phase A done (`9e9edec`); B–G outstanding.** Governs pay-period resolution, date filters, schedule generation, and billing period boundaries |
 | `TESTING.md` | ✅ | Ops | leads, lead_stage_history, attendance, family_documents | tests/e2e, playwright.config, .github/workflows | Playwright + GitHub Actions E2E strategy |
 | `TICKETING.md` | 🧱 | Ticketing | productions, tenants, shows⚠, tickets⚠, ticket_orders⚠ | /claim/[token] | Ticket sales, comps, scanning (6-table schema unbuilt) |
 | `UI_STYLE_DIRECTIVES.md` | ✅ | Brand | — | components/ui/select, tailwind, app/(admin\|portal\|teach) | Canonical portal visual system |
@@ -306,6 +311,19 @@ which supersedes this gap note with the reconciliation + build sequence. Pending
 | `operations/teacher-onboarding.md` | ✅ | Teachers/HR | staff_documents, teacher_compliance | ~M4, ~M12 | Two-week new-instructor apprenticeship + compliance |
 | `operations/teacher-recruitment.md` | ✅ | Teachers/HR | — | ~M4 | Faculty sourcing, interviewing, retention |
 | `strategy/platform-product-requirements.md` | ✅ | Strategy | studio_locations | (admin/teacher/parent) surfaces | Canonical M1–M13 capability-module PRD |
+
+### Still unindexed (swept 2026-07-27)
+
+Three docs were added to the manifest above in this pass: `TENANT_TIMEZONE_SPEC.md`,
+`BILLING_GENERALIZATION_SPEC_V2.md`, `SESSION_2026-07-25_FINDINGS.md`. A full sweep of
+`docs/*.md` found **11 more that appear nowhere in this index** — left unindexed here because
+several are competing billing drafts whose canonical status needs a decision, not a row:
+
+- Billing/ledger cluster (needs a canonical decision against `COMMERCE_AND_BILLING.md`):
+  `BILLING_GENERALIZATION_SPEC.md` (v1, superseded by V2), `COMMERCE_BILLING_ADDENDUM_v4.md`,
+  `COMMERCE_BILLING_ARCHITECTURE.md`, `LEDGER_DOUBLE_ENTRY_DESIGN.md`, `LEDGER_FOUNDATION_REVIEW.md`
+- Announcements: `ANNOUNCEMENT_MODULE_SPEC.md`, `ANNOUNCEMENT_MODULE_BUILD_PROMPT.md` (📝 prompt)
+- Other: `ENROLLMENT_ENTRY.md`, `TOOLS_SURVEYS.md`, `SESSION_2026-07-21_FINDINGS.md`, `SESSION_PICKUP.md`
 
 ## Archive Candidates (Phase 2)
 - `docs/bam-schedule-v10.html` — 99KB HTML mockup
@@ -335,7 +353,14 @@ which supersedes this gap note with the reconciliation + build sequence. Pending
       3. Keep the `studio_resources` table **dormant** (unused-but-harmless) for possible future equipment booking; retire only its CRUD (`resources/manage`) + the class-tag UI, not the table itself.
 12. **RBAC specs — collapse three into one.** `RBAC_AND_PERMISSIONS.md` (canonical) vs deprecated `ROLE_BASED_NAV_SPEC.md`/`ROLES_AND_PERMISSIONS.md`. Even canonical shows FK `profile_roles.profile_id` while live is `user_id`; `SECURITY.md` RLS examples still use dropped `profiles.role`/`students.parent_id`/`classes.teacher_id`. Fix FK names + RLS examples to match live.
 13. **Communications schema — reconcile the triple fork.** `COMMUNICATIONS.md` (`channels`) vs `COMMUNICATIONS_HUB.md` (`communication_groups`/`group_posts`) vs `COMMUNICATIONS_INBOX/TRIAGE` (`communication_threads`) — all three "authoritative/ready", all backed by live tables, none reconciled. Mark orphaned `COMMUNICATIONS_AND_STAFF_VISIBILITY.md` deprecated.
-14. **Canonical schema doc is stale.** `DATABASE_SCHEMA.md` (declared canonical) last updated Mar 2026 — missing `contact_channels`, `curriculum_*`, `family_documents`, locations tables, etc. Regenerate from `types/database.types.ts`. Add deprecation header to parallel `DATA_MODEL.md` (uses dropped `user_role` enum).
+14. **Canonical schema doc is stale.** `DATABASE_SCHEMA.md` (declared canonical) last updated Mar 2026 — missing `contact_channels`, `curriculum_*`, `family_documents`, locations tables, etc. Regenerate from `types/database.types.ts`. Add deprecation header to parallel `DATA_MODEL.md`.
+    - **Measured 2026-07-27** (against live `pg_attribute`, not estimated). Header says Mar 2026; last commit `5c49724`, 2026-04-29.
+      - **Coverage:** 30 tables documented at column level, plus 46 name-only rows in "Other Tables" = 76 named. Live schema has **164 tables + 1 view**, so **~88 live tables (54%) appear nowhere in the file.**
+      - **Accuracy of the 30:** only **17 are exactly correct**. The other 13 drift: **65 live columns absent from the doc**, and **5 documented columns that do not exist live**.
+      - **Worst drift:** `enrollments` (15 documented / 35 live — the entire approval, hold, and proration surface that `BILLING_APPROVAL_AND_DRAW.md` depends on is undocumented), `classes` (40/49), `profiles` (23/31), `students` (27/34), `rooms` (9/14), `family_contacts` (10/15).
+      - **The 5 phantom columns** — the actively dangerous ones, since `lib/supabase/server.ts` has no `<Database>` generic so a query against them compiles clean and fails at runtime: `extended_contact_students.created_at`, `extended_contacts.updated_at`, `families.stripe_payment_method_last4`, `families.updated_at`, `family_contacts.is_emergency`.
+      - **Decision needed: regenerate or retire.** Adding accurate sections one at a time to a file that is 54% absent and 43% drifted on what it does cover makes it *more* trusted without making it more correct. Until it is regenerated, `types/database.types.ts` is the only reliable schema reference — which is what CLAUDE.md's Schema Verification section already says.
+    - ⚠️ **Correction to a CLAUDE.md directive, found while measuring this.** CLAUDE.md states "`user_role` enum is DROPPED — never use `::user_role` cast." **Live check 2026-07-27: the `user_role` enum still exists and `profiles.role` is still typed `user_role`.** `DATABASE_SCHEMA.md` is correct here and CLAUDE.md is wrong. The *practice* (use `profile_roles`, not `profiles.role`) remains right; the *stated reason* is not. Needs fixing in CLAUDE.md §4.
 15. **Naming drift sweep.** `user_profiles`→`profiles`, `sessions`/`class_sessions`→`schedule_instances`, `profile_id`→`user_id`, singular `timesheet_entry`/`pay_period`→plural. Recurs in ATTENDANCE, COMMUNICATIONS_INBOX, DATA_MODEL, NOTIFICATIONS, teacher timesheet docs.
 16. **Unbuilt-schema (🧱) docs ride on ⚠NOT-IN-DB tables** — Billing (`invoices`/`billing_charges`), Contracts (4 tables), Ticketing (6 tables), Media Hub, Programs, Competition/Privates, Marketing Integrations, Integrations, Makeup. Decide build-vs-defer per area; add "schema not built" banners so they aren't implemented as-is.
 17. **Route groups `(learn)` and `(shop)` are undocumented** in `PORTAL_SURFACES.md` (the canonical surface map). `(shop)/shop` is a placeholder (no `products`/`shop_orders` code). Either add them to the surface map or mark them not-yet-built.
