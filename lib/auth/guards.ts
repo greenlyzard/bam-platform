@@ -114,10 +114,31 @@ export async function requireRole(
 }
 
 /**
+ * Every role that confers admin-tier access.
+ *
+ * MUST STAY IN SYNC with the `is_admin()` SQL function in the database
+ * (see the COMMENT on that function). Any role in this list can reach the
+ * admin surface and satisfies `is_admin()` in RLS, so granting one is a
+ * privilege escalation and must be reserved to super_admin.
+ *
+ * This list previously lived inline in addStaffRole/removeStaffRole and had
+ * drifted — it omitted studio_admin and studio_manager, which meant anyone
+ * could grant themselves admin-tier access through a role the escalation
+ * check did not recognise. Keep it in one place.
+ */
+export const ADMIN_TIER_ROLES = [
+  "admin",
+  "super_admin",
+  "studio_admin",
+  "studio_manager",
+  "finance_admin",
+] as const;
+
+/**
  * Require admin or super_admin role.
  */
 export async function requireAdmin(): Promise<AuthUser> {
-  return requireRole("admin", "super_admin", "studio_admin", "finance_admin", "studio_manager");
+  return requireRole(...ADMIN_TIER_ROLES);
 }
 
 /**

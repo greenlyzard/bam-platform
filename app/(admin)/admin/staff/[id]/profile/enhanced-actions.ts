@@ -1,5 +1,6 @@
 "use server";
 
+import { ADMIN_TIER_ROLES, requireAdmin } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
@@ -8,9 +9,8 @@ import { revalidatePath } from "next/cache";
 // 1. Update enhanced bio fields on profiles
 // ---------------------------------------------------------------------------
 export async function updateEnhancedBio(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
 
   const teacherId = formData.get("teacherId") as string;
   if (!teacherId) return { error: "Missing teacherId" };
@@ -58,9 +58,8 @@ export async function updateEnhancedBio(formData: FormData) {
 // 2. Add discipline
 // ---------------------------------------------------------------------------
 export async function addDiscipline(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
 
   const tenantId = formData.get("tenantId") as string;
   const teacherId = formData.get("teacherId") as string;
@@ -104,9 +103,8 @@ export async function addDiscipline(formData: FormData) {
 // 3. Remove discipline
 // ---------------------------------------------------------------------------
 export async function removeDiscipline(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
 
   const disciplineId = formData.get("disciplineId") as string;
   if (!disciplineId) return { error: "Missing disciplineId" };
@@ -126,9 +124,8 @@ export async function removeDiscipline(formData: FormData) {
 // 4. Reorder disciplines
 // ---------------------------------------------------------------------------
 export async function reorderDisciplines(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
 
   const teacherId = formData.get("teacherId") as string;
   if (!teacherId) return { error: "Missing teacherId" };
@@ -159,9 +156,8 @@ export async function reorderDisciplines(formData: FormData) {
 // 5. Add affiliation
 // ---------------------------------------------------------------------------
 export async function addAffiliation(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
 
   const tenantId = formData.get("tenantId") as string;
   const teacherId = formData.get("teacherId") as string;
@@ -209,9 +205,8 @@ export async function addAffiliation(formData: FormData) {
 // 6. Remove affiliation
 // ---------------------------------------------------------------------------
 export async function removeAffiliation(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
 
   const affiliationId = formData.get("affiliationId") as string;
   if (!affiliationId) return { error: "Missing affiliationId" };
@@ -231,9 +226,8 @@ export async function removeAffiliation(formData: FormData) {
 // 7. Reorder affiliations
 // ---------------------------------------------------------------------------
 export async function reorderAffiliations(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
 
   const teacherId = formData.get("teacherId") as string;
   if (!teacherId) return { error: "Missing teacherId" };
@@ -263,9 +257,8 @@ export async function reorderAffiliations(formData: FormData) {
 // 8. Upload teacher photo
 // ---------------------------------------------------------------------------
 export async function uploadTeacherPhoto(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
 
   const tenantId = formData.get("tenantId") as string;
   const teacherId = formData.get("teacherId") as string;
@@ -332,9 +325,8 @@ export async function uploadTeacherPhoto(formData: FormData) {
 // 9. Update photo caption
 // ---------------------------------------------------------------------------
 export async function updatePhotoCaption(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
 
   const photoId = formData.get("photoId") as string;
   if (!photoId) return { error: "Missing photoId" };
@@ -356,9 +348,8 @@ export async function updatePhotoCaption(formData: FormData) {
 // 10. Delete photo
 // ---------------------------------------------------------------------------
 export async function deletePhoto(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
 
   const photoId = formData.get("photoId") as string;
   if (!photoId) return { error: "Missing photoId" };
@@ -400,9 +391,8 @@ export async function deletePhoto(formData: FormData) {
 // 11. Reorder photos
 // ---------------------------------------------------------------------------
 export async function reorderPhotos(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
 
   const teacherId = formData.get("teacherId") as string;
   if (!teacherId) return { error: "Missing teacherId" };
@@ -432,9 +422,8 @@ export async function reorderPhotos(formData: FormData) {
 // 12. Toggle photo active status
 // ---------------------------------------------------------------------------
 export async function togglePhotoActive(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
 
   const photoId = formData.get("photoId") as string;
   const isActive = formData.get("isActive") === "true";
@@ -455,16 +444,26 @@ export async function togglePhotoActive(formData: FormData) {
 // 13. Add staff role
 // ---------------------------------------------------------------------------
 export async function addStaffRole(formData: FormData) {
+  const user = await requireAdmin();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
 
   const profileId = formData.get("profileId") as string;
   const role = formData.get("role") as string;
   const tenantId = formData.get("tenantId") as string;
   if (!profileId || !role || !tenantId) return { error: "Missing required fields" };
 
-  if (["admin", "finance_admin", "super_admin"].includes(role)) {
+  // Escalation gate. Granting ANY admin-tier role is a privilege escalation —
+  // every role in ADMIN_TIER_ROLES satisfies is_admin() in RLS and
+  // requireAdmin() in the app — so it is reserved to super_admin. A plain
+  // admin retains normal staff management: teacher, parent, student,
+  // front_desk.
+  //
+  // NOTE on front_desk: deliberately left grantable by a plain admin, but it
+  // routes to /admin/dashboard (see roleHome in lib/auth/guards.ts) while
+  // requireAdmin() excludes it. That inconsistency is unresolved — if
+  // front_desk should be admin-tier, add it to ADMIN_TIER_ROLES and is_admin()
+  // together, not here.
+  if ((ADMIN_TIER_ROLES as readonly string[]).includes(role)) {
     const { data: callerRole } = await supabase.from("profile_roles").select("role").eq("user_id", user.id).eq("role", "super_admin").eq("is_active", true).maybeSingle();
     if (!callerRole) return { error: "Only Studio Owners can assign this role" };
   }
@@ -479,19 +478,57 @@ export async function addStaffRole(formData: FormData) {
 // 14. Remove staff role
 // ---------------------------------------------------------------------------
 export async function removeStaffRole(formData: FormData) {
+  const user = await requireAdmin();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
 
   const profileId = formData.get("profileId") as string;
   const role = formData.get("role") as string;
   if (!profileId || !role) return { error: "Missing required fields" };
 
-  if (["admin", "finance_admin", "super_admin"].includes(role)) {
+  // Same escalation gate as addStaffRole — revoking admin-tier access is as
+  // sensitive as granting it (it can lock a colleague out of the studio).
+  if ((ADMIN_TIER_ROLES as readonly string[]).includes(role)) {
     const { data: callerRole } = await supabase.from("profile_roles").select("role").eq("user_id", user.id).eq("role", "super_admin").eq("is_active", true).maybeSingle();
     if (!callerRole) return { error: "Only Studio Owners can remove this role" };
   }
   if (profileId === user.id && role === "super_admin") return { error: "Cannot remove your own Studio Owner role" };
+
+  // Last-owner protection. The self-removal check above stops an owner
+  // demoting themselves, but not one owner removing another. A tenant with
+  // zero active super_admins cannot grant the role back through any UI —
+  // recovery requires direct SQL. Refuse instead.
+  if (role === "super_admin") {
+    const { data: target } = await supabase
+      .from("profile_roles")
+      .select("tenant_id, is_active")
+      .eq("user_id", profileId)
+      .eq("role", "super_admin")
+      .maybeSingle();
+
+    // Only a currently-active owner row can reduce the active owner count.
+    if (target?.is_active) {
+      let ownerQuery = supabase
+        .from("profile_roles")
+        .select("id", { count: "exact", head: true })
+        .eq("role", "super_admin")
+        .eq("is_active", true);
+
+      // Scope to the target's tenant when known; some legacy rows have none.
+      if (target.tenant_id) ownerQuery = ownerQuery.eq("tenant_id", target.tenant_id);
+
+      const { count, error: countErr } = await ownerQuery;
+
+      // Fail closed — if the count cannot be established, do not risk the
+      // removal being the last one.
+      if (countErr) {
+        console.error("[removeStaffRole] owner count failed:", countErr.message);
+        return { error: "Could not verify remaining Studio Owners — role not removed." };
+      }
+      if ((count ?? 0) <= 1) {
+        return { error: "Cannot remove the last Studio Owner. Assign another Studio Owner first." };
+      }
+    }
+  }
 
   const { error } = await supabase.from("profile_roles").delete().eq("user_id", profileId).eq("role", role);
   if (error) return { error: error.message };
