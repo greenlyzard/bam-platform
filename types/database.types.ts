@@ -9922,6 +9922,7 @@ export type Database = {
           id: string
           name: string
           slug: string
+          timezone: string
         }
         Insert: {
           angelina_enabled?: boolean
@@ -9929,6 +9930,7 @@ export type Database = {
           id?: string
           name: string
           slug: string
+          timezone?: string
         }
         Update: {
           angelina_enabled?: boolean
@@ -9936,6 +9938,7 @@ export type Database = {
           id?: string
           name?: string
           slug?: string
+          timezone?: string
         }
         Relationships: []
       }
@@ -10522,6 +10525,7 @@ export type Database = {
         Returns: string
       }
       get_user_role: { Args: never; Returns: string }
+      has_finance_role: { Args: never; Returns: boolean }
       has_permission: { Args: { perm_key: string }; Returns: boolean }
       is_admin: { Args: never; Returns: boolean }
       is_channel_member: {
