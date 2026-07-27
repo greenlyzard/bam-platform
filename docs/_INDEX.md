@@ -4,7 +4,7 @@
 > this index to find the canonical doc for the topic. Subordinate docs are
 > read only when explicitly referenced from canonical.
 >
-> Last reconciled: 2026-04-29 (topical map) · 2026-07-09 (spec-manifest + drift pass) · 2026-07-27 (3 specs added + DATABASE_SCHEMA staleness measured)
+> Last reconciled: 2026-04-29 (topical map) · 2026-07-09 (spec-manifest + drift pass) · 2026-07-27 (5 specs added + DATABASE_SCHEMA staleness measured)
 > See `docs/_AUDIT_2026_04_29.md` for the audit that produced the topical map, and the
 > **Spec Manifest** + **Locations & Facilities** sections below (added 2026-07-09) for the
 > per-spec mapping and the open drift list.
@@ -104,6 +104,7 @@ which supersedes this gap note with the reconciliation + build sequence. Pending
 | Onboarding (HR) | `docs/operations/teacher-onboarding.md` | Canonical |
 | Recruitment | `docs/operations/teacher-recruitment.md` | Canonical |
 | Rate management | `docs/TEACHER_RATE_MANAGEMENT.md` | Canonical |
+| Payroll correctness & annual/1099 reporting | `docs/PAYROLL_CORRECTNESS_AND_REPORTING.md` | ✅ Canonical *(Draft, 2026-07-27)* — 🔴 **P0 go-live blocker.** Pay is recomputed at render time from current rates; no period history, no annual view |
 | Substitute coverage | `docs/TEACHER_SUBSTITUTE_COVERAGE.md` | Canonical |
 | Substitute reporting | `docs/TEACHER_ABSENCE_SUBSTITUTE_SUMMARY.md` | Canonical |
 
@@ -125,6 +126,7 @@ which supersedes this gap note with the reconciliation + build sequence. Pending
 | Vaulting rails (card-on-file + ACH mandate) | `docs/AUTHORIZATION_CHECKOUT.md` | Subordinate — vault/ACH mechanics only; charge-at-checkout + auto-activate **superseded** by `BILLING_APPROVAL_AND_DRAW.md` |
 | FSA/HSA invoice PDF | `docs/INVOICE_PDF.md` | Subordinate — downstream renderer; reads from `ledger_entries` |
 | Payers, splits, offline payments, tagging | `docs/BILLING_GENERALIZATION_SPEC_V2.md` | ✅ Canonical *(Draft, 2026-07-25)* — supersedes `BILLING_GENERALIZATION_SPEC.md` (v1, still unindexed) |
+| Anomaly detection & admin alerting (money) | `docs/FINANCIAL_ANOMALY_DETECTION.md` | ✅ Canonical *(Draft, 2026-07-27)* — 🔴 **P0 go-live blocker.** Nothing detects a double charge or a billed-but-undelivered lesson today |
 | Performance/competition costs | `docs/PERFORMANCE_COMPETITION_COSTS.md` | |
 
 **Deprecated:** `TENANT_PAYMENT_CONFIG.md` (white-label feature deferred) · `BILLING_AND_CREDITS.md` (**superseded by `COMMERCE_AND_BILLING.md`** — its credit concept is absorbed as the bounded credit layer, `COMMERCE_AND_BILLING.md` §8.5; its `billing_charges` L2 spine is superseded by `ledger_entries`)
@@ -245,6 +247,7 @@ which supersedes this gap note with the reconciliation + build sequence. Pending
 | `ENROLLMENT_QUIZ_SPEC.md` | ✅ | Enrollment | ~leads, classes | (public)/enroll | Branching enroll quiz logic |
 | `ENROLLMENT_WIDGET.md` | ✅ | Enrollment | ~enrollment_carts, tenants | (widget)/widget, api/widget | Embeddable white-label enrollment widget (likely unbuilt) |
 | `EXPANSION.md` | ✅ | Expansion | expansion_markets, competitor_studios | admin/expansion, lib/queries/admin | Market/competitor readiness scoring for Location #2 |
+| `FINANCIAL_ANOMALY_DETECTION.md` | ✅ *(Draft)* | Commerce & Billing / Ops | notifications, billing_tasks, charges, enrollment_charge_items, ledger_entries, refunds, private_session_billing, private_sessions | lib/billing/approval-repo, lib/notifications/send, api/notifications, admin/privates/actions (cancelPrivateSession, updatePrivateSessionStatus), portal/book-private/actions, components/mobile-bottom-nav | 🔴 **P0 go-live blocker.** Whether anyone finds out when money goes wrong. Live findings 2026-07-27: **88 notifications, 100% unread** — no admin surface renders them (the bell ships only in `(portal)`, admin nav has no alerts item, `/admin/settings/notifications` is a dead link, `/api/notifications` has zero consumers, `lib/notifications/send.ts` has zero callers and its insert uses columns that don't exist). **`billing_tasks` is write-only** — one writer (`approval-repo.ts:277`), no reader, no resolver, no UI. **Double-charge prevention is one partial index** (`uq_charges_intent_period`, `kind='monthly_tuition'` only); `enrollment_charge_items`/`ledger_entries`/`refunds` have no unique constraints and no detection. **`private_session_billing` has 2 INSERTs and 0 UPDATEs** — cancel/no-show never touch it, so a cancelled session keeps its charge forever; 5 live rows already drifted. **No processor reconciliation exists** — Stripe is only ever written to, never read back |
 | `HOW_TO_ADD_SKILLS.md` | 📖 | Ops | — | CLAUDE.md | Skill-file loading guide (recommends @import — conflicts convention) |
 | `INTEGRATIONS.md` | 🔵 | Ops | tenant_integrations⚠ | admin/settings/integrations | Tenant-scoped integration adapter pattern (unbuilt) |
 | `INVOICE_PDF.md` | 🧱 | Billing | invoices⚠ | api/invoices, portal/billing/invoices | FSA/HSA PDF invoices — **subordinate to `COMMERCE_AND_BILLING.md`** (downstream renderer, reads `ledger_entries`; no conflict); only Stripe receipts today |
@@ -258,6 +261,7 @@ which supersedes this gap note with the reconciliation + build sequence. Pending
 | `MODULES.md` | 📖 | Ops/Strategy | — | →PORTAL_SURFACES, →PRD | Pointer to surfaces + M1–M13 taxonomy |
 | `NEW_STUDENT_PIPELINE.md` | ✅ | Enrollment | leads, trial_history, evaluation_requests, communication_threads, students | admin/enrollment/pipeline | CRM Kanban for new-student intake |
 | `NOTIFICATIONS.md` | ✅ | Communications | notifications, device_tokens, notification_preferences | api notifications, settings/notifications | Notification fan-out (in-app/push/email); uses `profile_id`⚠ |
+| `PAYROLL_CORRECTNESS_AND_REPORTING.md` | ✅ *(Draft)* | Teachers / Commerce & Billing | timesheet_entries (`rate_amount`, `rate_key`, `paid_at`), timesheets, pay_periods, teacher_rate_cards, teacher_hours, teachers (`*_rate_cents`) | admin/timesheets/payroll, teach/timesheets, teach/timesheets/summary, teach/hours, lib/timesheets/employment, lib/angelina/context | 🔴 **P0 go-live blocker.** Rate snapshotting, teacher period history, annual/1099 reporting, Angelina payroll context. Live findings 2026-07-27: **`timesheet_entries.rate_amount` is 0% populated** — pay is recomputed at render time from *current* `teachers.*_rate_cents`, so a Jan–Dec run reprices the whole year at today's rate across a mid-year raise, wrong in the direction of over-reporting income on a 1099-NEC. **No teacher-facing surface shows a prior period or YTD** — once a period closes a teacher cannot see what they filed. `/admin/timesheets/payroll` *does* aggregate correctly across periods (it filters `timesheet_entries.date`, never touches `pay_periods`) but has no `.limit()`, so an annual range can silently truncate at PostgREST `db-max-rows`. **Angelina reads `teacher_hours`, not the table payroll pays from** (`timesheet_entries`), and no admin/finance context includes any payroll data. All rates NULL and `timesheet_entries` empty on live today |
 | `PERFORMANCE_COMPETITION_COSTS.md` | ✅ | Billing | productions, timesheet_entries, pay_periods, teacher_rate_cards, competition⚠ | admin/reports/productions | Tag rehearsal/perf hours to production/competition costs |
 | `PERFORMANCE_MEDIA_AND_MONETIZATION.md` | 🔵 | Media | — | ~admin/stream-events | Multi-cam live stream + AI-edited paid media (vision) |
 | `PERMISSIONS_AUDIT.md` | 📖 | RBAC | profile_roles, profiles, timesheets, private_sessions, class_teachers, students | lib/auth/guards, lib/rbac/permissions | RLS/guard audit findings (open P0s) |
@@ -314,8 +318,9 @@ which supersedes this gap note with the reconciliation + build sequence. Pending
 
 ### Still unindexed (swept 2026-07-27)
 
-Three docs were added to the manifest above in this pass: `TENANT_TIMEZONE_SPEC.md`,
-`BILLING_GENERALIZATION_SPEC_V2.md`, `SESSION_2026-07-25_FINDINGS.md`. A full sweep of
+Five docs were added to the manifest above across this pass: `TENANT_TIMEZONE_SPEC.md`,
+`BILLING_GENERALIZATION_SPEC_V2.md`, `SESSION_2026-07-25_FINDINGS.md`, `FINANCIAL_ANOMALY_DETECTION.md`,
+`PAYROLL_CORRECTNESS_AND_REPORTING.md`. A full sweep of
 `docs/*.md` found **11 more that appear nowhere in this index** — left unindexed here because
 several are competing billing drafts whose canonical status needs a decision, not a row:
 
