@@ -1,6 +1,6 @@
 # SESSION PICKUP
 
-_Last rewritten: 2026-07-25 (end of session)_
+_Last rewritten: 2026-07-26 (end of session)_
 
 ---
 
@@ -13,7 +13,9 @@ Full protocol lives in `CLAUDE.md`. Short form:
 - **Schema days only:** migration list check
 - Supabase MCP is **read-only**. All DDL through `supabase db push` in Regular Terminal. No exceptions.
 
-⚠️ `tsc --noEmit` currently reports **8 errors in `scripts/e2e-teardown.ts`** — pre-existing, unrelated to any schema work, and that file never ships. `app/` and `lib/` are clean. Add `scripts/` to `tsconfig.json` `exclude` to stop the noise.
+`tsc --noEmit` now returns **zero errors** — `scripts/` was excluded from typechecking in `4b93aad`. If it reports anything, it is real.
+
+Staging command that keeps the e2e scratch files out: `git add -A ':!scripts'`
 
 ---
 
@@ -21,17 +23,29 @@ Full protocol lives in `CLAUDE.md`. Short form:
 
 - **HEAD = this pickup commit**, pushed to `origin/main`. Fully synced.
 - Verify: `git rev-list --count origin/main..HEAD` → expect `0`
-- Working tree clean except `scripts/e2e-*.ts` — untracked scratch, **never commit these**.
+- Clean tree except `scripts/e2e-*.ts` — untracked, **never commit these**.
 
-**Shipped 2026-07-25:**
+**Fourteen commits landed 2026-07-26:**
 
 | Commit | What |
 |---|---|
-| `f2f1a0b` | Pickup note |
 | `e3b8879` | Approvals nav link + codified untracked `platform_modules` state |
-| `0233bc7` | Billing generalization spec v1 |
-| `a044bb3` | Billing generalization spec **v2** (supersedes v1) |
-| `85aae35` | **Phase A1 migration + regenerated types** |
+| `0233bc7` → `a044bb3` | Billing generalization spec v1 → **v2** (v2 supersedes) |
+| `85aae35` | **Billing Phase A1** — migration + regenerated types |
+| `a836838` | Session findings + pickup note |
+| `d340387` | **Five teacher timesheet blockers** |
+| `b65b836` | Timesheet summary pay-period scoping |
+| `466a477` | **Payroll employment-type classification** |
+| `49cd5ca` | Owner classification + equity-draw separation |
+| `e463d03` | Employment type editable from staff profile |
+| `265c21b` | Staff-actions authorization + teachers row on add |
+| `4b93aad` | Exclude `scripts/` from typecheck |
+| `e1c9fab` | **Compensation authorization** — `requireFinance`, rate card RLS |
+| `c7ea1ca` | `enhanced-actions` guards + studio_admin escalation closed |
+| `ee73cf7` | Authorization on two **unauthenticated** settings actions |
+| `36741f2` | **Guards on all remaining ~100 admin server actions** |
+| `8626b5c` | Client-side date writes use local calendar date |
+| `5526f66` | Tenant timezone spec |
 
 ---
 
@@ -39,113 +53,146 @@ Full protocol lives in `CLAUDE.md`. Short form:
 
 **Live at `portal.balletacademyandmovement.com`, Stripe TEST MODE.**
 
-Verified end-to-end 2026-07-24: `checkout → card vaulted → webhook 200`
-Re-verified 2026-07-25 post-A1: cart add → cart renders with correct pricing.
+Stripe config unchanged from 2026-07-24: test-mode webhook (`checkout.session.completed` only), `sk_test`/`pk_test`/signing secret in Vercel prod env, `NEXT_PUBLIC_APP_URL` = portal domain (Production scope). Old live `pk_` is in Amanda's password manager. A live-mode webhook endpoint exists (created in error, harmless in test mode).
 
-### Stripe config (production Vercel env)
+**Go-live switch** is not piecemeal: swap `sk_`/`pk_`, repoint the signing secret, re-verify a real checkout.
 
-| Item | Value |
-|---|---|
-| Webhook endpoint | `BAM Platform Enrollment Webhook (test)` — test mode |
-| Subscribed events | `checkout.session.completed` **only** |
-| Signing secret / `sk_test` / `pk_test` | all in Vercel prod env |
-| `NEXT_PUBLIC_APP_URL` | portal domain, **Production scope** |
+### Verified working in production tonight
 
-- Old live-mode `pk_` rescued to Amanda's password manager.
-- A live-mode webhook endpoint also exists (created in error, harmless in test mode). At go-live, reuse or recreate cleanly.
-- **Go-live switch** is not piecemeal: swap `sk_`/`pk_`, repoint the signing secret, re-verify a real checkout.
+- Parent checkout → cart → correct pricing (post-A1)
+- Teacher timesheets: add entry → edit → **delete** → submit
+- Payroll: Amanda under **Owner Draws**, footer `1 (W-2: 0, 1099: 0, Owner: 1)`, excluded from Combined Total
+- Employment Type control on the staff profile
+- `/teach/privates` and `/teach/evaluations` still work under `requireTeacher()`
 
 ### Known prod data
 
-- Wyatt Cobb-Hardin has an active enrollment in Test Classes from 7/17 (`id 2fb3d183`, admin/seed path). This triggered the original 23505.
-- A **Test Classes cart item was added 2026-07-25** during A1 smoke testing and may still be open. Clean it up.
-- **Do not reuse Wyatt** for the approvals demo — use a student with no existing enrollment in the target class, or the queue lands empty.
+- Wyatt Cobb-Hardin has an active enrollment in Test Classes from 7/17 (`2fb3d183`). **Do not reuse Wyatt** for the approvals demo — use a student with no existing enrollment in the target class.
+- A Test Classes cart item from 2026-07-25 smoke testing may still be open.
+- Amanda's and Derek's `employment_type` are both `owner`.
 
 ---
 
-## 3. What changed 2026-07-25
+## 3. What shipped 2026-07-26
 
-### 3.1 Approvals nav link — DONE
-`/admin/enrollment/approvals` now appears under Students & Families (✓ glyph, `sort_order` 27). Verified live. Same migration codified two hand-applied `platform_modules` edits that existed in prod but in no migration.
+### 3.1 Billing Phase A1 — APPLIED
+Charge items and cart items generalized (`enrollment_id` nullable, `description` added, `item_type` widened to 10 values including costume/competition/late_fee/merchandise). Ledger cleanup, `productions.tenant_id` added, `timesheet_entries.production_id` FK with NO ACTION.
 
-### 3.2 Billing generalization spec v2 — COMMITTED
-`docs/BILLING_GENERALIZATION_SPEC_V2.md`. Nine phases. Supersedes v1 (five of v1's schema assumptions were wrong; corrected in v2 §0).
+**Phase A2 is BLOCKED.** Tightening `enrollment_charge_items.family_id` to NOT NULL requires `enrollments.family_id` be guaranteed non-null at both writer sites first — `approval-repo.ts:365` reads it as explicitly nullable.
 
-Scope: family as billing anchor · admin placement (comp / manual / vault request) · multi-payer with per-charge splits · offline payments with partial allocation · processor-agnostic card vaulting · ledger tagging.
+### 3.2 Teacher timesheets — WORKING END TO END
+Five blockers fixed. Four were the same bug: `.eq("user_id", …)` against `teacher_profiles`, a view with no `user_id` column. The fifth was a deadlock — the page picked the newest timesheet by `created_at`, so once approved, `isDraft` went false and the add-entry form vanished permanently.
 
-### 3.3 Phase A1 — APPLIED AND VERIFIED
+**A sweep found nine instances of that bug. Three fixed, six remain (§5.2).**
 
-Migration `20260725140000_billing_generalization_phase_a1.sql`:
+### 3.3 Payroll classification
+**Every teacher had been silently dropped from both W-2 and 1099 buckets since that code was written** — it compared `employment_type === "w2"`, but the CHECK constraint only permits `full_time | part_time | contract | employee | contractor_1099 | pending_classification`. No row ever held `"w2"`.
 
-- `enrollment_charge_items`: `enrollment_id` → nullable · added `description` · FKs on `family_id`/`student_id`/`class_id` (all still nullable) · `item_type` widened to 10 values including `costume`, `competition`, `late_fee`, `merchandise`
-- `enrollment_cart_items`: `class_id` → nullable · added `item_type` (NOT NULL, DEFAULT `class_enrollment`), `reference_id`, `description`
-- Ledger: dropped vestigial `invoice_id`/`payment_id`/`line_item_id` · renamed `1010` to "Cash – Processor Clearing" · added `1020 undeposited_funds`
-- `productions`: added `tenant_id` NOT NULL + FK (NO ACTION) + index
-- `timesheet_entries.production_id`: FK added, **ON DELETE NO ACTION** (protects production P&L labor attribution)
+Fixed via shared `classifyEmployment()` in `lib/timesheets/employment.ts`. The same bug existed at four sites; one mislabeled every teacher as "W-2 Employee" in the admin entry drawer.
 
-Types regenerated. `app/` and `lib/` typecheck clean.
+Added `owner` employment type → `owner_draw` payroll class. Equity distributions shown separately, excluded from wage totals and Combined Total.
+
+### 3.4 Security — the big one
+
+| Finding | Severity |
+|---|---|
+| `settings/studio` and `settings/disciplines` had **no authentication at all** — service-role writes callable by an unauthenticated request | Critical |
+| `addStaffMember` had no authorization — any signed-in user could mint accounts with any role in any tenant | Critical |
+| `upsertRateCard` had no authorization — any signed-in user could write compensation | Critical |
+| Escalation check in `addStaffRole` omitted `studio_admin` and `studio_manager`, both in `is_admin()` — any signed-in user could grant themselves admin-tier access | Critical |
+| `teachers_update_own` RLS let any teacher set their own pay rates | High |
+| ~120 admin server actions checked `auth.getUser()` only | High |
+
+**All closed.**
+
+Mechanism worth remembering: **page and layout guards do not protect server actions.** The action executes, *then* the RSC tree re-renders — so `requireAdmin()` in a page body redirects after the write has already committed. Only code inside the action is an authorization boundary.
+
+New: `requireFinance()` in `lib/auth/guards.ts` (finance_admin + super_admin), `has_finance_role()` in the DB, and an `ADMIN_TIER_ROLES` constant that `requireAdmin()` now spreads so the guard and the escalation check cannot drift apart again.
+
+**Cara loses access** to the payroll report, pay-rates settings, rate cards, and CSV rate columns. Intended.
+
+### 3.5 Dates — partially fixed
+Six client-side write sites now use `toLocalDateStr()` from the new `lib/dates.ts`. Attendance and timesheet dates stop being written a day ahead after 5pm Pacific.
+
+**Everything server-rendered is still UTC.** See `docs/TENANT_TIMEZONE_SPEC.md`.
 
 ---
 
-## 4. Next session — start here
+## 4. Next session — recommended order
 
-### 4.1 Phase A2 is BLOCKED, and why
-A2 tightens `enrollment_charge_items.family_id` to NOT NULL. **Do not do this yet.** `lib/billing/approval-repo.ts:365` reads `enrollments.family_id` as explicitly nullable. A2 requires that value be guaranteed non-null at both writer sites first (`webhook/route.ts:491` and `approval-repo.ts:394`).
+### 4.1 Timezone Phase A
+`docs/TENANT_TIMEZONE_SPEC.md` §5. Add `tenants.timezone`, build the helpers, thread the zone through `AuthUser`. Everything else in that spec depends on it.
 
-### 4.2 Recommended order
-1. **Phase B** — `payment_methods` table; migrate off `families.stripe_*`; `family_payers`
-2. **Phase C** — `charge_item_splits` + balance trigger
-3. **Phase H** — RLS for payer visibility. **Ships with C, not after.** Splits without RLS expose payers to each other
-4. **Phase D/E/F** — offline payments, admin card vaulting, placement modes
+Phases E (schedule generation) and F (billing proration) are deliberately last — both currently work and both are load-bearing.
 
-### 4.3 Amanda walkthrough
-Approvals queue at `/admin/enrollment/approvals`. Needs a **fresh test enrollment** on a student with no existing enrollment in the target class.
+**Verification constraint:** this bug cannot be caught on a Pacific machine before 5pm. Use `TZ=UTC` locally or test the deployed environment after 5pm Pacific. Do not accept "works on my machine."
+
+### 4.2 Cross-tenant authorization
+~100 actions now have role guards but **none validate that a client-supplied `tenantId` or record `id` belongs to the caller's tenant.** Latent with one tenant, hard blocker before the second. Needs a `requireTenant()` helper plus call-site changes.
+
+Related: `settings/studio/actions.ts` hardcodes `TENANT_ID` and `STUDIO_SETTINGS_ID` at module scope — a second tenant saving studio identity would silently overwrite BAM's row.
+
+### 4.3 Billing Phase B
+`payment_methods` table, migrate off `families.stripe_*`, `family_payers`. Then C (splits) + H (RLS) together — splits without RLS expose payers to each other.
 
 ---
 
-## 5. Open questions for Amanda
+## 5. Open defects
+
+### 5.1 Amanda's class assignments don't render
+`/admin/staff/[id]/profile` shows "No class assignments." She has three, visible at `/teach/evaluations`. The data is in `class_teachers`; the profile page query is wrong. **Uninvestigated.**
+
+### 5.2 Six remaining `teacher_profiles.user_id` instances
+- `lib/schedule/generate-sessions.ts:194-200` — session→teacher mapping silently empty
+- `lib/queries/admin.ts:170-174` — also `welcome_sent_at`, a column that exists in **no table**
+- `app/api/teachers/welcome/route.ts:114-116` — welcome tracking never persists; teachers can be re-emailed
+- `admin/productions/[id]/page.tsx:44,52-54,95,101` — **production labor-cost report broken**
+- `scripts/send-teacher-welcome-emails.ts`, `scripts/seed-teachers.ts` — both broken
+
+### 5.3 Root cause of the above
+`lib/supabase/server.ts:7` calls `createServerClient()` **without the `<Database>` generic**. Every query in the app is untyped — which is why nine queries against nonexistent columns compiled clean despite `types/database.types.ts` being regenerated religiously. Adding the generic will surface a wave of errors. That is the point. Its own session.
+
+### 5.4 Rate resolution — must fix before real payroll
+`rate_key` is never written by any code, `rate_amount` defaults to 0, `timesheets.total_pay` is never set. Pay is computed at **report time** from current `teachers.*_rate_cents`. So **changing a teacher's rate silently rewrites what past periods were worth.**
+
+### 5.5 Carried forward
+- Browse Classes "Request Enrollment" silent no-op (writes to nonexistent `admin_tasks`)
+- Ended classes appear in catalog (missing end-date filter)
+- Vercel custom domains "Invalid Configuration" — GoDaddy conflicting A records on `portal`/`staging`
+- `staging.` points at production
+- **41 tables lack `tenant_id`** incl. `classes`, `profiles`, `teachers`, `attendance` — see `SESSION_2026-07-25_FINDINGS.md`
+- `teacher_profiles` view hides departed teachers from payroll retroactively
+- `cancelled` vs `canceled` split across six tables
+- `addStaffMember` is not atomic — failures are now *visible* but still partial
+- `requireAdmin()` admits `finance_admin`, and the add-staff form can create `super_admin` — escalation within the admin tier
+- `productions` has no archive path now that the timesheet FK blocks deletes
+- `lib/auth/` holds five overlapping modules; the admin layout imports `requireRole` from a different one than everything else
+
+---
+
+## 6. Open questions for Amanda
 
 | # | Question | Blocks |
 |---|---|---|
-| 1 | **Consent copy** — parents are consenting to costume/competition charges the platform cannot produce (live in prod). What should it say? | Nothing, but it's live |
-| 2 | **Split billing** — confirmed needed, including grandparents. Does a non-parent payer need a portal login, or emailed receipts only? | Phase B design |
-| 3 | **Sibling discounts** — ~50% off 2nd+ registration. Registration only, or tuition too? | Phase C |
-| 4 | **Late fees** — charged at all? Automatic on aging or admin-applied? | Phase D |
-| 5 | **Costume / competition fees** — per-student flat, or per-production? | Phase A2 |
-| 6 | **Comp reasons** — require a picklist? (Recommend yes; `refunds.reason_id` is already NOT NULL) | Phase F |
-| 7 | **Credit on account** — auto-apply to next charge, or admin-allocated? | Phase D |
-| 8 | **Trial policy** — what, if anything, replaces the copy removed 2026-07-24? | Nothing |
-| 9 | **Day-one reports** — which reports does she actually pull weekly in Studio Pro? | Reporting spec |
-| 10 | **Newsletter / Klaviyo overlap** — deferred, don't lose it | — |
+| 1 | **Consent copy** — parents consent to costume/competition charges the platform cannot produce. Live in prod. | Nothing, but it's live |
+| 2 | **Value communication** — showing families the worth of comped/donated time. Framing is her call; scholarships may need to be opt-in per family. | New spec |
+| 3 | **Owner rate basis** — is her private hour valued at the family rate or an internal teaching rate? | Rate resolver |
+| 4 | **Split billing** — confirmed needed incl. grandparents. Portal login or emailed receipts only? | Billing B |
+| 5 | **Sibling discounts** — ~50% off 2nd+ registration. Registration only, or tuition too? | Billing C |
+| 6 | **Late fees** — charged? Automatic on aging or admin-applied? | Billing D |
+| 7 | **Costume/competition fees** — per-student flat or per-production? | Billing A2 |
+| 8 | **Day-one reports** — which does she pull weekly in Studio Pro? | Reporting spec |
+| 9 | **Trial policy** — what replaces the copy removed 2026-07-24? | Nothing |
 
 ---
 
-## 6. Backlog — see `docs/SESSION_2026-07-25_FINDINGS.md`
+## 7. Specs on file
 
-Newly documented, in priority order:
-
-- **P0 — 41 tables lack `tenant_id`**, including `classes`, `profiles`, `teachers`, `attendance`, `studio_settings`. Needs its own spec. Blocks tenant-facing reporting entirely
-- **P1 — `teacher_profiles` view hides departed teachers from payroll reports**, retroactively
-- **P1 — `cancelled` vs `canceled`** split across six tables; silent zero-row filters
-- **P1 — four money-state vocabularies** across `charges` / `charge_items` / `ledger_entries` / `refunds`
-- **P2 — two attendance tables** (`attendance` unscoped, `attendance_records` scoped), both in active use
-- **P2 — `productions` has no archive path** now that the FK blocks deletes
-
-Carried from `SESSION_2026-07-21_FINDINGS.md`:
-
-- Browse Classes "Request Enrollment" is a silent no-op (writes to nonexistent `admin_tasks`)
-- Ended classes appear in the catalog (missing end-date filter)
-- Vercel custom domains "Invalid Configuration" — check GoDaddy for conflicting A records on `portal`/`staging`
-- `staging.` points at production; not a real second environment
-
----
-
-## 7. Specs not yet written
-
-| Spec | Trigger |
+| Spec | Status |
 |---|---|
-| **Tenant scoping remediation** | P0 above. Biggest architectural debt in the platform |
-| **Reporting + semantic layer** | Investigated 2026-07-25 (findings §7). Build the metadata registry first; canned reports become definitions on top of it. BI export target is a versioned `reporting` schema of views, never raw tables |
-| **Expense module** | No expense table exists. Five expense accounts with no way to post to them. Required before any real production P&L |
-| **Private packages** | `item_type` already includes `private_pack`; `credit_accounts` exists (points-denominated, student-scoped) |
-| **`ADMIN_TASK_CENTER`** | Amanda wants a task list spanning financial, payroll, billing, timesheets, alerts, evaluations. Also resolves the `admin_tasks` no-op defect |
+| `docs/BILLING_GENERALIZATION_SPEC_V2.md` | A1 done, A2 blocked, B–I open |
+| `docs/TENANT_TIMEZONE_SPEC.md` | Phase A ready to build |
+| `docs/SESSION_2026-07-25_FINDINGS.md` | P0 tenant scoping, reporting state |
+| `docs/COMMUNICATIONS_HUB.md` | BAND replacement, partially built — **audit what shipped before building more** |
+
+**Not yet written:** tenant scoping remediation (P0), reporting + semantic layer, expense module, private packages, `ADMIN_TASK_CENTER`, rate-at-entry-time resolver.
