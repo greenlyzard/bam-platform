@@ -1,5 +1,6 @@
 "use server";
 
+import { requireAdmin } from "@/lib/auth/guards";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 
@@ -9,6 +10,7 @@ export async function saveDisciplineEdit(
   description: string | null,
   icon_id: string | null
 ) {
+  await requireAdmin();
   const supabase = createAdminClient();
   const { error } = await supabase
     .from("disciplines")
@@ -25,6 +27,7 @@ export async function addDiscipline(
   description: string | null,
   sort_order: number
 ) {
+  await requireAdmin();
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("disciplines")
@@ -36,6 +39,7 @@ export async function addDiscipline(
 }
 
 export async function toggleDisciplineActive(id: string, is_active: boolean) {
+  await requireAdmin();
   const supabase = createAdminClient();
   const { error } = await supabase
     .from("disciplines")
@@ -48,6 +52,7 @@ export async function toggleDisciplineActive(id: string, is_active: boolean) {
 export async function updateDisciplineSortOrder(
   items: Array<{ id: string; sort_order: number }>
 ) {
+  await requireAdmin();
   const supabase = createAdminClient();
   await Promise.all(
     items.map((item) =>
@@ -58,6 +63,7 @@ export async function updateDisciplineSortOrder(
 }
 
 export async function deleteDiscipline(id: string) {
+  await requireAdmin();
   const supabase = createAdminClient();
   const { error } = await supabase
     .from("disciplines")

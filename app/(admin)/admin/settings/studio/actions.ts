@@ -1,5 +1,6 @@
 "use server";
 
+import { requireAdmin } from "@/lib/auth/guards";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { LocationType } from "@/lib/locations/validate";
 
@@ -16,6 +17,7 @@ export async function updateStudioIdentity(payload: {
   phone?: string | null;
   email?: string | null;
 }): Promise<{ success: boolean; error?: string }> {
+  await requireAdmin();
   const supabase = createAdminClient();
 
   // Built as a variable (not an inline literal) so the new phone/email columns —
@@ -52,6 +54,7 @@ export async function upsertLocation(payload: {
   is_primary?: boolean;
   location_type?: LocationType;
 }): Promise<{ success: boolean; error?: string }> {
+  await requireAdmin();
   const supabase = createAdminClient();
 
   // If setting as primary, clear existing primary
@@ -97,6 +100,7 @@ export async function upsertRoom(payload: {
   location_id: string;
   notes?: string;
 }): Promise<{ success: boolean; error?: string }> {
+  await requireAdmin();
   const supabase = createAdminClient();
 
   const row = {
@@ -125,6 +129,7 @@ export async function toggleLocationActive(
   id: string,
   is_active: boolean
 ): Promise<{ success: boolean }> {
+  await requireAdmin();
   const supabase = createAdminClient();
   await supabase.from("studio_locations").update({ is_active }).eq("id", id);
   return { success: true };
@@ -134,6 +139,7 @@ export async function toggleRoomActive(
   id: string,
   is_active: boolean
 ): Promise<{ success: boolean }> {
+  await requireAdmin();
   const supabase = createAdminClient();
   await supabase.from("rooms").update({ is_active }).eq("id", id);
   return { success: true };
