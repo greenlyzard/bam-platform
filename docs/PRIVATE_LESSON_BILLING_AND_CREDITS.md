@@ -3,6 +3,7 @@
 **Status:** DRAFT — spec only, no implementation
 **Author:** Derek Shaw
 **Date:** 2026-07-28
+**Revised:** 2026-07-28 — rewritten against Gem's rate grid and the old rate matrix; credits re-denominated in dollars; pricing generalized for multi-tenant
 **Investigated against live DB:** 2026-07-28
 
 ---
@@ -11,13 +12,13 @@
 
 The platform can say what a private lesson **costs** — teacher pay, covered by `PAYROLL_CORRECTNESS_AND_REPORTING.md`. It has no working representation of what a lesson **sells for**.
 
-That gap blocks three things at once:
+That blocks three things:
 
 1. Families cannot be charged for privates through the platform
-2. The scholarship/discount callout has no honest source — computing it from a teacher's pay rate would both be wrong (pay is cost, not price) and leak rates, which §3.3 of the payroll spec restricts to `has_finance_role()`
+2. The scholarship/discount callout has no honest source — computing it from a teacher's pay rate would be wrong (pay is cost, not price) and would leak rates, which §3.3 of the payroll spec restricts to `can_manage_pay()`
 3. Packs of privates cannot be sold at all
 
-The tables to do it are largely present. Almost none of them are wired.
+Most of the tables exist. Almost none are wired.
 
 ---
 
@@ -31,44 +32,77 @@ The tables to do it are largely present. Almost none of them are wired.
 | `private_session_billing` (19 cols) | Per student: `split_percentage`, `amount_owed`, `points_owed`, `market_value`, `studio_contribution`, `teacher_contribution`, `teacher_contribution_note`, `billing_status`, `payment_method`, `paid_at`, `transaction_id`, `credit_transaction_id` |
 | `private_billing_records` + `private_billing_splits` | Confirmation workflow (`teacher_confirmed`, `admin_confirmed`, `billing_split_confirmed`) and per-split `split_amount`, `billing_account_id`, `billing_account_suggested`, `billing_account_override`, `waiver_reason`, `dispute_notes` |
 
-**`market_rate` / `market_value` and `studio_contribution` appear at both the session level and the per-student level.** Two places to write the same fact, no rule about which wins. **Pick one owner before anything writes to either.**
+`market_rate` / `market_value` and `studio_contribution` appear at **both** the session level and the per-student level. Two places to write the same fact, no rule about which wins.
 
-Recommendation: `private_sessions` owns the *event* (when, who taught, how long, what it lists for). `private_session_billing` owns *money per student*. The session-level `session_rate` / `market_rate` / `studio_contribution` columns become the list price and the per-student rows carry the actual charge. `private_billing_records` / `private_billing_splits` is a third representation of the same split and should be **audited before extension** — it may predate `private_session_billing` entirely.
+Recommendation: `private_sessions` owns the *event*; `private_session_billing` owns *money per student*. `private_billing_records` / `private_billing_splits` is a third representation of the same split and should be **audited before extension** — it may predate `private_session_billing` entirely.
 
 ### 2.2 The packs model is anticipated in three places and sold in none
 
-Already in the CHECK constraints:
+Already in the CHECK constraints: `private_sessions.billing_model` allows `bundle`; `private_session_billing.payment_method` allows `credit_pack`; `billing_status` allows `deducted_from_pack`; `credit_transactions.type` allows `purchase`, `charge`, `refund`, `adjustment`, `expiry`.
 
-- `private_sessions.billing_model` allows `bundle`
-- `private_session_billing.payment_method` allows `credit_pack`
-- `private_session_billing.billing_status` allows `deducted_from_pack`
-- `credit_transactions.type` allows `purchase`, `charge`, `refund`, `adjustment`, **`expiry`**
+`credit_accounts` holds `balance`, `lifetime_earned`, `lifetime_spent`, scoped by both `student_id` and `family_id`.
 
-`credit_accounts` holds `balance`, `lifetime_earned`, `lifetime_spent`, scoped by both `student_id` and `family_id`. `credit_transactions` is a typed ledger with `balance_after` and `reference_id`.
+**What does not exist:** any pack SKU, purchase path, price, or cost basis. The spend side is modeled; the buy side is absent — and since the discount happens *at purchase*, the buy side is where the family-facing savings figure originates.
 
-**What does not exist:** any pack SKU, any purchase path, any price per pack, any cost basis per point. The spend side is modeled; the buy side is absent. Since the discount happens **at purchase**, the buy side is precisely where the family-facing savings figure originates.
+### 2.3 Gem's rate grid decodes to a formula
 
-Note `expiry` in the transaction types: expiration was anticipated. See §4.3 — it conflicts with the weighted-average decision.
+`Teachers__Information.xlsx` → *Teacher List*, columns G–R: SOLO / DUO / TRIO × 30 / 45 / 60 / 90 minutes, for 20 teachers. Verified across every row:
 
-### 2.3 `teacher_rate_cards` is the price list, not a payroll table
+> **Duo per student = (solo rate + $10) ÷ 2**
+> **Trio per student = (solo rate + $15) ÷ 3**
 
-Descoped from payroll by `PAYROLL_CORRECTNESS_AND_REPORTING.md` §3.2, and correctly so — it is keyed per teacher, per `session_type`, with `standard_rate_30/45/60`, `market_rate_30/45/60`, `point_cost`, and a cancellation policy. That is a **billing** artifact. Re-scope it here rather than retiring it.
+The uplift is **per session, not per duration** — a 90-minute duo at Adelyn's $150 solo is (150 + 10) ÷ 2 = $80, and this holds for all four durations and all twenty teachers.
 
-It also has `tenant_id`, which `teachers` does not.
+Consequences:
 
-**Collection problem.** `session_type` allows five values (`solo`, `duet`, `group`, `pilates`, `hybrid`) × three durations × standard-and-market = **30 numbers per teacher, 600 across 20 staff.** Asking Amanda to fill that is not viable. Structure it as **studio-level defaults by session type and duration, with per-teacher overrides only where someone differs** — the same shape as the pay-rate workbook.
+- The price list is **four numbers per teacher** (one per duration), not a 12-cell matrix. `teacher_rate_cards` needs no duo/trio columns
+- Durations are **30 / 45 / 60 / 90**. The existing table has 30/45/60 only — no 90
+- Solo rates must be **stored per duration, not derived**. The ×1.5 / ×2 / ×3 pattern holds for most teachers but Amanda's 45 is $100 where the pattern predicts $112.50
 
-### 2.4 The cancellation policy already has an opinion nobody chose
+**Modal rates** — ten of twenty teachers sit exactly here, and these become the studio defaults:
 
-`teacher_rate_cards` defaults: `cancellation_notice_hours = 24`, `late_cancel_charge_pct = 100`, `no_show_charge_pct = 100`, plus a free-text `cancellation_policy_note`.
+| Duration | Default |
+|---|---|
+| 30 min | $50 |
+| 45 min | $75 |
+| 60 min | $100 |
+| 90 min | $150 |
 
-Those are somebody's placeholder, not Amanda's decision — and open question #2 in the session pickup ("is a cancelled/no-show private billable?") is blocked on exactly this. **The structure exists; only the answer is missing.** `private_sessions.status` already allows `cancelled` and `no_show`, so enforcement has both inputs.
+**Column S is unlabeled** and is exactly 50% of the 30-minute solo rate for every teacher. It matches no one's pay rate. Ask Gem before importing anything that depends on it.
 
-### 2.5 Live state
+### 2.4 A student-type tier exists that no spec accounted for
 
-Five `private_sessions` rows exist, and per `SESSION_2026-07-21_FINDINGS.md` they have already drifted against an unstated cancellation policy. `teacher_rate_cards` is empty. `credit_accounts` and `credit_transactions` are empty.
+The *Old Private Rate Matrix* sheet is keyed on `Teacher · Time (Min) · Private Size · # of Students · Student Type`, where **Student Type is `Company` or `Non-Company`**, with separate `Rate (Reg.)` and `Rate (Discounted)` per row.
 
-`private_sessions.studio` is **free text** carrying values like `'Studio 1'` with no FK to `rooms` — the third place that name collides, alongside `schedule_instances` and the retired-room renames (session pickup §5.3).
+Company students pay less — Amanda's 60-minute solo is $130 company against $150 non-company. This is a **systematic pricing tier**, not a per-family adjustment. It likely explains `teacher_rate_cards.standard_rate_*` vs `market_rate_*`.
+
+The discounts are **irregular**, not a clean percentage, so the tier must carry its own rates rather than a multiplier off the base.
+
+Eligibility is currently a hand-maintained note in the spreadsheet: *"Company Discounted: Ruby Turner, Gwen Johnson, Willow Anderson, Violet Fitzpatrick."* That belongs on the student record.
+
+**Open:** Gem's current grid has **no tier columns at all** — one rate set only. Either the tier was retired or it is applied by hand now. Confirm before modeling a discount that may be dead (§6 q1).
+
+### 2.5 The cancellation policy has an opinion nobody chose
+
+`teacher_rate_cards` defaults: `cancellation_notice_hours = 24`, `late_cancel_charge_pct = 100`, `no_show_charge_pct = 100`, plus free-text `cancellation_policy_note`. Placeholders, not decisions — and session-pickup question 2 is blocked on exactly this.
+
+The old matrix carries real fee columns (*"Sick Late Cancellation Fee 60 mins"*, *"Late Cancellation Fee 60 mins"*), which is actual data rather than a guess. `private_sessions.status` already allows `cancelled` and `no_show`, so enforcement has its inputs.
+
+### 2.6 Roster drift between the sheet and the database
+
+| Issue | Disposition |
+|---|---|
+| **Cara Hansvick** (sheet) = **Cara Matchett** (DB) | Former name. Same person |
+| Adelyn Haderlie, Mikhail Prieto, Melissa Chyba in sheet, not in DB | **Ignore for now** |
+| Kailey Luebrecht, Melanie Seeley in DB, not in sheet | **Studio default rates** |
+| Derek Shaw in DB with a `teachers` row and an active `teacher` role | **Not a teacher.** Remove the role and the row — he surfaces in staff and payroll reports otherwise |
+| Spelling drift: Cambell/Campbell, Moorea/Morea, Catherine/Kiki, Eliza/Ellie, Paola/Pie, Samantha/Sam | Match on email, never on name, when importing |
+
+### 2.7 Live state
+
+Five `private_sessions` rows exist and have already drifted against an unstated cancellation policy. `teacher_rate_cards`, `credit_accounts`, and `credit_transactions` are all empty.
+
+`private_sessions.studio` is **free text** carrying values like `'Studio 1'` with no FK to `rooms` — the third place that name collides.
 
 ---
 
@@ -76,86 +110,126 @@ Five `private_sessions` rows exist, and per `SESSION_2026-07-21_FINDINGS.md` the
 
 | Decision | Detail |
 |---|---|
-| **Private pricing varies by teacher** | Per-teacher rate cards are the right shape. `teacher_rate_cards` is re-scoped to billing, not retired |
-| **Packs are priced in points** | A lesson costs N points; N varies by teacher via `point_cost`. One pack works studio-wide without maintaining parallel dollar prices — and an expensive teacher costs more points, so there is no cheap-pack/expensive-teacher arbitrage |
-| **Refunds are at point value, not list** | What the family actually paid per point |
-| **Cost basis is weighted average** | One average cost per point per account, recomputed on each purchase. Simpler than lot tracking; see §4.3 for the caveat |
-| **The savings callout is billing-side only** | Standard price minus what the family was actually charged. No pay rate participates. A family inverting the arithmetic learns only their own discount, which they already know |
+| **Credits are denominated in dollars** | Not points. A pack sold as "10 for the price of 9" credits face value and debits actual lesson price. Liability is always exactly the sum of unredeemed balances |
+| **Displayed as a punch card** | Progress bar, not discrete punches — see §4.5 |
+| **Credits float across teachers** | Not locked to the teacher the pack was priced from. A pricier teacher consumes more credit; a departing teacher strands no balance |
+| **Privates only** | Credits are not redeemable against tuition, merchandise, or fees. Enforced at spend time |
+| **Refund at purchase ratio** | Cash paid ÷ face value, applied to the unused balance |
+| **Group pricing is a formula** | Uplift then divide (§2.3), stored as tenant configuration |
+| **Durations include 90 minutes** | And duration is an integer, not an enum |
+| **Prices vary by teacher, with studio defaults** | Defaults per §2.3; per-teacher override where they differ |
+| **Packs are not treated as regulated contracts** | Amanda's decision, 2026-07-28, recorded. The operational consequence stands regardless: unredeemed credit is a refundable obligation, which is why exact liability tracking is a requirement rather than a nicety |
 
 ---
 
 ## 4. Design
 
-### 4.1 Price list
+### 4.1 Pricing — three small config tables, not a wide matrix
 
-Two levels:
-
-```
-studio_private_prices          -- tenant defaults
-  tenant_id, session_type, duration_minutes,
-  list_price_cents, point_cost, is_active
-
-teacher_rate_cards             -- existing table, per-teacher override
-  (unchanged shape; rows only where a teacher differs from the default)
-```
-
-Resolution: teacher override if present, else studio default. Absent both, the lesson cannot be priced and must fail loudly rather than charge zero.
-
-**Open — `standard` vs `market`.** `teacher_rate_cards` carries both `standard_rate_*` and `market_rate_*`, both nullable, neither read by any code. The likely intent is that `standard` is what the studio charges and `market` is the independent going rate, used as the benchmark the savings figure is measured against. That is inference. §6 question 1.
-
-### 4.2 Packs
+BAM's formula is BAM's, not a universal rule. Another studio may price semis as a percentage, or per-student flat, or not offer them; may run 55-minute lessons; may have Competition Team instead of Company, or no tiers at all. **None of it can be columns or code.**
 
 ```
-credit_packs                   -- the SKU
-  tenant_id, name, points, price_cents, is_active,
-  valid_from, valid_to         -- promotional windows
+student_tiers                        -- per tenant
+  tenant_id, key, label, sort_order, is_default, is_active
+  -- BAM seeds: 'company', 'non_company' (default)
+  -- a studio with no tiers seeds one row and never thinks about it
 
-credit_purchases               -- one per transaction
+group_pricing_rules                  -- per tenant
+  tenant_id, student_count,
+  uplift_cents, multiplier, divide_across_students (bool),
+  is_active
+  -- BAM seeds: (2, +1000, null, true), (3, +1500, null, true)
+  -- percentage studios store multiplier instead of uplift
+  -- studios charging each student full price set divide = false
+
+private_lesson_prices
+  tenant_id, teacher_id (null = studio default),
+  duration_minutes (int), tier_id,
+  price_cents, valid_from, valid_to, is_active
+```
+
+**Resolution order:** teacher + duration + tier → studio default + duration + tier → fail loudly. Never charge zero for a missing price.
+
+**Group price** = apply the matching `group_pricing_rules` row to the resolved base: `(base + uplift) ÷ n`, or `base × multiplier`, or `base` where `divide = false`.
+
+`teacher_rate_cards` is superseded by this shape. Retire it or narrow it to the cancellation policy it also carries — it cannot express 90 minutes or tiers as built.
+
+**Effective dating** matters as much here as for pay: a price change must not silently reprice history. Same close-row-and-insert discipline as `teacher_rates`.
+
+### 4.2 Packs and credits
+
+```
+credit_packs                         -- the SKU
+  tenant_id, name, face_value_cents, price_cents,
+  is_active, valid_from, valid_to
+
+credit_purchases
   tenant_id, account_id, pack_id,
-  points_purchased, price_paid_cents,
+  face_value_cents, price_paid_cents,
   purchased_at, stripe_payment_intent_id
 ```
 
-On purchase: insert `credit_transactions` (`type = 'purchase'`), increment `credit_accounts.balance`, and recompute weighted average cost:
+"10 privates for the cost of 9" against a $70 lesson = `face_value_cents` 70000, `price_cents` 63000.
+
+On purchase: `credit_transactions` (`type = 'purchase'`), increment `credit_accounts.balance` by face value, recompute the **weighted-average purchase ratio**:
 
 ```
-new_avg = (old_balance × old_avg + points_purchased × price_paid)
-          / (old_balance + points_purchased)
+new_ratio = (old_balance × old_ratio + face_added × (price_paid / face_added))
+            / (old_balance + face_added)
 ```
 
-`credit_accounts` needs one new column: `avg_cost_cents` (numeric, not integer — the average will not divide evenly, and rounding it per-purchase compounds).
+`credit_accounts` needs one new column: `purchase_ratio` (numeric — it will not divide evenly; rounding per-purchase compounds).
 
-On spend: `credit_transactions` (`type = 'charge'`), decrement balance, leave `avg_cost_cents` unchanged. Weighted average is unaffected by consumption.
+On spend: `type = 'charge'`, decrement by the actual lesson price, ratio unchanged. On refund: `unused_balance × purchase_ratio`.
 
-On refund: points × `avg_cost_cents`, `type = 'refund'`.
+**Deferred revenue.** A sold credit is cash received for a service not yet delivered — a liability until the lesson happens, and refundable while it sits. It must not be recognized as revenue at purchase. The double-entry ledger from §9 billing is where this belongs, and it should be modeled before the first pack sells.
 
-**Deferred revenue.** A purchased point is cash received for a service not yet delivered — a liability until the lesson happens. The double-entry ledger from §9 billing is where this belongs, and points must not be recognized as revenue at purchase. This is the single most consequential accounting consequence of selling packs and it should be modeled before the first pack sells, not reconciled afterward.
+**Redemption scope is enforced, not documented.** `privates only` is a check at spend time. `payment_method = 'credit_pack'` must be rejected anywhere but a private session.
 
-### 4.3 Weighted average vs expiry — an unresolved tension
+### 4.3 Expiry — still open, and it constrains the cost basis
 
-`credit_transactions.type` already allows `expiry`, and expiration is inherently **per-lot**: a point bought in January expires before one bought in June. Weighted average discards which purchase a point came from, so it cannot answer "which points expired."
+`credit_transactions.type` allows `expiry`. Expiration is inherently **per-lot** — a credit bought in January expires before one bought in June — and the weighted-average ratio discards which purchase a dollar came from.
 
-Weighted average is the settled choice and is correct **if packs do not expire.** If Amanda wants expiration, lot tracking is unavoidable and building weighted average first is wasted work. §6 question 2 — and it should be answered before Phase 2, not after.
+Weighted average is settled and correct **if credits do not expire.** If they do, lot tracking is required instead and building the ratio first is wasted work. §6 q2, and it must be answered before Phase 4.
 
-### 4.4 Discount attribution and the family-facing callout
+### 4.4 Discount attribution and the savings callout
 
-`private_session_billing` already carries the whole model:
+`private_session_billing` already carries the model: `market_value`, `studio_contribution`, `teacher_contribution`, `teacher_contribution_note`, `amount_owed`.
 
-```
-market_value          -- what it would list at
-studio_contribution   -- absorbed by the studio
-teacher_contribution  -- absorbed by the teacher
-teacher_contribution_note
-amount_owed           -- what the family actually pays
-```
+The callout is `market_value − amount_owed`. Attribution between studio and teacher is **finance-only** — it is how owner subsidy becomes a visible cost rather than invisible generosity — but the family sees one savings figure.
 
-The callout is `market_value − amount_owed`. Attribution between studio and teacher is a **finance-only** view — it is how owner subsidy becomes visible as a real cost rather than invisible generosity — but the family sees a single savings figure.
+**Reason codes, not one label.** "Scholarship" implies awarded financial aid and a family may treat a documented scholarship as tax-relevant. Use a picklist — the pattern `refunds.reason_id` establishes — with `scholarship`, `owner_discount`, `promotional`, `company_tier`, `sibling` distinguishable. Only genuine awarded aid surfaces as a scholarship.
 
-**Reason codes, not one label.** "Scholarship" implies awarded financial aid and a family may treat a documented scholarship as tax-relevant. Use a reason picklist — the pattern `refunds.reason_id` already establishes — so `scholarship`, `owner_discount`, `promotional`, and `sibling` are distinguishable. Only genuine awarded aid should surface to a family as a scholarship.
+Note the tier discount (§2.4) is **pricing**, not a contribution — a company student's lower rate is the list price for that student, not a discount off it. Do not double-count it in the savings figure.
 
-### 4.5 Cancellation enforcement
+### 4.5 Parent/student dashboard
 
-Read `cancellation_notice_hours`, `late_cancel_charge_pct`, `no_show_charge_pct` from the resolved rate card. On a `cancelled` or `no_show` session, compute the charge and write a `private_session_billing` row with the appropriate `billing_status`. The defaults (24h / 100% / 100%) must be **replaced with Amanda's actual policy before enforcement ships** — enforcing a placeholder against five already-drifted live sessions would generate charges nobody agreed to.
+**Progress bar, not punches.** A card priced off a $70 teacher and spent on a $60 teacher leaves a fractional remainder; discrete punches would have to lie or show halves. A bar tolerates it and still reads as a card.
+
+Show: remaining balance as the primary figure, an approximate lesson count as context ("about 8 more 60-minute lessons at your usual rate"), and purchase date. Where a family has several accounts, list all balances with a combined total.
+
+**Reload prompts, with two guardrails:**
+
+- **Passive, not pushed.** They appear where a balance is displayed. No notification, email, or text telling a parent they are running low
+- **Never when the balance is zero and an invoice is unpaid.** Asking someone who is behind to prepay more is the wrong moment
+
+**Multi-child scoping needs a decision.** `credit_accounts` is scoped by both `student_id` and `family_id`. A family with two dancers may have one shared balance or two separate ones, and a shared balance displayed per-student will double-count. Decide which is authoritative before the dashboard renders it (§6 q5).
+
+### 4.6 Price administration in the platform
+
+Same requirement as pay rates (`PAYROLL_CORRECTNESS_AND_REPORTING.md` §3.9): **bulk, not one at a time.**
+
+- Grid: teachers down, durations across, one tier at a time. Studio defaults shown as the fallback row
+- Bulk actions: percentage increase across a selection, set an effective date across a batch
+- Import: template pre-filled with current prices → upload → preview with per-row errors inline → commit. Never direct-to-database. **Match on email, not name** (§2.6)
+- Every write effective-dated, closing the prior row rather than updating in place
+- Guarded by whoever governs *pricing* — which may not be the pay-management set, since a price is not compensation (§6 q6)
+
+### 4.7 Cancellation enforcement
+
+Read `cancellation_notice_hours`, `late_cancel_charge_pct`, `no_show_charge_pct` from the resolved policy. On a `cancelled` or `no_show` session, compute the charge and write a `private_session_billing` row with the appropriate `billing_status`.
+
+The old matrix distinguishes a **sick** late cancellation from an ordinary one, which the current single-percentage model cannot express. Defaults must be replaced with Amanda's actual policy **before enforcement ships** — enforcing a placeholder against five already-drifted live sessions would generate charges nobody agreed to.
 
 ---
 
@@ -164,18 +238,21 @@ Read `cancellation_notice_hours`, `late_cancel_charge_pct`, `no_show_charge_pct`
 | Phase | Scope | Risk |
 |---|---|---|
 | **1** | Decide the owner of session-level vs per-student money columns (§2.1); audit whether `private_billing_records` is superseded | Decision |
-| **2** | Answer the expiry question (§4.3) — gates the cost-basis model | Decision. **Before code** |
-| **3** | `studio_private_prices` + resolution helper; collect prices from Amanda | Low |
-| **4** | Pack SKUs, purchase path, weighted-average cost basis on `credit_accounts` | Medium |
-| **5** | Deferred-revenue treatment in the double-entry ledger (§4.2) | Medium. Do not defer past Phase 4 |
-| **6** | Charge a private: resolve price → `private_session_billing` row → card or `credit_pack` | Medium |
-| **7** | Discount attribution + reason codes (§4.4) | Low |
-| **8** | Family-facing savings callout | Low. Depends on 7 |
-| **9** | Cancellation enforcement (§4.5) — after Amanda's policy replaces the defaults | Low |
-| **10** | Refunds at weighted-average point value | Low |
-| **11** | Resolve `private_sessions.studio` free text to a `rooms` FK | Cleanup; overlaps `_INDEX.md` task 19 |
+| **2** | Answer expiry (§4.3) and the tier question (§2.4) — both gate schema | Decision. **Before code** |
+| **3** | `student_tiers`, `group_pricing_rules`, `private_lesson_prices`; seed BAM's defaults and formula | Medium |
+| **4** | Import Gem's grid: solo rates per teacher per duration, matched on email | Low. Depends on 3 |
+| **5** | Price resolution helper + group formula | Low |
+| **6** | Pack SKUs, purchase path, weighted-average purchase ratio | Medium |
+| **7** | Deferred-revenue treatment in the double-entry ledger (§4.2) | Medium. Do not defer past 6 |
+| **8** | Charge a private: resolve price → `private_session_billing` → card or credit | Medium |
+| **9** | Discount attribution + reason codes (§4.4) | Low |
+| **10** | Parent dashboard: progress bar, balances, reload prompts (§4.5) | Low |
+| **11** | Price administration grid + import (§4.6) | Medium |
+| **12** | Cancellation enforcement (§4.7) — after Amanda's policy replaces the defaults | Low |
+| **13** | Refunds at purchase ratio | Low |
+| **14** | Resolve `private_sessions.studio` free text to a `rooms` FK | Cleanup; overlaps task 19 |
 
-**RLS ships with each phase, not after.** A family sees their own account and their own charges. `credit_accounts` is scoped by both `student_id` and `family_id` — the policy must handle a student in two households without exposing either to the other.
+**RLS ships with each phase.** A family sees their own account and their own charges. `credit_accounts` is scoped by student and family both — the policy must handle a student in two households without exposing either to the other.
 
 ---
 
@@ -183,25 +260,38 @@ Read `cancellation_notice_hours`, `late_cancel_charge_pct`, `no_show_charge_pct`
 
 | # | Question | Blocks |
 |---|---|---|
-| 1 | **`standard` vs `market` on the rate cards** — which is charged, which is the benchmark? The savings figure is measured against one of them | Phase 3 |
-| 2 | **Do packs expire?** `credit_transactions.type` allows `expiry`. If yes, weighted average is not viable and lot tracking is required instead | Phase 2. **Answer before Phase 4** |
-| 3 | **Pack pricing** — how many points, at what price, and what discount versus buying singly? | Phase 4 |
-| 4 | **Cancellation policy** — is a late-cancelled or no-show private billable, and at what percentage? The table defaults say 24h/100%/100%; nobody chose those. Five live sessions have already drifted | Phase 9, and session pickup Q2 |
-| 5 | **Prices per teacher** — confirm studio defaults plus overrides rather than 30 numbers per teacher (§2.3) | Phase 3 |
-| 6 | **Sibling discounts** — ~50% off 2nd+ registration is settled for enrollment. Does it extend to privates? | Phase 7 |
-
-### For counsel, not Amanda
-
-**Selling prepaid lesson packages is a regulated product in California.** The Dance Studio Act (Civil Code §1812.50 et seq.) governs prepaid dance instruction contracts — it addresses contract value, duration, and cancellation rights, and exists because studios sold large prepaid lesson packages. Whether it reaches a modest points pack is not something anyone on this project can determine. Separately, expiration dates on prepaid value have their own constraints.
-
-**No one here is a lawyer.** The narrow questions: *does selling a prepaid pack of private lessons create a regulated contract, and may purchased points carry an expiration date?* Both should be answered before packs go on sale, not after.
+| 1 | **Is the Company / Non-Company tier still in use?** Gem's current grid has no tier columns; only the old matrix does. If retired, `student_tiers` seeds one row and the discount model simplifies | Phase 2 |
+| 2 | **Do credits expire?** If yes, weighted average is not viable and lot tracking is required | Phase 2. **Before Phase 6** |
+| 3 | **Pack sizes and pricing** — "10 for the cost of 9" against which teacher's rate? Or a fixed face value | Phase 6 |
+| 4 | **Column S** in Gem's grid — unlabeled, exactly 50% of the 30-minute solo rate, matches no pay rate. Ask Gem | Phase 4 |
+| 5 | **Family or student credit balance?** `credit_accounts` supports both. A shared balance shown per-student double-counts | Phase 10 |
+| 6 | **Who administers prices?** The pay-management set (`can_manage_pay()`), or a wider one? A price is not compensation | Phase 11 |
+| 7 | **Cancellation policy**, including the sick-vs-ordinary distinction the old matrix carries. Five live sessions have already drifted | Phase 12, and session-pickup q2 |
+| 8 | **Sibling discounts** — settled for enrollment at ~50% off 2nd+ registration. Do they extend to privates? | Phase 9 |
 
 ---
 
-## 7. Related
+## 7. Multi-tenant notes
 
-- `PAYROLL_CORRECTNESS_AND_REPORTING.md` — the cost side. §3.2 descopes `teacher_rate_cards` from payroll; this spec is where it lands. §3.3 is the rate visibility rule this spec must not violate
+Everything tenant-specific is data:
+
+| BAM's rule | Where it lives | Another studio |
+|---|---|---|
+| Duo +$10 ÷ 2, trio +$15 ÷ 3 | `group_pricing_rules` | Percentage multiplier, or no divide, or no semis |
+| Company / Non-Company | `student_tiers` | Any tiers, or one |
+| 30 / 45 / 60 / 90 | `duration_minutes` integer | Any durations, no migration |
+| $50 / $75 / $100 / $150 | `private_lesson_prices` with null `teacher_id` | Own defaults |
+| Credits for privates only | Redemption scope config | Could permit tuition |
+
+No BAM-specific value appears in code. The seed migration carries BAM's configuration; a new tenant gets an onboarding wizard or an empty set.
+
+---
+
+## 8. Related
+
+- `PAYROLL_CORRECTNESS_AND_REPORTING.md` — the cost side. §3.3 is the rate visibility rule this spec must not violate; §3.9 is the bulk-administration pattern §4.6 mirrors
 - `BILLING_GENERALIZATION_SPEC_V2.md` — the double-entry ledger deferred revenue depends on
 - `FINANCIAL_ANOMALY_DETECTION.md` — a pack sold and never consumed is a liability that ages
-- `TEACHER_RATE_MANAGEMENT.md` — describes the rate-card override hierarchy. Re-scope to billing rather than retire
+- `TEACHER_RATE_MANAGEMENT.md` — superseded by §4.1; retire or narrow to cancellation policy
 - `_INDEX.md` task 19 — occurrence generator; overlaps the `studio` free-text cleanup
+- `Teachers__Information.xlsx` — Gem's rate grid and the old rate matrix; source for Phase 4
