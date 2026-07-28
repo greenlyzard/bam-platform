@@ -3,7 +3,7 @@
 **Status:** DRAFT — spec only, no implementation
 **Author:** Derek Shaw
 **Date:** 2026-07-28
-**Revised:** 2026-07-28 — rewritten against Gem's rate grid and the old rate matrix; credits re-denominated in dollars; pricing generalized for multi-tenant
+**Revised:** 2026-07-28 — added §4.8 (session confirmation, pay/billing split, no repricing); rewritten against Gem's rate grid and the old rate matrix; credits re-denominated in dollars; pricing generalized for multi-tenant
 **Investigated against live DB:** 2026-07-28
 
 ---
@@ -118,6 +118,9 @@ Five `private_sessions` rows exist and have already drifted against an unstated 
 | **Group pricing is a formula** | Uplift then divide (§2.3), stored as tenant configuration |
 | **Durations include 90 minutes** | And duration is an integer, not an enum |
 | **Prices vary by teacher, with studio defaults** | Defaults per §2.3; per-teacher override where they differ |
+| **Booked privates pre-load as draft timesheet entries** | Teacher confirms per-student attendance; billing queues for finance confirmation (§4.8) |
+| **No repricing when a student misses** | Attendees pay as booked; the absent student is charged per the no-show policy (§4.8) |
+| **Teacher is not paid when nobody attends** | Studio default. One-off exceptions exist and require an explicit override (§4.8) |
 | **Packs are not treated as regulated contracts** | Amanda's decision, 2026-07-28, recorded. The operational consequence stands regardless: unredeemed credit is a refundable obligation, which is why exact liability tracking is a requirement rather than a nicety |
 
 ---
@@ -233,6 +236,65 @@ The old matrix distinguishes a **sick** late cancellation from an ordinary one, 
 
 ---
 
+### 4.8 Session confirmation — the bridge between pay and billing
+
+Booked privates pre-load as draft timesheet entries. The teacher confirms who actually attended. That single confirmation produces **two independent outcomes**, and treating it as one is the main way this goes wrong.
+
+#### What exists
+
+| Piece | State |
+|---|---|
+| `timesheet_entries.session_id` | Column exists, unwritten. This is the join that replaces the manual cross-reference |
+| `timesheet_entries.is_auto_populated` | Exists, unwritten. Marks a pre-created draft |
+| `private_billing_records.teacher_confirmed` / `admin_confirmed` / `billing_split_confirmed` | Two-stage confirmation, modeled, unwired |
+| `private_session_billing` | Already per-student: `split_percentage`, `amount_owed`, `billing_status`, `credit_transaction_id` |
+| `private_sessions.status` | Allows `scheduled`, `confirmed`, `completed`, `cancelled`, `no_show` |
+
+#### What does not exist
+
+**Per-student attendance has no home.** `private_sessions.student_ids` is an array and `timesheet_entries.attendance_status` is one value for the whole entry. There is nowhere to record that two of three students showed.
+
+Proposed:
+
+```
+private_session_students
+  session_id, student_id,
+  attendance_status,        -- attended | absent | excused
+  marked_by, marked_at
+```
+
+A junction rather than an attendance column on `private_session_billing`: attendance is a fact about the lesson, and should not exist only because a billing row does. It also gives the per-student rows something to hang off when a session is comped and no billing row is created.
+
+#### Pay and billing are computed separately
+
+| Situation | Teacher | Family |
+|---|---|---|
+| All students attend | Paid | Charged as booked |
+| Some attend, some do not | Paid in full — the session happened | Attendees charged as booked; absentees charged per `no_show_charge_pct` |
+| Nobody attends | **Not paid** (studio default) | Charged per `no_show_charge_pct` |
+| Nobody attends, one-off exception | Paid — requires an explicit override | Sometimes charged |
+| Session cancelled with notice | Not paid | Not charged, subject to `cancellation_notice_hours` |
+
+The third and fourth rows are the reason this cannot be one computation. A no-show produces *no pay and a charge* — the exact inverse of the normal case.
+
+#### No repricing
+
+**Settled 2026-07-28: a trio that becomes a duo does not reprice.** Attendees pay what they booked; the absent student is charged per the no-show policy.
+
+The arithmetic is why. A trio collects `solo + $15` — $65 on a $50 solo, $21.67 each. Repricing to duo makes the two who came pay $30 each: a **38% increase because of a third family's absence**, which is a support call and reads as a penalty for someone else's behaviour. Without repricing and with the no-show charged, the studio collects exactly `solo + $15` — the full session value — and nobody pays more than they agreed to.
+
+This also simplifies the build: **the price is fixed at booking.** Confirmation never recalculates an amount. It answers two questions only — is the absent student charged, and is the teacher paid.
+
+#### The billing queue
+
+Teacher confirmation does **not** charge a family. It populates a queue that `finance_admin` and above confirm, matching the existing `teacher_confirmed` → `admin_confirmed` shape.
+
+This is deliberate. A mistaken teacher confirmation would otherwise bill a family directly, and reversing a charge costs more than reviewing one. The queue is also where the one-off exceptions in the table above get applied.
+
+#### What this replaces
+
+Today an administrator reads every timesheet and cross-references it against the schedule in BAND, then charges clients by hand. Once an entry carries `session_id`, **the cross-reference is the join** — the queue is populated rather than assembled, and the reconciliation step disappears rather than being automated.
+
 ## 5. Build order
 
 | Phase | Scope | Risk |
@@ -248,9 +310,12 @@ The old matrix distinguishes a **sick** late cancellation from an ordinary one, 
 | **9** | Discount attribution + reason codes (§4.4) | Low |
 | **10** | Parent dashboard: progress bar, balances, reload prompts (§4.5) | Low |
 | **11** | Price administration grid + import (§4.6) | Medium |
-| **12** | Cancellation enforcement (§4.7) — after Amanda's policy replaces the defaults | Low |
-| **13** | Refunds at purchase ratio | Low |
-| **14** | Resolve `private_sessions.studio` free text to a `rooms` FK | Cleanup; overlaps task 19 |
+| **12** | `private_session_students` junction; per-student attendance capture (§4.8) | Low |
+| **13** | Pre-created draft entries from booked privates, `session_id` + `is_auto_populated` (§4.8) | Medium |
+| **14** | Billing queue: teacher confirm → finance confirm → charge (§4.8) | Medium |
+| **15** | Cancellation enforcement (§4.7) — after Amanda's policy replaces the defaults | Low |
+| **16** | Refunds at purchase ratio | Low |
+| **17** | Resolve `private_sessions.studio` free text to a `rooms` FK | Cleanup; overlaps task 19 |
 
 **RLS ships with each phase.** A family sees their own account and their own charges. `credit_accounts` is scoped by student and family both — the policy must handle a student in two households without exposing either to the other.
 
@@ -267,7 +332,10 @@ The old matrix distinguishes a **sick** late cancellation from an ordinary one, 
 | 5 | **Family or student credit balance?** `credit_accounts` supports both. A shared balance shown per-student double-counts | Phase 10 |
 | 6 | **Who administers prices?** The pay-management set (`can_manage_pay()`), or a wider one? A price is not compensation | Phase 11 |
 | 7 | **Cancellation policy**, including the sick-vs-ordinary distinction the old matrix carries. Five live sessions have already drifted | Phase 12, and session-pickup q2 |
-| 8 | **Sibling discounts** — settled for enrollment at ~50% off 2nd+ registration. Do they extend to privates? | Phase 9 |
+| 8 | **What is `no_show_charge_pct` actually?** The table default is 100%. With no repricing, this is the whole of what a missed lesson costs a family | Phase 14 |
+| 9 | **Who confirms the billing queue** — `finance_admin` and above, or may a studio manager? Note `can_manage_pay()` includes `studio_manager` while `requireFinance()` does not | Phase 14 |
+| 10 | **How is the "pay the teacher anyway" exception recorded?** A flag on the entry, or a manual entry with `rate_override`? It needs to be visible on the payroll report either way | Phase 13 |
+| 11 | **Sibling discounts** — settled for enrollment at ~50% off 2nd+ registration. Do they extend to privates? | Phase 9 |
 
 ---
 
