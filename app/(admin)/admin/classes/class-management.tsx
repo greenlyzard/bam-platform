@@ -829,9 +829,42 @@ ${(byDay[d] ?? [])
 
     // Build week days (Mon-Sat)
     const weekDays: Date[] = Array.from({ length: 6 }, (_, i) => { const d = new Date(calWeekStart); d.setDate(calWeekStart.getDate() + i); return d; });
-    // Rooms to show
-    const visibleRooms = calRoomFilter === "all" ? activeRooms : activeRooms.filter(r => r.id === calRoomFilter);
+    // Rooms to show — honours BOTH the calendar's own room filter and the
+    // page-level Location filter (`filterLocation`, the same control the class
+    // list obeys via matchesLocationFilter). Without the location clause this
+    // renders every active room across every location, so San Clemente's
+    // "Studio 1" and Rancho Santa Margarita's "Studio 1" appear as two
+    // identical, indistinguishable columns.
+    const locationScopedRooms = filterLocation
+      ? activeRooms.filter(r => r.location_id === filterLocation)
+      : activeRooms;
+    const visibleRooms = calRoomFilter === "all"
+      ? locationScopedRooms
+      : locationScopedRooms.filter(r => r.id === calRoomFilter);
     const roomCount = visibleRooms.length || 1;
+
+    // Room labels: a bare name is fine while it is unique on screen, but
+    // "Studio 1" is ambiguous the moment two locations' Studio 1 are both
+    // visible — which is the default state, since the Location filter starts at
+    // "All Locations". Append the location ONLY to the names that actually
+    // collide, so the common single-location case reads unchanged.
+    const shortLocationName = (locId: string | null) => {
+      const full = locId ? locationMap[locId] : undefined;
+      if (!full) return "No location";
+      const parts = full.split("—");
+      return (parts.length > 1 ? parts[parts.length - 1] : full).trim();
+    };
+    const makeRoomLabeller = (rooms: Array<{ name: string; location_id: string | null }>) => {
+      const duplicated = new Set(
+        rooms.map(r => r.name).filter((n, i, arr) => arr.indexOf(n) !== i)
+      );
+      return (room: { name: string; location_id: string | null }) =>
+        duplicated.has(room.name)
+          ? `${room.name} — ${shortLocationName(room.location_id)}`
+          : room.name;
+    };
+    const roomLabel = makeRoomLabeller(visibleRooms);
+    const roomOptionLabel = makeRoomLabeller(locationScopedRooms);
     // Time slots 8:00-21:00
     const slots: string[] = [];
     for (let h = 8; h <= 21; h++) { slots.push(`${h.toString().padStart(2, "0")}:00`); if (h < 21) slots.push(`${h.toString().padStart(2, "0")}:30`); }
@@ -845,7 +878,7 @@ ${(byDay[d] ?? [])
         const dc = filtered.filter(c => { const cd = (c.days_of_week?.[0] ?? c.day_of_week); return cd === day.getDay() && (c as any).room_id === room.id; });
         for (let i = 0; i < dc.length; i++) for (let j = i + 1; j < dc.length; j++) {
           const as = t2m(dc[i].start_time ?? ""), ae = t2m(dc[i].end_time ?? ""), bs = t2m(dc[j].start_time ?? ""), be = t2m(dc[j].end_time ?? "");
-          if (as < be && bs < ae) { dbWarnings.push(`${room.name} ${day.toLocaleDateString("en-US", { weekday: "short" })}`); break; }
+          if (as < be && bs < ae) { dbWarnings.push(`${roomLabel(room)} ${day.toLocaleDateString("en-US", { weekday: "short" })}`); break; }
         }
       });
     });
@@ -863,7 +896,7 @@ ${(byDay[d] ?? [])
           <div className="flex items-center gap-2">
             <select value={calRoomFilter} onChange={e => setCalRoomFilter(e.target.value)} className="text-sm border border-silver rounded px-2 py-1">
               <option value="all">All Rooms</option>
-              {activeRooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+              {locationScopedRooms.map(r => <option key={r.id} value={r.id}>{roomOptionLabel(r)}</option>)}
             </select>
             <div className="relative">
               <button onClick={() => setShowCalFieldPicker(v => !v)} className="px-3 py-1 text-sm border border-silver rounded hover:bg-cloud">⚙ Fields</button>
@@ -886,10 +919,10 @@ ${(byDay[d] ?? [])
 
         {/* Room legend */}
         <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 print:hidden">
-          {activeRooms.map(r => (
+          {locationScopedRooms.map(r => (
             <span key={r.id} className="inline-flex items-center gap-1.5 text-xs text-charcoal px-2 py-1 rounded-full border border-silver/50">
               <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: r.color_hex ?? "#9C8BBF" }} />
-              {r.name}
+              {roomOptionLabel(r)}
             </span>
           ))}
         </div>
@@ -952,7 +985,7 @@ ${(byDay[d] ?? [])
                     <div key={`${toLocalDateStr(day)}-${room.id}`} className="text-center py-1 border-r border-silver/50 last:border-r-0" style={{ width: RW, borderBottom: `2px solid ${room.color_hex ?? "#9C8BBF"}`, backgroundColor: `${room.color_hex ?? "#9C8BBF"}15` }}>
                       <div className="flex items-center justify-center gap-1">
                         <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: room.color_hex ?? "#9C8BBF" }} />
-                        <span className="text-[10px] font-medium text-charcoal truncate">{room.name}</span>
+                        <span className="text-[10px] font-medium text-charcoal truncate" title={roomLabel(room)}>{roomLabel(room)}</span>
                       </div>
                     </div>
                   ))}
