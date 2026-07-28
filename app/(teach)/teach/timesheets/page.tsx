@@ -41,10 +41,9 @@ export default async function TimesheetsPage() {
     name: p.name,
   }));
 
-  // Resolve the current pay period the same way resolvePeriodLock does (tenant
-  // + month + year) so the page and the actions' lock check always agree. The
-  // deadline/cutoff columns come back on this same row — the lock decision
-  // reuses it rather than issuing a second identical query.
+  // Resolve TODAY's pay period (tenant + month + year). The deadline/cutoff
+  // columns come back on this same row — the lock decision reuses it rather
+  // than issuing a second identical query.
   const { data: payPeriod } = user.tenantId
     ? await supabase
         .from("pay_periods")
@@ -55,8 +54,12 @@ export default async function TimesheetsPage() {
         .maybeSingle()
     : { data: null };
 
-  // Same decision function the server actions call, so the page can never show
-  // an open form for an edit the action will refuse (or vice versa).
+  // Same decision function the server actions call, but resolved against THIS
+  // period — the actions now resolve against the period of the entry's own work
+  // date (resolvePeriodLockForWorkDate). For an entry dated in this period the
+  // two agree exactly. For a backdated one they deliberately do not: the form
+  // stays open here and the action refuses on the earlier period's cutoff, which
+  // is the correct answer for a lock this page cannot know the date of yet.
   const lock = computePeriodLock(
     payPeriod,
     tenantToday(user.timezone),

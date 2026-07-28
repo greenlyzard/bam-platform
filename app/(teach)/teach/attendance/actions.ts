@@ -3,10 +3,13 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { getTenantTimezone } from "@/lib/tenant/timezone";
 import {
   getOrCreateTimesheet,
   getTeacherContext,
   computeHoursFromTimes,
+  periodLockMessage,
+  resolvePeriodLockForWorkDate,
 } from "@/lib/timesheets/helpers";
 
 const attendanceSchema = z.object({
@@ -166,6 +169,23 @@ export async function logHoursFromAttendance(data: {
 
   if (existing) {
     return { error: "Hours already logged for this class on this date." };
+  }
+
+  // This path had NO lock check at all, and once the season starts it is where
+  // most hours travel — so the cutoff was unenforced exactly where it mattered
+  // most. Keyed on the CLASS's date, matching the period the entry files to.
+  const timeZone = await getTenantTimezone(supabase, tp.tenant_id);
+  const lock = await resolvePeriodLockForWorkDate(
+    supabase,
+    tp.tenant_id,
+    timeZone,
+    data.date
+  );
+  if ("error" in lock) return { error: lock.error };
+  if (lock.locked) {
+    // periodLockMessage names the cutoff date being enforced, so the teacher
+    // knows to ask an admin to file it rather than retrying the button.
+    return { error: periodLockMessage(lock) };
   }
 
   // The CLASS's date decides the period, not today. Attendance is routinely

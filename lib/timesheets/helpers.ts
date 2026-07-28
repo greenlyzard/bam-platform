@@ -195,25 +195,14 @@ export function computePeriodLock(
   };
 }
 
-/**
- * Fetch the current pay period and resolve its lock state.
- *
- * For server actions, which have no pre-fetched period row. The page fetches the
- * row itself and calls computePeriodLock directly rather than paying for this
- * query twice — both routes go through the same decision function so the page
- * and the action can never disagree about whether editing is allowed.
- *
- * Does NOT change which period resolves as current: same tenantPayPeriod() +
- * tenant/month/year lookup used by getOrCreateTimesheet.
- */
-export async function resolvePeriodLock(
+/** The two date columns computePeriodLock decides from. */
+async function fetchPeriodDates(
   supabase: SupabaseClient,
   tenantId: string,
-  timeZone: string
-): Promise<PeriodLockState> {
-  const { month, year } = tenantPayPeriod(timeZone);
-
-  const { data: period } = await supabase
+  month: number,
+  year: number
+) {
+  const { data } = await supabase
     .from("pay_periods")
     .select("submission_deadline, teacher_edit_cutoff")
     .eq("tenant_id", tenantId)
@@ -221,7 +210,121 @@ export async function resolvePeriodLock(
     .eq("period_year", year)
     .maybeSingle();
 
+  return data;
+}
+
+/**
+ * Fetch the pay period TODAY falls in and resolve its lock state.
+ *
+ * For callers with no pre-fetched period row. /teach/timesheets fetches the row
+ * itself and calls computePeriodLock directly rather than paying for this query
+ * twice — both routes end at the same decision function, so for an entry dated
+ * in today's period the page and the write agree exactly.
+ *
+ * Read the period this resolves carefully before using it to gate a WRITE.
+ * Entries are filed to the period of their own work date (see payPeriodForDate
+ * and getOrCreateTimesheet), which on any backdated entry is NOT today's
+ * period — so gating a write with this checks a lock the write will not land
+ * behind. Every write path now uses resolvePeriodLockForPeriod below. This
+ * stays for the "is the teacher's current window open?" question, which is
+ * genuinely about today: banners, the entry form's enabled state, reminders.
+ */
+export async function resolvePeriodLock(
+  supabase: SupabaseClient,
+  tenantId: string,
+  timeZone: string
+): Promise<PeriodLockState> {
+  const { month, year } = tenantPayPeriod(timeZone);
+  const period = await fetchPeriodDates(supabase, tenantId, month, year);
+
   return computePeriodLock(period, tenantToday(timeZone), timeZone);
+}
+
+/**
+ * Resolve the lock state of a GIVEN pay period, not today's.
+ *
+ * The variant every write goes through. `resolvePeriodLock` above answers
+ * "is the current window open?"; a write needs "is the period this row will
+ * land in open?", and those diverge for exactly the case the cutoff exists to
+ * cover. On September 2 a teacher backdates an entry to August 31: today's
+ * period is September (open — its cutoff is October 3), the entry files to
+ * August (whose cutoff, September 3, is the one that governs it). Checking
+ * September there waves through the edit the August cutoff forbids.
+ *
+ * Resolution against `today` is unchanged — a cutoff is a date the tenant's
+ * calendar day is compared to. Only WHICH period's cutoff is read moves.
+ *
+ * **A missing period row is UNLOCKED here**, deliberately diverging from
+ * `computePeriodLock(null, …)`, which falls back to the hardcoded 26th. That
+ * fallback is right for today's period — a tenant with no row for the month
+ * they are living in should not fall open — but wrong for an arbitrary one. An
+ * entry whose period does not exist yet is about to CREATE that period
+ * (getOrCreateTimesheet inserts it moments later, status `open`), and it cannot
+ * be past a cutoff that did not exist when it was written. Locking on the
+ * hardcoded 26th would make every entry dated into a not-yet-seeded month
+ * unfilable after the 26th of the tenant's current month, which has nothing to
+ * do with the period being written to. Reported as basis `no_period_row` so the
+ * two cases stay distinguishable in logs.
+ *
+ * computePeriodLock's rules are untouched: it is still the only thing that
+ * decides `locked` whenever there is a row to decide from.
+ */
+export async function resolvePeriodLockForPeriod(
+  supabase: SupabaseClient,
+  tenantId: string,
+  timeZone: string,
+  period: { month: number; year: number }
+): Promise<PeriodLockState> {
+  const today = tenantToday(timeZone);
+  const row = await fetchPeriodDates(
+    supabase,
+    tenantId,
+    period.month,
+    period.year
+  );
+
+  if (!row) {
+    return {
+      locked: false,
+      lockDate: null,
+      submissionDeadline: null,
+      teacherEditCutoff: null,
+      lateButOpen: false,
+      basis: "no_period_row",
+      today,
+    };
+  }
+
+  return computePeriodLock(row, today, timeZone);
+}
+
+/** A resolved lock, or the reason the work date could not be resolved to one. */
+export type PeriodLockForWorkDate = PeriodLockState | { error: string };
+
+/**
+ * Resolve the lock governing a `YYYY-MM-DD` work date's own pay period.
+ *
+ * The form every write path wants: it pairs payPeriodForDate with
+ * resolvePeriodLockForPeriod so the period a caller LOCKS against and the
+ * period getOrCreateTimesheet FILES to are derived from the same date by the
+ * same function. Splitting those two derivations is how the check drifted off
+ * the write in the first place.
+ *
+ * A malformed date returns the same refusal getOrCreateTimesheet gives it, so a
+ * bad date reads identically whichever guard reaches it first.
+ */
+export async function resolvePeriodLockForWorkDate(
+  supabase: SupabaseClient,
+  tenantId: string,
+  timeZone: string,
+  workDate: string
+): Promise<PeriodLockForWorkDate> {
+  const period = payPeriodForDate(workDate);
+  if (!period) {
+    return { error: "That date is not a valid calendar date." };
+  }
+
+  return resolvePeriodLockForPeriod(supabase, tenantId, timeZone, period);
 }
 
 /**

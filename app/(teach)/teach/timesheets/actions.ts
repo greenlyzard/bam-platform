@@ -5,7 +5,7 @@ import { getTenantTimezone } from "@/lib/tenant/timezone";
 import {
   getOrCreateTimesheet,
   periodLockMessage,
-  resolvePeriodLock,
+  resolvePeriodLockForWorkDate,
 } from "@/lib/timesheets/helpers";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -90,15 +90,6 @@ export async function addTimesheetEntry(formData: FormData) {
   const tp = await getTeacherContext(supabase);
   if (!tp) return { error: "Teacher profile not found." };
 
-  // The lock check runs AFTER the tenant is resolved: the cutoff is a date on
-  // the TENANT's pay period, evaluated against the TENANT's calendar day. The
-  // runtime is UTC on Vercel, which would engage the lock at 5pm Pacific.
-  const timeZone = await getTenantTimezone(supabase, tp.tenant_id);
-  const lock = await resolvePeriodLock(supabase, tp.tenant_id, timeZone);
-  if (lock.locked) {
-    return { error: periodLockMessage(lock) };
-  }
-
   const parsed = entrySchema.safeParse({
     date: formData.get("date"),
     entryType: formData.get("entryType") || undefined,
@@ -119,8 +110,28 @@ export async function addTimesheetEntry(formData: FormData) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
+  // The lock check runs AFTER the tenant is resolved: the cutoff is a date on
+  // the TENANT's pay period, evaluated against the TENANT's calendar day. The
+  // runtime is UTC on Vercel, which would engage the lock at 5pm Pacific.
+  //
+  // It also runs after parsing, because it needs the ENTRY's date. The period
+  // being written to is the one whose cutoff governs — checking today's period
+  // instead let a September 2 backdate to August 31 past August's September 3
+  // cutoff, the exact case the cutoff exists for.
+  const timeZone = await getTenantTimezone(supabase, tp.tenant_id);
+  const lock = await resolvePeriodLockForWorkDate(
+    supabase,
+    tp.tenant_id,
+    timeZone,
+    parsed.data.date
+  );
+  if ("error" in lock) return { error: lock.error };
+  if (lock.locked) {
+    return { error: periodLockMessage(lock) };
+  }
+
   // The entry's own date decides the period, not today — an August 31 class
-  // entered on September 2 belongs to August.
+  // entered on September 2 belongs to August. Same date the lock resolved from.
   const timesheet = await getOrCreateTimesheet(
     supabase,
     tp.id,
@@ -180,15 +191,6 @@ export async function updateTimesheetEntry(formData: FormData) {
   const tp = await getTeacherContext(supabase);
   if (!tp) return { error: "Teacher profile not found." };
 
-  // The lock check runs AFTER the tenant is resolved: the cutoff is a date on
-  // the TENANT's pay period, evaluated against the TENANT's calendar day. The
-  // runtime is UTC on Vercel, which would engage the lock at 5pm Pacific.
-  const timeZone = await getTenantTimezone(supabase, tp.tenant_id);
-  const lock = await resolvePeriodLock(supabase, tp.tenant_id, timeZone);
-  if (lock.locked) {
-    return { error: periodLockMessage(lock) };
-  }
-
   const entryId = formData.get("entryId") as string;
 
   const parsed = entrySchema.safeParse({
@@ -211,10 +213,11 @@ export async function updateTimesheetEntry(formData: FormData) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  // Verify ownership via timesheet
+  // Verify ownership via timesheet. `date` is the STORED work date — the lock
+  // below keys off it, so it has to be read before anything is written.
   const { data: entry } = await supabase
     .from("timesheet_entries")
-    .select("timesheet_id, timesheets(teacher_id, status)")
+    .select("timesheet_id, date, timesheets(teacher_id, status)")
     .eq("id", entryId)
     .single();
 
@@ -227,6 +230,22 @@ export async function updateTimesheetEntry(formData: FormData) {
   if (ts.teacher_id !== tp.id) return { error: "Not your entry." };
   if (ts.status !== "draft") {
     return { error: "Timesheet already submitted — cannot edit entries." };
+  }
+
+  // Locked against the period of the date ALREADY STORED, not the submitted
+  // one. Keying off the submitted date would make a date change the way out of
+  // a locked period: re-date a locked August entry to September and the check
+  // reads September, which is open, and the edit lands.
+  const timeZone = await getTenantTimezone(supabase, tp.tenant_id);
+  const lock = await resolvePeriodLockForWorkDate(
+    supabase,
+    tp.tenant_id,
+    timeZone,
+    entry.date
+  );
+  if ("error" in lock) return { error: lock.error };
+  if (lock.locked) {
+    return { error: periodLockMessage(lock) };
   }
 
   const entryType = resolveEntryType(formData);
@@ -282,21 +301,13 @@ export async function deleteTimesheetEntry(formData: FormData) {
   const tp = await getTeacherContext(supabase);
   if (!tp) return { error: "Teacher profile not found." };
 
-  // The lock check runs AFTER the tenant is resolved: the cutoff is a date on
-  // the TENANT's pay period, evaluated against the TENANT's calendar day. The
-  // runtime is UTC on Vercel, which would engage the lock at 5pm Pacific.
-  const timeZone = await getTenantTimezone(supabase, tp.tenant_id);
-  const lock = await resolvePeriodLock(supabase, tp.tenant_id, timeZone);
-  if (lock.locked) {
-    return { error: periodLockMessage(lock) };
-  }
-
   const entryId = formData.get("entryId") as string;
 
-  // Verify ownership
+  // Verify ownership. `date` is the entry's own work date, which decides which
+  // period's cutoff governs the delete.
   const { data: entry } = await supabase
     .from("timesheet_entries")
-    .select("timesheet_id, timesheets(teacher_id, status)")
+    .select("timesheet_id, date, timesheets(teacher_id, status)")
     .eq("id", entryId)
     .single();
 
@@ -309,6 +320,20 @@ export async function deleteTimesheetEntry(formData: FormData) {
   if (ts.teacher_id !== tp.id) return { error: "Not your entry." };
   if (ts.status !== "draft") {
     return { error: "Timesheet already submitted — cannot delete entries." };
+  }
+
+  // Same rule as add and update: the entry's own period, not today's. A delete
+  // after the cutoff removes hours from a period payroll may already have run.
+  const timeZone = await getTenantTimezone(supabase, tp.tenant_id);
+  const lock = await resolvePeriodLockForWorkDate(
+    supabase,
+    tp.tenant_id,
+    timeZone,
+    entry.date
+  );
+  if ("error" in lock) return { error: lock.error };
+  if (lock.locked) {
+    return { error: periodLockMessage(lock) };
   }
 
   const { error } = await supabase

@@ -24,6 +24,36 @@ Replaces manual spreadsheet tracking (currently emailed to `payroll@bamsocal.com
 | Reminder notifications | 3 days before deadline, 1 day before deadline |
 | Late submission | Flagged for Finance Admin and Studio Manager; teacher notified |
 
+### Which period a lock is evaluated against
+
+*(Behaviour as built, 2026-07-28. `lib/timesheets/helpers.ts`.)*
+
+`submission_deadline` is a due date; `pay_periods.teacher_edit_cutoff` is the
+freeze. Two separate questions resolve against two different periods, and
+conflating them is what let hours past a cutoff through:
+
+| Question | Period resolved | Function |
+|---|---|---|
+| Is the teacher's current window open? (banners, form state, reminders) | The period **today** falls in | `resolvePeriodLock` |
+| May this row be written? (add / update / delete) | The period the **entry's own work date** falls in | `resolvePeriodLockForWorkDate` → `resolvePeriodLockForPeriod` |
+
+Entries are filed to the period of their work date, so every write is gated on
+that period's cutoff. Update and delete key off the date **already stored**, not
+a submitted one — otherwise re-dating a locked entry would be a way to edit it.
+Both gates compare against the tenant-local calendar day, never the runtime's.
+
+Enforced on: `/teach/timesheets` add, update, delete, and the "Log Hours" path
+from `/teach/attendance`. **Not** enforced on `adminAddEntry`
+(`/admin/timesheets`) — an admin filing on a teacher's behalf after a cutoff is
+an open policy question (see Decision 3 below, which requires Finance Admin
+approval for retroactive entry but has no built surface).
+
+A pay period row that does not exist yet is treated as unlocked for a write:
+the entry is about to create that period, and cannot be past a cutoff that did
+not exist. For today's period a missing row still falls back to the legacy
+locked-after-the-26th rule, so a tenant with no row for the month they are
+living in does not fall open.
+
 ---
 
 ## User Roles
