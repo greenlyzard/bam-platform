@@ -298,33 +298,17 @@ Full specs: `docs/strategy/platform-product-requirements.md`
 
 ## 9. Current Faculty
 
-| Name | Notes |
-|------|-------|
-| Amanda Cobb | Founder, super_admin, lead instructor |
-| Cara Matchett | admin + teacher |
-| Samantha Weeks | Teacher |
-| Paola Gonzalez | Teacher / Coach |
-| Campbell Castner | Teacher |
-| Lauryn Rowe | Teacher |
-| Deborah Fauerbach | Teacher |
-| Kylie Yamano | Teacher |
-| Katherine Thomas | Teacher |
-| Leila Meghdadi | Teacher |
-| Catherine Galpin | Teacher |
-| Aleah Doone | Teacher |
-| Madelynn Hampton | Teacher |
-| Ally Helmen | Teacher |
+Do not hardcode the roster here — it goes stale silently. Query the live data:
+`teachers` joined to `profiles` (`teachers.id = profiles.id`), filtered on
+`teachers.is_active`. Key people and their platform roles are in §3 above.
 
 ---
 
 ## 10. Brand Guidelines
 
-**Palette:** Lavender `#9C8BBF` · Dark Lavender `#6B5A99` · Cream `#FAF8F3` · Gold `#C9A84C`  
-**Typography:** Headings: Cormorant Garamond · UI: Montserrat (300–600)  
-**Aesthetic:** Minimal luxury ballet studio. No cartoonish graphics, no generic fitness branding.  
-**Tone:** Warm, refined, encouraging, knowledgeable.
-
-Full guidelines: `docs/brand/brand-guidelines.md`
+Canonical: `docs/BRAND.md` (identity, voice, photography) and
+`docs/UI_STYLE_DIRECTIVES.md` (portal colors, typography, components) — see §14.
+Do not restate the palette or type scale here; two copies drift.
 
 ---
 
