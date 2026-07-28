@@ -3,7 +3,7 @@
 **Status:** DRAFT — spec only, no implementation
 **Author:** Derek Shaw
 **Date:** 2026-07-27
-**Revised:** 2026-07-28 — §2.6, §3.1, §3.2, §3.6, §4, §5 rewritten against the live CHECK constraints
+**Revised:** 2026-07-28 — §2.6, §3.1, §3.2, §3.6, §4, §5 rewritten against the live CHECK constraints; second pass added §3.7 (Square Payroll boundary), retroactive rate handling, and the rate visibility rule; third pass added §3.8 (payroll deductions) and period-level paid marking
 **Investigated against live DB and codebase:** 2026-07-27, 2026-07-28
 
 ---
@@ -172,7 +172,18 @@ This supersedes the entry-vs-approval question in the original draft. With effec
 - The figure is available on the draft, so the teacher sees a dollar amount immediately.
 - It is stable: re-resolving the same entry always yields the same number.
 
-Re-resolve on edit of `date`, `entry_type`, or hours. Never re-resolve on approval. `rate_override` / `rate_override_by` remain the escape hatch for a one-off manual amount, and an overridden entry is never re-resolved.
+Re-resolve on edit of `date`, `entry_type`, or hours. `rate_override` / `rate_override_by` remain the escape hatch for a one-off manual amount, and an overridden entry is never re-resolved.
+
+**Retroactive rates (settled 2026-07-28: raises are sometimes backdated).** A rate row inserted with `valid_from` in the past invalidates every snapshot in its window. Those entries must be recomputed — but not uniformly:
+
+| Entry state | Action |
+|---|---|
+| `draft`, `submitted`, `approved`, not yet paid | Re-resolve in place. Record the prior amount in `adjustment_note` |
+| Already paid through Square | **Never rewrite.** Generate a separate catch-up entry for the difference, `status = 'adjusted'` |
+
+Rewriting a paid entry would put the portal in disagreement with money that actually left the account, and the portal is not the payer (§3.7). `timesheet_entries` already allows `status = 'adjusted'` and carries `adjusted_by` and `adjustment_note` — modeled, unwired, the same pattern as `rate_amount` and `is_auto_populated`.
+
+Retroactive re-resolution must be an explicit, audited operation with a preview of affected entries and totals. It must never run implicitly as a side effect of saving a rate.
 
 Payroll then sums stored amounts and **never multiplies**. That also collapses the flat-vs-hourly distinction at read time — see §3.2.
 
@@ -212,6 +223,8 @@ teacher_rates
 - `rate_key` is validated against the same allowed set as `entry_type`, so the taxonomies cannot drift again. A tenant-scoped category table is the white-label form of this; a shared CHECK is the v1 form.
 - `rate_type = 'flat'` entries store `amount_cents` directly on the timesheet entry with `total_hours` null. Faking a flat fee as "1 hour at $500" would corrupt every hours total, the teacher's YTD, and any utilization reporting later.
 
+**`rate_type` belongs on the rate row, not the person.** Confirmed by the guest-performer case (2026-07-28): a guest is paid a **pre-negotiated lump sum for performances and an hourly rate for rehearsals** — the same individual, two categories, two rate types, simultaneously. A per-person flat/hourly flag could not express this. The per-category shape above handles it without modification.
+
 On `timesheet_entries`, store the resolved `amount_cents` alongside the existing `rate_amount` / `rate_key`, or repurpose `rate_amount` to integer cents with an explicit rename. Either way, **one unit, named unambiguously** (§2.3).
 
 `teachers.*_rate_cents` becomes read-only legacy, seeded into `teacher_rates` with an open `valid_from`, then dropped in a later phase. It is all NULL today, so there is nothing to migrate.
@@ -220,18 +233,53 @@ On `timesheet_entries`, store the resolved `amount_cents` alongside the existing
 
 A period picker or history list on `/teach/timesheets`, showing prior periods read-only. Low complexity — `pay_periods` and `timesheets` already carry everything needed; the pages simply hard-scope to the current period.
 
-Include a year-to-date total. A teacher asking "how much have I earned this year" is a reasonable question and currently unanswerable by anyone.
+Include a year-to-date total. **Settled 2026-07-28: teachers see their own pay.** Labeled per §3.7 as this platform's record of hours worked, not a pay stub.
 
-### 3.4 Annual / 1099 report
+**Visibility rule, in full:**
+
+| Viewer | Own rates and amounts | Another person's |
+|---|---|---|
+| Teacher | Yes | No |
+| `admin`, `studio_admin`, `studio_manager` | Own only | **No** |
+| `finance_admin`, `super_admin` | Yes | Yes |
+
+Enforced in RLS on `teacher_rates` and on the amount columns of `timesheet_entries`, not in the UI. The guard is `has_finance_role()` — **never `is_admin()`**, which admits five roles including `studio_manager` (§2.6, `CLAUDE.md` §4). Self-access is `auth.uid()` equality, not a role check.
+
+Note `has_finance_role()` is **not tenant-scoped** — it answers "is this user a finance admin anywhere." Correct with one tenant, wrong the day a second studio exists. A `has_finance_role(p_tenant_id uuid)` variant, mirroring `is_tenant_admin(p_tenant_id, p_user_id)`, belongs in Phase 2 rather than as a retrofit after rate rows exist.
+
+There is also no UI path to grant `finance_admin` — the Add Staff form offers three roles of the seven in `profile_roles`, single-select. Until that is fixed, Amanda cannot delegate payroll visibility without a manual insert.
+
+### 3.4 Annual reconciliation report — not a tax filing
+
+**Reframed 2026-07-28.** Payroll is run through **Square Payroll** (§3.7). Square issues W-2s and 1099s; this platform does not and must not appear to. The annual report's purpose is **reconciliation** — "here is what we expect Square to show" — which is how a missed timesheet or an unbilled substitute gets caught before the year closes.
 
 Per-teacher annual totals, split by employment classification, with:
 
 - Amounts from **stored** cents (post-§3.1), never recomputed
 - Explicit pagination (§2.2) — the row cap must not silently truncate
-- A distinction between **owed** and **paid** (`paid_at`) — a 1099-NEC reports payments made, not hours worked
+- A distinction between **owed** (this platform's arithmetic) and **paid** (Square's record)
 - Flat-fee entries included in the dollar total and excluded from every hours total
+- **A visible caveat on the report itself**: this is not a tax document, Square is the system of record for payment
 
-**Do not build this before §3.1.** An annual report built on render-time rate computation produces a number Amanda would sign her name to and that would be wrong.
+**Copy fix required.** `payroll-report.tsx:464` currently reads *"1099 contractors are responsible for their own taxes. Payments over $600/year require a Form 1099-NEC."* That implies this platform issues the form. Rewrite to point at Square.
+
+**Do not build this before §3.1.** An annual report built on render-time rate computation produces a number that disagrees with Square for reasons no one can trace.
+
+### 3.7 Square Payroll is the system of record for payment
+
+Settled 2026-07-28. **This platform computes what is owed; Square Payroll pays it.** That boundary has to be visible in the product, not just understood by the people who built it.
+
+Consequences:
+
+| Area | Implication |
+|---|---|
+| `paid_at` | Cannot be derived internally. Either entered when a Square run completes, or pulled from the Square Payroll API. Until then, every figure in the product is *owed*, not *paid* |
+| Tax forms | Square issues them. Remove or rewrite any copy implying otherwise (§3.4) |
+| `employment_type` | Square is authoritative for W-2 vs 1099 classification. The local column can drift; treat a mismatch as an anomaly worth surfacing |
+| Teacher-facing surfaces | A YTD figure must be labeled as this platform's record of hours worked, not as a pay stub. A teacher comparing it to a Square deposit and finding a gap must not conclude they were underpaid |
+| Retroactive adjustments | §3.1 — a paid entry is never rewritten, because the payment is Square's fact, not ours |
+
+**Open:** whether to integrate the Square Payroll API to push approved hours and pull payment confirmation, or keep the handoff manual. Manual is correct for v1; the reconciliation report (§3.4) is what makes manual safe.
 
 ### 3.5 Angelina — payroll context
 
@@ -255,16 +303,80 @@ Generate `is_auto_populated = true` draft entries from scheduled occurrences whe
 
 Rules still to settle before building:
 
+- **Substitute rate basis, settled 2026-07-28: a substitute earns their own rate, not the rate of the teacher they covered.** Resolution therefore keys on the working teacher's own `teacher_rates` row for `substitute`. If Amanda's returned sheet shows the `substitute` rate equal to `class_lead` for everyone, the category is redundant and can collapse — but that is a data finding, not an assumption to build on
 - Which of the six substitution representations (§2.6) is authoritative for pay, with the other five derived from it or dropped
 - Whether an unconfirmed auto-draft is submitted by default at period close, or silently dropped — dropping loses real hours, submitting pays for classes that may not have happened
 - `class_lead` vs `class_assistant` derives from `class_teachers`, so that assignment must be reliable before drafts inherit it
 - Whether a lead and an assistant both auto-draft from the same occurrence, which is legitimate and must not be mistaken for a duplicate
+- **No teacher has `is_sub_eligible = true`** (all 20 rows, checked 2026-07-28). The substitute flow has no eligible pool today
 
 **Blocked on `_INDEX.md` task 19** (§2.7). Nothing in this section is authorable until the occurrence generator produces correct `schedule_instances`.
 
 ---
 
-## 4. Build order
+### 3.8 Payroll deductions — authorization is the primitive
+
+Staff are also customers. A teacher buys merchandise, enrolls their own child in classes, books privates, or owes a share of a guest performer's rehearsal cost. Today this is settled by hand: Katherine's June 2026 sheet shows gross $1,093.75, a magenta cell reading *"Deduction: $90; Tate's 6/2 Privates"*, and a green cell reading paid $1,003.60. Three problems in one screenshot.
+
+**Problem 1 — the net is what gets keyed into Square.** Gross wages are $1,093.75. Paying $1,003.75 as though it were gross understates W-2 wages, computes payroll tax on the wrong base, and makes the $90 disappear rather than land as studio revenue. Square supports gross plus a separate post-tax deduction line. The report must emit **three figures — gross, itemized deductions, net** — not one.
+
+**Problem 2 — it does not reconcile.** $1,093.75 − $90.00 = $1,003.75. The sheet says $1,003.60. Fifteen cents, hand-computed, and precisely the class of defect `FINANCIAL_ANOMALY_DETECTION.md` exists to catch.
+
+**Problem 3 — the deduction leaves no trace on the family's account.** The $90 vanished from a paycheck; nothing marks the private as paid on the billing side.
+
+#### The model
+
+A deduction is **never** an edit to hours, rates, or a snapshotted amount. It is a line item on the timesheet, and it may only exist if an authorization exists.
+
+```
+payroll_deduction_authorizations
+  id, tenant_id
+  teacher_id             not null
+  deduction_type         not null   -- 'merchandise' | 'tuition' | 'privates'
+                                    -- | 'costume' | 'other'
+  reference_id           null       -- the order or billing record it settles
+  is_recurring           not null default false
+  per_period_cap_cents   null       -- null = no cap
+  total_cap_cents        null       -- null = open-ended
+  authorized_at          not null
+  authorized_by          not null   -- the employee, always
+  initiated_by           not null   -- employee or admin
+  accepted_at            null       -- required when admin-initiated
+  revoked_at             null
+```
+
+Each deduction line references an active authorization. **No authorization, no deduction — enforced in the write path, not the UI.**
+
+#### Two flows, one table
+
+- **Employee-initiated.** The teacher buys merch or asks to put their child's tuition on payroll, and authorizes at the point of request. This is the common path and should be one click.
+- **Admin-initiated.** Amanda proposes it; it sits `accepted_at IS NULL` and does not apply until the employee accepts in their own portal. Never unilateral.
+
+Revocation is available to the employee at any time and stops future deductions. It does not reverse deductions already taken.
+
+#### Guardrails, built in from the first migration
+
+| Guardrail | Why |
+|---|---|
+| **Minimum-wage floor** — deductions may not reduce net pay below minimum wage for hours worked in the period | Hard requirement in California and easy to breach accidentally with a large costume or merch order |
+| **Per-period cap with rollover** — a $300 costume does not zero one paycheck; the remainder carries and the running balance is visible | Predictability for the employee; avoids the floor breach above |
+| **Per-type policy switch** — `merchandise`, `tuition`, `privates`, `costume` each enabled or disabled in tenant settings | When counsel answers the question below, Amanda flips a setting rather than waiting on a release |
+| **Settlement write-back** — a deduction settling a billing record marks that record paid via `reference_id` | Problem 3. Money collected must land somewhere, not merely leave a paycheck |
+
+#### The legal question, unresolved
+
+California Labor Code §221 prohibits an employer from collecting back wages already paid; §224 permits deductions the employee has expressly authorized in writing for specified purposes. Where a given deduction falls appears to turn on whether the obligation exists **independently of employment**:
+
+| Case | Character |
+|---|---|
+| Merchandise or costume bought through a payroll-deduction agreement | The obligation is created *by* the agreement. Conventional voluntary deduction |
+| A family tuition or private-lesson balance owed by someone who happens to be staff | The obligation exists regardless of employment. This is closer to what §221 targets, and written authorization may not cure it |
+
+**This is not a determination — no one on this project is a lawyer.** The narrow question for counsel: *may the studio deduct a family's studio balance from a staff member's paycheck with written authorization, and if not, what is the compliant alternative?* The likely alternative is invoicing the family through normal billing, which the platform will do anyway.
+
+Build the machinery regardless — merchandise, costumes, and uniforms need it independent of how tuition resolves. The schema, the caps, and the gross/deductions/net output are identical. Only the per-type switch differs.
+
+
 
 | Phase | Scope | Risk |
 |---|---|---|
@@ -279,7 +391,13 @@ Rules still to settle before building:
 | **9** | Angelina: fix the `teacher_hours` → `timesheet_entries` bug (§3.5) | Low |
 | **10** | Auto-drafted entries (§3.6) | **Blocked on task 19** |
 | **11** | Angelina payroll context (§3.5) | Depends on 3; needs finance-level gating |
-| **12** | Retire `teachers.*_rate_cents` and reconcile `teacher_hours` | Cleanup |
+| **12** | Retroactive re-resolution for backdated raises (§3.1) — audited, previewed, never touches paid entries | Medium |
+| **13** | Mark-period-as-paid: bulk `paid_at` + Square run reference; paid entries become immutable (§3.7) | Low |
+| **14** | Payroll deductions (§3.8) — authorization table, line items, minimum-wage floor, per-type switches | Medium |
+| **15** | Square reconciliation: owed-vs-paid variance surfacing (§3.7) | Depends on 13 |
+| **16** | Retire `teachers.*_rate_cents` and reconcile `teacher_hours` | Cleanup |
+
+**RLS is not a phase — it ships with Phase 2.** `teacher_rates` and the amount columns on `timesheet_entries` carry the §3.3 visibility rule from the first migration. Adding rate rows before the policies exist means compensation data sits readable by whatever the default grant allows.
 
 **Phases 2–3 are time-sensitive.** `timesheet_entries` is empty today. Every hour logged before rate snapshotting exists is an hour whose true rate is unrecoverable. Fall classes begin **2026-08-15**.
 
@@ -287,19 +405,42 @@ Rules still to settle before building:
 
 ## 5. Open questions for Amanda
 
-**Resolved:** rate model (flat per-category hourly, §3.2); snapshot timing (work date, §3.1); substitute pay — the substitute is paid, the covered teacher is not (§3.6).
+**Settled 2026-07-28:**
+
+| Decision | Section |
+|---|---|
+| Rate model — flat per-category hourly, categories as data | §3.2 |
+| Snapshot timing — resolved on the entry's work date | §3.1 |
+| A covered teacher is not paid; the substitute is | §3.6 |
+| A substitute earns **their own** rate, not the covered teacher's | §3.6 |
+| Guest performers — lump sum for performances **plus** hourly for rehearsals | §3.2 |
+| Teachers see their own pay; cross-teacher visibility is `has_finance_role()` only | §3.3 |
+| Raises are sometimes backdated — retroactive re-resolution required | §3.1 |
+| Square Payroll is the system of record for payment | §3.7 |
+| Marking paid is a period-level bulk action; a paid entry is immutable | §3.7 |
+| Backdated raises produce a memo line on a future timesheet, one per affected period, never an edit to paid history | §3.1 |
+| Deductions require employee authorization, employee- or admin-initiated | §3.8 |
+
+**Still open:**
 
 | # | Question | Blocks |
 |---|---|---|
-| 1 | **The actual rates** — a number for each of the ten entry types, per teacher, or a studio default with per-teacher exceptions | Phase 4. Nothing pays out without this |
-| 2 | **`class_assistant` rate** — a fixed fraction of the lead rate, or independently set? | Phase 2 shape |
-| 3 | **Are `training` and `competition` paid at all**, and at what rate? Both are allowed entry types with no rate | Phase 4 |
-| 4 | **Guest performers** — are they in `teachers` at all? A one-off Nutcracker guest may have no profile, no schedule, no login, but must appear on a 1099 | Phase 2. This is a modeling gap, not a rate question |
-| 5 | **Flat fees** — per-engagement ad hoc, or a standing per-session rate (e.g. a weekly accompanist)? Different shapes | Phase 2 |
-| 6 | **Are rates ever retroactive?** A backdated raise changes what effective dating must support | Phase 2 |
-| 7 | **Substitute rate** — does a sub earn their own rate for the category, or the rate of the teacher they covered? (That the absent teacher is unpaid is settled; this is the remaining half) | Phase 3, §3.6 |
-| 8 | **Should teachers see their own YTD earnings**, or only hours? | Phase 7 |
-| 9 | **Owner draws in the annual report** — Amanda's hours are `owner_draw` and excluded from wage totals. Does she want an annual figure anyway? | Phase 8 |
+| 1 | **The actual rates** — out with Amanda as `BAM_Teacher_Pay_Rates.xlsx` (studio defaults + per-teacher exceptions) | Phase 4. Nothing pays out without this |
+| 2 | **Guest lump sum — per show or per run?** "$800 for Nutcracker" splits across four performance entries; "$200 a show" does not. Per-run becomes one flat entry plus separate hourly rehearsal entries | Phase 2 shape |
+| 3 | **Are guest performers in `teachers` at all?** A one-off guest may have no profile, no schedule, no login. `timesheet_entries` reaches a person through `timesheets.teacher_id`, so without a row they cannot be paid or reported at all. Recommended: a `teachers` row, `employment_type = 'contractor_1099'`, no login | Phase 2. Modeling gap, not a rate question |
+| 4 | **Are `training` and `competition` paid**, and at what rate? Both are allowed entry types with no rate today. The returned sheet should answer this | Phase 4 |
+| 5 | **`class_assistant`** — a fixed fraction of the lead rate, or set independently per person? | Phase 2 shape |
+| 6 | **Owner draws in the annual report** — Amanda's and Derek's hours are `owner_draw` and excluded from wage totals. Include an annual figure anyway? | Phase 8 |
+| 7 | **Square handoff** — manual entry of pay runs, or API integration? Manual is correct for v1 | Phase 9 |
+| 8 | **For counsel, not Amanda** — may a family's studio balance be deducted from a staff member's paycheck with written authorization (§3.8)? Merchandise and costumes are a separate, likelier-permissible case. Build proceeds either way; the answer sets a switch | Phase 14 policy |
+| 9 | **Deduction caps** — a per-period ceiling so a large costume order does not consume one paycheck. What figure, or a percentage of net? | Phase 14 |
+
+**Live data findings needing attention regardless (checked 2026-07-28):**
+
+- **`w9_on_file` is false for all 20 staff.** Square will need these
+- **No one has `employment_type = 'contractor_1099'`** — seven values are allowed, and the classification split in the report has nothing to split on
+- **`is_sub_eligible` is false for all 20** — the substitute flow has no eligible pool
+- **`profiles.role` disagrees with `profile_roles`** for at least Cara (`parent` vs admin+teacher) and Katherine Thomas — §5.1 of the session pickup, and the reason ~30 API routes lock the wrong people out
 
 ---
 
@@ -310,3 +451,4 @@ Rules still to settle before building:
 - `docs/TEACHER_RATE_MANAGEMENT.md` — describes a `teacher_rate_cards`-driven override hierarchy that no timesheet code reads. **Descoped from payroll by §3.2** — retire or re-scope to private-lesson pricing
 - `docs/TEACHER_TIME_ATTENDANCE.md` — canonical for timesheets
 - `_INDEX.md` task 19 — occurrence generator; blocks §3.6
+- `BAM_Teacher_Pay_Rates.xlsx` — rate collection workbook sent to Amanda 2026-07-28
