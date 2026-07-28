@@ -3,7 +3,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { tenantPayPeriod } from "@/lib/dates";
 import { getTenantTimezone } from "@/lib/tenant/timezone";
-import { isPeriodLocked, payPeriodDeadline } from "@/lib/timesheets/helpers";
+import {
+  payPeriodDeadline,
+  periodLockMessage,
+  resolvePeriodLock,
+} from "@/lib/timesheets/helpers";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -161,12 +165,13 @@ export async function addTimesheetEntry(formData: FormData) {
   const tp = await getTeacherContext(supabase);
   if (!tp) return { error: "Teacher profile not found." };
 
-  // The lock check now runs AFTER the tenant is resolved, because the cutoff is
-  // the 26th of the TENANT's calendar day, not the runtime's — and the runtime
-  // is UTC on Vercel, which engages the lock at 5pm Pacific on the 26th.
+  // The lock check runs AFTER the tenant is resolved: the cutoff is a date on
+  // the TENANT's pay period, evaluated against the TENANT's calendar day. The
+  // runtime is UTC on Vercel, which would engage the lock at 5pm Pacific.
   const timeZone = await getTenantTimezone(supabase, tp.tenant_id);
-  if (isPeriodLocked(timeZone)) {
-    return { error: "Pay period is locked after the 26th." };
+  const lock = await resolvePeriodLock(supabase, tp.tenant_id, timeZone);
+  if (lock.locked) {
+    return { error: periodLockMessage(lock) };
   }
 
   const parsed = entrySchema.safeParse({
@@ -243,12 +248,13 @@ export async function updateTimesheetEntry(formData: FormData) {
   const tp = await getTeacherContext(supabase);
   if (!tp) return { error: "Teacher profile not found." };
 
-  // The lock check now runs AFTER the tenant is resolved, because the cutoff is
-  // the 26th of the TENANT's calendar day, not the runtime's — and the runtime
-  // is UTC on Vercel, which engages the lock at 5pm Pacific on the 26th.
+  // The lock check runs AFTER the tenant is resolved: the cutoff is a date on
+  // the TENANT's pay period, evaluated against the TENANT's calendar day. The
+  // runtime is UTC on Vercel, which would engage the lock at 5pm Pacific.
   const timeZone = await getTenantTimezone(supabase, tp.tenant_id);
-  if (isPeriodLocked(timeZone)) {
-    return { error: "Pay period is locked after the 26th." };
+  const lock = await resolvePeriodLock(supabase, tp.tenant_id, timeZone);
+  if (lock.locked) {
+    return { error: periodLockMessage(lock) };
   }
 
   const entryId = formData.get("entryId") as string;
@@ -344,12 +350,13 @@ export async function deleteTimesheetEntry(formData: FormData) {
   const tp = await getTeacherContext(supabase);
   if (!tp) return { error: "Teacher profile not found." };
 
-  // The lock check now runs AFTER the tenant is resolved, because the cutoff is
-  // the 26th of the TENANT's calendar day, not the runtime's — and the runtime
-  // is UTC on Vercel, which engages the lock at 5pm Pacific on the 26th.
+  // The lock check runs AFTER the tenant is resolved: the cutoff is a date on
+  // the TENANT's pay period, evaluated against the TENANT's calendar day. The
+  // runtime is UTC on Vercel, which would engage the lock at 5pm Pacific.
   const timeZone = await getTenantTimezone(supabase, tp.tenant_id);
-  if (isPeriodLocked(timeZone)) {
-    return { error: "Pay period is locked after the 26th." };
+  const lock = await resolvePeriodLock(supabase, tp.tenant_id, timeZone);
+  if (lock.locked) {
+    return { error: periodLockMessage(lock) };
   }
 
   const entryId = formData.get("entryId") as string;

@@ -175,10 +175,18 @@ function MultiSelectDropdown({
 
 export function AddEntryForm({
   locked,
+  lockedMessage,
   employmentType,
   productions,
 }: {
   locked: boolean;
+  /**
+   * Names the cutoff actually being enforced. Passed from the server, which is
+   * the only place that knows the period's `teacher_edit_cutoff`. The fallback
+   * is deliberately dateless rather than repeating the old hardcoded "the 26th",
+   * which was the submission deadline and not the freeze.
+   */
+  lockedMessage?: string;
   employmentType?: string;
   productions?: Production[];
 }) {
@@ -187,7 +195,8 @@ export function AddEntryForm({
   if (locked) {
     return (
       <div className="rounded-xl border border-dashed border-silver bg-cloud/30 p-5 text-center text-sm text-mist">
-        Pay period locked after the 26th. Entries cannot be added.
+        {lockedMessage ??
+          "This pay period is closed to edits. Entries cannot be added."}
       </div>
     );
   }

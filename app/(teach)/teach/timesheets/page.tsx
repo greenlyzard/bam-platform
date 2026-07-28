@@ -1,6 +1,6 @@
 import { requireRole } from "@/lib/auth/guards";
-import { tenantPayPeriod } from "@/lib/dates";
-import { isPeriodLocked } from "@/lib/timesheets/helpers";
+import { tenantPayPeriod, tenantToday } from "@/lib/dates";
+import { computePeriodLock, formatPeriodDate } from "@/lib/timesheets/helpers";
 import { createClient } from "@/lib/supabase/server";
 import { AddEntryForm, EditEntryRow } from "./entry-form";
 import { FlagResponseForm } from "./flag-response";
@@ -15,11 +15,10 @@ export default async function TimesheetsPage() {
     year: "numeric",
   });
 
-  // Pay period + lock resolved in the tenant's zone, matching the server
-  // actions exactly. If these disagree with getOrCreateTimesheet the page reads
-  // one period while the add-entry action writes to another.
+  // Pay period resolved in the tenant's zone, matching the server actions
+  // exactly. If these disagree with getOrCreateTimesheet the page reads one
+  // period while the add-entry action writes to another.
   const currentPeriod = tenantPayPeriod(user.timezone);
-  const isLocked = isPeriodLocked(user.timezone);
 
   // Get teacher_profile — VIEW uses `id` (= profiles.id), not `user_id`
   const { data: teacherProfile } = await supabase
@@ -43,15 +42,26 @@ export default async function TimesheetsPage() {
 
   // Resolve the current pay period the same way getOrCreateTimesheet does
   // (tenant + month + year) so the page and the add-entry action always agree.
+  // The deadline/cutoff columns come back on this same row — the lock decision
+  // reuses it rather than issuing a second identical query.
   const { data: payPeriod } = user.tenantId
     ? await supabase
         .from("pay_periods")
-        .select("id")
+        .select("id, submission_deadline, teacher_edit_cutoff")
         .eq("tenant_id", user.tenantId)
         .eq("period_month", currentPeriod.month)
         .eq("period_year", currentPeriod.year)
         .maybeSingle()
     : { data: null };
+
+  // Same decision function the server actions call, so the page can never show
+  // an open form for an edit the action will refuse (or vice versa).
+  const lock = computePeriodLock(
+    payPeriod,
+    tenantToday(user.timezone),
+    user.timezone
+  );
+  const isLocked = lock.locked;
 
   // Fetch this teacher's timesheet for the CURRENT pay period only (any status).
   // Scoping by period — rather than newest-by-created_at — is what lets a teacher
@@ -144,10 +154,41 @@ export default async function TimesheetsPage() {
         </div>
       </div>
 
+      {/* Locked: names the date actually enforced. Previously this said "after
+          the 26th" — the submission deadline — while the studio's real edit
+          cutoff for July 2026 is August 3. */}
       {isLocked && isDraft && (
         <div className="rounded-lg bg-warning/10 border border-warning/20 px-4 py-3 text-sm text-warning">
-          The pay period is locked after the 26th. You can still review and
-          submit your timesheet, but entries cannot be added or edited.
+          This pay period closed to edits after{" "}
+          <strong>
+            {lock.lockDate ? formatPeriodDate(lock.lockDate) : "the cutoff date"}
+          </strong>
+          . You can still review and submit your timesheet, but entries cannot be
+          added or edited.
+        </div>
+      )}
+
+      {/* Late but still open — a real state, and the one the old copy erased.
+          Work done on the 27th–31st belongs in this period and can still be
+          entered; the teacher just needs to know they are past due. */}
+      {lock.lateButOpen && isDraft && (
+        <div className="rounded-lg bg-gold/10 border border-gold/20 px-4 py-3 text-sm text-gold-dark">
+          This timesheet was due{" "}
+          <strong>
+            {lock.submissionDeadline
+              ? formatPeriodDate(lock.submissionDeadline)
+              : "earlier this period"}
+          </strong>
+          .{" "}
+          {lock.teacherEditCutoff ? (
+            <>
+              You can still add and edit entries until{" "}
+              <strong>{formatPeriodDate(lock.teacherEditCutoff)}</strong> — please
+              finish and submit as soon as you can.
+            </>
+          ) : (
+            <>Please finish and submit as soon as you can.</>
+          )}
         </div>
       )}
 
@@ -258,6 +299,11 @@ export default async function TimesheetsPage() {
       {isDraft && (
         <AddEntryForm
           locked={isLocked}
+          lockedMessage={
+            lock.lockDate
+              ? `Pay period closed to edits after ${formatPeriodDate(lock.lockDate)}. Entries cannot be added.`
+              : undefined
+          }
           employmentType={employmentType}
           productions={productions}
         />
