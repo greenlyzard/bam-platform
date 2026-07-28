@@ -21,7 +21,10 @@ export default async function TeacherSchedulePage() {
   // Fetch class details
   const { data: classes } = await supabase
     .from("classes")
-    .select("id, name, day_of_week, start_time, end_time, room, levels, max_enrollment, max_students, location_id")
+    // start_date/end_date are needed so the week grid can window each class to
+    // the days it actually runs — without them every class renders on every
+    // week. See classRunsOn in lib/dates.ts.
+    .select("id, name, day_of_week, start_time, end_time, room, levels, max_enrollment, max_students, location_id, start_date, end_date")
     .in("id", classIds)
     .eq("is_active", true);
 
@@ -61,6 +64,8 @@ export default async function TeacherSchedulePage() {
     enrolled: countMap[c.id] ?? 0,
     capacity: c.max_enrollment ?? c.max_students ?? 10,
     location: c.location_id ? (locationNames[c.location_id] ?? null) : null,
+    start_date: (c.start_date as string | null) ?? null,
+    end_date: (c.end_date as string | null) ?? null,
   }));
 
   return <ScheduleClient classes={mapped} userId={user.id} />;

@@ -153,3 +153,43 @@ export function tenantPayPeriod(timeZone: string): {
   const { year, month } = zonedParts(new Date(), timeZone);
   return { month, year };
 }
+
+/* ────────────────────────── date-window helper ─────────────────────────── */
+
+/**
+ * Does a dated record's `[start_date, end_date]` window cover the calendar day
+ * `ymd`?
+ *
+ * Used by every week/day view that renders recurring classes, so a class only
+ * appears on days it actually runs. Without it a calendar shows every class on
+ * every week — last season's (ending 2026-06-15) and next season's (starting
+ * 2026-08-15) side by side on today's grid.
+ *
+ * Both bounds are OPTIONAL and independent. A null `start_date` means no lower
+ * bound; a null `end_date` means no upper bound. **Null must never mean "never
+ * show"** — the 89 imported Fall 2026/27 classes had both columns null before
+ * the backfill, and treating null as exclusive would have blanked the calendar.
+ *
+ * PLAIN STRING COMPARISON, DELIBERATELY. `start_date`/`end_date` are Postgres
+ * `date` columns and PostgREST returns them as zero-padded `YYYY-MM-DD`
+ * (verified against live rows, e.g. "2025-08-14") — exactly what
+ * `toLocalDateStr` emits. Lexicographic order on that format IS chronological
+ * order, so this needs no parsing.
+ *
+ * Do NOT "improve" this by parsing to Date. `new Date("2026-08-15")` parses as
+ * UTC midnight, so for anyone west of UTC it becomes the 14th local — the exact
+ * class of bug docs/TENANT_TIMEZONE_SPEC.md exists to eliminate. Pass `ymd` from
+ * `toLocalDateStr(day)` (client) or `tenantDateStr(day, tz)` (server).
+ *
+ * @param record `{ start_date, end_date }` — either may be null
+ * @param ymd    the calendar day under test, `YYYY-MM-DD`
+ */
+export function classRunsOn(
+  record: { start_date: string | null; end_date: string | null },
+  ymd: string
+): boolean {
+  return (
+    (!record.start_date || record.start_date <= ymd) &&
+    (!record.end_date || record.end_date >= ymd)
+  );
+}

@@ -27,7 +27,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { ClassEditDrawer } from "./class-edit-drawer";
-import { toLocalDateStr } from "@/lib/dates";
+import { toLocalDateStr, classRunsOn } from "@/lib/dates";
 
 // ── Types ────────────────────────────────────────────────
 export interface ClassRecord {
@@ -865,6 +865,7 @@ ${(byDay[d] ?? [])
     };
     const roomLabel = makeRoomLabeller(visibleRooms);
     const roomOptionLabel = makeRoomLabeller(locationScopedRooms);
+
     // Time slots 8:00-21:00
     const slots: string[] = [];
     for (let h = 8; h <= 21; h++) { slots.push(`${h.toString().padStart(2, "0")}:00`); if (h < 21) slots.push(`${h.toString().padStart(2, "0")}:30`); }
@@ -874,8 +875,13 @@ ${(byDay[d] ?? [])
     // Double booking detection (skip Pilates Room)
     const dbWarnings: string[] = [];
     weekDays.forEach(day => {
+      // Same date window as the cell filter below — two classes that never
+      // coexist are not a double booking. Without this, last season's class and
+      // this season's replacement in the same room and slot are reported as a
+      // conflict on every week of the year.
+      const dayYmd = toLocalDateStr(day);
       visibleRooms.filter(r => !r.name.toLowerCase().includes("pilates")).forEach(room => {
-        const dc = filtered.filter(c => { const cd = (c.days_of_week?.[0] ?? c.day_of_week); return cd === day.getDay() && (c as any).room_id === room.id; });
+        const dc = filtered.filter(c => { const cd = (c.days_of_week?.[0] ?? c.day_of_week); return cd === day.getDay() && (c as any).room_id === room.id && classRunsOn(c, dayYmd); });
         for (let i = 0; i < dc.length; i++) for (let j = i + 1; j < dc.length; j++) {
           const as = t2m(dc[i].start_time ?? ""), ae = t2m(dc[i].end_time ?? ""), bs = t2m(dc[j].start_time ?? ""), be = t2m(dc[j].end_time ?? "");
           if (as < be && bs < ae) { dbWarnings.push(`${roomLabel(room)} ${day.toLocaleDateString("en-US", { weekday: "short" })}`); break; }
@@ -1020,7 +1026,7 @@ ${(byDay[d] ?? [])
                   const colLeft = TW + (dayIdx * roomCount + roomIdx) * RW;
                   const dayClasses = filtered.filter(c => {
                     const cd = c.days_of_week?.[0] ?? c.day_of_week;
-                    return cd === dayOfWeek && (c as any).room_id === room.id;
+                    return cd === dayOfWeek && (c as any).room_id === room.id && classRunsOn(c, dateStr);
                   });
                   const dayPrivates = (privateSessionsRaw ?? []).filter(p => p.session_date === dateStr && p.studio === room.name);
 

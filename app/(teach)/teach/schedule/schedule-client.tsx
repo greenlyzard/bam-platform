@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { toLocalDateStr, classRunsOn } from "@/lib/dates";
 
 interface ClassItem {
   id: string;
@@ -14,6 +15,9 @@ interface ClassItem {
   levels: string[] | null;
   enrolled: number;
   capacity: number;
+  /** `YYYY-MM-DD`; null means unbounded on that side. See classRunsOn. */
+  start_date: string | null;
+  end_date: string | null;
 }
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -94,6 +98,16 @@ export function ScheduleClient({ classes, userId }: { classes: ClassItem[]; user
     byDay[Number(day)].sort((a, b) => a.startTime.localeCompare(b.startTime));
   }
 
+  // byDay is keyed by weekday only, so it is week-agnostic — the same bucket is
+  // reused for every week the teacher pages through. Narrow it to the classes
+  // whose date window actually covers THIS week's instance of that weekday,
+  // otherwise a class shows on every week forever (including next season's
+  // classes on today's grid, and last season's on next year's).
+  const classesOn = (dow: number, dayDate: Date): ClassItem[] => {
+    const ymd = toLocalDateStr(dayDate);
+    return (byDay[dow] ?? []).filter((cls) => classRunsOn(cls, ymd));
+  };
+
   const totalClasses = classes.length;
   const weekLabel = `${formatDateShort(monday)} – ${formatDateShort(addDays(monday, 5))}`;
   const isCurrentWeek = weekOffset === 0;
@@ -171,7 +185,7 @@ export function ScheduleClient({ classes, userId }: { classes: ClassItem[]; user
             {WEEK_DAYS.map((dow) => {
               const dayDate = addDays(monday, dow - 1);
               const isToday = isCurrentWeek && todayDow === dow;
-              const dayClasses = byDay[dow] ?? [];
+              const dayClasses = classesOn(dow, dayDate);
 
               return (
                 <section key={dow}>
@@ -225,7 +239,7 @@ export function ScheduleClient({ classes, userId }: { classes: ClassItem[]; user
             {WEEK_DAYS.map((dow) => {
               const dayDate = addDays(monday, dow - 1);
               const isToday = isCurrentWeek && todayDow === dow;
-              const dayClasses = byDay[dow] ?? [];
+              const dayClasses = classesOn(dow, dayDate);
 
               return (
                 <div
