@@ -19,23 +19,32 @@ Replaces manual spreadsheet tracking (currently emailed to `payroll@bamsocal.com
 | Setting | Value |
 |---|---|
 | Cadence | Monthly |
-| Submission deadline | **26th of each month** |
+| Submission deadline | **26th of each month** (`pay_periods.submission_deadline`) — a due date, not a freeze |
+| Teacher edit cutoff | **3rd of the following month** (`pay_periods.teacher_edit_cutoff`) — the freeze. Seeded for all 13 periods of 2026/27 by `20260728000004`; see the drift note on Decision 2 |
 | Payroll contact | payroll@bamsocal.com |
 | Reminder notifications | 3 days before deadline, 1 day before deadline |
 | Late submission | Flagged for Finance Admin and Studio Manager; teacher notified |
 
 ### Which period a lock is evaluated against
 
-*(Behaviour as built, 2026-07-28. `lib/timesheets/helpers.ts`.)*
+*(Behaviour as built, 2026-07-28. `lib/timesheets/helpers.ts`,
+`app/(teach)/teach/timesheets/actions.ts`. Commits `1da6896`, `a9c7697`,
+`fe17faa`, `a673eba`.)*
 
 `submission_deadline` is a due date; `pay_periods.teacher_edit_cutoff` is the
 freeze. Two separate questions resolve against two different periods, and
 conflating them is what let hours past a cutoff through:
 
-| Question | Period resolved | Function |
+| Question | Period resolved | How |
 |---|---|---|
-| Is the teacher's current window open? (banners, form state, reminders) | The period **today** falls in | `resolvePeriodLock` |
-| May this row be written? (add / update / delete) | The period the **entry's own work date** falls in | `resolvePeriodLockForWorkDate` → `resolvePeriodLockForPeriod` |
+| Is the teacher's current window open? (banners, form state, reminders) | The period **today** falls in | Caller fetches the `pay_periods` row and calls `computePeriodLock` directly, as `/teach/timesheets` does |
+| May this row be written? (add / update / delete) | The period the **entry's own work date** falls in | `resolvePeriodLockForWorkDate` → `resolvePeriodLockForPeriod` → `computePeriodLock` |
+
+Both routes end at `computePeriodLock`, which is the only thing that decides
+`locked`. A `resolvePeriodLock` helper that resolved *today's* period for
+callers with no pre-fetched row existed until `a673eba` and was deleted with
+zero callers: for a write it answers the wrong question, and a helper whose own
+doc comment has to warn against its obvious use is a trap.
 
 Entries are filed to the period of their work date, so every write is gated on
 that period's cutoff. Update and delete key off the date **already stored**, not
@@ -53,6 +62,53 @@ the entry is about to create that period, and cannot be past a cutoff that did
 not exist. For today's period a missing row still falls back to the legacy
 locked-after-the-26th rule, so a tenant with no row for the month they are
 living in does not fall open.
+
+### Editing an entry across a period boundary
+
+*(Behaviour as built, 2026-07-28, `a673eba` + `ad9dad7`.)*
+
+Changing an entry's date can move it to a different pay period — a September 1
+entry corrected to August 31 belongs to August, not September. Before `a673eba`
+the update wrote the new date and left `timesheet_id` pointing at the old
+period's timesheet, so the row read one period and was filed to another:
+`/admin/timesheets/payroll` queries by `date` and saw it in August, while
+`/teach/timesheets` scopes by `pay_period_id` and showed it in September. The
+same misfiling class as `a9c7697`, entered through edit instead of create.
+
+`updateTimesheetEntry` compares the pay period of the **stored** date with the
+pay period of the **submitted** date — both via `payPeriodForDate`, the same
+function `getOrCreateTimesheet` files by, so "different period" here means
+exactly "different timesheet" there.
+
+**Same period on both sides.** Unchanged: one lock check, against the stored
+date. A date change within a period does not move the entry.
+
+**Different period.** Four rules, all of which must pass:
+
+| Rule | Behaviour |
+|---|---|
+| Source period open | The period the entry is leaving must not be past its cutoff. Moving hours **out** of a closed period is an edit to a closed period — it silently drains a period payroll may already have run |
+| Destination period open | The period the entry is entering must not be past its cutoff either. Locked on **either** side refuses, and the message names that side's own cutoff date |
+| Destination timesheet is `draft` | `getOrCreateTimesheet` resolves (or creates) the acting teacher's timesheet for the new period. If it exists and its status is not `draft`, the move is refused — hours are never moved onto a submitted or approved timesheet |
+| Re-filed in one statement | `timesheet_id` is set in the **same** `UPDATE` as `date`, never as a follow-up write. The snapshot trigger reads `new.timesheet_id` and `new.date` together; splitting them would price one against the other's period |
+
+The destination is always the acting teacher's own timesheet — it is resolved
+from the authenticated teacher context, never from submitted input. There is no
+field on this path that can move an entry to another teacher.
+
+Application code does **not** recompute `amount_cents` or `rate_id` on a move.
+The database trigger owns them; see `PAYROLL_CORRECTNESS_AND_REPORTING.md` §3.1.
+
+**A paid entry cannot be re-dated or moved at all.** This is enforced by the
+`snapshot_timesheet_entry_rate` trigger (`20260728000005`), which raises on any
+update changing `date` or `timesheet_id` where `old.paid_at is not null` —
+**not** by application code, and not by the period lock. In practice the source
+period is usually closed by the time an entry is paid, but "paid" and "locked"
+are different conditions and must not be relied on to coincide: an admin path
+with no lock check reaches the row otherwise. Everything else on a paid entry
+stays editable — notes, description, and `paid_at` itself, so a payment can be
+corrected or reversed. A correction to a paid entry's amount is a separate
+adjustment entry, per `PAYROLL_CORRECTNESS_AND_REPORTING.md` §3.1.
 
 ---
 
@@ -288,13 +344,16 @@ Each timesheet displays a summary table:
 ## Data Model
 
 ### `pay_period`
+> Live table is `pay_periods` (plural), per `_INDEX.md` task 15.
+
 | Field | Type | Notes |
 |---|---|---|
 | `id` | UUID | |
 | `tenant_id` | FK | |
 | `period_month` | integer | 1–12 |
 | `period_year` | integer | |
-| `submission_deadline` | date | Default: 26th |
+| `submission_deadline` | date | Default: 26th. A **due date** — does not freeze edits |
+| `teacher_edit_cutoff` | date | The **freeze**. 3rd of the following month as shipped. Null falls back to `submission_deadline` |
 | `status` | enum | open / closed / exported |
 
 ### `timesheet`
@@ -329,9 +388,13 @@ Each timesheet displays a summary table:
 | `total_hours` | decimal | Calculated from start/end |
 | `description` | text | Class name, production name, or manual description |
 | `notes` | text | |
-| `rate_key` | FK → rate_definition | |
-| `rate_amount` | decimal | Snapshot at time of entry |
-| `rate_override` | boolean | True if Finance Admin overrode |
+| `rate_key` | text | Set by the snapshot trigger to the entry's `entry_type` |
+| `rate_amount` | decimal | **Legacy, unused.** Superseded by `amount_cents`; never populated. See `PAYROLL_CORRECTNESS_AND_REPORTING.md` §2.3 |
+| `amount_cents` | integer | **The snapshotted pay figure payroll sums.** Written by trigger from the rate in effect on `date`. NULL = unpriced, never 0 |
+| `rate_id` | FK → `teacher_rates` | Provenance: which rate row produced `amount_cents` |
+| `rate_resolved_at` | timestamptz | When the snapshot was taken |
+| `paid_at` | timestamptz | Set when a Square run completes. Once set, `date` and `timesheet_id` are immutable — enforced by trigger |
+| `rate_override` | boolean | True if Finance Admin overrode. An overridden entry is never re-resolved |
 | `rate_override_by` | FK → user | |
 | `is_auto_populated` | boolean | True if sourced from schedule |
 | `attendance_status` | enum | confirmed / absent / substitute_covered |
@@ -404,6 +467,7 @@ Each timesheet displays a summary table:
 |---|---|---|
 | 1 | Payroll processor | Square Payroll — CSV export columns will match Square Payroll import format |
 | 2 | Teacher edit cutoff | Default = last day of the month; Finance Admin and above can override per pay period in tenant settings; supported cadences: weekly, bi-weekly, bi-monthly, monthly, custom date |
+| 2a | ⚠️ **Decision 2 does not match what shipped** (2026-07-28) | `c601279` / `20260728000004` seeded `teacher_edit_cutoff` as the **3rd of the following month**, not the last day of the month, for all 13 periods of 2026/27. Auto-created periods inherit the same rule from `payPeriodEditCutoff()` in `lib/timesheets/helpers.ts`, which carries a `TODO(tenant-config)`: the rule is hardcoded, so there is **no per-period override and no tenant setting** — the second half of Decision 2 is unbuilt. A period row with a null cutoff falls back to `submission_deadline`, which is the pre-`1da6896` behaviour and must not be reintroduced. Reconcile Decision 2 with the shipped rule, or change the shipped rule — do not leave both recorded |
 | 3 | Retroactive entry after cutoff | Requires Finance Admin approval; teacher submits request with reason |
 | 4 | Waived private — teacher pay | Finance Admin decides per case; Finance Admin toggles "pay teacher" per waived entry |
 | 5 | Stripe account | Same Stripe account as tuition; private billing charges go through the same pipeline |

@@ -1,10 +1,11 @@
 # Payroll Correctness & Reporting
 
-**Status:** DRAFT — spec only, no implementation
+**Status:** PARTIALLY BUILT — Phases 1–6 shipped 2026-07-28; 7–18 remain spec
 **Author:** Derek Shaw
 **Date:** 2026-07-27
-**Revised:** 2026-07-28 — §2.6, §3.1, §3.2, §3.6, §4, §5 rewritten against the live CHECK constraints; second pass added §3.7 (Square Payroll boundary), retroactive rate handling, and the rate visibility rule; third pass added §3.8 (payroll deductions) and period-level paid marking; fourth pass added §3.9 (bulk rate administration), revised §3.3 for the pay-management role set, and restored the §4 heading dropped in the third pass
+**Revised:** 2026-07-28 — §2.6, §3.1, §3.2, §3.6, §4, §5 rewritten against the live CHECK constraints; second pass added §3.7 (Square Payroll boundary), retroactive rate handling, and the rate visibility rule; third pass added §3.8 (payroll deductions) and period-level paid marking; fourth pass added §3.9 (bulk rate administration), revised §3.3 for the pay-management role set, and restored the §4 heading dropped in the third pass; **fifth pass (evening) rewrote §3.1 as built, marked Phases 2–6 done with commit refs, recorded the §2.2/§2.3/§2.4/§2.6 findings as resolved rather than deleting them, folded the returned rate workbook into §5, and flagged the unclosed `timesheet_entries` amount-column gap in §3.3**
 **Investigated against live DB and codebase:** 2026-07-27, 2026-07-28
+**Shipped this doc describes:** `20260728000001`–`20260728000005`, commits `8384cad`, `4c303cf`, `c601279`, `1da6896`, `a9c7697`, `fe17faa`, `a673eba`, `ad9dad7`
 
 ---
 
@@ -50,6 +51,8 @@ So a Jan 1 – Dec 31 range would sum every entry in the window regardless of ho
 
 **⚠️ Silent truncation hazard.** `entryQuery` has **no `.limit()` or `.range()`**, so it inherits PostgREST's `db-max-rows` cap (Supabase default 1000). At current volume that is irrelevant. A full-year, multi-teacher range would **silently truncate at the cap — no error, no indication, totals just come back low.** This must be resolved before anyone runs an annual report. Confirm the project's configured max-rows and paginate explicitly.
 
+> **✅ Resolved 2026-07-28 (`4c303cf`).** The entry fetch pages explicitly with `.range()`. Two details that matter for anyone touching it: the sort must be a **total** order (`date, id` — `date` alone is not unique, so pages would overlap and drop rows), and the loop advances by the number of rows **actually returned**, stopping only on an empty page. A short page means the server cap is below the requested page size, not that the data ended. Costs one extra empty request per run and is correct for any configured cap.
+
 **No annual or multi-period view exists** — not per-teacher-per-year, not per-period history, not a rollup. The only multi-period capability in the product is that free-form from/to on an admin-only, finance-guarded surface.
 
 ### 2.3 The rate snapshot problem — the serious one
@@ -76,6 +79,14 @@ There is also no `paid_at` population (0 rows), so the report reflects *hours ow
 
 **Unit hazard.** `timesheet_entries.rate_amount` is `numeric` with a `>= 0` check. `teachers.*_rate_cents` is integer cents. Nothing in the codebase reconciles the two because nothing writes the former. Any implementation must **standardize on integer cents and name the column accordingly** before the first row lands.
 
+> **✅ Resolved 2026-07-28 (`8384cad`, `4c303cf`) — kept because it explains the column set.**
+>
+> Render-time computation is gone; pay is snapshotted per entry against the rate in effect on the entry's own work date (§3.1). The unit hazard was settled by **adding `amount_cents` rather than repurposing `rate_amount`**: `rate_amount` stays as unused legacy, and integer cents is the only unit that reaches payroll. That is why `timesheet_entries` now carries both — one is live, one is dead, and the dead one is not to be written.
+>
+> `teachers.*_rate_cents` is now read by nothing in the payroll path and is scheduled for removal in Phase 18.
+>
+> Unchanged: `paid_at` is still 0% populated, so every figure the product shows is **owed**, not **paid**. The 1099-NEC figure requires the latter (§3.7).
+
 ### 2.4 1099 readiness — mechanically yes, meaningfully no
 
 The copy is real, at `payroll-report.tsx:464`: *"1099 contractors are responsible for their own taxes. Payments over $600/year require a Form 1099-NEC."*
@@ -90,6 +101,10 @@ A Jan 1 – Dec 31 range would execute correctly, and the report already splits 
 | Six entry types have no rate column at all | Structural, not a data gap — see §2.6 |
 
 The report would render, show every teacher under "hours but no rates," and total **$0.00**. It is not wrong at the margin — **there is no payroll data in the system at all.** `timesheets` has 3 rows and `pay_periods` has 2, but zero entries hang off them.
+
+> **Partially resolved 2026-07-28.** Two of the four blockers are closed: `teacher_rates` now holds **171 rows** across 19 teachers, effective 2026-08-15 (`20260728000002`), and the six rate-less entry types are gone as a structural gap (§2.6). `pay_periods` now holds 13 rows for the 2026/27 season (`20260728000004`).
+>
+> Still open: **`timesheet_entries` is empty** — nothing prices until hours are logged, which for auto-drafted class entries is blocked on `_INDEX.md` task 19 (§2.7). `teachers.*_rate_cents` and `teacher_rate_cards` remain all-NULL/empty and are now deliberately unread (§3.2). `employment_type` mapping and the `classifyEmployment` fall-through question below are untouched.
 
 `teachers.employment_type` allows seven values (`full_time`, `part_time`, `contract`, `employee`, `contractor_1099`, `pending_classification`, `owner`). `classifyEmployment` collapses these into W-2 / 1099 / owner-draw; confirm the mapping handles `contract` and `pending_classification` explicitly rather than falling through to a default.
 
@@ -138,6 +153,16 @@ No two agree, and the one payroll pays from is the widest.
 
 This is not hypothetical for Fall. The season carries 26 rehearsal rows and a Nutcracker production; `performance_event` and `substitute` entries are certain to appear.
 
+> **✅ Resolved 2026-07-28 — kept here because it is why the schema looks as it does.**
+>
+> The `hours × rate` arithmetic is gone. `/admin/timesheets/payroll` no longer reads `teachers.*_rate_cents` at all; it sums `timesheet_entries.amount_cents`, snapshotted per entry by trigger (§3.1). Commit `4c303cf`.
+>
+> The four-column taxonomy that caused this is what `teacher_rates` replaces: `rate_key` carries a CHECK mirroring `entry_type`, so all ten types are expressible and the two taxonomies cannot drift apart again. Nine of the ten are seeded (`20260728000002`); `bonus` is deliberately not, being `flat` and per-engagement.
+>
+> The silent-`undefined` failure mode is now a **surfaced** one: an entry with no rate in effect keeps `amount_cents` NULL — never 0 — and the report counts unpriced entries, unpriced hours, and affected teachers, warns on the page, and writes the word `UNPRICED` rather than `0.00` into the CSV. Flat-rate entries are reported separately and excluded from hours totals, per §3.2.
+>
+> Still true and still unresolved: the six-way representation of substitution listed below. One of them must be authoritative for pay before auto-drafting (§3.6).
+
 **Two entry types are structurally different from the rest:**
 
 - **`bonus`** is not an hourly quantity. `hours × rate` is meaningless for it. This is the shape a guest performer's lump sum takes.
@@ -161,35 +186,64 @@ The intended flow, per the product owner: a teacher scheduled for a class with n
 
 ## 3. Proposed design
 
-### 3.1 Rate snapshot — do this first
+### 3.1 Rate snapshot — ✅ BUILT 2026-07-28 (`8384cad` / `20260728000003`, hardened by `ad9dad7` / `20260728000005`)
 
-Populate a stored amount on `timesheet_entries` at the moment the entry is created, resolved against **the rate in effect on the entry's `date`** — not the date of entry, not the date of approval.
+`timesheet_entries` carries a stored amount, resolved against **the rate in effect on the entry's own `date`** — not the date of entry, not the date of approval. This settles the entry-vs-approval question from the original draft: with effective-dated rates (§3.2), work-date resolution is strictly better than either. A teacher who files late does not get a new rate applied to old work; an approval landing after a raise does not reprice the period; the figure is on the draft, so the teacher sees a dollar amount immediately; and it is stable — re-resolving the same entry always yields the same number.
 
-This supersedes the entry-vs-approval question in the original draft. With effective-dated rates (§3.2), work-date resolution is strictly better than either:
+**What was built.**
 
-- A teacher who files late does not get a new rate applied to old work.
-- An approval landing after a raise does not reprice the period.
-- The figure is available on the draft, so the teacher sees a dollar amount immediately.
-- It is stable: re-resolving the same entry always yields the same number.
+| Piece | Shipped as |
+|---|---|
+| Storage | `timesheet_entries.amount_cents` (integer, `>= 0`), `rate_id` (FK → `teacher_rates`, `on delete set null`), `rate_resolved_at` |
+| Resolver | `resolve_teacher_rate(p_teacher_id, p_rate_key, p_work_date)` — returns the at-most-one `teacher_rates` row whose `[valid_from, valid_to)` window contains the work date. `SECURITY INVOKER` deliberately: a `SECURITY DEFINER` function returning an amount would let any caller learn any teacher's rate, defeating §3.3 |
+| Application | `trg_snapshot_timesheet_entry_rate`, `BEFORE INSERT OR UPDATE ... FOR EACH ROW` on `timesheet_entries` |
 
-Re-resolve on edit of `date`, `entry_type`, or hours. `rate_override` / `rate_override_by` remain the escape hatch for a one-off manual amount, and an overridden entry is never re-resolved.
+**The snapshot is applied by TRIGGER, not by application code.** There are several write paths today — `/teach/timesheets` add/update/delete, the "Log Hours" path from `/teach/attendance`, `adminAddEntry` on `/admin/timesheets` — and native clients are planned. A trigger cannot be bypassed by a path that forgets to call the resolver; an application-side helper can, and the history in §2.3 is what that failure looks like. Application code must **never** write `amount_cents` or `rate_id` directly.
 
-**Retroactive rates (settled 2026-07-28: raises are sometimes backdated).** A rate row inserted with `valid_from` in the past invalidates every snapshot in its window. Those entries must be recomputed — but not uniformly:
+**Which teacher's rate applies** is read from `timesheets.teacher_id` via the entry's `timesheet_id` — the entry itself has no teacher column.
+
+#### Re-resolution rules
+
+On `UPDATE`, the trigger re-resolves only when something that affects the amount actually changed. The guard is:
+
+| Column changed | Re-resolves | Why |
+|---|---|---|
+| `date` | Yes | Moves which effective-dated rate row is in force |
+| `entry_type` | Yes | Selects a different `rate_key`, and therefore a different rate |
+| `total_hours` | Yes | The multiplicand for an `hourly` rate |
+| `timesheet_id` | Yes | **The timesheet determines whose rate applies.** Moving an entry to another teacher's timesheet changes the rate even when date, category and hours are identical |
+| Anything else (notes, description, status, production tags…) | No | Cannot change the amount; re-resolving would only add churn to `rate_resolved_at` |
+
+`timesheet_id` was absent from this guard until `ad9dad7`. Nothing in the code reachable at the time could hit the gap — `timesheet_id` is only ever set alongside a date change (see `TEACHER_TIME_ATTENDANCE.md`, "Editing an entry across a period boundary") — but an admin "reassign this entry to another teacher" surface is a plausible next feature and would have silently kept the previous teacher's price.
+
+**An overridden entry is never re-resolved.** `rate_override = true` short-circuits the trigger before anything is read. `rate_override` / `rate_override_by` remain the escape hatch for a one-off manual amount, and the trigger does not touch it.
+
+**No rate in effect leaves `amount_cents` NULL — never 0.** A null surfaces as *unpriced* and is counted and warned about on the payroll report (§2.6); a zero looks like unpaid work and reconciles to a wrong total silently. `rate_id` and `rate_resolved_at` are nulled alongside it.
+
+**Flat rates store the amount directly**, whatever hours were recorded. Hourly rates store `round(amount_cents × total_hours)`.
+
+#### A paid entry is immutable in `date` and `timesheet_id`
+
+Previously written here as "never rewritten," which was aspirational. As of `ad9dad7` it is **enforced**: the trigger raises `check_violation` on any update to a row with `paid_at IS NOT NULL` that changes `date` or `timesheet_id`.
+
+Refusing is deliberate rather than returning early and declining to reprice. An early return would let the move happen and merely leave the amount alone — producing a row whose date says one period and whose payment happened in another. Note that the period lock is **not** what protects this: in practice a paid entry's period is closed, but "paid" and "locked" are different conditions and an admin path with no lock check reaches the row. Everything else on a paid entry stays editable, including `paid_at` itself, so a payment can be corrected or reversed.
+
+#### Retroactive rates — still unbuilt (Phase 12)
+
+**Settled 2026-07-28: raises are sometimes backdated.** A rate row inserted with `valid_from` in the past invalidates every snapshot in its window. Those entries must be recomputed — but not uniformly:
 
 | Entry state | Action |
 |---|---|
 | `draft`, `submitted`, `approved`, not yet paid | Re-resolve in place. Record the prior amount in `adjustment_note` |
-| Already paid through Square | **Never rewrite.** Generate a separate catch-up entry for the difference, `status = 'adjusted'` |
+| Already paid through Square | **Never rewrite the amount.** Generate a separate catch-up entry for the difference, `status = 'adjusted'` |
 
-Rewriting a paid entry would put the portal in disagreement with money that actually left the account, and the portal is not the payer (§3.7). `timesheet_entries` already allows `status = 'adjusted'` and carries `adjusted_by` and `adjustment_note` — modeled, unwired, the same pattern as `rate_amount` and `is_auto_populated`.
+Rewriting a paid entry would put the portal in disagreement with money that actually left the account, and the portal is not the payer (§3.7). `timesheet_entries` already allows `status = 'adjusted'` and carries `adjusted_by` and `adjustment_note` — modeled, unwired, the same pattern `rate_amount` and `is_auto_populated` follow.
 
-Retroactive re-resolution must be an explicit, audited operation with a preview of affected entries and totals. It must never run implicitly as a side effect of saving a rate.
+Retroactive re-resolution must be an explicit, audited operation with a preview of affected entries and totals. It must never run implicitly as a side effect of saving a rate. Nothing built to date does this: the trigger re-resolves **one row on write**, and no path walks existing entries when a rate row is inserted.
 
-Payroll then sums stored amounts and **never multiplies**. That also collapses the flat-vs-hourly distinction at read time — see §3.2.
+Payroll sums stored amounts and **never multiplies** — built, see §2.6. That also collapses the flat-vs-hourly distinction at read time (§3.2).
 
-**Migration note:** with `timesheet_entries` at 0 rows, this is free right now. Once real hours exist, backfilling means reconstructing historical rates that were never recorded — which cannot be done accurately.
-
-**This is the cheapest it will ever be. Do it before Fall.**
+**Migration note (resolved).** This landed with `timesheet_entries` at 0 rows, so no backfill was needed and no historical rate had to be reconstructed. Fall classes begin 2026-08-15; the seeded rates carry that `valid_from`, so the first hour logged in the new season prices correctly on insert.
 
 ### 3.2 Rate model — decided
 
@@ -247,23 +301,25 @@ Include a year-to-date total. **Settled 2026-07-28: teachers see their own pay.*
 
 Anyone who can change a rate can necessarily see it, so viewing and editing share one role set. **`admin` is excluded from both** — that is Cara's role, and the exclusion is deliberate.
 
-**This requires a new guard.** `has_finance_role()` is `finance_admin` + `super_admin` and no longer matches. `is_admin()` admits five roles including plain `admin` and must never appear near pay.
+**This requires a new guard — ✅ built 2026-07-28 (`20260728000001`).** `has_finance_role()` is `finance_admin` + `super_admin` and no longer matches. `is_admin()` admits five roles including plain `admin` and must never appear near pay.
 
-```sql
-create or replace function public.can_manage_pay()
-returns boolean language sql stable security definer as $BODY$
-  select exists (
-    select 1 from profile_roles
-    where user_id = auth.uid()
-      and role in ('super_admin', 'finance_admin', 'studio_manager')
-      and is_active = true
-  )
-$BODY$;
-```
+`can_manage_pay()` shipped in **two forms**, both `SECURITY DEFINER`:
 
-Enforced in RLS on `teacher_rates` and on the amount columns of `timesheet_entries`, not in the UI. Self-access is `auth.uid()` equality, not a role check.
+- `can_manage_pay(p_tenant_id uuid)` — the one RLS uses. Answers "does this user hold a pay-management role **in this tenant**."
+- `can_manage_pay()` — the bare form, for callers with no tenant in hand. Answers "…*anywhere*," which is the weaker question.
 
-**Tenant scoping.** Neither `has_finance_role()` nor the function above is tenant-scoped — each answers "does this user hold the role *anywhere*." Correct with one tenant, wrong the day a second studio exists. Ship `can_manage_pay(p_tenant_id uuid)` from the start, mirroring `is_tenant_admin(p_tenant_id, p_user_id)`, rather than retrofitting after rate rows exist.
+**Use the tenant-scoped form.** The bare form is correct only while one tenant exists; the day a second studio has data, it grants a pay manager at studio A visibility into studio B. The tenant-scoped form was shipped from the start rather than retrofitted, mirroring `is_tenant_admin(p_tenant_id, p_user_id)`, precisely so no policy ever had to be rewritten after rate rows existed.
+
+Enforced in RLS on `teacher_rates`, not in the UI: self-select by `auth.uid()` equality, plus select/insert/update for pay managers. **There is no delete policy** — a rate is closed by setting `valid_to`, never removed, so the effective-dated history stays intact.
+
+**⚠️ Not enforced on `timesheet_entries.amount_cents` — verified 2026-07-28.** The guard above covers `teacher_rates`. The amount columns on entries still inherit the policies from `20260312000001`, which predate all of this:
+
+- `admins_timesheet_entries` is `FOR ALL` and authorizes off **`profiles.role in ('super_admin','admin')`**. That is the stale single-role column `CLAUDE.md` §4 forbids authorizing from, and it admits plain `admin` — Cara's role, the one §3.3 deliberately excludes from pay. She can read and write every teacher's `amount_cents` today.
+- The `teachers_own_entries_*` policies join `teacher_profiles tp on … tp.user_id = auth.uid()`, but `teacher_profiles` is a VIEW whose `id` **is** `profiles.id` and which has **no `user_id` column** (`CLAUDE.md` §4). Confirm whether these policies evaluate at all.
+
+Two further notes for whoever closes this. First, the original phrasing here — "RLS on the amount columns" — is not a thing Postgres does: RLS is row-level, so hiding a *column* from a role that may read the row needs column privileges or a separate view. Second, `amount_cents` is written by a `BEFORE` trigger on rows the teacher legitimately owns, so any fix must keep the teacher's own insert/update working while withholding the amount from `admin`.
+
+This is the largest known gap in §3.3 and it is a live one, not a future one.
 
 **Two live gaps.** `studio_manager` appears in **no `profile_roles` row today** — defined and unused. And confirm the multi-role Add Staff picker shipped 2026-07-28 offers both `finance_admin` and `studio_manager`, or pay management cannot be delegated at all.
 
@@ -305,7 +361,7 @@ Generate `is_auto_populated = true` draft entries from scheduled occurrences whe
 
 Rules still to settle before building:
 
-- **Substitute rate basis, settled 2026-07-28: a substitute earns their own rate, not the rate of the teacher they covered.** Resolution therefore keys on the working teacher's own `teacher_rates` row for `substitute`. If Amanda's returned sheet shows the `substitute` rate equal to `class_lead` for everyone, the category is redundant and can collapse — but that is a data finding, not an assumption to build on
+- **Substitute rate basis, settled 2026-07-28: a substitute earns their own rate, not the rate of the teacher they covered.** Resolution therefore keys on the working teacher's own `teacher_rates` row for `substitute`. Built as specified — the trigger resolves against the teacher on the entry's `timesheet_id`, which is the person who worked. **The collapse condition is not met:** the returned workbook seeds `substitute` at a uniform $50/hr for all 19 teachers while `class_lead` ranges $35–$75, so the category is neither redundant with `class_lead` nor per-person. It is a studio-wide sub premium and must stay a distinct `rate_key`
 - Which of the six substitution representations (§2.6) is authoritative for pay, with the other five derived from it or dropped
 - Whether an unconfirmed auto-draft is submitted by default at period close, or silently dropped — dropping loses real hours, submitting pays for classes that may not have happened
 - `class_lead` vs `class_assistant` derives from `class_teachers`, so that assignment must be reliable before drafts inherit it
@@ -421,12 +477,12 @@ Three surfaces, in priority order:
 
 | Phase | Scope | Risk |
 |---|---|---|
-| **1** | ~~Decide the rate model~~ — **decided 2026-07-28**, §3.2 | Done |
-| **2** | `teacher_rates` table: effective-dated, per-category, hourly-or-flat, integer cents | Medium — schema |
-| **3** | Rate resolver + snapshot at entry, resolved on work date (§3.1) | **Free now, impossible to backfill later** |
-| **4** | Enter the 18 teachers' actual rates. Nothing above matters without them | Blocked on Amanda |
-| **5** | Payroll read path sums stored cents; drop the `hours × rate` arithmetic (§2.6) | Low — fixes the NaN bucket bug |
-| **6** | Pagination fix on the payroll query (§2.2) | Low, but blocks any annual run |
+| **1** | ~~Decide the rate model~~ — **decided 2026-07-28**, §3.2 | ✅ Done |
+| **2** | ~~`teacher_rates` table: effective-dated, per-category, hourly-or-flat, integer cents~~ | ✅ **Done 2026-07-28 — `20260728000001`.** Shipped with the `teacher_rates_no_overlap` exclusion constraint, a `rate_key` CHECK mirroring `entry_type`, `can_manage_pay(p_tenant_id)` **and** a bare `can_manage_pay()`, and RLS from the first migration (self-select, pay-manager select/insert/update, **no delete policy** — rates are closed with `valid_to`, never removed) |
+| **3** | ~~Rate resolver + snapshot at entry, resolved on work date (§3.1)~~ | ✅ **Done 2026-07-28 — `8384cad` / `20260728000003`, hardened `ad9dad7` / `20260728000005`.** `resolve_teacher_rate()` + `trg_snapshot_timesheet_entry_rate`. Landed at 0 entry rows, so no backfill |
+| **4** | ~~Enter the 18 teachers' actual rates~~ | ✅ **Done 2026-07-28 — `20260728000002`.** 171 rows: 19 teachers × 9 categories, `valid_from` **2026-08-15** (the season start, not the migration date). `bonus` deliberately unseeded — it is `flat` and per-engagement. Derek Shaw excluded, not a teacher |
+| **5** | ~~Payroll read path sums stored cents; drop the `hours × rate` arithmetic (§2.6)~~ | ✅ **Done 2026-07-28 — `4c303cf`.** `rateMap` and the `teachers.*_rate_cents` read are gone from `/admin/timesheets/payroll` entirely |
+| **6** | ~~Pagination fix on the payroll query (§2.2)~~ | ✅ **Done 2026-07-28 — `4c303cf`.** Explicit `.range()` paging on a total order (`date, id`), advancing by rows actually returned and stopping on an empty page, so a server cap below the page size is not mistaken for the end of the data |
 | **7** | Teacher period history + YTD (§3.3) | Low |
 | **8** | Annual / 1099 report (§3.4) | Depends on 3, 5, 6 |
 | **9** | Angelina: fix the `teacher_hours` → `timesheet_entries` bug (§3.5) | Low |
@@ -440,9 +496,21 @@ Three surfaces, in priority order:
 | **17** | Rate import/export with preview (§3.9) | Medium |
 | **18** | Retire `teachers.*_rate_cents` and reconcile `teacher_hours` | Cleanup |
 
-**RLS is not a phase — it ships with Phase 2.** `teacher_rates` and the amount columns on `timesheet_entries` carry the §3.3 visibility rule from the first migration. Adding rate rows before the policies exist means compensation data sits readable by whatever the default grant allows.
+**RLS is not a phase — it ships with Phase 2.** Held: `20260728000001` created the policies in the same migration as the table, so no rate row ever existed unprotected.
 
-**Phases 2–3 are time-sensitive.** `timesheet_entries` is empty today. Every hour logged before rate snapshotting exists is an hour whose true rate is unrecoverable. Fall classes begin **2026-08-15**.
+**Phases 2–3 were time-sensitive, and landed in time.** They shipped 2026-07-28 with `timesheet_entries` at 0 rows — every hour of the Fall season will be priced on insert, and no historical rate had to be reconstructed. Fall classes begin **2026-08-15**.
+
+**Also shipped 2026-07-28, outside the numbered phases** — timesheet write correctness, which the snapshot depends on because the trigger prices against the entry's `date` and the teacher on its `timesheet_id`:
+
+| Commit | Change |
+|---|---|
+| `c601279` / `20260728000004` | 13 `pay_periods` for the 2026/27 season; `teacher_edit_cutoff` separated from `submission_deadline` |
+| `1da6896` | The period lock reads `teacher_edit_cutoff`, not the submission deadline; late-but-open surfaced as a distinct state |
+| `a9c7697` | Three divergent `getOrCreateTimesheet` implementations consolidated to one; entries filed by **work date**, not today |
+| `fe17faa` | Writes gated on the **entry period's** cutoff rather than today's; the `/teach/attendance` path gated for the first time |
+| `a673eba` | Cross-period re-dating re-files the entry to the destination timesheet and checks **both** periods' locks; dead `resolvePeriodLock` deleted |
+
+Full behaviour in `TEACHER_TIME_ATTENDANCE.md` — "Which period a lock is evaluated against" and "Editing an entry across a period boundary."
 
 ---
 
@@ -466,19 +534,24 @@ Three surfaces, in priority order:
 | Rates are administered in-platform in bulk, not one record at a time | §3.9 |
 | Pay rates editable by super_admin, finance_admin, studio_manager only | §3.3 |
 
+**Answered by the returned workbook, 2026-07-28** (`BAM_Teacher_Pay_Rates.xlsx` → `20260728000002`):
+
+| Was | Answer |
+|---|---|
+| Q1 — the actual rates | Returned and seeded. 171 rows, 19 teachers × 9 categories, `valid_from` 2026-08-15. Studio defaults where a teacher had no override: `class_lead` $35 · `class_assistant` $20 · `private` $45 · `rehearsal` $35 · `performance_event` $20 · `competition` $20 · `training` $20 · `admin` $20 · `substitute` $50 |
+| Q4 — are `training` and `competition` paid | **Yes, both.** Seeded for all 19 teachers, uniformly at $20/hr |
+| Q5 — is `class_assistant` a fraction of the lead rate | **Neither a fraction nor per-person.** It is a uniform $20/hr for all 19, while `class_lead` ranges $35–$75. No constant ratio exists, so it must stay an independent per-category rate — which is the shape `teacher_rates` already has |
+
 **Still open:**
 
 | # | Question | Blocks |
 |---|---|---|
-| 1 | **The actual rates** — out with Amanda as `BAM_Teacher_Pay_Rates.xlsx` (studio defaults + per-teacher exceptions) | Phase 4. Nothing pays out without this |
-| 2 | **Guest lump sum — per show or per run?** "$800 for Nutcracker" splits across four performance entries; "$200 a show" does not. Per-run becomes one flat entry plus separate hourly rehearsal entries | Phase 2 shape |
+| 2 | **Guest lump sum — per show or per run?** "$800 for Nutcracker" splits across four performance entries; "$200 a show" does not. Per-run becomes one flat entry plus separate hourly rehearsal entries. **Still unanswered by the workbook** — `bonus` was deliberately left unseeded, since a per-engagement flat amount would be wrong at any seeded value | Phase 2 shape. The only `flat` path with no data behind it |
 | 3 | **Are guest performers in `teachers` at all?** A one-off guest may have no profile, no schedule, no login. `timesheet_entries` reaches a person through `timesheets.teacher_id`, so without a row they cannot be paid or reported at all. Recommended: a `teachers` row, `employment_type = 'contractor_1099'`, no login | Phase 2. Modeling gap, not a rate question |
-| 4 | **Are `training` and `competition` paid**, and at what rate? Both are allowed entry types with no rate today. The returned sheet should answer this | Phase 4 |
-| 5 | **`class_assistant`** — a fixed fraction of the lead rate, or set independently per person? | Phase 2 shape |
 | 6 | **Owner draws in the annual report** — Amanda's and Derek's hours are `owner_draw` and excluded from wage totals. Include an annual figure anyway? | Phase 8 |
 | 7 | **Square handoff** — manual entry of pay runs, or API integration? Manual is correct for v1 | Phase 9 |
 | 8 | **For counsel, not Amanda** — may a family's studio balance be deducted from a staff member's paycheck with written authorization (§3.8)? Merchandise and costumes are a separate, likelier-permissible case. Build proceeds either way; the answer sets a switch | Phase 14 policy |
-| 9 | **Does `studio_admin` belong in `can_manage_pay()`** alongside `studio_manager`? Currently excluded (§3.3) | Phase 2 RLS |
+| 9 | **Does `studio_admin` belong in `can_manage_pay()`** alongside `studio_manager`? **Shipped 2026-07-28 excluded** (`20260728000001`), matching §3.3. Still a policy question, not a code one — changing the answer is a one-line function change plus a `NOTIFY pgrst` | Nothing. Answer it before a `studio_admin` exists who needs it |
 | 10 | **Deduction caps** — a per-period ceiling so a large costume order does not consume one paycheck. What figure, or a percentage of net? | Phase 14 |
 
 **Live data findings needing attention regardless (checked 2026-07-28):**
