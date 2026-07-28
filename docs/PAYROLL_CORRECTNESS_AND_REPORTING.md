@@ -3,7 +3,7 @@
 **Status:** DRAFT — spec only, no implementation
 **Author:** Derek Shaw
 **Date:** 2026-07-27
-**Revised:** 2026-07-28 — §2.6, §3.1, §3.2, §3.6, §4, §5 rewritten against the live CHECK constraints; second pass added §3.7 (Square Payroll boundary), retroactive rate handling, and the rate visibility rule; third pass added §3.8 (payroll deductions) and period-level paid marking
+**Revised:** 2026-07-28 — §2.6, §3.1, §3.2, §3.6, §4, §5 rewritten against the live CHECK constraints; second pass added §3.7 (Square Payroll boundary), retroactive rate handling, and the rate visibility rule; third pass added §3.8 (payroll deductions) and period-level paid marking; fourth pass added §3.9 (bulk rate administration), revised §3.3 for the pay-management role set, and restored the §4 heading dropped in the third pass
 **Investigated against live DB and codebase:** 2026-07-27, 2026-07-28
 
 ---
@@ -235,19 +235,37 @@ A period picker or history list on `/teach/timesheets`, showing prior periods re
 
 Include a year-to-date total. **Settled 2026-07-28: teachers see their own pay.** Labeled per §3.7 as this platform's record of hours worked, not a pay stub.
 
-**Visibility rule, in full:**
+**Visibility and edit rule, in full** (revised 2026-07-28 — `studio_manager` added to the pay-management set):
 
-| Viewer | Own rates and amounts | Another person's |
-|---|---|---|
-| Teacher | Yes | No |
-| `admin`, `studio_admin`, `studio_manager` | Own only | **No** |
-| `finance_admin`, `super_admin` | Yes | Yes |
+| Viewer | Own rates and amounts | Another person's | Can change rates |
+|---|---|---|---|
+| Teacher, parent, front_desk, student | View own | No | No |
+| `admin` | View own | **No** | **No** |
+| `studio_admin` | View own | **No** | **No** — pending confirmation |
+| `studio_manager` | Yes | Yes | **Yes** |
+| `finance_admin`, `super_admin` | Yes | Yes | Yes |
 
-Enforced in RLS on `teacher_rates` and on the amount columns of `timesheet_entries`, not in the UI. The guard is `has_finance_role()` — **never `is_admin()`**, which admits five roles including `studio_manager` (§2.6, `CLAUDE.md` §4). Self-access is `auth.uid()` equality, not a role check.
+Anyone who can change a rate can necessarily see it, so viewing and editing share one role set. **`admin` is excluded from both** — that is Cara's role, and the exclusion is deliberate.
 
-Note `has_finance_role()` is **not tenant-scoped** — it answers "is this user a finance admin anywhere." Correct with one tenant, wrong the day a second studio exists. A `has_finance_role(p_tenant_id uuid)` variant, mirroring `is_tenant_admin(p_tenant_id, p_user_id)`, belongs in Phase 2 rather than as a retrofit after rate rows exist.
+**This requires a new guard.** `has_finance_role()` is `finance_admin` + `super_admin` and no longer matches. `is_admin()` admits five roles including plain `admin` and must never appear near pay.
 
-There is also no UI path to grant `finance_admin` — the Add Staff form offers three roles of the seven in `profile_roles`, single-select. Until that is fixed, Amanda cannot delegate payroll visibility without a manual insert.
+```sql
+create or replace function public.can_manage_pay()
+returns boolean language sql stable security definer as $BODY$
+  select exists (
+    select 1 from profile_roles
+    where user_id = auth.uid()
+      and role in ('super_admin', 'finance_admin', 'studio_manager')
+      and is_active = true
+  )
+$BODY$;
+```
+
+Enforced in RLS on `teacher_rates` and on the amount columns of `timesheet_entries`, not in the UI. Self-access is `auth.uid()` equality, not a role check.
+
+**Tenant scoping.** Neither `has_finance_role()` nor the function above is tenant-scoped — each answers "does this user hold the role *anywhere*." Correct with one tenant, wrong the day a second studio exists. Ship `can_manage_pay(p_tenant_id uuid)` from the start, mirroring `is_tenant_admin(p_tenant_id, p_user_id)`, rather than retrofitting after rate rows exist.
+
+**Two live gaps.** `studio_manager` appears in **no `profile_roles` row today** — defined and unused. And confirm the multi-role Add Staff picker shipped 2026-07-28 offers both `finance_admin` and `studio_manager`, or pay management cannot be delegated at all.
 
 ### 3.4 Annual reconciliation report — not a tax filing
 
@@ -264,22 +282,6 @@ Per-teacher annual totals, split by employment classification, with:
 **Copy fix required.** `payroll-report.tsx:464` currently reads *"1099 contractors are responsible for their own taxes. Payments over $600/year require a Form 1099-NEC."* That implies this platform issues the form. Rewrite to point at Square.
 
 **Do not build this before §3.1.** An annual report built on render-time rate computation produces a number that disagrees with Square for reasons no one can trace.
-
-### 3.7 Square Payroll is the system of record for payment
-
-Settled 2026-07-28. **This platform computes what is owed; Square Payroll pays it.** That boundary has to be visible in the product, not just understood by the people who built it.
-
-Consequences:
-
-| Area | Implication |
-|---|---|
-| `paid_at` | Cannot be derived internally. Either entered when a Square run completes, or pulled from the Square Payroll API. Until then, every figure in the product is *owed*, not *paid* |
-| Tax forms | Square issues them. Remove or rewrite any copy implying otherwise (§3.4) |
-| `employment_type` | Square is authoritative for W-2 vs 1099 classification. The local column can drift; treat a mismatch as an anomaly worth surfacing |
-| Teacher-facing surfaces | A YTD figure must be labeled as this platform's record of hours worked, not as a pay stub. A teacher comparing it to a Square deposit and finding a gap must not conclude they were underpaid |
-| Retroactive adjustments | §3.1 — a paid entry is never rewritten, because the payment is Square's fact, not ours |
-
-**Open:** whether to integrate the Square Payroll API to push approved hours and pull payment confirmation, or keep the handoff manual. Manual is correct for v1; the reconciliation report (§3.4) is what makes manual safe.
 
 ### 3.5 Angelina — payroll context
 
@@ -313,6 +315,22 @@ Rules still to settle before building:
 **Blocked on `_INDEX.md` task 19** (§2.7). Nothing in this section is authorable until the occurrence generator produces correct `schedule_instances`.
 
 ---
+
+### 3.7 Square Payroll is the system of record for payment
+
+Settled 2026-07-28. **This platform computes what is owed; Square Payroll pays it.** That boundary has to be visible in the product, not just understood by the people who built it.
+
+Consequences:
+
+| Area | Implication |
+|---|---|
+| `paid_at` | Cannot be derived internally. Either entered when a Square run completes, or pulled from the Square Payroll API. Until then, every figure in the product is *owed*, not *paid* |
+| Tax forms | Square issues them. Remove or rewrite any copy implying otherwise (§3.4) |
+| `employment_type` | Square is authoritative for W-2 vs 1099 classification. The local column can drift; treat a mismatch as an anomaly worth surfacing |
+| Teacher-facing surfaces | A YTD figure must be labeled as this platform's record of hours worked, not as a pay stub. A teacher comparing it to a Square deposit and finding a gap must not conclude they were underpaid |
+| Retroactive adjustments | §3.1 — a paid entry is never rewritten, because the payment is Square's fact, not ours |
+
+**Open:** whether to integrate the Square Payroll API to push approved hours and pull payment confirmation, or keep the handoff manual. Manual is correct for v1; the reconciliation report (§3.4) is what makes manual safe.
 
 ### 3.8 Payroll deductions — authorization is the primitive
 
@@ -378,6 +396,29 @@ Build the machinery regardless — merchandise, costumes, and uniforms need it i
 
 
 
+### 3.9 Rate administration in the platform — bulk, not one at a time
+
+The 2026-07-28 rate collection ran through a spreadsheet because no in-product path existed. That was acceptable once. It is not the ongoing model: **rates must be viewable and editable inside the platform, in bulk.** The same applies to private lesson prices (`PRIVATE_LESSON_BILLING_AND_CREDITS.md` §4.1).
+
+Three surfaces, in priority order:
+
+**1. Grid editor.** Teachers down, categories across, one screen. Inline edit, visible dirty state, save-all in one action. This is how an owner actually adjusts rates — comparing across people, not opening twenty profiles. The returned workbook is the evidence: nineteen of twenty teachers carry a per-teacher rate, so the grid *is* the normal case and single-record editing is the exception.
+
+**2. Bulk actions on a selection.** Set a category to a value for selected teachers; apply a percentage increase; set an effective date across the batch. An annual raise becomes one action, not twenty.
+
+**3. Import from spreadsheet.** Download a template pre-filled with current rates, edit offline, upload, **preview with per-row errors inline, then commit.** Never direct-to-database. Same discipline as the class importer: create-and-update against a stable key (`teacher_id` + `rate_key`), errors blocking commit rather than applying partially.
+
+**Non-negotiables for all three:**
+
+- Every write is effective-dated. Editing a rate **closes the current row and inserts a new one** — never an update in place. The grid shows the rate in effect today; history is preserved beneath it
+- An effective date is required on every change, defaulting to today, accepting a past date (§3.1 retroactive handling applies, including the preview of affected entries)
+- Guarded by `can_manage_pay()` (§3.3) in RLS, not in the route
+- Every change records who and when. A rate edit is a financial control point
+
+**Same shape for private prices.** A studio-defaults grid plus a per-teacher override grid, same import path — but guarded by whoever governs *pricing* rather than pay. Those may not be the same people, since a price is not compensation.
+
+## 4. Build order
+
 | Phase | Scope | Risk |
 |---|---|---|
 | **1** | ~~Decide the rate model~~ — **decided 2026-07-28**, §3.2 | Done |
@@ -395,7 +436,9 @@ Build the machinery regardless — merchandise, costumes, and uniforms need it i
 | **13** | Mark-period-as-paid: bulk `paid_at` + Square run reference; paid entries become immutable (§3.7) | Low |
 | **14** | Payroll deductions (§3.8) — authorization table, line items, minimum-wage floor, per-type switches | Medium |
 | **15** | Square reconciliation: owed-vs-paid variance surfacing (§3.7) | Depends on 13 |
-| **16** | Retire `teachers.*_rate_cents` and reconcile `teacher_hours` | Cleanup |
+| **16** | Rate administration UI: grid editor + bulk actions (§3.9) | Medium |
+| **17** | Rate import/export with preview (§3.9) | Medium |
+| **18** | Retire `teachers.*_rate_cents` and reconcile `teacher_hours` | Cleanup |
 
 **RLS is not a phase — it ships with Phase 2.** `teacher_rates` and the amount columns on `timesheet_entries` carry the §3.3 visibility rule from the first migration. Adding rate rows before the policies exist means compensation data sits readable by whatever the default grant allows.
 
@@ -420,6 +463,8 @@ Build the machinery regardless — merchandise, costumes, and uniforms need it i
 | Marking paid is a period-level bulk action; a paid entry is immutable | §3.7 |
 | Backdated raises produce a memo line on a future timesheet, one per affected period, never an edit to paid history | §3.1 |
 | Deductions require employee authorization, employee- or admin-initiated | §3.8 |
+| Rates are administered in-platform in bulk, not one record at a time | §3.9 |
+| Pay rates editable by super_admin, finance_admin, studio_manager only | §3.3 |
 
 **Still open:**
 
@@ -433,7 +478,8 @@ Build the machinery regardless — merchandise, costumes, and uniforms need it i
 | 6 | **Owner draws in the annual report** — Amanda's and Derek's hours are `owner_draw` and excluded from wage totals. Include an annual figure anyway? | Phase 8 |
 | 7 | **Square handoff** — manual entry of pay runs, or API integration? Manual is correct for v1 | Phase 9 |
 | 8 | **For counsel, not Amanda** — may a family's studio balance be deducted from a staff member's paycheck with written authorization (§3.8)? Merchandise and costumes are a separate, likelier-permissible case. Build proceeds either way; the answer sets a switch | Phase 14 policy |
-| 9 | **Deduction caps** — a per-period ceiling so a large costume order does not consume one paycheck. What figure, or a percentage of net? | Phase 14 |
+| 9 | **Does `studio_admin` belong in `can_manage_pay()`** alongside `studio_manager`? Currently excluded (§3.3) | Phase 2 RLS |
+| 10 | **Deduction caps** — a per-period ceiling so a large costume order does not consume one paycheck. What figure, or a percentage of net? | Phase 14 |
 
 **Live data findings needing attention regardless (checked 2026-07-28):**
 
