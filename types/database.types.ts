@@ -10100,6 +10100,7 @@ export type Database = {
         Row: {
           adjusted_by: string | null
           adjustment_note: string | null
+          amount_cents: number | null
           approved_at: string | null
           approved_by: string | null
           attendance_status: string | null
@@ -10124,9 +10125,11 @@ export type Database = {
           production_id: string | null
           production_name: string | null
           rate_amount: number | null
+          rate_id: string | null
           rate_key: string | null
           rate_override: boolean
           rate_override_by: string | null
+          rate_resolved_at: string | null
           schedule_instance_id: string | null
           session_id: string | null
           start_time: string | null
@@ -10144,6 +10147,7 @@ export type Database = {
         Insert: {
           adjusted_by?: string | null
           adjustment_note?: string | null
+          amount_cents?: number | null
           approved_at?: string | null
           approved_by?: string | null
           attendance_status?: string | null
@@ -10168,9 +10172,11 @@ export type Database = {
           production_id?: string | null
           production_name?: string | null
           rate_amount?: number | null
+          rate_id?: string | null
           rate_key?: string | null
           rate_override?: boolean
           rate_override_by?: string | null
+          rate_resolved_at?: string | null
           schedule_instance_id?: string | null
           session_id?: string | null
           start_time?: string | null
@@ -10188,6 +10194,7 @@ export type Database = {
         Update: {
           adjusted_by?: string | null
           adjustment_note?: string | null
+          amount_cents?: number | null
           approved_at?: string | null
           approved_by?: string | null
           attendance_status?: string | null
@@ -10212,9 +10219,11 @@ export type Database = {
           production_id?: string | null
           production_name?: string | null
           rate_amount?: number | null
+          rate_id?: string | null
           rate_key?: string | null
           rate_override?: boolean
           rate_override_by?: string | null
+          rate_resolved_at?: string | null
           schedule_instance_id?: string | null
           session_id?: string | null
           start_time?: string | null
@@ -10242,6 +10251,13 @@ export type Database = {
             columns: ["production_id"]
             isOneToOne: false
             referencedRelation: "productions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timesheet_entries_rate_id_fkey"
+            columns: ["rate_id"]
+            isOneToOne: false
+            referencedRelation: "teacher_rates"
             referencedColumns: ["id"]
           },
           {
@@ -10636,6 +10652,14 @@ export type Database = {
           p_tenant: string
         }
         Returns: string
+      }
+      resolve_teacher_rate: {
+        Args: { p_rate_key: string; p_teacher_id: string; p_work_date: string }
+        Returns: {
+          amount_cents: number
+          rate_id: string
+          rate_type: string
+        }[]
       }
     }
     Enums: {
