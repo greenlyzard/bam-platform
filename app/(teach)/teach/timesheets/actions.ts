@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getTenantTimezone } from "@/lib/tenant/timezone";
 import {
   getOrCreateTimesheet,
+  payPeriodForDate,
   periodLockMessage,
   resolvePeriodLockForWorkDate,
 } from "@/lib/timesheets/helpers";
@@ -232,20 +233,94 @@ export async function updateTimesheetEntry(formData: FormData) {
     return { error: "Timesheet already submitted — cannot edit entries." };
   }
 
-  // Locked against the period of the date ALREADY STORED, not the submitted
-  // one. Keying off the submitted date would make a date change the way out of
-  // a locked period: re-date a locked August entry to September and the check
-  // reads September, which is open, and the edit lands.
   const timeZone = await getTenantTimezone(supabase, tp.tenant_id);
-  const lock = await resolvePeriodLockForWorkDate(
-    supabase,
-    tp.tenant_id,
-    timeZone,
-    entry.date
-  );
-  if ("error" in lock) return { error: lock.error };
-  if (lock.locked) {
-    return { error: periodLockMessage(lock) };
+
+  // Does this edit move the entry to a DIFFERENT pay period? The stored date and
+  // the submitted one are both resolved by payPeriodForDate — the same function
+  // getOrCreateTimesheet files by — so "different period" here means exactly
+  // "different timesheet" there.
+  const storedPeriod = payPeriodForDate(entry.date);
+  const submittedPeriod = payPeriodForDate(parsed.data.date);
+  if (!storedPeriod || !submittedPeriod) {
+    return { error: "That date is not a valid calendar date." };
+  }
+  const crossesPeriod =
+    storedPeriod.year !== submittedPeriod.year ||
+    storedPeriod.month !== submittedPeriod.month;
+
+  // Where the entry will live after this update. Only moves on a cross-period
+  // edit; a within-period date change keeps the timesheet it is already on.
+  let destinationTimesheetId: string | null = null;
+
+  if (crossesPeriod) {
+    // BOTH sides have to be open. Moving hours OUT of a closed period and INTO
+    // one are both edits to a closed period: the first silently drains a period
+    // payroll may already have run, the second adds to one. Locked on either
+    // side refuses, and the message names that side's own cutoff.
+    const sourceLock = await resolvePeriodLockForWorkDate(
+      supabase,
+      tp.tenant_id,
+      timeZone,
+      entry.date
+    );
+    if ("error" in sourceLock) return { error: sourceLock.error };
+    if (sourceLock.locked) {
+      return {
+        error: `These hours cannot be moved out of their pay period. ${periodLockMessage(sourceLock)}`,
+      };
+    }
+
+    const destLock = await resolvePeriodLockForWorkDate(
+      supabase,
+      tp.tenant_id,
+      timeZone,
+      parsed.data.date
+    );
+    if ("error" in destLock) return { error: destLock.error };
+    if (destLock.locked) {
+      return {
+        error: `These hours cannot be moved into that pay period. ${periodLockMessage(destLock)}`,
+      };
+    }
+
+    // Re-file the entry. Without this the row keeps its old timesheet_id while
+    // reading a new date, so payroll (which queries by `date`) and
+    // /teach/timesheets (which scopes by pay_period_id) disagree about which
+    // period the hours are in — and the snapshot trigger reprices against the
+    // new date on a row still attached to the old period's timesheet.
+    //
+    // tp.id, not the entry's teacher — the destination is always the acting
+    // teacher's own timesheet for that period.
+    const destination = await getOrCreateTimesheet(
+      supabase,
+      tp.id,
+      tp.tenant_id,
+      parsed.data.date
+    );
+    if ("error" in destination) return { error: destination.error };
+    if (destination.status !== "draft") {
+      return {
+        error:
+          "That pay period's timesheet has already been submitted — these hours cannot be moved onto it.",
+      };
+    }
+    destinationTimesheetId = destination.id;
+  } else {
+    // Same period on both sides: lock against the stored date, as before.
+    // Keying off the submitted date alone would make a date change the way out
+    // of a locked period — re-date a locked August entry to September and the
+    // check reads September, which is open, and the edit lands. That escape is
+    // closed above for the cross-period case by checking both sides.
+    const lock = await resolvePeriodLockForWorkDate(
+      supabase,
+      tp.tenant_id,
+      timeZone,
+      entry.date
+    );
+    if ("error" in lock) return { error: lock.error };
+    if (lock.locked) {
+      return { error: periodLockMessage(lock) };
+    }
   }
 
   const entryType = resolveEntryType(formData);
@@ -255,6 +330,13 @@ export async function updateTimesheetEntry(formData: FormData) {
     .update({
       entry_type: entryType,
       date: parsed.data.date,
+      // Set in the same statement as `date`, never as a follow-up write: the
+      // BEFORE UPDATE snapshot trigger reads new.timesheet_id and new.date
+      // together, so splitting them would price one against the other's period.
+      // amount_cents / rate_id are deliberately absent — the trigger owns them.
+      ...(destinationTimesheetId
+        ? { timesheet_id: destinationTimesheetId }
+        : {}),
       total_hours: parsed.data.totalHours,
       description: parsed.data.description || null,
       sub_for: parsed.data.subFor || null,

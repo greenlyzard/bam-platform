@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { tenantPayPeriod, tenantToday } from "@/lib/dates";
+import { tenantToday } from "@/lib/dates";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -214,42 +214,21 @@ async function fetchPeriodDates(
 }
 
 /**
- * Fetch the pay period TODAY falls in and resolve its lock state.
- *
- * For callers with no pre-fetched period row. /teach/timesheets fetches the row
- * itself and calls computePeriodLock directly rather than paying for this query
- * twice — both routes end at the same decision function, so for an entry dated
- * in today's period the page and the write agree exactly.
- *
- * Read the period this resolves carefully before using it to gate a WRITE.
- * Entries are filed to the period of their own work date (see payPeriodForDate
- * and getOrCreateTimesheet), which on any backdated entry is NOT today's
- * period — so gating a write with this checks a lock the write will not land
- * behind. Every write path now uses resolvePeriodLockForPeriod below. This
- * stays for the "is the teacher's current window open?" question, which is
- * genuinely about today: banners, the entry form's enabled state, reminders.
- */
-export async function resolvePeriodLock(
-  supabase: SupabaseClient,
-  tenantId: string,
-  timeZone: string
-): Promise<PeriodLockState> {
-  const { month, year } = tenantPayPeriod(timeZone);
-  const period = await fetchPeriodDates(supabase, tenantId, month, year);
-
-  return computePeriodLock(period, tenantToday(timeZone), timeZone);
-}
-
-/**
  * Resolve the lock state of a GIVEN pay period, not today's.
  *
- * The variant every write goes through. `resolvePeriodLock` above answers
- * "is the current window open?"; a write needs "is the period this row will
- * land in open?", and those diverge for exactly the case the cutoff exists to
- * cover. On September 2 a teacher backdates an entry to August 31: today's
- * period is September (open — its cutoff is October 3), the entry files to
- * August (whose cutoff, September 3, is the one that governs it). Checking
+ * The variant every write goes through, and the only one — a `resolvePeriodLock`
+ * that resolved TODAY's period used to sit here and was deleted with zero
+ * callers, because for a write it answers the wrong question and its own doc
+ * comment had to warn against it. "Is the current window open?" and "is the
+ * period this row will land in open?" diverge for exactly the case the cutoff
+ * exists to cover. On September 2 a teacher backdates an entry to August 31:
+ * today's period is September (open — its cutoff is October 3), the entry files
+ * to August (whose cutoff, September 3, is the one that governs it). Checking
  * September there waves through the edit the August cutoff forbids.
+ *
+ * Callers that genuinely want today's window — banners, the entry form's
+ * enabled state — fetch the row and call computePeriodLock directly, as
+ * /teach/timesheets does.
  *
  * Resolution against `today` is unchanged — a cutoff is a date the tenant's
  * calendar day is compared to. Only WHICH period's cutoff is read moves.
