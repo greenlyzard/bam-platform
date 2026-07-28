@@ -143,7 +143,11 @@ This is not hypothetical for Fall. The season carries 26 rehearsal rows and a Nu
 - **`bonus`** is not an hourly quantity. `hours × rate` is meaningless for it. This is the shape a guest performer's lump sum takes.
 - **`class_assistant`** is a distinct pay grade for the same work unit as `class_lead`, not a distinct activity. The taxonomy already encodes a seniority dimension, which the four rate columns cannot express.
 
-Note also the overlap around substitution: `entry_type = 'substitute'`, plus a separate `is_substitute` boolean, plus `sub_for`, plus `substitute_for_teacher_id`, plus `teacher_role = 'substitute'`, plus `attendance_status = 'substitute_covered'`. Five representations of one concept. Which is authoritative for *pay* must be settled before the resolver is written, or a covered class will be paid twice or not at all.
+Note also the overlap around substitution: `entry_type = 'substitute'`, plus a separate `is_substitute` boolean, plus `sub_for`, plus `substitute_for_teacher_id`, plus `teacher_role = 'substitute'`, plus `attendance_status = 'substitute_covered'`. Six representations of one concept, and one of them must be authoritative for pay before the resolver is written.
+
+**To be clear about what the risk is and is not.** Two people paid for one class is *normal* — `class_lead` and `class_assistant` are separate entry types with separate rates, and both may legitimately work the same session. The taxonomy handles that correctly.
+
+The risk is narrower: **one absence producing two paid entries for the same slot.** If an auto-draft is generated for the assigned teacher, and the substitute also files an entry, and nothing marks the assigned teacher as not-present, the studio pays for a class that teacher did not teach. `attendance_status = 'substitute_covered'` exists to prevent exactly that and is never written — the same unwired-by-design pattern as `rate_amount` and `is_auto_populated`.
 
 ### 2.7 The auto-draft machinery is already modeled and unwired
 
@@ -247,11 +251,14 @@ Two separate pieces:
 
 Generate `is_auto_populated = true` draft entries from scheduled occurrences where the assigned teacher has no substitute recorded. Teacher confirms, adjusts, or deletes. Attendance-taking flips `attendance_status` to `confirmed`; it does not create the entry.
 
-Rules to settle before building:
+**Settled policy (2026-07-28): a teacher who is absent and covered is not paid for that class.** The substitute is paid; the absent teacher receives nothing. Therefore `attendance_status = 'substitute_covered'` must **delete or zero the assigned teacher's auto-draft**, not merely annotate it. An annotated draft that remains submittable is a row that pays someone for a class they did not teach, and it will pass through approval looking ordinary.
 
-- Which of the five substitution representations (§2.6) determines who gets paid
+Rules still to settle before building:
+
+- Which of the six substitution representations (§2.6) is authoritative for pay, with the other five derived from it or dropped
 - Whether an unconfirmed auto-draft is submitted by default at period close, or silently dropped — dropping loses real hours, submitting pays for classes that may not have happened
 - `class_lead` vs `class_assistant` derives from `class_teachers`, so that assignment must be reliable before drafts inherit it
+- Whether a lead and an assistant both auto-draft from the same occurrence, which is legitimate and must not be mistaken for a duplicate
 
 **Blocked on `_INDEX.md` task 19** (§2.7). Nothing in this section is authorable until the occurrence generator produces correct `schedule_instances`.
 
@@ -280,7 +287,7 @@ Rules to settle before building:
 
 ## 5. Open questions for Amanda
 
-**Resolved:** rate model (flat per-category hourly, §3.2); snapshot timing (work date, §3.1).
+**Resolved:** rate model (flat per-category hourly, §3.2); snapshot timing (work date, §3.1); substitute pay — the substitute is paid, the covered teacher is not (§3.6).
 
 | # | Question | Blocks |
 |---|---|---|
@@ -290,7 +297,7 @@ Rules to settle before building:
 | 4 | **Guest performers** — are they in `teachers` at all? A one-off Nutcracker guest may have no profile, no schedule, no login, but must appear on a 1099 | Phase 2. This is a modeling gap, not a rate question |
 | 5 | **Flat fees** — per-engagement ad hoc, or a standing per-session rate (e.g. a weekly accompanist)? Different shapes | Phase 2 |
 | 6 | **Are rates ever retroactive?** A backdated raise changes what effective dating must support | Phase 2 |
-| 7 | **Substitute pay** — does a sub earn their own rate or the absent teacher's? And is the absent teacher paid anything? | Phase 3, §3.6 |
+| 7 | **Substitute rate** — does a sub earn their own rate for the category, or the rate of the teacher they covered? (That the absent teacher is unpaid is settled; this is the remaining half) | Phase 3, §3.6 |
 | 8 | **Should teachers see their own YTD earnings**, or only hours? | Phase 7 |
 | 9 | **Owner draws in the annual report** — Amanda's hours are `owner_draw` and excluded from wage totals. Does she want an annual figure anyway? | Phase 8 |
 
