@@ -43,12 +43,21 @@ function buildUrl(params: Record<string, string>): string {
 export function AttendanceOverview({
   rows,
   teachers,
+  canSeeHoursLogged,
   dateFrom,
   dateTo,
   filterTeacher,
 }: {
   rows: SessionRow[];
   teachers: Teacher[];
+  /**
+   * Whether `row.hoursLogged` is a fact or an absence of permission.
+   *
+   * False for an admin without pay access: timesheet_entries is unreadable to
+   * them, so every row arrives `hoursLogged: false` regardless of the truth.
+   * Rendering that as ⚠ would invent a studio-wide missing-hours problem.
+   */
+  canSeeHoursLogged: boolean;
   dateFrom: string;
   dateTo: string;
   filterTeacher: string;
@@ -82,12 +91,14 @@ export function AttendanceOverview({
             Track attendance and verify teacher hours are logged.
           </p>
         </div>
-        <Link
-          href="/admin/timesheets"
-          className="h-10 rounded-lg border border-silver bg-white hover:bg-cloud text-sm font-medium text-charcoal px-4 transition-colors inline-flex items-center gap-1.5 shrink-0"
-        >
-          Timesheets →
-        </Link>
+        {canSeeHoursLogged && (
+          <Link
+            href="/admin/timesheets"
+            className="h-10 rounded-lg border border-silver bg-white hover:bg-cloud text-sm font-medium text-charcoal px-4 transition-colors inline-flex items-center gap-1.5 shrink-0"
+          >
+            Timesheets →
+          </Link>
+        )}
       </div>
 
       {/* Stats cards */}
@@ -113,7 +124,7 @@ export function AttendanceOverview({
             Hours Logged
           </p>
           <p className="mt-1 text-2xl font-semibold text-charcoal">
-            {hoursLoggedCount}
+            {canSeeHoursLogged ? hoursLoggedCount : "—"}
           </p>
         </div>
         <div className="rounded-xl border border-silver bg-white p-4">
@@ -122,10 +133,14 @@ export function AttendanceOverview({
           </p>
           <p
             className={`mt-1 text-2xl font-semibold ${
-              missingHours > 0 ? "text-error" : "text-success"
+              !canSeeHoursLogged
+                ? "text-mist"
+                : missingHours > 0
+                  ? "text-error"
+                  : "text-success"
             }`}
           >
-            {missingHours}
+            {canSeeHoursLogged ? missingHours : "—"}
           </p>
         </div>
       </div>
@@ -265,7 +280,14 @@ export function AttendanceOverview({
                             )}
                           </td>
                           <td className="px-4 py-2.5 text-center">
-                            {row.hoursLogged ? (
+                            {!canSeeHoursLogged ? (
+                              <span
+                                className="inline-flex items-center text-sm text-mist cursor-help"
+                                title="Requires payroll access"
+                              >
+                                —
+                              </span>
+                            ) : row.hoursLogged ? (
                               <span
                                 className="inline-flex items-center text-sm text-success"
                                 title="Hours logged for this session"

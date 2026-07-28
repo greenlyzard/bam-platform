@@ -32,6 +32,14 @@ export default async function AdminLayout({
   const isParent = userRoles?.some((r) => r.role === "parent") ?? false;
   const userEmail = session.user.email;
 
+  // Mirrors can_manage_pay() in RLS (20260728000006) and requireFinance() in
+  // lib/auth/guards. Computed from the profile_roles rows already fetched
+  // above, so hiding the pay nav costs no extra query. Read from profile_roles,
+  // never profiles.role — see CLAUDE.md §4.
+  const canManagePay =
+    userRoles?.some((r) => r.role === "finance_admin" || r.role === "super_admin") ??
+    false;
+
   const modules: ModuleItem[] = (moduleRows ?? []).map((m) => ({
     key: m.key,
     label: m.label,
@@ -90,7 +98,7 @@ export default async function AdminLayout({
         {/* Desktop: sidebar + content */}
         <div className="hidden lg:flex">
           <aside className="w-60 shrink-0 border-r border-silver bg-white min-h-[calc(100vh-3.5rem)] overflow-y-auto py-4 px-3">
-            <AdminNav role={role} modules={modules} userEmail={userEmail} />
+            <AdminNav role={role} modules={modules} userEmail={userEmail} canManagePay={canManagePay} />
           </aside>
           <main className="flex-1 p-6 min-w-0">{children}</main>
         </div>
@@ -100,7 +108,7 @@ export default async function AdminLayout({
 
         {/* Bottom tab bar (mobile) */}
         <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-silver bg-white lg:hidden">
-          <AdminNav mobile role={role} modules={modules} userEmail={userEmail} />
+          <AdminNav mobile role={role} modules={modules} userEmail={userEmail} canManagePay={canManagePay} />
         </nav>
         <AngelinaChat role="admin" mode="floating" enabled={angelinaEnabled} />
       </div>

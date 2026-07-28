@@ -36,7 +36,13 @@ export default async function AdminTimesheetsPage({
     payPeriod?: string;
   }>;
 }) {
-  const currentUser = await requireRole("teacher", "finance_admin", "admin", "super_admin");
+  // Plain `admin` no longer reaches this page. Since 20260728000006 the only
+  // policies on `timesheets` / `timesheet_entries` are `can_manage_pay()` and
+  // teacher self-access, so an admin who got in would see an empty page rather
+  // than a refusal — worse than being redirected, because empty reads as "no
+  // timesheets exist." `teacher` stays: this page doubles as a teacher's own
+  // view, and self-access is an identity check that RLS still honours.
+  const currentUser = await requireRole("teacher", "finance_admin", "super_admin");
   const isTeacherOnly = currentUser.roles.every((r) => r === "teacher");
   const supabase = await createClient();
   const params = await searchParams;
@@ -352,7 +358,7 @@ export default async function AdminTimesheetsPage({
       csvRows={csvRows}
       entryTypeLabels={ENTRY_TYPE_LABELS}
       isTeacherOnly={isTeacherOnly}
-      isAdmin={currentUser.roles.some((r) => ["finance_admin", "admin", "super_admin"].includes(r))}
+      canManagePay={canViewRates}
       canViewRates={canViewRates}
       canExport={canExport}
       billingRecords={billingRecords}

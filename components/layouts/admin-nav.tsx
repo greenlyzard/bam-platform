@@ -33,19 +33,41 @@ const GROUP_ORDER = [
   "Settings",
 ];
 
+/**
+ * Modules whose surfaces read compensation and are governed by
+ * `can_manage_pay()` in RLS (20260728000006).
+ *
+ * Hidden outright from anyone without pay access rather than left visible to
+ * fail on arrival. Since the policy change these pages return EMPTY rather than
+ * erroring for a plain admin, and an empty timesheet list reads as "nobody has
+ * filed anything" — a wrong answer is worse than a missing menu item.
+ *
+ * Keyed by `platform_modules.key`, not href, because href can be re-pointed in
+ * the database. `platform_modules.requires_role` would be the natural home for
+ * this, but it is null on every row and populating it is a data migration.
+ */
+const PAY_MANAGER_MODULE_KEYS = new Set(["timesheets", "payroll"]);
+
 /** Bottom tab items — "More" is handled specially */
 const mobileTabItems = [
   { label: "Home", href: "/admin/dashboard", icon: "⌂" },
-  { label: "Timesheets", href: "/admin/timesheets", icon: "▤" },
+  { label: "Timesheets", href: "/admin/timesheets", icon: "▤", requiresPay: true },
   { label: "Comms", href: "/admin/communications", icon: "✉" },
   { label: "Students", href: "/admin/students", icon: "♡" },
 ];
 
-function buildNavGroups(modules: ModuleItem[], isDerek: boolean): NavGroup[] {
+function buildNavGroups(
+  modules: ModuleItem[],
+  isDerek: boolean,
+  canManagePay: boolean
+): NavGroup[] {
   const groupMap: Record<string, ModuleItem[]> = {};
   for (const mod of modules) {
     if (!mod.platform_enabled) continue;
     if (mod.key === "settings_platform" && !isDerek) continue;
+    // Pay gate runs before the isDerek escape below — Derek's override exists to
+    // preview disabled modules, not to bypass a compensation guard.
+    if (PAY_MANAGER_MODULE_KEYS.has(mod.key) && !canManagePay) continue;
     const isEnabled = mod.tenant_enabled && mod.nav_visible;
     if (!isEnabled && !isDerek) continue;
     if (!groupMap[mod.nav_group]) groupMap[mod.nav_group] = [];
@@ -64,11 +86,14 @@ export function AdminNav({
   role,
   modules = [],
   userEmail,
+  canManagePay = false,
 }: {
   mobile?: boolean;
   role?: Role;
   modules?: ModuleItem[];
   userEmail?: string;
+  /** Resolved server-side from profile_roles; mirrors can_manage_pay() in RLS. */
+  canManagePay?: boolean;
 }) {
   const pathname = usePathname();
   const isDerek = userEmail === SUPER_EMAIL;
@@ -80,12 +105,15 @@ export function AdminNav({
   }, [pathname]);
 
   if (mobile) {
-    const groups = buildNavGroups(modules, isDerek);
+    const groups = buildNavGroups(modules, isDerek, canManagePay);
+    const tabItems = mobileTabItems.filter(
+      (item) => !item.requiresPay || canManagePay
+    );
 
     return (
       <>
         <div className="flex h-14 items-center justify-around">
-          {mobileTabItems.map((item) => {
+          {tabItems.map((item) => {
             const active = pathname.startsWith(item.href);
             return (
               <a
@@ -174,7 +202,7 @@ export function AdminNav({
     );
   }
 
-  const groups = buildNavGroups(modules, isDerek);
+  const groups = buildNavGroups(modules, isDerek, canManagePay);
 
   return (
     <nav className="space-y-1">

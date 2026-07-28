@@ -226,7 +226,7 @@ export function TimesheetsClient({
   csvRows,
   entryTypeLabels,
   isTeacherOnly,
-  isAdmin,
+  canManagePay,
   canViewRates,
   canExport,
   billingRecords,
@@ -249,7 +249,7 @@ export function TimesheetsClient({
   csvRows: CsvRow[];
   entryTypeLabels: Record<string, string>;
   isTeacherOnly: boolean;
-  isAdmin: boolean;
+  canManagePay: boolean;
   canViewRates?: boolean;
   canExport?: boolean;
   billingRecords?: PrivateBillingRecord[];
@@ -325,12 +325,16 @@ export function TimesheetsClient({
             stickyTeacher={stickyTeacher}
             onEntryAdded={(hrs) => setSessionHours((p) => p + hrs)}
           />
-          <Link
-            href="/admin/timesheets/payroll"
-            className="h-10 rounded-lg border border-silver bg-white hover:bg-cloud text-sm font-medium text-charcoal px-4 transition-colors inline-flex items-center gap-1.5"
-          >
-            Payroll Report →
-          </Link>
+          {/* /admin/timesheets/payroll is requireFinance() — a teacher reaching
+              this page for their own timesheet would only be redirected. */}
+          {canManagePay && (
+            <Link
+              href="/admin/timesheets/payroll"
+              className="h-10 rounded-lg border border-silver bg-white hover:bg-cloud text-sm font-medium text-charcoal px-4 transition-colors inline-flex items-center gap-1.5"
+            >
+              Payroll Report →
+            </Link>
+          )}
           {csvRows.length > 0 && canExport && (
             <ExportCsvButton rows={csvRows} includeRates={canViewRates} />
           )}
@@ -418,7 +422,7 @@ export function TimesheetsClient({
           )}
 
           {/* Bulk approve bar */}
-          {isAdmin && selectedIds.size > 0 && (
+          {canManagePay && selectedIds.size > 0 && (
             <div className="flex items-center gap-3 rounded-lg bg-success/5 border border-success/20 px-4 py-3">
               <button
                 onClick={handleBulkApprove}
@@ -447,7 +451,7 @@ export function TimesheetsClient({
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-silver bg-cloud/50">
-                      {isAdmin && (
+                      {canManagePay && (
                         <th className="px-4 py-3 w-10">
                           <input
                             type="checkbox"
@@ -472,14 +476,14 @@ export function TimesheetsClient({
                       const badge = STATUS_BADGES[ts.status] ?? STATUS_BADGES.draft;
                       const isExpanded = expandedId === ts.id;
                       const tsEntries = entries.filter((e) => e.timesheet_id === ts.id);
-                      const colCount = (filterStatus === "submitted" ? 6 : 5) + (isAdmin ? 1 : 0);
+                      const colCount = (filterStatus === "submitted" ? 6 : 5) + (canManagePay ? 1 : 0);
                       return (
                         <Fragment key={ts.id}>
                           <tr
                             className="hover:bg-cloud/30 transition-colors cursor-pointer"
                             onClick={() => setExpandedId(isExpanded ? null : ts.id)}
                           >
-                            {isAdmin && (
+                            {canManagePay && (
                               <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                                 <input
                                   type="checkbox"
@@ -610,7 +614,7 @@ export function TimesheetsClient({
                                                   entry={{ ...e, teacher_id: ts.teacherId }}
                                                   teachers={teachers}
                                                   productions={productions}
-                                                  isAdmin={isAdmin}
+                                                  canManagePay={canManagePay}
                                                 />
                                                 <AdminDeleteEntryButton entryId={e.id} />
                                               </div>
@@ -796,7 +800,7 @@ export function TimesheetsClient({
                                 entry={{ ...e, teacher_id: e.teacherId }}
                                 teachers={teachers}
                                 productions={productions}
-                                isAdmin={isAdmin}
+                                canManagePay={canManagePay}
                               />
                               <AdminDeleteEntryButton entryId={e.id} />
                             </div>

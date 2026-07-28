@@ -312,12 +312,12 @@ export function AdminEditEntryButton({
   entry,
   teachers,
   productions,
-  isAdmin,
+  canManagePay,
 }: {
   entry: EntryData;
   teachers: Teacher[];
   productions: Production[];
-  isAdmin?: boolean;
+  canManagePay?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -335,7 +335,7 @@ export function AdminEditEntryButton({
           entry={entry}
           teachers={teachers}
           productions={productions}
-          isAdmin={isAdmin}
+          canManagePay={canManagePay}
           onClose={() => setOpen(false)}
         />
       )}
@@ -397,7 +397,7 @@ function EntryDrawer({
   productions,
   quickMode,
   defaultTeacher,
-  isAdmin,
+  canManagePay,
   onClose,
   onSaved,
 }: {
@@ -406,7 +406,7 @@ function EntryDrawer({
   productions: Production[];
   quickMode?: boolean;
   defaultTeacher?: string;
-  isAdmin?: boolean;
+  canManagePay?: boolean;
   onClose: () => void;
   onSaved?: (hours: number) => void;
 }) {
@@ -964,7 +964,7 @@ function EntryDrawer({
             </button>
 
             {/* Submit / Approve buttons for admin in edit mode */}
-            {isEdit && isAdmin && entry?.status === "draft" && (
+            {isEdit && canManagePay && entry?.status === "draft" && (
               <button
                 type="button"
                 disabled={loading}
@@ -983,7 +983,7 @@ function EntryDrawer({
                 Submit
               </button>
             )}
-            {isEdit && isAdmin && (entry?.status === "submitted" || entry?.status === "flagged") && (
+            {isEdit && canManagePay && (entry?.status === "submitted" || entry?.status === "flagged") && (
               <button
                 type="button"
                 disabled={loading}

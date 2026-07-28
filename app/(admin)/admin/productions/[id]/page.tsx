@@ -8,6 +8,8 @@ import {
   getAllDances,
 } from "@/lib/queries/productions";
 import { createClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/auth/guards";
+import { canViewPayRates } from "@/lib/rbac/permissions";
 import { ProductionDetail } from "./production-detail";
 import { ProductionLabor } from "./production-labor";
 
@@ -23,7 +25,16 @@ export default async function ProductionDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const user = await requireAdmin();
   const supabase = await createClient();
+
+  // The labor block below is a compensation surface — teacher names against
+  // hours and dollar rates — and had no guard of its own beyond the admin
+  // layout. Since 20260728000006 its query returns nothing for a plain admin,
+  // so leaving it ungated would render "No timesheet entries tagged to X" for a
+  // production that has plenty. Skip the whole block instead of showing a
+  // permission boundary disguised as a data statement.
+  const canSeeLabor = await canViewPayRates(user.id);
 
   const [production, prodDances, casting, rehearsals, students, allDances] =
     await Promise.all([
@@ -38,12 +49,14 @@ export default async function ProductionDetailPage({
   if (!production) notFound();
 
   // Fetch labor data: timesheet entries tagged to this production
-  const { data: laborEntries } = await supabase
-    .from("timesheet_entries")
-    .select(
-      "entry_type, total_hours, rate_amount, timesheets!inner(teacher_id, teacher_profiles!inner(first_name, last_name, employment_type, user_id))"
-    )
-    .eq("production_id", id);
+  const { data: laborEntries } = canSeeLabor
+    ? await supabase
+        .from("timesheet_entries")
+        .select(
+          "entry_type, total_hours, rate_amount, timesheets!inner(teacher_id, teacher_profiles!inner(first_name, last_name, employment_type, user_id))"
+        )
+        .eq("production_id", id)
+    : { data: [] };
 
   // Get teacher rates from legacy teachers table
   const userIds = new Set<string>();
@@ -136,10 +149,12 @@ export default async function ProductionDetailPage({
         allDances={allDances}
       />
 
-      <ProductionLabor
-        productionName={production.name}
-        entries={mappedLabor}
-      />
+      {canSeeLabor && (
+        <ProductionLabor
+          productionName={production.name}
+          entries={mappedLabor}
+        />
+      )}
     </div>
   );
 }

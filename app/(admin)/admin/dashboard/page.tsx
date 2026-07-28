@@ -6,17 +6,25 @@ import {
   getExpansionMarkets,
 } from "@/lib/queries/admin";
 import { getPayrollSummary } from "@/lib/queries/payroll-summary";
+import { canViewPayRates } from "@/lib/rbac/permissions";
 import { DashboardViewToggle } from "./dashboard-client";
 
 export default async function AdminDashboardPage() {
   const user = await requireAdmin();
   const supabase = createAdminClient();
 
+  // The payroll card is skipped entirely for anyone without pay access, not
+  // just hidden. getPayrollSummary() reads timesheets/timesheet_entries through
+  // the RLS-bound client, so since 20260728000006 it returns zeros for a plain
+  // admin — which would render as "0 pending, 0 hours, $0 payroll" and read as
+  // a factual claim about the studio rather than a permission boundary.
+  const canSeePayroll = await canViewPayRates(user.id);
+
   const [stats, capacity, markets, payroll] = await Promise.all([
     getEnrollmentStats(),
     getCapacitySummary(),
     getExpansionMarkets(),
-    getPayrollSummary(),
+    canSeePayroll ? getPayrollSummary() : Promise.resolve(null),
   ]);
 
   // Check if admin is also a teacher
@@ -100,7 +108,7 @@ export default async function AdminDashboardPage() {
       </section>
 
       {/* Payroll Summary */}
-      {payroll.pendingCount > 0 && (
+      {payroll && payroll.pendingCount > 0 && (
         <section>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-heading font-semibold text-charcoal">Payroll Summary</h2>

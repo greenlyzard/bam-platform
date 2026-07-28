@@ -1,5 +1,6 @@
 import { requireRole } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
+import { canViewPayRates } from "@/lib/rbac/permissions";
 import { AttendanceOverview } from "./attendance-overview";
 
 export const metadata = { title: "Attendance — Admin" };
@@ -11,9 +12,17 @@ export default async function AdminAttendancePage({
 }: {
   searchParams: Promise<{ from?: string; to?: string; teacher?: string }>;
 }) {
-  await requireRole("admin", "super_admin");
+  const user = await requireRole("admin", "super_admin");
   const supabase = await createClient();
   const params = await searchParams;
+
+  // The "Hours Logged" column reads timesheet_entries, which since
+  // 20260728000006 is pay-manager-only. This page stays open to plain admins —
+  // attendance is their job — but the column has to declare itself unknown for
+  // them rather than resolve to false. An empty read here is indistinguishable
+  // from "no hours were logged", and that renders as a red ⚠ against every
+  // session in the range: a fabricated problem report, not a hidden one.
+  const canSeeHoursLogged = await canViewPayRates(user.id);
 
   // Default: current week (Mon–Sun)
   const now = new Date();
@@ -126,14 +135,15 @@ export default async function AdminAttendancePage({
   }
 
   // Get timesheet entries for these class/date combos to check Hours Logged
-  const { data: timesheetEntries } = classIds.length
-    ? await supabase
-        .from("timesheet_entries")
-        .select("class_id, date")
-        .in("class_id", classIds)
-        .gte("date", dateFrom)
-        .lte("date", dateTo)
-    : { data: [] };
+  const { data: timesheetEntries } =
+    canSeeHoursLogged && classIds.length
+      ? await supabase
+          .from("timesheet_entries")
+          .select("class_id, date")
+          .in("class_id", classIds)
+          .gte("date", dateFrom)
+          .lte("date", dateTo)
+      : { data: [] };
 
   const timesheetMap = new Set<string>();
   for (const e of timesheetEntries ?? []) {
@@ -186,6 +196,7 @@ export default async function AdminAttendancePage({
     <AttendanceOverview
       rows={rows}
       teachers={teachers}
+      canSeeHoursLogged={canSeeHoursLogged}
       dateFrom={dateFrom}
       dateTo={dateTo}
       filterTeacher={params.teacher || ""}
