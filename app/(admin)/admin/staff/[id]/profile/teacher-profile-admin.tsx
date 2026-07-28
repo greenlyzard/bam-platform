@@ -20,6 +20,7 @@ import {
   uploadTeacherPhoto, updatePhotoCaption, deletePhoto, reorderPhotos, togglePhotoActive,
   addStaffRole, removeStaffRole,
 } from "./enhanced-actions";
+import { STAFF_ROLE_OPTIONS, staffRoleLabel } from "@/lib/auth/staff-roles";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -209,7 +210,7 @@ export function TeacherProfileAdmin({
   // Roles state
   const [staffRoles, setStaffRoles] = useState<{ role: string; is_active: boolean }[]>([]);
   const [addRoleOpen, setAddRoleOpen] = useState(false);
-  const [newRole, setNewRole] = useState("teacher");
+  const [newRoles, setNewRoles] = useState<string[]>([]);
   const [confirmRemoveRole, setConfirmRemoveRole] = useState<string | null>(null);
 
   useEffect(() => {
@@ -225,14 +226,18 @@ export function TeacherProfileAdmin({
   function flash(msg: string) { setToast(msg); setTimeout(() => setToast(""), 3000); }
 
   function handleAddRole() {
+    if (newRoles.length === 0) return;
     const fd = new FormData();
-    fd.set("profileId", teacher.id); fd.set("role", newRole); fd.set("tenantId", tenantId);
+    fd.set("profileId", teacher.id); fd.set("tenantId", tenantId);
+    for (const r of newRoles) fd.append("roles", r);
     startTransition(async () => {
       const res = await addStaffRole(fd);
       if (res.error) return flash(res.error);
-      setStaffRoles(r => [...r, { role: newRole, is_active: true }]);
+      const added = newRoles;
+      setStaffRoles(r => [...r, ...added.map(role => ({ role, is_active: true }))]);
+      setNewRoles([]);
       setAddRoleOpen(false);
-      flash("Role added");
+      flash(added.length === 1 ? "Role added" : `${added.length} roles added`);
     });
   }
 
@@ -617,7 +622,7 @@ export function TeacherProfileAdmin({
         <div className="flex flex-wrap gap-2">
           {staffRoles.map((r) => (
             <span key={r.role} className="inline-flex items-center gap-1.5 rounded-full bg-lavender/10 text-lavender-dark px-3 py-1 text-sm font-medium">
-              {r.role === "super_admin" ? "Studio Owner" : r.role === "finance_admin" ? "Finance Admin" : r.role.charAt(0).toUpperCase() + r.role.slice(1)}
+              {staffRoleLabel(r.role)}
               {confirmRemoveRole === r.role ? (
                 <span className="flex items-center gap-1 ml-1">
                   <button onClick={() => handleRemoveRole(r.role)} className="text-error text-xs font-semibold">Yes</button>
@@ -633,14 +638,30 @@ export function TeacherProfileAdmin({
         {!addRoleOpen ? (
           <button className={btnSecondary} onClick={() => setAddRoleOpen(true)}>+ Add Role</button>
         ) : (
-          <div className="flex gap-2 items-end">
-            <SimpleSelect value={newRole} onValueChange={setNewRole} options={[
-              { value: "teacher", label: "Teacher" },
-              { value: "admin", label: "Admin" },
-              { value: "finance_admin", label: "Finance Admin" },
-            ]} placeholder="Select role" className="w-48" />
-            <button className={btnPrimary} onClick={handleAddRole} disabled={isPending}>Add</button>
-            <button className={btnSecondary} onClick={() => setAddRoleOpen(false)}>Cancel</button>
+          // Multi-select, matching the Add Staff Member form: several roles can
+          // be granted in one go. Roles already held are omitted — they are
+          // shown as removable chips above.
+          <div className="space-y-2">
+            <div className="flex flex-wrap gap-1.5">
+              {STAFF_ROLE_OPTIONS.filter(opt => !staffRoles.some(r => r.role === opt.value)).map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setNewRoles(prev => prev.includes(opt.value) ? prev.filter(r => r !== opt.value) : [...prev, opt.value])}
+                  className={`rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
+                    newRoles.includes(opt.value)
+                      ? "bg-lavender text-white border-lavender"
+                      : "bg-white text-slate border-silver hover:border-lavender"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2 items-end">
+              <button className={btnPrimary} onClick={handleAddRole} disabled={isPending || newRoles.length === 0}>Add</button>
+              <button className={btnSecondary} onClick={() => { setNewRoles([]); setAddRoleOpen(false); }}>Cancel</button>
+            </div>
           </div>
         )}
       </div>

@@ -1,6 +1,7 @@
 "use server";
 
 import { ADMIN_TIER_ROLES, requireAdmin } from "@/lib/auth/guards";
+import { isStaffRole, staffRoleLabel } from "@/lib/auth/staff-roles";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
@@ -441,35 +442,59 @@ export async function togglePhotoActive(formData: FormData) {
 }
 
 // ---------------------------------------------------------------------------
-// 13. Add staff role
+// 13. Add staff roles
 // ---------------------------------------------------------------------------
+/**
+ * Grants one or more roles in a single call. Roles arrive as repeated "roles"
+ * entries, matching the multi-select on the Add Staff Member form — a person
+ * holds one profile_roles row per role and commonly holds several.
+ */
 export async function addStaffRole(formData: FormData) {
   const user = await requireAdmin();
   const supabase = await createClient();
 
   const profileId = formData.get("profileId") as string;
-  const role = formData.get("role") as string;
   const tenantId = formData.get("tenantId") as string;
-  if (!profileId || !role || !tenantId) return { error: "Missing required fields" };
+  const roles = [
+    ...new Set(
+      formData
+        .getAll("roles")
+        .map((r) => String(r).trim())
+        .filter(Boolean)
+    ),
+  ];
+
+  if (!profileId || !tenantId) return { error: "Missing required fields" };
+  if (roles.length === 0) return { error: "Select at least one role" };
+
+  const unknown = roles.filter((r) => !isStaffRole(r));
+  if (unknown.length > 0) return { error: `Invalid role: ${unknown.join(", ")}` };
 
   // Escalation gate. Granting ANY admin-tier role is a privilege escalation —
   // every role in ADMIN_TIER_ROLES satisfies is_admin() in RLS and
   // requireAdmin() in the app — so it is reserved to super_admin. A plain
   // admin retains normal staff management: teacher, parent, student,
-  // front_desk.
+  // front_desk. Checked across the whole selection before any insert, so a
+  // mixed selection cannot slip an admin-tier role in beside a permitted one.
   //
   // NOTE on front_desk: deliberately left grantable by a plain admin, but it
   // routes to /admin/dashboard (see roleHome in lib/auth/guards.ts) while
   // requireAdmin() excludes it. That inconsistency is unresolved — if
   // front_desk should be admin-tier, add it to ADMIN_TIER_ROLES and is_admin()
   // together, not here.
-  if ((ADMIN_TIER_ROLES as readonly string[]).includes(role)) {
+  const adminTier = roles.filter((r) => (ADMIN_TIER_ROLES as readonly string[]).includes(r));
+  if (adminTier.length > 0) {
     const { data: callerRole } = await supabase.from("profile_roles").select("role").eq("user_id", user.id).eq("role", "super_admin").eq("is_active", true).maybeSingle();
-    if (!callerRole) return { error: "Only Studio Owners can assign this role" };
+    if (!callerRole) return { error: `Only Studio Owners can assign this role: ${adminTier.map(staffRoleLabel).join(", ")}` };
   }
 
-  const { error } = await supabase.from("profile_roles").insert({ user_id: profileId, role, tenant_id: tenantId, is_active: true });
-  if (error) { if (error.code === "23505") return { error: "Role already assigned" }; return { error: error.message }; }
+  // Upsert on the unique key (user_id, tenant_id, role) so re-granting a role
+  // the person already holds is a no-op rather than a 23505.
+  const { error } = await supabase.from("profile_roles").upsert(
+    roles.map((role) => ({ user_id: profileId, role, tenant_id: tenantId, is_active: true })),
+    { onConflict: "user_id,tenant_id,role" }
+  );
+  if (error) return { error: error.message };
   revalidatePath("/admin/staff");
   return {};
 }

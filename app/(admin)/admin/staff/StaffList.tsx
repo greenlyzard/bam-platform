@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { SimpleSelect } from "@/components/ui/select";
 import { addStaffMember, updateStaffOrder, resetStaffOrder } from "./staff-actions";
 import { EMPLOYMENT_TYPE_OPTIONS } from "@/lib/timesheets/employment";
+import { STAFF_ROLE_OPTIONS } from "@/lib/auth/staff-roles";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -87,7 +88,7 @@ export function StaffList({ staff: initialStaff, allDisciplines, tenantId, isSup
   const [roleFilter, setRoleFilter] = useState<string[]>([]);
   const [discFilter, setDiscFilter] = useState<string[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [addForm, setAddForm] = useState({ firstName: "", lastName: "", email: "", role: "teacher", employmentType: "", sendWelcome: true });
+  const [addForm, setAddForm] = useState<{ firstName: string; lastName: string; email: string; roles: string[]; employmentType: string; sendWelcome: boolean }>({ firstName: "", lastName: "", email: "", roles: ["teacher"], employmentType: "", sendWelcome: true });
   const [addError, setAddError] = useState("");
   const [toast, setToast] = useState("");
 
@@ -337,12 +338,39 @@ export function StaffList({ staff: initialStaff, allDisciplines, tenantId, isSup
               <input className="h-9 rounded-md border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:outline-none" placeholder="Last Name *" value={addForm.lastName} onChange={e => setAddForm(f => ({ ...f, lastName: e.target.value }))} />
             </div>
             <input className="w-full h-9 rounded-md border border-silver bg-white px-3 text-sm text-charcoal focus:border-lavender focus:outline-none" placeholder="Email *" type="email" value={addForm.email} onChange={e => setAddForm(f => ({ ...f, email: e.target.value }))} />
-            <SimpleSelect value={addForm.role} onValueChange={v => setAddForm(f => ({ ...f, role: v }))} options={[{ value: "teacher", label: "Teacher" }, { value: "admin", label: "Admin" }, { value: "super_admin", label: "Studio Owner" }]} placeholder="Role" />
+            {/* Roles are multi-select: profile_roles carries one row per role
+                and a staff member routinely holds several (Cara is admin and
+                teacher). Chips rather than a dropdown — the same toggle idiom
+                used for levels and disciplines elsewhere in the admin. */}
+            <div className="space-y-1.5">
+              <span className="text-xs text-slate">Roles * <span className="text-mist">(select all that apply)</span></span>
+              <div className="flex flex-wrap gap-1.5">
+                {STAFF_ROLE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setAddForm(f => ({
+                      ...f,
+                      roles: f.roles.includes(opt.value)
+                        ? f.roles.filter(r => r !== opt.value)
+                        : [...f.roles, opt.value],
+                    }))}
+                    className={`rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
+                      addForm.roles.includes(opt.value)
+                        ? "bg-lavender text-white border-lavender"
+                        : "bg-white text-slate border-silver hover:border-lavender"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
             {/* Employment type is a tax classification stored on the teachers
                 row, which is only created for teaching staff — so it is only
-                offered when the selected role is teacher. Optional: left blank,
-                they show as Unclassified in payroll until it is set. */}
-            {addForm.role === "teacher" && (
+                offered when teacher is among the selected roles. Optional: left
+                blank, they show as Unclassified in payroll until it is set. */}
+            {addForm.roles.includes("teacher") && (
               <div className="space-y-1">
                 <SimpleSelect value={addForm.employmentType} onValueChange={v => setAddForm(f => ({ ...f, employmentType: v }))} options={EMPLOYMENT_TYPE_OPTIONS} placeholder="Employment Type (optional)" />
                 <p className="text-xs text-mist">How they are paid. Can be set later from their staff profile.</p>
@@ -355,14 +383,16 @@ export function StaffList({ staff: initialStaff, allDisciplines, tenantId, isSup
             {addError && <p className="text-xs text-error">{addError}</p>}
             <div className="flex gap-3">
               <button
-                disabled={isPending || !addForm.firstName.trim() || !addForm.email.trim()}
+                disabled={isPending || !addForm.firstName.trim() || !addForm.email.trim() || addForm.roles.length === 0}
                 onClick={() => {
                   setAddError("");
                   const fd = new FormData();
                   fd.set("firstName", addForm.firstName);
                   fd.set("lastName", addForm.lastName);
                   fd.set("email", addForm.email);
-                  fd.set("role", addForm.role);
+                  // One "roles" entry per selection — the action reads them
+                  // with formData.getAll("roles").
+                  for (const r of addForm.roles) fd.append("roles", r);
                   fd.set("employmentType", addForm.employmentType);
                   fd.set("sendWelcome", String(addForm.sendWelcome));
                   fd.set("tenantId", tenantId);
@@ -376,7 +406,7 @@ export function StaffList({ staff: initialStaff, allDisciplines, tenantId, isSup
                       return;
                     }
                     setShowAddModal(false);
-                    setAddForm({ firstName: "", lastName: "", email: "", role: "teacher", employmentType: "", sendWelcome: true });
+                    setAddForm({ firstName: "", lastName: "", email: "", roles: ["teacher"], employmentType: "", sendWelcome: true });
                     setToast(`${addForm.firstName} has been added to your team`);
                     setTimeout(() => setToast(""), 3000);
                     router.refresh();
