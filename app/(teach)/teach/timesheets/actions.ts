@@ -1,10 +1,9 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { tenantPayPeriod } from "@/lib/dates";
 import { getTenantTimezone } from "@/lib/tenant/timezone";
 import {
-  payPeriodDeadline,
+  getOrCreateTimesheet,
   periodLockMessage,
   resolvePeriodLock,
 } from "@/lib/timesheets/helpers";
@@ -47,80 +46,6 @@ const entrySchema = z.object({
   endTime: z.string().optional(),
   classId: z.string().uuid().optional(),
 });
-
-/** Get or create a draft timesheet for this teacher / current pay period */
-async function getOrCreateTimesheet(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  teacherProfileId: string,
-  tenantId: string
-) {
-  // Pay period resolved in the TENANT's zone, not the runtime's. On a UTC
-  // runtime, after 5pm Pacific on the last day of a month, `now.getMonth()`
-  // returns the next month and the entry is filed to the wrong pay period.
-  const timeZone = await getTenantTimezone(supabase, tenantId);
-  const { month, year } = tenantPayPeriod(timeZone);
-
-  // Find or create pay period for this tenant + month
-  let { data: payPeriod } = await supabase
-    .from("pay_periods")
-    .select("id")
-    .eq("tenant_id", tenantId)
-    .eq("period_month", month)
-    .eq("period_year", year)
-    .maybeSingle();
-
-  if (!payPeriod) {
-    const { data: created, error } = await supabase
-      .from("pay_periods")
-      .insert({
-        tenant_id: tenantId,
-        period_month: month,
-        period_year: year,
-        submission_deadline: payPeriodDeadline(year, month),
-        status: "open",
-      })
-      .select("id")
-      .single();
-
-    if (error) {
-      console.error("[timesheets:createPayPeriod]", error);
-      return null;
-    }
-    payPeriod = created;
-  }
-
-  if (!payPeriod) return null;
-
-  // Look for existing timesheet for this teacher + pay period (any status)
-  const { data: existing } = await supabase
-    .from("timesheets")
-    .select("id, status")
-    .eq("tenant_id", tenantId)
-    .eq("teacher_id", teacherProfileId)
-    .eq("pay_period_id", payPeriod.id)
-    .maybeSingle();
-
-  if (existing) return existing;
-
-  // Create new draft timesheet
-  const { data: newTs, error: tsError } = await supabase
-    .from("timesheets")
-    .insert({
-      tenant_id: tenantId,
-      teacher_id: teacherProfileId,
-      pay_period_id: payPeriod.id,
-      status: "draft",
-    })
-    .select("id, status")
-    .single();
-
-  if (tsError) {
-    console.error("[timesheets:createTimesheet]", tsError);
-    return null;
-  }
-
-  return newTs;
-}
 
 async function getTeacherContext(supabase: Awaited<ReturnType<typeof createClient>>) {
   const {
@@ -194,8 +119,15 @@ export async function addTimesheetEntry(formData: FormData) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  const timesheet = await getOrCreateTimesheet(supabase, tp.id, tp.tenant_id);
-  if (!timesheet) return { error: "Could not create timesheet." };
+  // The entry's own date decides the period, not today — an August 31 class
+  // entered on September 2 belongs to August.
+  const timesheet = await getOrCreateTimesheet(
+    supabase,
+    tp.id,
+    tp.tenant_id,
+    parsed.data.date
+  );
+  if ("error" in timesheet) return { error: timesheet.error };
   if (timesheet.status !== "draft") {
     return { error: "Timesheet already submitted — cannot add entries." };
   }

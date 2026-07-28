@@ -41,9 +41,17 @@ export default async function TimesheetSummaryPage() {
     );
   }
 
-  // Resolve the current pay period exactly as /teach/timesheets and
-  // getOrCreateTimesheet do (tenant + month + year, in the TENANT's zone), so
-  // both pages always resolve the same timesheet and cannot drift apart.
+  // Resolve the CURRENT pay period exactly as /teach/timesheets does (tenant +
+  // month + year, in the TENANT's zone), so both pages always resolve the same
+  // timesheet and cannot drift apart.
+  //
+  // getOrCreateTimesheet no longer matches this: it resolves from the ENTRY's
+  // work date, so an entry dated last month is filed to last month's timesheet
+  // and will not appear here. That is intended — this page is "the current
+  // period", not "everything just entered". Backdated hours are visible on the
+  // admin timesheet views and on the payroll report for the period they belong
+  // to. If teachers need to see their own prior periods, that is a period
+  // picker on these pages, not a change to how entries are filed.
   const currentPeriod = tenantPayPeriod(user.timezone);
   const { data: payPeriod } = user.tenantId
     ? await supabase

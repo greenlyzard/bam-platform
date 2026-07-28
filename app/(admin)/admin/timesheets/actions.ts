@@ -1,9 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { tenantPayPeriod } from "@/lib/dates";
-import { getTenantTimezone } from "@/lib/tenant/timezone";
-import { payPeriodDeadline } from "@/lib/timesheets/helpers";
+import { getOrCreateTimesheet } from "@/lib/timesheets/helpers";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -631,89 +629,6 @@ const adminEntrySchema = z.object({
   scheduleInstanceId: z.string().uuid().optional(),
 });
 
-async function getOrCreateTimesheetForTeacher(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  teacherProfileId: string,
-  tenantId: string
-): Promise<{ id: string; status: string } | { error: string }> {
-  // Pay period resolved in the TENANT's zone, not the runtime's. On a UTC
-  // runtime, after 5pm Pacific on the last day of a month, `now.getMonth()`
-  // returns the next month and the entry is filed to the wrong pay period.
-  const timeZone = await getTenantTimezone(supabase, tenantId);
-  const { month, year } = tenantPayPeriod(timeZone);
-
-  // Find or create pay period for this tenant + month
-  let { data: payPeriod, error: ppFetchErr } = await supabase
-    .from("pay_periods")
-    .select("id")
-    .eq("tenant_id", tenantId)
-    .eq("period_month", month)
-    .eq("period_year", year)
-    .maybeSingle();
-
-  if (ppFetchErr) {
-    console.error("[admin:getOrCreateTimesheet] pay_period fetch error:", ppFetchErr);
-    return { error: `Pay period lookup failed: ${ppFetchErr.message}` };
-  }
-
-  if (!payPeriod) {
-    const { data: created, error: ppErr } = await supabase
-      .from("pay_periods")
-      .insert({
-        tenant_id: tenantId,
-        period_month: month,
-        period_year: year,
-        submission_deadline: payPeriodDeadline(year, month),
-        status: "open",
-      })
-      .select("id")
-      .single();
-
-    if (ppErr) {
-      console.error("[admin:getOrCreateTimesheet] pay_period insert error:", ppErr);
-      return { error: `Could not create pay period: ${ppErr.message}` };
-    }
-    payPeriod = created;
-  }
-
-  if (!payPeriod) return { error: "Pay period could not be resolved." };
-
-  // Look for any existing timesheet for this teacher + pay period (any status)
-  const { data: existing, error: tsFetchErr } = await supabase
-    .from("timesheets")
-    .select("id, status")
-    .eq("tenant_id", tenantId)
-    .eq("teacher_id", teacherProfileId)
-    .eq("pay_period_id", payPeriod.id)
-    .maybeSingle();
-
-  if (tsFetchErr) {
-    console.error("[admin:getOrCreateTimesheet] timesheet fetch error:", tsFetchErr);
-    return { error: `Timesheet lookup failed: ${tsFetchErr.message}` };
-  }
-
-  if (existing) return existing;
-
-  // Create a new draft timesheet
-  const { data: newTs, error: tsErr } = await supabase
-    .from("timesheets")
-    .insert({
-      tenant_id: tenantId,
-      teacher_id: teacherProfileId,
-      pay_period_id: payPeriod.id,
-      status: "draft",
-    })
-    .select("id, status")
-    .single();
-
-  if (tsErr) {
-    console.error("[admin:getOrCreateTimesheet] timesheet insert error:", tsErr);
-    return { error: `Could not create timesheet: ${tsErr.message}` };
-  }
-
-  return newTs ?? { error: "Timesheet creation returned no data." };
-}
-
 export async function adminAddEntry(formData: FormData) {
   const { supabase, user, profile, isAdmin, teacherProfileId, error: authError } = await requireAuth();
   if (authError || !user) return { error: authError ?? "Unauthorized" };
@@ -769,7 +684,10 @@ export async function adminAddEntry(formData: FormData) {
   const tenantId = teacherRoles?.[0]?.tenant_id;
   if (!tenantId) return { error: "Teacher has no active tenant role." };
 
-  const timesheetResult = await getOrCreateTimesheetForTeacher(supabase, tp.id, tenantId);
+  // The entry's own date decides the period, not today. This path matters most
+  // for it: an admin filing hours on a teacher's behalf is usually doing so
+  // after the fact, often for the month that just ended.
+  const timesheetResult = await getOrCreateTimesheet(supabase, tp.id, tenantId, d.date);
   if ("error" in timesheetResult) return { error: timesheetResult.error };
   const timesheet = timesheetResult;
 

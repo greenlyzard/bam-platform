@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
 import { tenantPayPeriod, tenantToday } from "@/lib/dates";
-import { getTenantTimezone } from "@/lib/tenant/timezone";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -14,6 +13,65 @@ type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
  */
 export function payPeriodDeadline(year: number, month: number): string {
   return `${year}-${String(month).padStart(2, "0")}-26`;
+}
+
+/**
+ * The teacher edit cutoff for a pay period: the 3rd of the FOLLOWING month.
+ *
+ * TODO(tenant-config): this constant belongs on the tenant, not in code. The
+ * "3rd of the following month" rule is Ballet Academy and Movement's, taken
+ * from the seeded 2026/27 season (supabase/migrations/20260728000004). A
+ * white-label studio on a different cadence needs its own value, so this should
+ * become a `tenants` column (e.g. `teacher_edit_cutoff_day` + a month offset)
+ * read here instead of a literal. Until then every auto-created period inherits
+ * BAM's calendar.
+ *
+ * Why this must be set at all: a period row inserted with a null cutoff falls
+ * back to `submission_deadline` in computePeriodLock — the lock-after-the-26th
+ * behaviour that 1da6896 exists to undo. Leaving it null silently reinstates
+ * the old bug for any tenant whose periods are auto-created rather than seeded.
+ *
+ * Same string-arithmetic discipline as payPeriodDeadline: December rolls to
+ * January of the next year by integer math, with no Date in the path.
+ */
+export function payPeriodEditCutoff(year: number, month: number): string {
+  const cutoffYear = month === 12 ? year + 1 : year;
+  const cutoffMonth = month === 12 ? 1 : month + 1;
+  return `${cutoffYear}-${String(cutoffMonth).padStart(2, "0")}-03`;
+}
+
+/**
+ * The pay period a `YYYY-MM-DD` work date belongs to.
+ *
+ * NOT the period "now" falls in. An attendance record for August 31 entered on
+ * September 2 belongs to the AUGUST period — the hours were worked in August
+ * and are paid on August's run. Resolving from today would file them to
+ * September, where the teacher's August timesheet will never show them.
+ *
+ * Takes no timezone, deliberately. `date` on `timesheet_entries` is a Postgres
+ * `date` — a calendar day with no instant and no zone attached. It was already
+ * resolved in the tenant's zone at the point it was captured (client-side
+ * defaults via toLocalDateStr, or typed by the teacher). Converting it through
+ * a Date here to "apply" a zone would shift it by a day, which is exactly the
+ * failure docs/TENANT_TIMEZONE_SPEC.md catalogues. Pure string parsing is the
+ * correct operation, not a shortcut around one.
+ *
+ * Returns null on anything that is not a well-formed `YYYY-MM-DD` with a real
+ * month, so a malformed date surfaces as a refused write rather than a row
+ * filed to year 0.
+ */
+export function payPeriodForDate(
+  ymd: string
+): { month: number; year: number } | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+
+  return { month, year };
 }
 
 /**
@@ -178,52 +236,122 @@ export function periodLockMessage(lock: PeriodLockState): string {
   return "This pay period is closed to edits.";
 }
 
-/** Get or create a draft timesheet for a teacher in the current pay period */
+/**
+ * A resolved timesheet, or the reason it could not be resolved.
+ *
+ * Discriminated rather than `Timesheet | null` because every failure here is
+ * something the teacher can act on or report — a bad work date, a pay period
+ * that could not be created, an RLS refusal. The previous null return collapsed
+ * all of them into "Could not create timesheet." at the call site with the real
+ * Postgres error only in the server log.
+ */
+export type TimesheetForPeriod =
+  | { id: string; status: string }
+  | { error: string };
+
+/**
+ * Get or create the draft timesheet a work date's hours belong on.
+ *
+ * THE ONE implementation. Three used to exist — this one, a copy in
+ * app/(teach)/teach/timesheets/actions.ts, and a third in
+ * app/(admin)/admin/timesheets/actions.ts — and they did not agree.
+ *
+ * The dangerous divergence was this function's own previous body: it looked up
+ * a timesheet by `status in ('draft','rejected')` ordered by `created_at`, with
+ * NO pay-period scope. So the attendance path attached new hours to whatever
+ * draft the teacher last happened to have — for a teacher carrying an unfiled
+ * March draft, an August class landed in March. Nothing surfaced the mistake:
+ * /teach/timesheets scopes its query by `pay_period_id`, so those hours simply
+ * were not on the page, in any period. That path is how most hours get logged
+ * once the season starts.
+ *
+ * Two rules this now holds to:
+ *
+ *  1. Scope by pay period. `timesheets` is UNIQUE (tenant_id, teacher_id,
+ *     pay_period_id), so tenant + teacher + period identifies exactly one row.
+ *     Status is not a lookup key — an approved timesheet for August must not
+ *     cause a second August timesheet, and a stale March draft must not absorb
+ *     August's hours. The caller decides what to do about a non-draft status;
+ *     that decision does not belong in the lookup.
+ *
+ *  2. Derive the period from `workDate`, never from today. See payPeriodForDate.
+ *
+ * Does NOT check the period lock — callers do, before they get here, so the
+ * refusal message can name the date being enforced. Does NOT resolve or write
+ * rates: a BEFORE INSERT/UPDATE trigger (trg_snapshot_timesheet_entry_rate)
+ * snapshots amount_cents from the entry's own `date`.
+ *
+ * @param workDate the entry's `YYYY-MM-DD` work date — NOT today
+ */
 export async function getOrCreateTimesheet(
   supabase: SupabaseClient,
   teacherProfileId: string,
-  tenantId: string
-) {
-  const { data: existing } = await supabase
-    .from("timesheets")
-    .select("id, status")
-    .eq("teacher_id", teacherProfileId)
-    .in("status", ["draft", "rejected"])
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  tenantId: string,
+  workDate: string
+): Promise<TimesheetForPeriod> {
+  const period = payPeriodForDate(workDate);
+  if (!period) {
+    console.error("[timesheets:getOrCreateTimesheet] bad work date:", workDate);
+    return { error: "That date is not a valid calendar date." };
+  }
+  const { month, year } = period;
 
-  if (existing) return existing;
-
-  // Pay period resolved in the TENANT's zone, not the runtime's. On a UTC
-  // runtime, after 5pm Pacific on the last day of a month, `now.getMonth()`
-  // returns the next month and the entry is filed to the wrong pay period.
-  const timeZone = await getTenantTimezone(supabase, tenantId);
-  const { month, year } = tenantPayPeriod(timeZone);
-
-  let { data: payPeriod } = await supabase
+  // Tenant-scoped. The unique key on pay_periods is
+  // (tenant_id, period_month, period_year) — without the tenant filter this
+  // .maybeSingle() starts erroring the moment a second tenant exists, and would
+  // hand back another studio's period before that.
+  const { data: fetched, error: ppFetchErr } = await supabase
     .from("pay_periods")
     .select("id")
+    .eq("tenant_id", tenantId)
     .eq("period_month", month)
     .eq("period_year", year)
     .maybeSingle();
 
+  if (ppFetchErr) {
+    console.error("[timesheets:payPeriodFetch]", ppFetchErr);
+    return { error: `Pay period lookup failed: ${ppFetchErr.message}` };
+  }
+
+  let payPeriod = fetched;
+
   if (!payPeriod) {
-    const { data: created } = await supabase
+    const { data: created, error: ppErr } = await supabase
       .from("pay_periods")
       .insert({
         tenant_id: tenantId,
         period_month: month,
         period_year: year,
         submission_deadline: payPeriodDeadline(year, month),
+        teacher_edit_cutoff: payPeriodEditCutoff(year, month),
         status: "open",
       })
       .select("id")
       .single();
+
+    if (ppErr) {
+      console.error("[timesheets:createPayPeriod]", ppErr);
+      return { error: `Could not create pay period: ${ppErr.message}` };
+    }
     payPeriod = created;
   }
 
-  if (!payPeriod) return null;
+  if (!payPeriod) return { error: "Pay period could not be resolved." };
+
+  const { data: existing, error: tsFetchErr } = await supabase
+    .from("timesheets")
+    .select("id, status")
+    .eq("tenant_id", tenantId)
+    .eq("teacher_id", teacherProfileId)
+    .eq("pay_period_id", payPeriod.id)
+    .maybeSingle();
+
+  if (tsFetchErr) {
+    console.error("[timesheets:timesheetFetch]", tsFetchErr);
+    return { error: `Timesheet lookup failed: ${tsFetchErr.message}` };
+  }
+
+  if (existing) return existing;
 
   const { data: newTs, error: tsError } = await supabase
     .from("timesheets")
@@ -238,10 +366,10 @@ export async function getOrCreateTimesheet(
 
   if (tsError) {
     console.error("[timesheets:createTimesheet]", tsError);
-    return null;
+    return { error: `Could not create timesheet: ${tsError.message}` };
   }
 
-  return newTs;
+  return newTs ?? { error: "Timesheet creation returned no data." };
 }
 
 /** Get the teacher context (profile id + tenant) for the current authenticated user */

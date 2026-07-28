@@ -168,8 +168,16 @@ export async function logHoursFromAttendance(data: {
     return { error: "Hours already logged for this class on this date." };
   }
 
-  const timesheet = await getOrCreateTimesheet(supabase, tp.id, tp.tenant_id);
-  if (!timesheet) return { error: "Could not find or create timesheet." };
+  // The CLASS's date decides the period, not today. Attendance is routinely
+  // marked a day or two after the fact, and a class taught on the last day of a
+  // month must be paid on that month's run.
+  const timesheet = await getOrCreateTimesheet(
+    supabase,
+    tp.id,
+    tp.tenant_id,
+    data.date
+  );
+  if ("error" in timesheet) return { error: timesheet.error };
   if (timesheet.status !== "draft") {
     return { error: "Timesheet is already submitted. Add hours manually." };
   }

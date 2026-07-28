@@ -15,9 +15,10 @@ export default async function TimesheetsPage() {
     year: "numeric",
   });
 
-  // Pay period resolved in the tenant's zone, matching the server actions
-  // exactly. If these disagree with getOrCreateTimesheet the page reads one
-  // period while the add-entry action writes to another.
+  // Pay period resolved in the tenant's zone, matching the lock check in the
+  // server actions exactly. Note this is TODAY's period; getOrCreateTimesheet
+  // files an entry to the period of the entry's own work date, so a backdated
+  // entry deliberately lands on an earlier timesheet than the one shown here.
   const currentPeriod = tenantPayPeriod(user.timezone);
 
   // Get teacher_profile — VIEW uses `id` (= profiles.id), not `user_id`
@@ -40,9 +41,9 @@ export default async function TimesheetsPage() {
     name: p.name,
   }));
 
-  // Resolve the current pay period the same way getOrCreateTimesheet does
-  // (tenant + month + year) so the page and the add-entry action always agree.
-  // The deadline/cutoff columns come back on this same row — the lock decision
+  // Resolve the current pay period the same way resolvePeriodLock does (tenant
+  // + month + year) so the page and the actions' lock check always agree. The
+  // deadline/cutoff columns come back on this same row — the lock decision
   // reuses it rather than issuing a second identical query.
   const { data: payPeriod } = user.tenantId
     ? await supabase
