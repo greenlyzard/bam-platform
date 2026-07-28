@@ -9566,6 +9566,80 @@ export type Database = {
           },
         ]
       }
+      teacher_rates: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          created_by: string | null
+          id: string
+          note: string | null
+          rate_key: string
+          rate_type: string
+          teacher_id: string
+          tenant_id: string
+          updated_at: string
+          valid_from: string
+          valid_to: string | null
+        }
+        Insert: {
+          amount_cents: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          rate_key: string
+          rate_type?: string
+          teacher_id: string
+          tenant_id: string
+          updated_at?: string
+          valid_from?: string
+          valid_to?: string | null
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          rate_key?: string
+          rate_type?: string
+          teacher_id?: string
+          tenant_id?: string
+          updated_at?: string
+          valid_from?: string
+          valid_to?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teacher_rates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "teacher_rates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "teacher_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "teacher_rates_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "teachers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "teacher_rates_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       teacher_specialties: {
         Row: {
           created_at: string
@@ -9711,9 +9785,11 @@ export type Database = {
           mandated_reporter_cert_expires_at: string | null
           private_rate_cents: number | null
           rehearsal_rate_cents: number | null
+          schedule_type: string | null
           specialties: string[] | null
           substitute_session_count: number | null
           substitute_session_threshold: number | null
+          tax_classification: string | null
           updated_at: string | null
           w9_on_file: boolean | null
         }
@@ -9737,9 +9813,11 @@ export type Database = {
           mandated_reporter_cert_expires_at?: string | null
           private_rate_cents?: number | null
           rehearsal_rate_cents?: number | null
+          schedule_type?: string | null
           specialties?: string[] | null
           substitute_session_count?: number | null
           substitute_session_threshold?: number | null
+          tax_classification?: string | null
           updated_at?: string | null
           w9_on_file?: boolean | null
         }
@@ -9763,9 +9841,11 @@ export type Database = {
           mandated_reporter_cert_expires_at?: string | null
           private_rate_cents?: number | null
           rehearsal_rate_cents?: number | null
+          schedule_type?: string | null
           specialties?: string[] | null
           substitute_session_count?: number | null
           substitute_session_threshold?: number | null
+          tax_classification?: string | null
           updated_at?: string | null
           w9_on_file?: boolean | null
         }
@@ -10520,6 +10600,9 @@ export type Database = {
     }
     Functions: {
       auth_family_ids: { Args: never; Returns: string[] }
+      can_manage_pay:
+        | { Args: never; Returns: boolean }
+        | { Args: { p_tenant_id: string }; Returns: boolean }
       get_or_create_dm_channel: {
         Args: { p_profile_a: string; p_profile_b: string; p_tenant_id: string }
         Returns: string
