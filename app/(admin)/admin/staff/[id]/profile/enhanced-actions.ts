@@ -1,10 +1,65 @@
 "use server";
 
 import { ADMIN_TIER_ROLES, requireAdmin } from "@/lib/auth/guards";
-import { isStaffRole, staffRoleLabel } from "@/lib/auth/staff-roles";
+import { isStaffRole, legacyProfileRole, staffRoleLabel } from "@/lib/auth/staff-roles";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
+
+/**
+ * LEGACY MIRROR. `profile_roles` is authoritative for authorization; this keeps
+ * the stale single-value `profiles.role` enum column in step, because roughly
+ * thirty API routes still read it. Without it, granting or removing a role here
+ * leaves the mirror pointing at whatever the person's role was years ago —
+ * which is how Cara ends up with profiles.role = 'parent' while holding admin.
+ *
+ * Reads the effective active set back rather than mirroring only the role that
+ * was just changed: both call sites are single-role edits against a person who
+ * commonly holds several, so the submitted role alone would demote them.
+ *
+ * Uses the admin client so neither the read-back nor the write can be silently
+ * narrowed by RLS on profiles — a partial read here would collapse the mirror
+ * to a lower role. Failure is non-fatal: profile_roles already governs access.
+ *
+ * `fallbackRoles` is used only if the read-back itself fails, and only where a
+ * safe floor is known (the grant path knows the roles it just wrote). Omit it
+ * on the removal path — there the remaining set is unknown, and guessing would
+ * write 'parent' over a Studio Owner on a transient read error. Skipping leaves
+ * the mirror stale, which is the same state it was in before this call.
+ */
+async function syncLegacyProfileRole(profileId: string, fallbackRoles?: string[]) {
+  const admin = createAdminClient();
+
+  const { data: activeRoles, error: readbackErr } = await admin
+    .from("profile_roles")
+    .select("role")
+    .eq("user_id", profileId)
+    .eq("is_active", true);
+
+  if (readbackErr) {
+    console.error(
+      "[syncLegacyProfileRole] role read-back failed:",
+      readbackErr.message
+    );
+    if (!fallbackRoles) return;
+  }
+
+  const effectiveRoles = readbackErr
+    ? fallbackRoles!
+    : (activeRoles ?? []).map((r) => r.role);
+
+  const { error: mirrorErr } = await admin
+    .from("profiles")
+    .update({ role: legacyProfileRole(effectiveRoles) })
+    .eq("id", profileId);
+
+  if (mirrorErr) {
+    console.error(
+      "[syncLegacyProfileRole] legacy profiles.role mirror failed:",
+      mirrorErr.message
+    );
+  }
+}
 
 // ---------------------------------------------------------------------------
 // 1. Update enhanced bio fields on profiles
@@ -495,6 +550,11 @@ export async function addStaffRole(formData: FormData) {
     { onConflict: "user_id,tenant_id,role" }
   );
   if (error) return { error: error.message };
+
+  // The roles just granted are a safe floor if the read-back fails — the upsert
+  // above has already committed them.
+  await syncLegacyProfileRole(profileId, roles);
+
   revalidatePath("/admin/staff");
   return {};
 }
@@ -557,6 +617,13 @@ export async function removeStaffRole(formData: FormData) {
 
   const { error } = await supabase.from("profile_roles").delete().eq("user_id", profileId).eq("role", role);
   if (error) return { error: error.message };
+
+  // No fallback set — see syncLegacyProfileRole. If every active role is now
+  // gone, legacyProfileRole([]) collapses to 'parent', which is the correct
+  // floor: it is the least-privileged label the user_role enum offers, and the
+  // person keeps no admin or teaching access from profile_roles either way.
+  await syncLegacyProfileRole(profileId);
+
   revalidatePath("/admin/staff");
   return {};
 }
