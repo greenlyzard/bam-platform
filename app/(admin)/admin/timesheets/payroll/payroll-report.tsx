@@ -42,21 +42,27 @@ interface TeacherPayroll {
   email: string;
   employmentType: string;
   payrollClass: PayrollClass;
-  rates: { class: number; private: number; rehearsal: number; admin: number } | null;
   hours: {
     class: number;
     private: number;
     rehearsal: number;
     admin: number;
     other: number;
+    /** Excludes flat-rate hours. */
     total: number;
   };
-  totalOwed: number;
+  /** Sum of stored amount_cents. Integer cents until the moment of display. */
+  totalOwedCents: number;
+  unpriced: { count: number; hours: number };
+  flat: { count: number; hours: number };
   entries: {
     id: string;
     date: string;
     entry_type: string;
     total_hours: number;
+    /** NULL means UNPRICED — no rate was in effect. Never rendered as $0.00. */
+    amount_cents: number | null;
+    rate_type: string | null;
     description: string | null;
     sub_for: string | null;
     production_id: string | null;
@@ -65,7 +71,7 @@ interface TeacherPayroll {
     notes: string | null;
     timesheet_status: string;
   }[];
-  hasMissingRates: boolean;
+  hasUnpricedEntries: boolean;
 }
 
 interface PayrollReportProps {
@@ -75,12 +81,21 @@ interface PayrollReportProps {
   contractorTeachers: TeacherPayroll[];
   ownerTeachers: TeacherPayroll[];
   unclassifiedTeachers: TeacherPayroll[];
-  totalW2Owed: number;
-  total1099Owed: number;
-  totalOwnerDraw: number;
-  totalUnclassifiedOwed: number;
+  totalW2OwedCents: number;
+  total1099OwedCents: number;
+  totalOwnerDrawCents: number;
+  totalUnclassifiedOwedCents: number;
   totalHours: number;
-  missingRatesCount: number;
+  unpricedEntryCount: number;
+  unpricedHours: number;
+  unpricedTeacherCount: number;
+  flatEntryCount: number;
+  flatHours: number;
+  fetchedRowCount: number;
+  truncated: boolean;
+  entryFetchError: string | null;
+  rateLookupError: string | null;
+  unattributedEntryCount: number;
   teacherList: { id: string; name: string }[];
   productions: { id: string; name: string }[];
   filterTeacher: string;
@@ -110,8 +125,13 @@ const STATUS_BORDER: Record<string, string> = {
   exported: "border-l-4 border-l-success",
 };
 
-function formatCurrency(n: number): string {
-  return n.toLocaleString("en-US", {
+/**
+ * Cents are summed as integers all the way through and divided exactly once,
+ * here. Converting each entry to dollars before summing reintroduces the
+ * float drift that integer cents exist to avoid.
+ */
+function formatCents(cents: number): string {
+  return (cents / 100).toLocaleString("en-US", {
     style: "currency",
     currency: "USD",
     minimumFractionDigits: 2,
@@ -133,12 +153,21 @@ export function PayrollReport({
   contractorTeachers,
   ownerTeachers,
   unclassifiedTeachers,
-  totalW2Owed,
-  total1099Owed,
-  totalOwnerDraw,
-  totalUnclassifiedOwed,
+  totalW2OwedCents,
+  total1099OwedCents,
+  totalOwnerDrawCents,
+  totalUnclassifiedOwedCents,
   totalHours,
-  missingRatesCount,
+  unpricedEntryCount,
+  unpricedHours,
+  unpricedTeacherCount,
+  flatEntryCount,
+  flatHours,
+  fetchedRowCount,
+  truncated,
+  entryFetchError,
+  rateLookupError,
+  unattributedEntryCount,
   teacherList,
   productions,
   filterTeacher,
@@ -155,7 +184,8 @@ export function PayrollReport({
   const totalTeachers = allTeachers.filter((t) => t.entries.length > 0).length;
   // Owner draws are equity, not payroll expense — deliberately excluded from
   // the combined payroll total and reported on their own line instead.
-  const combinedOwed = totalW2Owed + total1099Owed + totalUnclassifiedOwed;
+  const combinedOwedCents =
+    totalW2OwedCents + total1099OwedCents + totalUnclassifiedOwedCents;
   const activeOwners = ownerTeachers.filter((t) => t.entries.length > 0).length;
   const activeUnclassified = unclassifiedTeachers.filter(
     (t) => t.entries.length > 0
@@ -176,7 +206,9 @@ export function PayrollReport({
         ? `"${v.replace(/"/g, '""')}"`
         : v;
 
-    // Summary sheet
+    // Summary sheet. Rate columns are gone — a rate is a property of an entry
+    // at the moment it was worked, not of a teacher, so there is no single
+    // per-teacher rate to export. Amounts are the stored snapshots.
     const summaryHeaders = [
       "Teacher",
       "Email",
@@ -187,10 +219,10 @@ export function PayrollReport({
       "Admin Hours",
       "Other Hours",
       "Total Hours",
-      "Class Rate",
-      "Private Rate",
-      "Rehearsal Rate",
-      "Admin Rate",
+      "Flat-Rate Entries",
+      "Flat-Rate Hours (excl. from hours)",
+      "Unpriced Entries",
+      "Unpriced Hours",
       "Total Owed",
     ];
 
@@ -206,11 +238,11 @@ export function PayrollReport({
         t.hours.admin.toFixed(2),
         t.hours.other.toFixed(2),
         t.hours.total.toFixed(2),
-        t.rates?.class.toFixed(2) ?? "",
-        t.rates?.private.toFixed(2) ?? "",
-        t.rates?.rehearsal.toFixed(2) ?? "",
-        t.rates?.admin.toFixed(2) ?? "",
-        t.totalOwed.toFixed(2),
+        String(t.flat.count),
+        t.flat.hours.toFixed(2),
+        String(t.unpriced.count),
+        t.unpriced.hours.toFixed(2),
+        (t.totalOwedCents / 100).toFixed(2),
       ]);
 
     // Detail sheet
@@ -220,6 +252,8 @@ export function PayrollReport({
       "Date",
       "Category",
       "Hours",
+      "Rate Type",
+      "Amount",
       "Description",
       "Sub For",
       "Production",
@@ -235,6 +269,11 @@ export function PayrollReport({
         e.date,
         ENTRY_TYPE_LABELS[e.entry_type] ?? e.entry_type,
         e.total_hours.toFixed(2),
+        e.rate_type ?? "",
+        // A word, not "0.00" — an unpriced entry has no amount, and a zero here
+        // would be summed silently by whoever opens the spreadsheet. A
+        // non-numeric cell forces them to look at it.
+        e.amount_cents === null ? "UNPRICED" : (e.amount_cents / 100).toFixed(2),
         escape(e.description ?? ""),
         escape(e.sub_for ?? ""),
         escape(e.production_name ?? ""),
@@ -304,17 +343,63 @@ export function PayrollReport({
         </div>
       </div>
 
-      {/* Missing Rates Warning */}
-      {missingRatesCount > 0 && (
+      {/* Fetch integrity warnings. These come first: if the underlying read was
+          incomplete, every figure below is understated and that matters more
+          than any of them. */}
+      {entryFetchError && (
+        <div className="rounded-lg bg-error/10 border border-error/20 px-4 py-3 text-sm text-error">
+          ⚠️ Entry fetch failed after {fetchedRowCount.toLocaleString()} row
+          {fetchedRowCount !== 1 ? "s" : ""} ({entryFetchError}). The totals
+          below are incomplete — do not run payroll from this report.
+        </div>
+      )}
+
+      {truncated && (
+        <div className="rounded-lg bg-error/10 border border-error/20 px-4 py-3 text-sm text-error">
+          ⚠️ This range exceeds the {fetchedRowCount.toLocaleString()}-row fetch
+          limit and was truncated. Narrow the date range — the totals below are
+          understated.
+        </div>
+      )}
+
+      {rateLookupError && (
         <div className="rounded-lg bg-warning/10 border border-warning/20 px-4 py-3 text-sm text-warning">
-          ⚠️ {missingRatesCount} teacher{missingRatesCount !== 1 ? "s have" : " has"} no pay rates configured. Set rates in{" "}
+          ⚠️ Rate types could not be loaded ({rateLookupError}). Dollar totals
+          are still correct, but flat-rate hours may be counted in the hours
+          columns.
+        </div>
+      )}
+
+      {unattributedEntryCount > 0 && (
+        <div className="rounded-lg bg-warning/10 border border-warning/20 px-4 py-3 text-sm text-warning">
+          ⚠️ {unattributedEntryCount.toLocaleString()} entr
+          {unattributedEntryCount !== 1 ? "ies" : "y"} in this range belong to a
+          teacher who is not active on the staff roster, so they appear in no
+          section and in no total below.
+        </div>
+      )}
+
+      {/* Unpriced Entries Warning. Replaces the old "no pay rates configured"
+          check, which tested the four legacy teachers.*_rate_cents columns —
+          all NULL, so it fired for everyone regardless of the actual data.
+          The question that matters is whether any entry in range went unpriced
+          at the time it was worked. */}
+      {unpricedEntryCount > 0 && (
+        <div className="rounded-lg bg-warning/10 border border-warning/20 px-4 py-3 text-sm text-warning">
+          ⚠️ {unpricedEntryCount.toLocaleString()} entr
+          {unpricedEntryCount !== 1 ? "ies" : "y"} ({unpricedHours.toFixed(1)}{" "}
+          hours) across {unpricedTeacherCount} teacher
+          {unpricedTeacherCount !== 1 ? "s" : ""} had no rate in effect on the
+          date worked, so they carry no amount. Their hours are included below;
+          their pay is <strong>not</strong> in any dollar total. Add the missing
+          rates in{" "}
           <Link
             href="/admin/settings/pay-rates"
             className="underline font-medium"
           >
             Settings → Pay Rates
           </Link>{" "}
-          before running payroll.
+          and re-save the affected entries to price them.
         </div>
       )}
 
@@ -451,7 +536,7 @@ export function PayrollReport({
         <PayrollSection
           title="W-2 Employees"
           teachers={w2Teachers}
-          totalOwed={totalW2Owed}
+          totalOwedCents={totalW2OwedCents}
         />
       )}
 
@@ -460,7 +545,7 @@ export function PayrollReport({
         <PayrollSection
           title="1099 Contractors"
           teachers={contractorTeachers}
-          totalOwed={total1099Owed}
+          totalOwedCents={total1099OwedCents}
           note="1099 contractors are responsible for their own taxes. Payments over $600/year require a Form 1099-NEC."
         />
       )}
@@ -474,7 +559,7 @@ export function PayrollReport({
           <PayrollSection
             title="Owner Draws"
             teachers={ownerTeachers}
-            totalOwed={totalOwnerDraw}
+            totalOwedCents={totalOwnerDrawCents}
             note="Payments to an owner are equity distributions, not wages. They are not subject to payroll tax withholding and are not reported on a W-2 or 1099. Hours are logged for reconciliation against private billing; the value shown is not a payroll liability and is excluded from the combined payroll total."
           />
         )}
@@ -486,7 +571,7 @@ export function PayrollReport({
           <PayrollSection
             title="Unclassified"
             teachers={unclassifiedTeachers}
-            totalOwed={totalUnclassifiedOwed}
+            totalOwedCents={totalUnclassifiedOwedCents}
             note="These teachers have hours but no W-2/1099 classification on their staff record. Set their employment type before running payroll — their hours are counted in the totals below but cannot be filed correctly."
             warn
           />
@@ -505,31 +590,44 @@ export function PayrollReport({
           />
           <SummaryStat
             label="W-2 Owed"
-            value={formatCurrency(totalW2Owed)}
+            value={formatCents(totalW2OwedCents)}
           />
           <SummaryStat
             label="1099 Owed"
-            value={formatCurrency(total1099Owed)}
+            value={formatCents(total1099OwedCents)}
           />
           <SummaryStat
             label="Combined Total"
-            value={formatCurrency(combinedOwed)}
+            value={formatCents(combinedOwedCents)}
             highlight
           />
           {/* Reported outside Combined Total on purpose — equity, not payroll. */}
           {activeOwners > 0 && (
             <SummaryStat
               label="Owner Draws (equity)"
-              value={formatCurrency(totalOwnerDraw)}
+              value={formatCents(totalOwnerDrawCents)}
             />
           )}
-          {missingRatesCount > 0 && (
+          {/* Flat-rate hours are held out of Total Hours because a flat fee is
+              not earned per hour. Shown so the hours figure reconciles. */}
+          {flatEntryCount > 0 && (
             <SummaryStat
-              label="Missing Rates"
-              value={`${missingRatesCount} ⚠️`}
+              label="Flat-rate hrs (excl.)"
+              value={`${flatHours.toFixed(1)} (${flatEntryCount})`}
+            />
+          )}
+          {unpricedEntryCount > 0 && (
+            <SummaryStat
+              label="Unpriced (no amount)"
+              value={`${unpricedEntryCount} · ${unpricedHours.toFixed(1)} hrs ⚠️`}
               warning
             />
           )}
+          <SummaryStat
+            label="Entries read"
+            value={`${fetchedRowCount.toLocaleString()}${truncated ? " ⚠️" : ""}`}
+            warning={truncated}
+          />
         </div>
       </div>
     </div>
@@ -539,13 +637,13 @@ export function PayrollReport({
 function PayrollSection({
   title,
   teachers,
-  totalOwed,
+  totalOwedCents,
   note,
   warn,
 }: {
   title: string;
   teachers: TeacherPayroll[];
-  totalOwed: number;
+  totalOwedCents: number;
   note?: string;
   warn?: boolean;
 }) {
@@ -559,7 +657,7 @@ function PayrollSection({
         </h2>
         <div className="text-sm text-slate">
           {activeTeachers.length} teacher{activeTeachers.length !== 1 ? "s" : ""}{" "}
-          · {formatCurrency(totalOwed)}
+          · {formatCents(totalOwedCents)}
         </div>
       </div>
 
@@ -608,7 +706,7 @@ function PayrollSection({
                     Total hrs
                   </th>
                   <th className="px-4 py-3 text-left font-medium text-slate">
-                    Rate Info
+                    Unpriced
                   </th>
                   <th className="px-4 py-3 text-right font-medium text-slate">
                     Total Owed
@@ -630,21 +728,6 @@ function PayrollSection({
 
 function TeacherRow({ teacher }: { teacher: TeacherPayroll }) {
   const [expanded, setExpanded] = useState(false);
-
-  // A teacher row can exist with a rates object whose values are all zero (a
-  // `teachers` row with NULL rate columns). Joining those yields "", which is
-  // not nullish — so check length rather than relying on ?? to catch it.
-  const rateParts = teacher.rates
-    ? [
-        teacher.rates.class > 0 ? `Class $${teacher.rates.class}` : null,
-        teacher.rates.private > 0 ? `Private $${teacher.rates.private}` : null,
-        teacher.rates.rehearsal > 0
-          ? `Rehearsal $${teacher.rates.rehearsal}`
-          : null,
-        teacher.rates.admin > 0 ? `Admin $${teacher.rates.admin}` : null,
-      ].filter(Boolean)
-    : [];
-  const rateInfo = rateParts.length > 0 ? rateParts.join(" / ") : null;
 
   return (
     <>
@@ -678,19 +761,38 @@ function TeacherRow({ teacher }: { teacher: TeacherPayroll }) {
           {teacher.hours.other > 0 ? teacher.hours.other.toFixed(1) : "—"}
         </td>
         <td className="px-4 py-3 text-right font-semibold text-charcoal">
-          {teacher.hours.total.toFixed(1)}
+          <div className="flex flex-col items-end leading-tight">
+            <span>{teacher.hours.total.toFixed(1)}</span>
+            {/* Flat-rate hours are paid but not hourly, so they sit outside the
+                total. Named here so the row still reconciles by eye. */}
+            {teacher.flat.count > 0 && (
+              <span className="text-[10px] font-normal text-slate">
+                +{teacher.flat.hours.toFixed(1)} flat
+              </span>
+            )}
+          </div>
         </td>
-        <td className="px-4 py-3 text-xs text-slate max-w-[180px] truncate">
-          {rateInfo ?? <span className="text-warning">No rates set ⚠️</span>}
+        <td className="px-4 py-3 text-xs max-w-[180px]">
+          {teacher.unpriced.count > 0 ? (
+            <span className="text-warning">
+              ⚠️ {teacher.unpriced.count} entr
+              {teacher.unpriced.count !== 1 ? "ies" : "y"} ·{" "}
+              {teacher.unpriced.hours.toFixed(1)} hrs
+            </span>
+          ) : (
+            <span className="text-slate">—</span>
+          )}
         </td>
         {/* Always show a figure. A teacher who worked must never be rendered as
-            a blank or a dash — an incomplete row beats a silently missing one. */}
+            a blank or a dash — an incomplete row beats a silently missing one.
+            The figure is the sum of stored amounts; the note below it says so
+            when that sum is known to be short. */}
         <td className="px-4 py-3 text-right font-semibold text-charcoal">
           <div className="flex flex-col items-end leading-tight">
-            <span>{formatCurrency(teacher.totalOwed)}</span>
-            {teacher.hasMissingRates && (
+            <span>{formatCents(teacher.totalOwedCents)}</span>
+            {teacher.hasUnpricedEntries && (
               <span className="text-[10px] font-normal text-warning">
-                ⚠️ rates missing
+                ⚠️ excludes unpriced work
               </span>
             )}
           </div>
@@ -706,6 +808,7 @@ function TeacherRow({ teacher }: { teacher: TeacherPayroll }) {
                     <th className="pb-2 text-left font-medium">Date</th>
                     <th className="pb-2 text-left font-medium">Category</th>
                     <th className="pb-2 text-right font-medium">Hours</th>
+                    <th className="pb-2 text-right font-medium">Amount</th>
                     <th className="pb-2 text-left font-medium">
                       Class/Student
                     </th>
@@ -738,6 +841,24 @@ function TeacherRow({ teacher }: { teacher: TeacherPayroll }) {
                         </td>
                         <td className="py-1.5 pr-3 text-right text-charcoal font-medium">
                           {e.total_hours.toFixed(1)}
+                          {e.rate_type === "flat" && (
+                            <span className="ml-1 text-[9px] font-normal text-slate">
+                              flat
+                            </span>
+                          )}
+                        </td>
+                        {/* The stored snapshot, verbatim. NULL renders as an
+                            explicit "unpriced", never as $0.00 — a zero here
+                            would read as "worked for free" rather than "no rate
+                            was in effect". */}
+                        <td className="py-1.5 pr-3 text-right font-medium">
+                          {e.amount_cents === null ? (
+                            <span className="text-warning">unpriced ⚠️</span>
+                          ) : (
+                            <span className="text-charcoal">
+                              {formatCents(e.amount_cents)}
+                            </span>
+                          )}
                         </td>
                         <td className="py-1.5 pr-3 text-charcoal max-w-[120px] truncate">
                           {e.description ?? "—"}
