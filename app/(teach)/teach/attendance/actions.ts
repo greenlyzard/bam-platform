@@ -12,9 +12,22 @@ import {
   resolvePeriodLockForWorkDate,
 } from "@/lib/timesheets/helpers";
 
+/**
+ * Attendance is recorded against an OCCURRENCE (`schedule_instances.id`), not
+ * against (class, date).
+ *
+ * `class_id + event_date` does not identify an occurrence: a class that meets
+ * twice in one day is two distinct sessions with two distinct rosters. Keyed on
+ * class/date, saving the second roster deletes the first — silent data loss with
+ * no error and no trace. Rehearsal weeks produce exactly that shape.
+ *
+ * The occurrence id is therefore the ONLY key the caller supplies. `class_id`
+ * and `class_date` are still written (both are NOT NULL) but are derived from
+ * the occurrence rather than accepted from the client, so a row can never claim
+ * a date its occurrence does not have.
+ */
 const attendanceSchema = z.object({
-  classId: z.string().uuid(),
-  date: z.string().date(),
+  scheduleInstanceId: z.string().uuid(),
   records: z.array(
     z.object({
       studentId: z.string().uuid(),
@@ -39,8 +52,7 @@ export interface AttendanceResult {
 }
 
 export async function markAttendance(data: {
-  classId: string;
-  date: string;
+  scheduleInstanceId: string;
   records: { studentId: string; status: string }[];
 }): Promise<AttendanceResult> {
   const supabase = await createClient();
@@ -58,28 +70,60 @@ export async function markAttendance(data: {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  const { classId, date, records } = parsed.data;
+  const { scheduleInstanceId, records } = parsed.data;
 
-  // Verify this teacher owns the class and get class details
+  // Resolve the occurrence. RLS scopes this SELECT to instances the caller may
+  // see, so a teacher cannot name someone else's occurrence and have it resolve.
+  const { data: instance } = await supabase
+    .from("schedule_instances")
+    .select("id, class_id, event_date, event_type, status")
+    .eq("id", scheduleInstanceId)
+    .maybeSingle();
+
+  if (!instance) {
+    return { error: "That class occurrence was not found." };
+  }
+
+  const classId: string | null = instance.class_id;
+  if (instance.event_type !== "class" || !classId) {
+    return {
+      error: "Attendance can only be recorded against a class occurrence.",
+    };
+  }
+
+  if (instance.status === "cancelled") {
+    return { error: "This class was cancelled — attendance cannot be recorded." };
+  }
+
+  const date: string = instance.event_date;
+
+  // Verify this teacher owns the class and get class details. Deliberately the
+  // same rule as before this action moved to occurrence keying — ownership of
+  // the class the occurrence belongs to. Note this still excludes a substitute
+  // assigned via `schedule_instances.substitute_teacher_id`, who cannot mark
+  // attendance for a class they are covering. That gap predates this change and
+  // is left alone here rather than widened in passing.
   const { data: classData } = await supabase
     .from("classes")
     .select("id, name, start_time, end_time, teacher_id")
     .eq("id", classId)
     .eq("teacher_id", user.id)
-    .single();
+    .maybeSingle();
 
   if (!classData) {
     return { error: "You can only mark attendance for your own classes." };
   }
 
-  // Delete existing records for this class/date, then insert fresh
+  // Delete existing records for this OCCURRENCE, then insert fresh. Scoped to
+  // the occurrence, so a second session of the same class on the same day is
+  // untouched.
   await supabase
     .from("attendance")
     .delete()
-    .eq("class_id", classId)
-    .eq("class_date", date);
+    .eq("schedule_instance_id", scheduleInstanceId);
 
   const rows = records.map((r) => ({
+    schedule_instance_id: scheduleInstanceId,
     class_id: classId,
     student_id: r.studentId,
     class_date: date,

@@ -26,6 +26,15 @@ interface RosterStudent {
   } | null;
 }
 
+/** One occurrence of the selected class on the selected date. */
+interface Occurrence {
+  id: string;
+  event_date: string;
+  start_time: string;
+  end_time: string;
+  status: string;
+}
+
 type AttendanceStatus = "present" | "absent" | "excused" | "late";
 
 const statusStyles: Record<AttendanceStatus, string> = {
@@ -47,6 +56,10 @@ export function AttendanceMarker({ classes }: { classes: ClassOption[] }) {
   const router = useRouter();
   const [selectedClassId, setSelectedClassId] = useState("");
   const [date, setDate] = useState(toLocalDateStr());
+  // Attendance is saved against an occurrence, so this is the real key of the
+  // form — not the class and not the date.
+  const [occurrences, setOccurrences] = useState<Occurrence[]>([]);
+  const [selectedInstanceId, setSelectedInstanceId] = useState("");
   const [roster, setRoster] = useState<RosterStudent[]>([]);
   const [attendance, setAttendance] = useState<
     Record<string, AttendanceStatus>
@@ -72,15 +85,27 @@ export function AttendanceMarker({ classes }: { classes: ClassOption[] }) {
     }
   }, [classes]);
 
-  const loadRoster = useCallback(async (classId: string) => {
-    if (!classId) return;
+  const loadRoster = useCallback(async () => {
+    if (!selectedClassId) return;
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(
-        `/api/teach/roster?classId=${classId}&date=${date}`
-      );
+      const qs = new URLSearchParams({ classId: selectedClassId, date });
+      // Existing statuses come back only once an occurrence is chosen — they
+      // belong to that occurrence, not to the class-and-date pair.
+      if (selectedInstanceId) qs.set("instanceId", selectedInstanceId);
+      const res = await fetch(`/api/teach/roster?${qs.toString()}`);
       const data = await res.json();
+
+      const occ: Occurrence[] = data.occurrences ?? [];
+      setOccurrences(occ);
+      // Auto-select ONLY when there is exactly one occurrence — then there is no
+      // ambiguity to resolve. With two, the teacher chooses; guessing is what
+      // wiped the other session's roster.
+      if (!selectedInstanceId && occ.length === 1) {
+        setSelectedInstanceId(occ[0].id);
+      }
+
       if (data.roster) {
         setRoster(data.roster);
         const existing: Record<string, AttendanceStatus> = {};
@@ -99,13 +124,30 @@ export function AttendanceMarker({ classes }: { classes: ClassOption[] }) {
     } finally {
       setLoading(false);
     }
-  }, [date]);
+  }, [selectedClassId, date, selectedInstanceId]);
 
   useEffect(() => {
-    if (selectedClassId) {
-      loadRoster(selectedClassId);
-    }
-  }, [selectedClassId, date, loadRoster]);
+    loadRoster();
+  }, [loadRoster]);
+
+  /**
+   * Changing the class or the date invalidates the chosen occurrence. Cleared
+   * here in the event handlers rather than in an effect so the reset lands
+   * before the reload fires — an effect-based reset would let one fetch go out
+   * carrying the previous class's occurrence id and merge its statuses into the
+   * new roster.
+   */
+  function changeClass(classId: string) {
+    setSelectedClassId(classId);
+    setSelectedInstanceId("");
+    setSuccess("");
+  }
+
+  function changeDate(next: string) {
+    setDate(next);
+    setSelectedInstanceId("");
+    setSuccess("");
+  }
 
   function toggleStatus(studentId: string) {
     const order: AttendanceStatus[] = [
@@ -120,6 +162,11 @@ export function AttendanceMarker({ classes }: { classes: ClassOption[] }) {
   }
 
   async function handleSave() {
+    if (!selectedInstanceId) {
+      setError("Choose which session you are marking attendance for.");
+      return;
+    }
+
     setSaving(true);
     setError("");
     setSuccess("");
@@ -130,8 +177,7 @@ export function AttendanceMarker({ classes }: { classes: ClassOption[] }) {
     }));
 
     const result = await markAttendance({
-      classId: selectedClassId,
-      date,
+      scheduleInstanceId: selectedInstanceId,
       records,
     });
 
@@ -192,7 +238,7 @@ export function AttendanceMarker({ classes }: { classes: ClassOption[] }) {
           </label>
           <SimpleSelect
             value={selectedClassId}
-            onValueChange={setSelectedClassId}
+            onValueChange={changeClass}
             options={classes.map((c) => ({ value: c.id, label: c.name }))}
             placeholder="Select a class..."
             className="w-full"
@@ -209,11 +255,48 @@ export function AttendanceMarker({ classes }: { classes: ClassOption[] }) {
             id="dateSelect"
             type="date"
             value={date}
-            onChange={(e) => setDate(e.target.value)}
+            onChange={(e) => changeDate(e.target.value)}
             className="w-full h-11 rounded-lg border border-silver bg-white px-4 text-base text-charcoal focus:border-lavender focus:ring-2 focus:ring-lavender/20 focus:outline-none"
           />
         </div>
       </div>
+
+      {/* Session picker.
+          Only rendered when the class-and-date pair is genuinely ambiguous. One
+          occurrence needs no choice; zero means there is nothing to record
+          against and the form says so rather than inventing a session. */}
+      {selectedClassId && !loading && occurrences.length > 1 && (
+        <div>
+          <label
+            htmlFor="sessionSelect"
+            className="block text-sm font-medium text-charcoal mb-1.5"
+          >
+            Session
+          </label>
+          <SimpleSelect
+            value={selectedInstanceId}
+            onValueChange={setSelectedInstanceId}
+            options={occurrences.map((o) => ({
+              value: o.id,
+              label: `${formatTime12h(o.start_time.slice(0, 5))} – ${formatTime12h(o.end_time.slice(0, 5))}`,
+            }))}
+            placeholder="Select a session..."
+            className="w-full"
+          />
+          <p className="mt-1.5 text-xs text-slate">
+            This class meets {occurrences.length} times on this date. Each
+            session keeps its own roster.
+          </p>
+        </div>
+      )}
+
+      {selectedClassId && !loading && occurrences.length === 0 && (
+        <div className="rounded-lg bg-warning/10 border border-warning/20 px-4 py-3 text-sm text-charcoal">
+          No session is scheduled for this class on this date, so there is
+          nothing to record attendance against. Check the date, or ask an admin
+          to publish the schedule for this class.
+        </div>
+      )}
 
       {/* Error / Success messages */}
       {error && (
@@ -294,11 +377,18 @@ export function AttendanceMarker({ classes }: { classes: ClassOption[] }) {
             <button
               type="button"
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || !selectedInstanceId}
               className="h-10 rounded-lg bg-lavender hover:bg-lavender-dark text-white font-semibold text-sm px-6 transition-colors disabled:opacity-50"
             >
               {saving ? "Saving..." : "Save Attendance"}
             </button>
+            {!selectedInstanceId && (
+              <p className="mt-2 text-xs text-slate">
+                {occurrences.length > 1
+                  ? "Choose a session above to save."
+                  : "Attendance is saved against a scheduled session."}
+              </p>
+            )}
           </div>
         </div>
       )}
