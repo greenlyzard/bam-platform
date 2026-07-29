@@ -1,6 +1,6 @@
 # SESSION PICKUP
 
-_Last rewritten: 2026-07-27 (end of session)_
+_Last rewritten: 2026-07-25 (end of session)_
 
 ---
 
@@ -13,185 +13,139 @@ Full protocol lives in `CLAUDE.md`. Short form:
 - **Schema days only:** migration list check
 - Supabase MCP is **read-only**. All DDL through `supabase db push` in Regular Terminal. No exceptions.
 
-`tsc --noEmit` returns **zero errors**. If it reports anything, it is real.
-Staging command that keeps the e2e scratch files out: `git add -A ':!scripts'`
-
-⚠️ **`CLAUDE.md` was corrected 2026-07-27** — it previously claimed the `user_role` enum was dropped (it is not) and under-described `is_admin()` (five roles, not two). Corrections take effect only for sessions started after `db07952`.
+⚠️ `tsc --noEmit` currently reports **8 errors in `scripts/e2e-teardown.ts`** — pre-existing, unrelated to any schema work, and that file never ships. `app/` and `lib/` are clean. Add `scripts/` to `tsconfig.json` `exclude` to stop the noise.
 
 ---
 
 ## 1. Repo state
 
 - **HEAD = this pickup commit**, pushed to `origin/main`. Fully synced.
-- Clean tree except `scripts/e2e-*.ts` — untracked, **never commit these**.
+- Verify: `git rev-list --count origin/main..HEAD` → expect `0`
+- Working tree clean except `scripts/e2e-*.ts` — untracked scratch, **never commit these**.
 
-**Shipped 2026-07-27:**
+**Shipped 2026-07-25:**
 
 | Commit | What |
 |---|---|
-| `9e9edec` | **Timezone Phase A** — `tenants.timezone`, zone-aware helpers, `AuthUser` threading |
-| `db07952` | CLAUDE.md schema corrections, indexed missing specs |
-| `1d134a3` | **Timezone Phase B** — pay periods, period lock, submission deadlines |
-| `1802cd2` | Financial anomaly + payroll correctness specs |
-| `aecfb51` | Indexed those two specs |
-| `80874d1` | Knowledge repository + role-scoped AI spec |
-| `9db2efe` | **Fall 2026/27 class import** (89 classes), room location scoping, retired orphaned rooms |
-| `d873d2e` | Calendar date windowing, Fall class start/end dates |
-
-Previous day (2026-07-26): teacher timesheets fixed end to end, ~120 admin server actions authorized, client-side date writes corrected. Detail in git history.
+| `f2f1a0b` | Pickup note |
+| `e3b8879` | Approvals nav link + codified untracked `platform_modules` state |
+| `0233bc7` | Billing generalization spec v1 |
+| `a044bb3` | Billing generalization spec **v2** (supersedes v1) |
+| `85aae35` | **Phase A1 migration + regenerated types** |
 
 ---
 
 ## 2. Production state
 
-**Live at `portal.balletacademyandmovement.com`, Stripe TEST MODE.** Config unchanged — test webhook (`checkout.session.completed` only), `sk_test`/`pk_test`/signing secret in Vercel prod, `NEXT_PUBLIC_APP_URL` = portal domain.
+**Live at `portal.balletacademyandmovement.com`, Stripe TEST MODE.**
 
-### Fall 2026/2027 is loaded
+Verified end-to-end 2026-07-24: `checkout → card vaulted → webhook 200`
+Re-verified 2026-07-25 post-A1: cart add → cart renders with correct pricing.
 
-**89 classes imported for San Clemente**, plus the pre-existing Test Classes row = 90 in season `2026/2027`.
+### Stripe config (production Vercel env)
 
-| | |
+| Item | Value |
 |---|---|
-| Season id | `af220d93-0b39-4816-a2ec-0d09c6dfda7e` (name is `2026/2027`, slash not hyphen) |
-| Location id | `70acde19-bd54-46c2-a4f4-2200b0adb393` (San Clemente) |
-| Dates | All 89: `2026-08-15` → `2027-06-15` |
-| Rehearsals | 26, as `classes` rows with `is_rehearsal = true` |
-| Teachers | 14 assigned; **4 classes have no teacher** (Thu/Sat Petites, Tricks classes) |
-| Rooms | All assigned by Amanda; `room_id` populated on all 90 |
+| Webhook endpoint | `BAM Platform Enrollment Webhook (test)` — test mode |
+| Subscribed events | `checkout.session.completed` **only** |
+| Signing secret / `sk_test` / `pk_test` | all in Vercel prod env |
+| `NEXT_PUBLIC_APP_URL` | portal domain, **Production scope** |
 
-**Source of truth for the import:** `BAM_Fall_2026_27_Classes_REVIEW.xlsx` — a Studio Pro export parsed into last season's naming convention, then reviewed and corrected by Amanda. The convention, verified against the 63 rows of 2025/2026:
-
-> `name` = `<Difficulty> <Discipline>[-<Qualifier>]` — **never the level, never the day.**
-> The level lives in `description`, matching the Studio Pro display string.
-> Examples: `Advanced Ballet`, `Intermediate Jazz-Turns & Jumps`, `Princess Petites-Ballet & Movement`.
-
-`levels` is `text[]` in the exact form `"Level 4B"` — never `"4B"`, never lowercase.
-
-### Deliberate test data — do not "fix"
-
-Three room/time overlaps exist in season 2026/2027, kept on purpose to exercise conflict detection:
-
-| Day | Room | Classes |
-|---|---|---|
-| Mon | Studio 1 | Beginner Jazz 16:15–17:00 (Paola) × Beginner Ballet 16:30–17:30 (Deborah) |
-| Wed | Studio 2 | Test Classes 18:00–18:30 (Amanda) × Advanced Contemporary 17:30–18:30 (Leila) |
-| Thu | Studio 3 | Mini Star Hip Hop 15:30–16:30 × its own rehearsal 16:15–16:30 (both Leila) |
-
-The Wednesday one involves **Test Classes**, which still has its own dates (`2026-08-03` → `2026-09-24`). Deleting or re-dating that row is an open decision.
+- Old live-mode `pk_` rescued to Amanda's password manager.
+- A live-mode webhook endpoint also exists (created in error, harmless in test mode). At go-live, reuse or recreate cleanly.
+- **Go-live switch** is not piecemeal: swap `sk_`/`pk_`, repoint the signing secret, re-verify a real checkout.
 
 ### Known prod data
 
-- Wyatt Cobb-Hardin has an active enrollment in Test Classes from 7/17. **Do not reuse Wyatt** for the approvals demo.
-- The three orphaned rooms are now named `Studio 1 (retired)` etc. — see §5.3.
+- Wyatt Cobb-Hardin has an active enrollment in Test Classes from 7/17 (`id 2fb3d183`, admin/seed path). This triggered the original 23505.
+- A **Test Classes cart item was added 2026-07-25** during A1 smoke testing and may still be open. Clean it up.
+- **Do not reuse Wyatt** for the approvals demo — use a student with no existing enrollment in the target class, or the queue lands empty.
 
 ---
 
-## 3. What shipped 2026-07-27
+## 3. What changed 2026-07-25
 
-### 3.1 Timezone Phases A and B
-`tenants.timezone` (default `America/Los_Angeles`), `tenantToday()` / `tenantDateStr()` / `tenantPayPeriod()` in `lib/dates.ts`, threaded onto `AuthUser` with a 5-minute process cache. Then pay-period resolution, `isPeriodLocked`, and `submission_deadline` moved to the tenant's zone.
+### 3.1 Approvals nav link — DONE
+`/admin/enrollment/approvals` now appears under Students & Families (✓ glyph, `sort_order` 27). Verified live. Same migration codified two hand-applied `platform_modules` edits that existed in prod but in no migration.
 
-**Verified under `TZ=UTC` with pinned clocks**, per spec §6 — a Pacific-machine test proves nothing. At 17:30 PDT on 7/31, old code filed to August; new files to July.
+### 3.2 Billing generalization spec v2 — COMMITTED
+`docs/BILLING_GENERALIZATION_SPEC_V2.md`. Nine phases. Supersedes v1 (five of v1's schema assumptions were wrong; corrected in v2 §0).
 
-Phases C–G remain. **Phase D carries an unbudgeted decision** — see `TENANT_TIMEZONE_SPEC.md` §4.3.1: the originally reported header bug is on the `SessionWithRole` path, which Phase A did not touch.
+Scope: family as billing anchor · admin placement (comp / manual / vault request) · multi-payer with per-charge splits · offline payments with partial allocation · processor-agnostic card vaulting · ledger tagging.
 
-### 3.2 Fall class import
-Studio Pro export → parsed spreadsheet → Amanda review → migration. Four bugs surfaced along the way:
+### 3.3 Phase A1 — APPLIED AND VERIFIED
 
-| Bug | Status |
-|---|---|
-| `classes` has no `tenant_id` (I wrote one into the INSERT) | Fixed — tenant lives on `class_teachers.tenant_id` |
-| Room columns rendered all 8 rooms across 3 locations | Fixed — scoped to the existing location filter, labels disambiguated |
-| Import omitted `start_date`/`end_date` | Fixed — backfilled |
-| **Calendars never windowed by date at all** | Fixed — `classRunsOn` in `lib/dates.ts` |
+Migration `20260725140000_billing_generalization_phase_a1.sql`:
 
-That last one was pre-existing and the most consequential: `/teach/schedule` has **no `showPast`, no status filter, only `is_active = true`** — so teachers saw every class they'd ever been assigned on every week. All 63 of last season's classes are still `is_active = true`.
+- `enrollment_charge_items`: `enrollment_id` → nullable · added `description` · FKs on `family_id`/`student_id`/`class_id` (all still nullable) · `item_type` widened to 10 values including `costume`, `competition`, `late_fee`, `merchandise`
+- `enrollment_cart_items`: `class_id` → nullable · added `item_type` (NOT NULL, DEFAULT `class_enrollment`), `reference_id`, `description`
+- Ledger: dropped vestigial `invoice_id`/`payment_id`/`line_item_id` · renamed `1010` to "Cash – Processor Clearing" · added `1020 undeposited_funds`
+- `productions`: added `tenant_id` NOT NULL + FK (NO ACTION) + index
+- `timesheet_entries.production_id`: FK added, **ON DELETE NO ACTION** (protects production P&L labor attribution)
 
-### 3.3 Three specs written
-- `FINANCIAL_ANOMALY_DETECTION.md` — 🔴 P0. Nothing detects a double charge or a billed-but-undelivered lesson.
-- `PAYROLL_CORRECTNESS_AND_REPORTING.md` — 🔴 P0. Pay is recomputed at render time from *current* rates.
-- `KNOWLEDGE_REPOSITORY_AND_AI.md` — document repository serving humans and Angelina under one access model.
+Types regenerated. `app/` and `lib/` typecheck clean.
 
 ---
 
-## 4. Next session — recommended
+## 4. Next session — start here
 
-### 4.1 Open product decision, small
-**The calendar defaults to "All Locations"**, so every admin sees 8 room columns with 5 permanently empty (RSM has no classes and doesn't open until September). Options: default the *calendar* to the primary location while the list keeps "All"; or hide rooms with no classes in the visible week. Neither is a bug — the labels are unambiguous now — but it's noise.
+### 4.1 Phase A2 is BLOCKED, and why
+A2 tightens `enrollment_charge_items.family_id` to NOT NULL. **Do not do this yet.** `lib/billing/approval-repo.ts:365` reads `enrollments.family_id` as explicitly nullable. A2 requires that value be guaranteed non-null at both writer sites first (`webhook/route.ts:491` and `approval-repo.ts:394`).
 
-### 4.2 Rate snapshotting — time-sensitive
-`PAYROLL_CORRECTNESS_AND_REPORTING.md` phases 1–3. `timesheet_entries` is empty **today**, so snapshotting `rate_amount` at entry/approval is free. Every hour logged before it exists is an hour whose true rate is unrecoverable.
+### 4.2 Recommended order
+1. **Phase B** — `payment_methods` table; migrate off `families.stripe_*`; `family_payers`
+2. **Phase C** — `charge_item_splits` + balance trigger
+3. **Phase H** — RLS for payer visibility. **Ships with C, not after.** Splits without RLS expose payers to each other
+4. **Phase D/E/F** — offline payments, admin card vaulting, placement modes
 
-### 4.3 Admin notification surface
-`FINANCIAL_ANOMALY_DETECTION.md` §3.1. **88 notifications, 100% unread** — the table and API already exist, only the UI is missing. Highest value per hour in that document.
-
-### 4.4 Timezone Phase C
-Filters and comparisons. Ten-plus sites, low risk. Fixes "today's classes vanish from the teacher dashboard after 5pm."
-
----
-
-## 5. Open defects
-
-### 5.1 The `profiles.role` authorization family — ~30 API routes
-Roughly 30 API routes authorize off `profiles.role` instead of `profile_roles` — the `api/admin/resources/*` family, schedule-embeds, schedule-change-requests, rentals, substitute-requests, approval-tasks, feature-flags, platform-modules, teach/roster, plus `api/teacher/*`.
-
-**Consequence:** Cara's `profiles.role` reads `parent`, so she is **locked out of admin surfaces she runs**. `finance_admin`, `studio_admin`, and `studio_manager` are locked out everywhere. `proxy.ts:107` is the one place that does it correctly.
-
-This is the mirror of the 2026-07-26 server-action sweep — same defect, opposite direction (too restrictive rather than too permissive).
-
-### 5.2 Six remaining `teacher_profiles.user_id` instances
-The view has no `user_id` column. Still broken: `lib/schedule/generate-sessions.ts:194-200`, `lib/queries/admin.ts:170-174`, `api/teachers/welcome/route.ts:114-116`, `admin/productions/[id]/page.tsx` (production labor-cost report), and both scripts. `welcome_sent_at` exists in **no table**.
-
-### 5.3 `schedule_instances` — 70% point at retired rooms
-61 of 87 rows reference the three now-renamed `Studio N (retired)` rooms — the frozen `2026-03-09` → `03-14` week from the broken occurrence generator (`_INDEX.md` task 19). They were renamed rather than deleted because `ON DELETE SET NULL` would have silently stripped `room_id` from all 61.
-
-Disposition deferred to task 19. Note `private_sessions.studio` carries free-text `'Studio 1'` with no FK — a third place the name collides.
-
-### 5.4 Root cause of the whole bug family
-`lib/supabase/server.ts:7` calls `createServerClient()` **without the `<Database>` generic**. Every query is untyped — which is why queries against columns that never existed compile clean. Adding the generic will surface a wave of errors. That is the point. Its own session.
-
-### 5.5 Other
-- Enrollment catalog (`lib/queries/enroll.ts:32`) filters `end_date` only, no start bound — a scheduled class appears before it starts
-- `/teach/schedule` header count reads total assigned, not the visible week ("12 classes" while the grid shows 5)
-- `/admin/staff/[id]/profile` shows "No class assignments" — uninvestigated
-- Browse Classes "Request Enrollment" writes to nonexistent `admin_tasks`
-- Vercel custom domains "Invalid Configuration" — check GoDaddy A records on `portal`/`staging`
-- **41 tables lack `tenant_id`** incl. `classes`, `profiles`, `teachers`, `attendance` — see `SESSION_2026-07-25_FINDINGS.md`
-- `teacher_profiles` view hides departed teachers from payroll retroactively
-- `cancelled` vs `canceled` split across six tables
-- `DATABASE_SCHEMA.md` is 54% absent and drifted on 13 of 30 documented tables — regenerate or retire (`_INDEX.md` task 14)
+### 4.3 Amanda walkthrough
+Approvals queue at `/admin/enrollment/approvals`. Needs a **fresh test enrollment** on a student with no existing enrollment in the target class.
 
 ---
 
-## 6. Open questions for Amanda
+## 5. Open questions for Amanda
 
 | # | Question | Blocks |
 |---|---|---|
-| 1 | **Consent copy** — parents consent to costume/competition charges the platform cannot produce. Live in prod | Nothing, but it's live |
-| 2 | **Cancellation policy for privates** — is a cancelled/no-show private billable? 5 live rows already drifted | Anomaly spec §3.4 |
-| 3 | **Handbook vs Code of Conduct** — which is canonical where they disagree? Handbook says "Season 5 – 2025/26" | Knowledge repo Phase 0 |
-| 4 | **Existing text/phone AI agent** — what is it? Feed it or replace it | Knowledge repo Phase 8 |
-| 5 | **Which rate model** — flat `teachers.*_rate_cents` or `teacher_rate_cards`? Nothing reads the latter | Payroll spec §3.2 |
-| 6 | **Split billing** — grandparents confirmed. Portal login or emailed receipts? | Billing Phase B |
-| 7 | **Sibling discounts** — ~50% off 2nd+ registration. Registration only or tuition too? | Billing Phase C |
-| 8 | **4 teacherless Fall classes** — who teaches Thu/Sat Petites and the Tricks classes? | Before Fall starts |
-| 9 | **Test Classes row** — keep as demo data or remove? It creates the Wed Studio 2 conflict | Small |
+| 1 | **Consent copy** — parents are consenting to costume/competition charges the platform cannot produce (live in prod). What should it say? | Nothing, but it's live |
+| 2 | **Split billing** — confirmed needed, including grandparents. Does a non-parent payer need a portal login, or emailed receipts only? | Phase B design |
+| 3 | **Sibling discounts** — ~50% off 2nd+ registration. Registration only, or tuition too? | Phase C |
+| 4 | **Late fees** — charged at all? Automatic on aging or admin-applied? | Phase D |
+| 5 | **Costume / competition fees** — per-student flat, or per-production? | Phase A2 |
+| 6 | **Comp reasons** — require a picklist? (Recommend yes; `refunds.reason_id` is already NOT NULL) | Phase F |
+| 7 | **Credit on account** — auto-apply to next charge, or admin-allocated? | Phase D |
+| 8 | **Trial policy** — what, if anything, replaces the copy removed 2026-07-24? | Nothing |
+| 9 | **Day-one reports** — which reports does she actually pull weekly in Studio Pro? | Reporting spec |
+| 10 | **Newsletter / Klaviyo overlap** — deferred, don't lose it | — |
 
 ---
 
-## 7. Specs on file
+## 6. Backlog — see `docs/SESSION_2026-07-25_FINDINGS.md`
 
-| Spec | Status |
+Newly documented, in priority order:
+
+- **P0 — 41 tables lack `tenant_id`**, including `classes`, `profiles`, `teachers`, `attendance`, `studio_settings`. Needs its own spec. Blocks tenant-facing reporting entirely
+- **P1 — `teacher_profiles` view hides departed teachers from payroll reports**, retroactively
+- **P1 — `cancelled` vs `canceled`** split across six tables; silent zero-row filters
+- **P1 — four money-state vocabularies** across `charges` / `charge_items` / `ledger_entries` / `refunds`
+- **P2 — two attendance tables** (`attendance` unscoped, `attendance_records` scoped), both in active use
+- **P2 — `productions` has no archive path** now that the FK blocks deletes
+
+Carried from `SESSION_2026-07-21_FINDINGS.md`:
+
+- Browse Classes "Request Enrollment" is a silent no-op (writes to nonexistent `admin_tasks`)
+- Ended classes appear in the catalog (missing end-date filter)
+- Vercel custom domains "Invalid Configuration" — check GoDaddy for conflicting A records on `portal`/`staging`
+- `staging.` points at production; not a real second environment
+
+---
+
+## 7. Specs not yet written
+
+| Spec | Trigger |
 |---|---|
-| `BILLING_GENERALIZATION_SPEC_V2.md` | A1 done, A2 blocked, B–I open |
-| `TENANT_TIMEZONE_SPEC.md` | **A + B done**, C–G open; D needs the §4.3.1 decision |
-| `FINANCIAL_ANOMALY_DETECTION.md` | 🔴 P0, not started |
-| `PAYROLL_CORRECTNESS_AND_REPORTING.md` | 🔴 P0, not started |
-| `KNOWLEDGE_REPOSITORY_AND_AI.md` | Not started; Phase 0 is editorial and gates the rest |
-| `SESSION_2026-07-25_FINDINGS.md` | Reference |
-| `COMMUNICATIONS_HUB.md` | BAND replacement, partially built — **audit what shipped before building more** |
-
-**Not yet written:** tenant scoping remediation (P0), reporting + semantic layer, expense module, private packages, `ADMIN_TASK_CENTER`, class importer UI.
-
-### Class importer — worth building
-This session's Fall import was a one-off script. For white-label it should be a feature: **downloadable template → upload → parse → preview with errors flagged inline → commit.** Never direct-to-database. The template columns *are* the class model, so it depends on the naming convention in §2 being settled. v1 should be upload-only and create-only; update-on-reimport is a separate problem needing stable keys.
+| **Tenant scoping remediation** | P0 above. Biggest architectural debt in the platform |
+| **Reporting + semantic layer** | Investigated 2026-07-25 (findings §7). Build the metadata registry first; canned reports become definitions on top of it. BI export target is a versioned `reporting` schema of views, never raw tables |
+| **Expense module** | No expense table exists. Five expense accounts with no way to post to them. Required before any real production P&L |
+| **Private packages** | `item_type` already includes `private_pack`; `credit_accounts` exists (points-denominated, student-scoped) |
+| **`ADMIN_TASK_CENTER`** | Amanda wants a task list spanning financial, payroll, billing, timesheets, alerts, evaluations. Also resolves the `admin_tasks` no-op defect |
