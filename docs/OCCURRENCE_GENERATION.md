@@ -31,9 +31,11 @@ rule before the first execution rather than retrofitting one.
 | Classes | 153 — all `status='active'`, all `is_active=true` |
 | Recurrence data | **complete on all 153** |
 | Classes intersecting the Fall window | **91** · ended before Fall: **62** |
-| `schedule_instances` rows | 1,042 |
+| `schedule_instances` rows | 1,042 total = **981 `published` + 61 `cancelled`** (no other status). The 61 cancelled are the Phase 3 orphans below — before Phase 3 all 1,042 were `published` |
 | Orphans (NULL `class_id`) | 61 — **all now `cancelled`** (Phase 3) |
 | Orphan date range | 2026-03-09 → 2026-03-14, the frozen March seed week |
+| Published coverage span | **2026-07-23 → 2026-11-26**, across 66 classes. Was 2026-03-09 → 2026-11-26 until Phase 3 cancelled the March week |
+| Coverage is **not** continuous | Every March occurrence was an orphan, so cancelling them left **no published occurrence anywhere before 2026-07-23** — and no row of *any* status exists 2026-03-15 → 2026-07-22. The 66 covered classes are covered from late July only, not since March. Fall is unaffected: it begins 2026-08-15 and coverage starts 2026-07-23 |
 | Classes with no `teacher_id` | 4 |
 | Rehearsal classes | 39 |
 | `studio_closures` | **6 rows, all Spring Break 2026-04-06 → 04-11 — nothing for Fall** |
