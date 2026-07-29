@@ -1,6 +1,7 @@
 # Occurrence Generation
 
-_Task 19. Written 2026-07-29. Status: spec, not built._
+_Task 19. Written 2026-07-29. Amended 2026-07-29 with Phase 0 results.
+Status: spec. Phase 0 complete, Phases 1–6 not built._
 
 Fall begins **2026-08-15**.
 
@@ -40,6 +41,9 @@ choosing the rule before the first execution rather than retrofitting one.
 | `studio_closures` | 6 rows, `closed_date` (single date), tenant-scoped |
 | Duplicates on `(class_id, event_date, start_time)` | **0** |
 | `attendance` / `attendance_records` / `rehearsal_attendance` | **all empty** |
+| `days_of_week` | `integer[]`, distinct values **1–6 only** |
+| Sunday instances | **0** · classes containing `0`: **0** · containing `7`: **0** |
+| Classes with `end_date < start_date` | **0** |
 
 ### Corrections to the 2026-07-28 pickup note
 
@@ -81,6 +85,16 @@ above.
 existing rows, so a partial unique index is created and generation is
 `ON CONFLICT DO NOTHING`. Re-running produces zero new rows and zero errors.
 
+**Weekdays are ISO: Monday 1 … Sunday 7. `0` is invalid.** Phase 0 established that
+ISO (`isodow`) and Postgres `dow` are *identical* for Monday–Saturday and diverge
+only on Sunday — ISO 7 against `dow` 0. All 981 testable instances matched both
+encodings, so the existing data cannot distinguish them and does not need to: no
+Sunday class exists, and no array contains `0` or `7`. The ambiguity is therefore
+harmless today and dangerous tomorrow, because an admin adding the first Sunday
+class could reasonably enter either value and one of them would silently generate
+nothing. Resolved by fiat: generation uses `isodow`, and a CHECK constraint pins
+`days_of_week` elements to `1..7`. No current row violates it.
+
 **Closures are skipped at generation.** A date present in `studio_closures` for the
 tenant produces no occurrence. Closure rows are single-date. This is what makes the
 proration rule in the billing spec computable.
@@ -117,7 +131,7 @@ For each eligible class — `is_active`, `status='active'`, tenant-scoped — an
 date `d` in the intersection of `[p_from, p_to]` and the class's
 `[start_date, end_date]`:
 
-1. Skip unless `extract(isodow from d)` is in `days_of_week`.
+1. Skip unless `extract(isodow from d)::int = any(days_of_week)`.
 2. Skip if `d` is in `studio_closures` for the tenant.
 3. Skip if `d <= current_date`.
 4. Insert with the class's `start_time`, `end_time`, `teacher_id`, `room_id`,
@@ -125,22 +139,20 @@ date `d` in the intersection of `[p_from, p_to]` and the class's
 
 `SECURITY DEFINER`, tenant-scoped, callable only by schedule managers.
 
-**`days_of_week` encoding must be confirmed before implementation** — whether the
-array holds ISO 1–7 (Mon–Sun) or 0–6 (Sun–Sat) decides step 1, and getting it wrong
-shifts every occurrence by a day. Verify against the 66 already-covered classes:
-their existing instances give the correct mapping directly.
-
 ---
 
 ## 5. Phases
 
-**Phase 0 — pre-flight.** Confirm `days_of_week` encoding against the 66 covered
-classes. Confirm no class has `end_date < start_date`. Both as `DO` blocks that
-`RAISE EXCEPTION` on bad data.
+**Phase 0 — pre-flight. ✅ Complete 2026-07-29.**
+Weekday encoding resolved (§3). `end_date < start_date`: zero rows. Nothing blocks
+Phase 1.
 
-**Phase 1 — index.** Partial unique index on
-`(class_id, event_date, start_time) WHERE class_id IS NOT NULL`. Safe: zero
-duplicates today.
+**Phase 1 — constraints.**
+- Partial unique index on
+  `(class_id, event_date, start_time) WHERE class_id IS NOT NULL`. Safe: zero
+  duplicates today.
+- CHECK constraint pinning `days_of_week` elements to `1..7`. Safe: zero violations
+  today.
 
 **Phase 2 — the function.** As §4.
 
@@ -206,12 +218,11 @@ Checks 1–5 are single queries and should be run as one `DO` block ending in
 
 | # | Question | Blocks |
 |---|---|---|
-| 1 | `days_of_week` encoding — ISO 1–7 or 0–6? Answerable from data, not from Amanda | Phase 0 |
-| 2 | Do any `timesheet_entries` reference the 61 orphans? | Phase 3 |
-| 3 | Should rehearsal occurrences be attendance-markable for Fall? | Roster route |
-| 4 | Are the 6 closure rows complete for the Fall season, or is the holiday calendar still to be entered? **Amanda** | Phase 4 correctness |
-| 5 | Who teaches the Friday 3:30–6:30 Tricks block? Already open. Generation will now produce those occurrences with a NULL teacher | Fall |
+| 1 | Do any `timesheet_entries` reference the 61 orphans? | Phase 3 |
+| 2 | Should rehearsal occurrences be attendance-markable for Fall? | Roster route |
+| 3 | Are the 6 closure rows complete for the Fall season, or is the holiday calendar still to be entered? **Amanda** | Phase 4 correctness |
+| 4 | Who teaches the Friday 3:30–6:30 Tricks block? Already open. Generation will now produce those occurrences with a NULL teacher | Fall |
 
-Question 4 matters more than it looks. Generating a full season against an
+Question 3 matters more than it looks. Generating a full season against an
 incomplete closure list produces occurrences on days the studio is shut, which then
 produce timesheet drafts and, downstream, proration against dates nobody worked.
