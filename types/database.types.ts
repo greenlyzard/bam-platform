@@ -447,6 +447,7 @@ export type Database = {
           created_at: string | null
           id: string
           recorded_by: string | null
+          schedule_instance_id: string | null
           status: string
           student_id: string
           teacher_notes: string | null
@@ -457,6 +458,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           recorded_by?: string | null
+          schedule_instance_id?: string | null
           status?: string
           student_id: string
           teacher_notes?: string | null
@@ -467,6 +469,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           recorded_by?: string | null
+          schedule_instance_id?: string | null
           status?: string
           student_id?: string
           teacher_notes?: string | null
@@ -491,6 +494,13 @@ export type Database = {
             columns: ["recorded_by"]
             isOneToOne: false
             referencedRelation: "teacher_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_schedule_instance_fkey"
+            columns: ["schedule_instance_id"]
+            isOneToOne: false
+            referencedRelation: "schedule_instances"
             referencedColumns: ["id"]
           },
           {
@@ -10619,6 +10629,20 @@ export type Database = {
       can_manage_pay:
         | { Args: never; Returns: boolean }
         | { Args: { p_tenant_id: string }; Returns: boolean }
+      generate_timesheet_drafts: {
+        Args: {
+          p_from: string
+          p_teacher_id?: string
+          p_tenant_id: string
+          p_to: string
+        }
+        Returns: {
+          created: number
+          skipped_existing: number
+          skipped_locked: number
+          skipped_no_teacher: number
+        }[]
+      }
       get_or_create_dm_channel: {
         Args: { p_profile_a: string; p_profile_b: string; p_tenant_id: string }
         Returns: string
@@ -10660,6 +10684,10 @@ export type Database = {
           rate_id: string
           rate_type: string
         }[]
+      }
+      resolve_timesheet_for_date: {
+        Args: { p_teacher_id: string; p_tenant_id: string; p_work_date: string }
+        Returns: string
       }
     }
     Enums: {

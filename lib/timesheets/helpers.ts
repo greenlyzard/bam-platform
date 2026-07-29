@@ -41,6 +41,56 @@ export function payPeriodEditCutoff(year: number, month: number): string {
 }
 
 /**
+ * First and last calendar day of a pay period's month, as `YYYY-MM-DD`.
+ *
+ * The window the draft generator is called with from the timesheet page: it
+ * drafts the period the teacher is looking at, and nothing outside it.
+ *
+ * Same string-arithmetic discipline as payPeriodDeadline — the last day is
+ * found by taking day 0 of the FOLLOWING month through `Date.UTC`, which is
+ * pure calendar arithmetic on a fixed zone, then reading back UTC components.
+ * No toISOString, no local-zone Date: both would let the runtime's offset move
+ * the boundary by a day, which is the failure docs/TENANT_TIMEZONE_SPEC.md
+ * catalogues.
+ */
+export function payPeriodMonthRange(
+  year: number,
+  month: number
+): { from: string; to: string } {
+  const mm = String(month).padStart(2, "0");
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return {
+    from: `${year}-${mm}-01`,
+    to: `${year}-${mm}-${String(lastDay).padStart(2, "0")}`,
+  };
+}
+
+/**
+ * Add (or subtract) whole days to a `YYYY-MM-DD`, returning `YYYY-MM-DD`.
+ *
+ * Anchored at UTC midnight and read back with getUTC* accessors, so the result
+ * is pure calendar arithmetic — month and year rollover included — with no
+ * instant and no zone in the answer. Deliberately not `toISOString().slice(0,10)`:
+ * that reintroduces a formatting path this codebase bans, and the manual
+ * padding here makes the absence of a zone explicit rather than incidental.
+ *
+ * Returns the input unchanged if it is not a well-formed date, so a malformed
+ * value fails at the query rather than becoming a silently shifted window.
+ */
+export function addDaysToYmd(ymd: string, days: number): string {
+  const parsed = payPeriodForDate(ymd);
+  if (!parsed) return ymd;
+
+  const day = Number(ymd.slice(8, 10));
+  const d = new Date(Date.UTC(parsed.year, parsed.month - 1, day + days));
+
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${dd}`;
+}
+
+/**
  * The pay period a `YYYY-MM-DD` work date belongs to.
  *
  * NOT the period "now" falls in. An attendance record for August 31 entered on

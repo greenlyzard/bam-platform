@@ -1,8 +1,17 @@
 import { requireRole } from "@/lib/auth/guards";
 import { tenantPayPeriod, tenantToday } from "@/lib/dates";
-import { computePeriodLock, formatPeriodDate } from "@/lib/timesheets/helpers";
+import {
+  computePeriodLock,
+  formatPeriodDate,
+  payPeriodMonthRange,
+} from "@/lib/timesheets/helpers";
+import {
+  generateTimesheetDrafts,
+  fetchAttendanceTakenInstances,
+} from "@/lib/timesheets/drafts";
 import { createClient } from "@/lib/supabase/server";
 import { AddEntryForm, EditEntryRow } from "./entry-form";
+import { ConfirmAllDrafts } from "./confirm-drafts";
 import { FlagResponseForm } from "./flag-response";
 
 export default async function TimesheetsPage() {
@@ -29,6 +38,46 @@ export default async function TimesheetsPage() {
     .single();
 
   const employmentType = teacherProfile?.employment_type ?? "w2";
+
+  // ── Draft generation ──────────────────────────────────────────────────────
+  // Runs before the entries are read, so drafts created now appear on this
+  // render rather than the next one.
+  //
+  // Scoped to this teacher and to the month of the period being viewed. The
+  // window comes from payPeriodMonthRange, not from a Date the runtime formats:
+  // Vercel runs UTC and a locally-formatted boundary would shift by a day.
+  //
+  // Idempotent by (teacher, schedule_instance_id) in the function itself, so
+  // this is safe on every page load — a refresh creates nothing, and an entry
+  // the teacher deleted is never resurrected. Nothing here re-implements or
+  // works around that; the guarantee lives in SQL on purpose.
+  const draftWindow = payPeriodMonthRange(currentPeriod.year, currentPeriod.month);
+  const draftResult =
+    user.tenantId && teacherProfile
+      ? await generateTimesheetDrafts(supabase, {
+          tenantId: user.tenantId,
+          from: draftWindow.from,
+          to: draftWindow.to,
+          teacherId: teacherProfile.id,
+        })
+      : { error: "No tenant or teacher profile — draft generation skipped." };
+
+  // Render never depends on this succeeding. The counts are logged for every
+  // load; only a non-zero `created` reaches the page, because "we made nothing
+  // because there was nothing to make" is not news to a teacher.
+  const draftError = "error" in draftResult ? draftResult.error : null;
+  const draftsCreated = "error" in draftResult ? 0 : draftResult.created;
+  if (draftError) {
+    console.error("[teach:timesheets] draft generation failed:", draftError);
+  } else if (!("error" in draftResult)) {
+    console.log(
+      `[teach:timesheets] drafts for ${teacherProfile?.id} ${draftWindow.from}..${draftWindow.to}:`,
+      `created=${draftResult.created}`,
+      `skipped_locked=${draftResult.skipped_locked}`,
+      `skipped_existing=${draftResult.skipped_existing}`,
+      `skipped_no_teacher=${draftResult.skipped_no_teacher}`
+    );
+  }
 
   // Fetch productions for dropdown
   const { data: productionRows } = await supabase
@@ -82,23 +131,56 @@ export default async function TimesheetsPage() {
           .maybeSingle()
       : { data: null };
 
-  // Fetch entries with new fields
-  const { data: entries } = timesheet
+  // Fetch entries with new fields.
+  //
+  // The classes join supplies what a generated row cannot say for itself: a
+  // draft carries a class_id and times but no description, so without the name
+  // it renders as a blank row with hours on it. schedule_instance_id is what
+  // distinguishes a proposal from something typed.
+  const { data: entriesRaw } = timesheet
     ? await supabase
         .from("timesheet_entries")
         .select(
-          "id, date, entry_type, total_hours, description, sub_for, production_id, production_name, event_tag, notes, status, flag_question, flag_response, flagged_at, approved_at, adjustment_note"
+          "id, date, entry_type, total_hours, description, sub_for, production_id, production_name, event_tag, notes, status, flag_question, flag_response, flagged_at, approved_at, adjustment_note, is_auto_populated, attendance_status, schedule_instance_id, class_id, start_time, end_time, classes(name)"
         )
         .eq("timesheet_id", timesheet.id)
         .order("date", { ascending: false })
     : { data: null };
 
-  const flaggedEntries = (entries ?? []).filter((e) => e.status === "flagged");
-
-  const totalHours = (entries ?? []).reduce(
-    (sum, e) => sum + (e.total_hours ?? 0),
-    0
+  // Which occurrences already have attendance recorded. Joined ONLY on
+  // schedule_instance_id — see fetchAttendanceTakenInstances for why a
+  // (class_id, class_date) match is wrong rather than merely loose. Drives a
+  // prompt; never gates confirmation.
+  const attendanceTaken = await fetchAttendanceTakenInstances(
+    supabase,
+    (entriesRaw ?? [])
+      .map((e) => e.schedule_instance_id)
+      .filter((id): id is string => !!id)
   );
+
+  const entries = (entriesRaw ?? []).map((e) => {
+    // Supabase returns a joined relation as an array or an object depending on
+    // cardinality — normalise both, never assume the object form.
+    const cls = e.classes as unknown as { name: string } | { name: string }[] | null;
+    const className = Array.isArray(cls) ? cls[0]?.name ?? null : cls?.name ?? null;
+    return {
+      ...e,
+      className,
+      attendanceTaken: e.schedule_instance_id
+        ? attendanceTaken.has(e.schedule_instance_id)
+        : null,
+    };
+  });
+
+  const flaggedEntries = entries.filter((e) => e.status === "flagged");
+
+  // Drafts still awaiting a decision. `attendance_status` is null until the
+  // teacher confirms; the generator never sets it.
+  const unconfirmedDrafts = entries.filter(
+    (e) => e.is_auto_populated && !e.attendance_status
+  );
+
+  const totalHours = entries.reduce((sum, e) => sum + (e.total_hours ?? 0), 0);
   const timesheetStatus = timesheet?.status ?? "draft";
   const isDraft = timesheetStatus === "draft";
   const canEdit = isDraft && !isLocked;
@@ -148,7 +230,7 @@ export default async function TimesheetsPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {badge && (entries?.length ?? 0) > 0 && (
+          {badge && entries.length > 0 && (
             <span
               className={`inline-flex items-center rounded-full ${badge.bg} px-3 py-1 text-xs font-medium ${badge.text}`}
             >
@@ -157,6 +239,26 @@ export default async function TimesheetsPage() {
           )}
         </div>
       </div>
+
+      {/* Drafts were just created. Said once, on the load that made them —
+          silently adding rows a teacher did not type would read as their own
+          forgotten work. */}
+      {draftsCreated > 0 && (
+        <div className="rounded-lg bg-lavender/10 border border-lavender/20 px-4 py-3 text-sm text-lavender-dark">
+          Added <strong>{draftsCreated}</strong>{" "}
+          {draftsCreated === 1 ? "entry" : "entries"} from your schedule for{" "}
+          {monthLabel}. Review the hours, then confirm — adjust or delete
+          anything that did not happen as scheduled.
+        </div>
+      )}
+
+      {/* Confirm all. Only when something is actually awaiting a decision. */}
+      {canEdit && timesheet && unconfirmedDrafts.length > 0 && (
+        <ConfirmAllDrafts
+          timesheetId={timesheet.id}
+          count={unconfirmedDrafts.length}
+        />
+      )}
 
       {/* Locked: names the date actually enforced. Previously this said "after
           the 26th" — the submission deadline — while the studio's real edit
@@ -237,7 +339,7 @@ export default async function TimesheetsPage() {
       )}
 
       {/* Entries table */}
-      {!entries || entries.length === 0 ? (
+      {entries.length === 0 ? (
         <div className="rounded-xl border border-dashed border-silver bg-white p-8 text-center text-sm text-mist">
           No timesheet entries for {monthLabel}. Add your first entry below.
         </div>
@@ -314,7 +416,7 @@ export default async function TimesheetsPage() {
       )}
 
       {/* Submit flow */}
-      {timesheet && isDraft && (entries?.length ?? 0) > 0 && (
+      {timesheet && isDraft && entries.length > 0 && (
         <div className="rounded-xl border border-silver bg-white p-5">
           <div className="flex items-center justify-between">
             <div>
@@ -322,9 +424,17 @@ export default async function TimesheetsPage() {
                 Ready to submit?
               </h3>
               <p className="text-sm text-slate mt-1">
-                {entries?.length ?? 0}{" "}
-                {(entries?.length ?? 0) === 1 ? "entry" : "entries"} ·{" "}
+                {entries.length}{" "}
+                {entries.length === 1 ? "entry" : "entries"} ·{" "}
                 {totalHours.toFixed(1)} hours total
+                {unconfirmedDrafts.length > 0 && (
+                  <>
+                    {" · "}
+                    <span className="text-gold-dark font-medium">
+                      {unconfirmedDrafts.length} unconfirmed
+                    </span>
+                  </>
+                )}
               </p>
             </div>
             <a

@@ -5,6 +5,7 @@ import {
   addTimesheetEntry,
   updateTimesheetEntry,
   deleteTimesheetEntry,
+  confirmAutoDraftEntry,
 } from "./actions";
 import { SimpleSelect } from "@/components/ui/select";
 import { toLocalDateStr } from "@/lib/dates";
@@ -52,6 +53,35 @@ interface Entry {
   start_time?: string | null;
   end_time?: string | null;
   production_ids?: string[];
+  /** True when the row came from the schedule, not from the teacher. */
+  is_auto_populated?: boolean | null;
+  /** 'confirmed' once accepted. Null on a draft awaiting a decision. */
+  attendance_status?: string | null;
+  schedule_instance_id?: string | null;
+  class_id?: string | null;
+  /** Class name resolved from the linked occurrence — a draft has no description. */
+  className?: string | null;
+  /**
+   * Whether attendance exists for this occurrence. Null when the row has no
+   * occurrence to check (hand-entered), which is not the same as false.
+   */
+  attendanceTaken?: boolean | null;
+}
+
+/** "9:00 AM – 10:30 AM" from two `HH:MM[:SS]` strings; empty if either is absent. */
+function formatTimeRange(
+  start?: string | null,
+  end?: string | null
+): string | null {
+  if (!start || !end) return null;
+  const fmt = (t: string) => {
+    const [h, m] = t.split(":").map(Number);
+    if (isNaN(h) || isNaN(m)) return t;
+    const ampm = h >= 12 ? "PM" : "AM";
+    const h12 = h % 12 === 0 ? 12 : h % 12;
+    return `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
+  };
+  return `${fmt(start)} – ${fmt(end)}`;
 }
 
 interface Production {
@@ -561,11 +591,16 @@ export function EditEntryRow({
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   const categoryLabel =
     CATEGORIES.find(
       (c) => c.value === (ENTRY_TYPE_TO_CATEGORY[entry.entry_type] ?? "other")
     )?.label ?? entry.entry_type;
+
+  const isAuto = !!entry.is_auto_populated;
+  const isConfirmed = entry.attendance_status === "confirmed";
+  const timeRange = formatTimeRange(entry.start_time, entry.end_time);
 
   if (editing) {
     return (
@@ -583,19 +618,57 @@ export function EditEntryRow({
   }
 
   return (
-    <tr className="hover:bg-cloud/30 transition-colors">
+    <tr
+      className={`hover:bg-cloud/30 transition-colors ${
+        isAuto && !isConfirmed ? "bg-lavender/[0.04]" : ""
+      }`}
+    >
       <td className="px-4 py-3 text-charcoal">
         {new Date(entry.date + "T12:00:00").toLocaleDateString("en-US", {
           weekday: "short",
           month: "short",
           day: "numeric",
         })}
+        {timeRange && (
+          <span className="block text-xs text-mist mt-0.5">{timeRange}</span>
+        )}
       </td>
       <td className="px-4 py-3 text-charcoal">
-        {entry.description ?? "\u2014"}
+        {/* A generated row has no description \u2014 the class name from the linked
+            occurrence is what makes it recognisable. Falls back to the typed
+            description for hand-entered rows. */}
+        {entry.className ?? entry.description ?? "\u2014"}
         {entry.sub_for && (
           <span className="ml-1.5 text-xs text-mist">
             (Sub: {entry.sub_for})
+          </span>
+        )}
+
+        {/* Provenance. The teacher must be able to tell what the system
+            proposed from what they typed \u2014 and, once accepted, that it was
+            still the system that proposed it. is_auto_populated never flips on
+            confirm, so this badge is permanent for a generated row. */}
+        {isAuto && (
+          <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-lavender/15 px-2 py-0.5 text-[10px] font-medium text-lavender-dark align-middle">
+            {isConfirmed ? "From schedule \u00b7 confirmed" : "From schedule"}
+          </span>
+        )}
+
+        {/* Attendance prompt. A PROMPT \u2014 confirming works either way. Rendered
+            only when there is an occurrence to check against; a hand-entered
+            row has nothing to say here and gets no nag. */}
+        {isAuto && entry.attendanceTaken === false && (
+          <a
+            href="/teach/attendance"
+            className="ml-2 inline-flex items-center gap-1 rounded-full bg-gold/15 px-2 py-0.5 text-[10px] font-medium text-gold-dark hover:bg-gold/25 transition-colors align-middle"
+            title="No attendance recorded for this class. You can still confirm these hours."
+          >
+            Attendance not taken \u2192
+          </a>
+        )}
+        {isAuto && entry.attendanceTaken === true && (
+          <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-medium text-success align-middle">
+            Attendance taken
           </span>
         )}
       </td>
@@ -620,7 +693,31 @@ export function EditEntryRow({
       </td>
       {!locked && (
         <td className="px-4 py-3 text-right">
-          <div className="flex justify-end gap-1">
+          <div className="flex justify-end items-center gap-1">
+            {/* Confirm sets attendance_status only. Never gated on attendance:
+                a teacher who taught the class is owed the hours whether or not
+                a roster was marked. */}
+            {isAuto && !isConfirmed && (
+              <form
+                action={async (fd: FormData) => {
+                  setConfirming(true);
+                  setError("");
+                  const result = await confirmAutoDraftEntry(fd);
+                  setConfirming(false);
+                  if (result?.error) setError(result.error);
+                }}
+                className="mr-1"
+              >
+                <input type="hidden" name="entryId" value={entry.id} />
+                <button
+                  type="submit"
+                  disabled={confirming}
+                  className="text-xs rounded-md bg-lavender hover:bg-lavender-dark text-white font-medium px-2.5 py-1 transition-colors disabled:opacity-50"
+                >
+                  {confirming ? "…" : "Confirm"}
+                </button>
+              </form>
+            )}
             <button
               onClick={() => setEditing(true)}
               className="text-xs text-lavender hover:text-lavender-dark font-medium"

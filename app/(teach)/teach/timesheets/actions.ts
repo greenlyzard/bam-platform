@@ -6,6 +6,7 @@ import {
   getOrCreateTimesheet,
   payPeriodForDate,
   periodLockMessage,
+  resolvePeriodLockForPeriod,
   resolvePeriodLockForWorkDate,
 } from "@/lib/timesheets/helpers";
 import { revalidatePath } from "next/cache";
@@ -372,6 +373,147 @@ export async function updateTimesheetEntry(formData: FormData) {
         await supabase.from("teacher_hour_productions").insert(rows);
       }
     } catch { /* ignore parse errors */ }
+  }
+
+  revalidatePath("/teach/timesheets");
+  return { success: true };
+}
+
+/**
+ * Accept an auto-drafted entry: `attendance_status` → 'confirmed'.
+ *
+ * Sets that column and NOTHING else. In particular it does not touch
+ * `is_auto_populated`, which stays true forever. "The system proposed this and
+ * the teacher accepted it" and "the teacher typed this from memory" are
+ * different evidence about how a number came to exist, and payroll review, the
+ * audit trail, and any later dispute all need to tell them apart. Flipping the
+ * flag on confirm would erase the distinction at the exact moment it starts to
+ * matter.
+ *
+ * Does not touch `amount_cents` or `rate_id` either — the snapshot trigger owns
+ * them, and confirming changes none of the four columns it re-resolves on
+ * (date, entry_type, total_hours, timesheet_id), so the amount is left exactly
+ * as the generator priced it.
+ *
+ * Confirmation is INDEPENDENT of whether attendance was taken. The page prompts
+ * for missing attendance; it never blocks on it. A teacher who taught a class
+ * is owed those hours whether or not anyone marked a roster, and a payroll
+ * surface that withholds confirmation until an unrelated task is done just
+ * teaches people to work around it.
+ */
+export async function confirmAutoDraftEntry(formData: FormData) {
+  const supabase = await createClient();
+  const tp = await getTeacherContext(supabase);
+  if (!tp) return { error: "Teacher profile not found." };
+
+  const entryId = formData.get("entryId") as string;
+  if (!entryId) return { error: "Entry ID required." };
+
+  const { data: entry } = await supabase
+    .from("timesheet_entries")
+    .select("id, date, is_auto_populated, timesheets(teacher_id, status)")
+    .eq("id", entryId)
+    .single();
+
+  if (!entry) return { error: "Entry not found." };
+
+  const ts = entry.timesheets as unknown as {
+    teacher_id: string;
+    status: string;
+  };
+  if (ts.teacher_id !== tp.id) return { error: "Not your entry." };
+  if (ts.status !== "draft") {
+    return { error: "Timesheet already submitted — nothing to confirm." };
+  }
+  if (!entry.is_auto_populated) {
+    return { error: "That entry was entered by hand — there is nothing to confirm." };
+  }
+
+  // Same lock rule as add / update / delete, resolved against the entry's own
+  // work date. The generator already refuses to draft into a period past its
+  // cutoff, so a confirmable draft in a locked period is an edge case — but
+  // confirming is a write to a closed period like any other, and this path must
+  // not become the one that skips the check.
+  const timeZone = await getTenantTimezone(supabase, tp.tenant_id);
+  const lock = await resolvePeriodLockForWorkDate(
+    supabase,
+    tp.tenant_id,
+    timeZone,
+    entry.date
+  );
+  if ("error" in lock) return { error: lock.error };
+  if (lock.locked) return { error: periodLockMessage(lock) };
+
+  const { error } = await supabase
+    .from("timesheet_entries")
+    .update({ attendance_status: "confirmed" })
+    .eq("id", entryId);
+
+  if (error) {
+    console.error("[timesheets:confirmDraft]", error);
+    return { error: "Failed to confirm entry." };
+  }
+
+  revalidatePath("/teach/timesheets");
+  return { success: true };
+}
+
+/**
+ * Confirm every unconfirmed auto-draft on one timesheet.
+ *
+ * Scoped to a timesheet id — i.e. to one pay period — rather than "all my
+ * drafts", so a teacher cannot sweep a period they are not looking at.
+ *
+ * Filtered on `is_auto_populated` so a bulk confirm can never mark a
+ * hand-entered row as system-proposed, and on a null `attendance_status` so
+ * re-running it is a no-op rather than a rewrite of rows already decided.
+ * Locked once for the timesheet's own period: every entry on a timesheet
+ * belongs to that period by construction, so a per-row lock check here would
+ * re-resolve the same answer N times.
+ */
+export async function confirmAllAutoDrafts(formData: FormData) {
+  const supabase = await createClient();
+  const tp = await getTeacherContext(supabase);
+  if (!tp) return { error: "Teacher profile not found." };
+
+  const timesheetId = formData.get("timesheetId") as string;
+  if (!timesheetId) return { error: "Timesheet ID required." };
+
+  const { data: timesheet } = await supabase
+    .from("timesheets")
+    .select("id, teacher_id, status, pay_periods(period_month, period_year)")
+    .eq("id", timesheetId)
+    .single();
+
+  if (!timesheet) return { error: "Timesheet not found." };
+  if (timesheet.teacher_id !== tp.id) return { error: "Not your timesheet." };
+  if (timesheet.status !== "draft") {
+    return { error: "Timesheet already submitted — nothing to confirm." };
+  }
+
+  const period = timesheet.pay_periods as unknown as {
+    period_month: number;
+    period_year: number;
+  } | null;
+  if (!period) return { error: "Timesheet has no pay period." };
+
+  const timeZone = await getTenantTimezone(supabase, tp.tenant_id);
+  const lock = await resolvePeriodLockForPeriod(supabase, tp.tenant_id, timeZone, {
+    month: period.period_month,
+    year: period.period_year,
+  });
+  if (lock.locked) return { error: periodLockMessage(lock) };
+
+  const { error } = await supabase
+    .from("timesheet_entries")
+    .update({ attendance_status: "confirmed" })
+    .eq("timesheet_id", timesheetId)
+    .eq("is_auto_populated", true)
+    .is("attendance_status", null);
+
+  if (error) {
+    console.error("[timesheets:confirmAllDrafts]", error);
+    return { error: "Failed to confirm entries." };
   }
 
   revalidatePath("/teach/timesheets");
