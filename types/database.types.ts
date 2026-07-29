@@ -4661,6 +4661,7 @@ export type Database = {
           reporter_id: string
           status: string
           student_id: string | null
+          tenant_id: string
         }
         Insert: {
           action_taken?: string | null
@@ -4678,6 +4679,7 @@ export type Database = {
           reporter_id: string
           status?: string
           student_id?: string | null
+          tenant_id: string
         }
         Update: {
           action_taken?: string | null
@@ -4695,6 +4697,7 @@ export type Database = {
           reporter_id?: string
           status?: string
           student_id?: string | null
+          tenant_id?: string
         }
         Relationships: [
           {
@@ -4730,6 +4733,13 @@ export type Database = {
             columns: ["student_id"]
             isOneToOne: false
             referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mri_tenant_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -10629,6 +10639,7 @@ export type Database = {
       can_manage_pay:
         | { Args: never; Returns: boolean }
         | { Args: { p_tenant_id: string }; Returns: boolean }
+      can_view_safeguarding: { Args: { p_tenant_id: string }; Returns: boolean }
       generate_timesheet_drafts: {
         Args: {
           p_from: string
