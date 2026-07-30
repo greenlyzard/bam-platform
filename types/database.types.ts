@@ -1769,6 +1769,46 @@ export type Database = {
           },
         ]
       }
+      closure_locations: {
+        Row: {
+          closure_id: string
+          location_id: string
+          tenant_id: string
+        }
+        Insert: {
+          closure_id: string
+          location_id: string
+          tenant_id: string
+        }
+        Update: {
+          closure_id?: string
+          location_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "closure_locations_closure_id_fkey"
+            columns: ["closure_id"]
+            isOneToOne: false
+            referencedRelation: "studio_closures"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "closure_locations_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "studio_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "closure_locations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       communication_attachments: {
         Row: {
           content_type: string | null
@@ -5312,8 +5352,10 @@ export type Database = {
           ical_uid: string | null
           id: string
           is_recurring: boolean
+          location_id: string | null
           location_notes: string | null
           market_rate: number | null
+          overrides_closure: boolean
           parent_visible_notes: string | null
           primary_teacher_id: string
           recurrence_parent_id: string | null
@@ -5349,8 +5391,10 @@ export type Database = {
           ical_uid?: string | null
           id?: string
           is_recurring?: boolean
+          location_id?: string | null
           location_notes?: string | null
           market_rate?: number | null
+          overrides_closure?: boolean
           parent_visible_notes?: string | null
           primary_teacher_id: string
           recurrence_parent_id?: string | null
@@ -5386,8 +5430,10 @@ export type Database = {
           ical_uid?: string | null
           id?: string
           is_recurring?: boolean
+          location_id?: string | null
           location_notes?: string | null
           market_rate?: number | null
+          overrides_closure?: boolean
           parent_visible_notes?: string | null
           primary_teacher_id?: string
           recurrence_parent_id?: string | null
@@ -5439,6 +5485,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "teacher_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "private_sessions_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "studio_locations"
             referencedColumns: ["id"]
           },
           {
@@ -8410,23 +8463,35 @@ export type Database = {
       }
       studio_closures: {
         Row: {
+          all_studios: boolean
           closed_date: string
+          closed_through: string
           created_at: string | null
+          exempt_event_types: string[]
           id: string
+          is_total: boolean
           reason: string | null
           tenant_id: string
         }
         Insert: {
+          all_studios?: boolean
           closed_date: string
+          closed_through: string
           created_at?: string | null
+          exempt_event_types?: string[]
           id?: string
+          is_total?: boolean
           reason?: string | null
           tenant_id: string
         }
         Update: {
+          all_studios?: boolean
           closed_date?: string
+          closed_through?: string
           created_at?: string | null
+          exempt_event_types?: string[]
           id?: string
+          is_total?: boolean
           reason?: string | null
           tenant_id?: string
         }
@@ -10640,6 +10705,18 @@ export type Database = {
         | { Args: never; Returns: boolean }
         | { Args: { p_tenant_id: string }; Returns: boolean }
       can_view_safeguarding: { Args: { p_tenant_id: string }; Returns: boolean }
+      generate_occurrences: {
+        Args: {
+          p_class_id?: string
+          p_from: string
+          p_tenant_id: string
+          p_to: string
+        }
+        Returns: {
+          classes_processed: number
+          occurrences_created: number
+        }[]
+      }
       generate_timesheet_drafts: {
         Args: {
           p_from: string
