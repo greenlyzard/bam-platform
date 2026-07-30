@@ -10700,6 +10700,23 @@ export type Database = {
       }
     }
     Functions: {
+      apply_closures: {
+        Args: {
+          p_dry_run?: boolean
+          p_from: string
+          p_tenant_id: string
+          p_to: string
+        }
+        Returns: {
+          blocked_by_payroll: number
+          by_closure: Json
+          drafts_removed: number
+          dry_run: boolean
+          exempted: number
+          occurrences_cancelled: number
+          payroll_conflicts: Json
+        }[]
+      }
       auth_family_ids: { Args: never; Returns: string[] }
       can_manage_pay:
         | { Args: never; Returns: boolean }
