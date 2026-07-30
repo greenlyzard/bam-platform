@@ -1,11 +1,12 @@
 # Studio Closures — Cancellation, Location Scoping & Overrides
 
 **Status:** Draft spec v2 — awaiting approval. Not built.
-**Last updated:** 2026-07-29
+**Last updated:** 2026-07-30
 **Supersedes:** the 2026-07-10 location-scoping spec (`fe53713`) and the 2026-07-29
 cancellation-pass rewrite (`636ba43`). Both were authoritative in part; this merges them.
 **Governs:** `studio_closures`, `closure_locations` (new), `private_sessions` (location + override),
-`classes.closure_exempt` (new), `apply_closures` (new), closure display surfaces, closure enforcement
+`apply_closures` (new), the 2026–2027 closure calendar (§15), closure display surfaces,
+closure enforcement
 **Related:** `docs/LOCATIONS_AND_FACILITIES.md` (location model) · `docs/OCCURRENCE_GENERATION.md`
 (the generator, Phases 1–3 shipped 2026-07-29) · `docs/PRIVATE_LESSON_BILLING_AND_CREDITS.md` (proration)
 
@@ -70,6 +71,19 @@ closure dates. Phase 3 below removes that behaviour again, deliberately.
 concern. They were display-only first, for months, and several surfaces still
 implement only that. Both facts belong in the record.
 
+### Decisions — 2026-07-30
+
+Appended, not merged into the record above. Prior entries and their dates stand as written.
+
+| # | Decision | Source |
+|---|---|---|
+| D1 | **`classes.closure_exempt` is withdrawn.** The column was never created and is not needed — see §5. | this session |
+| D2 | **`closed_through` is NOT NULL**, backfilled to `closed_date`. The 6 existing Spring Break rows are **not** collapsed into a range — see §5, §12 Phase 1. | this session |
+| D3 | **The private-session location column is `location_id`, not `room_id`** — closures are location-scoped, rooms are not. See §5. | this session |
+| D4 | **The 2026–2027 closure calendar is 12 rows** (§15). Amanda confirmed the studio **is** closed Veterans Day and is **not** closed Lincoln Day; Lincoln Day is removed entirely. | Amanda, 2026-07-30 |
+| D5 | **`exempt_event_types = {private_lesson}` on every partial closure. No rehearsal exemption anywhere.** This resolves §14 Q1. | Amanda, 2026-07-30 |
+| D6 | **Tuition does not count occurrences.** `TUITION_MODES.md` supersedes the §4 proration recommendation. | `TUITION_MODES.md` |
+
 **Task 19 is no longer a blocker.** The 2026-07-10 version deferred the entire class
 half of this spec until an occurrence generator existed. It exists: `OCCURRENCE_GENERATION.md`
 Phases 1–3 shipped 2026-07-29 (`2633d1a`, `3222fec`, `d7e7b9f`). A rolled-back test
@@ -122,12 +136,14 @@ This is one mechanism instead of two, and it gains three properties:
   was cancelled for Thanksgiving" is a better record than the occurrence never having
   existed, both for parents and for billing audit.
 
-**Consequence for billing.** Proration in `PRIVATE_LESSON_BILLING_AND_CREDITS.md` and
-the tuition rules currently compute "dates from start to anchor, minus closures."
-Under this model they should count **non-cancelled occurrences** instead. That is
-strictly more accurate — it picks up single-class cancellations, teacher absences and
-room blocks, not just studio-wide closures — and it removes a duplicate closure
-calculation from the billing path.
+**No consequence for tuition.** This section previously recommended that proration
+count **non-cancelled occurrences**. That recommendation is **removed, superseded by
+`docs/TUITION_MODES.md` (2026-07-29)**, which locked flat monthly tuition paid in full
+and in advance, with closures **not** excluded — and, where a tenant enables proration,
+a basis of **total calendar days** rather than weekdays or sessions. Tuition does not
+count occurrences in either mode, so a closure changes no tuition figure. Cancellation
+remains the right model for scheduling, attendance and payroll; it is simply not a
+billing input.
 
 ---
 
@@ -138,12 +154,21 @@ calculation from the billing path.
 | Column | Type | Meaning |
 |---|---|---|
 | `all_studios` | boolean NOT NULL DEFAULT true | `true` → applies to every `location_type='studio'` location, including studios that do not exist yet. `false` → applies only to the studios listed in `closure_locations`. |
-| `closed_through` | date NULL | End of an inclusive range. NULL means a single day. Winter break becomes one row, not ten. |
+| `closed_through` | date **NOT NULL** | End of an inclusive range. A single day is `closed_through = closed_date`, not NULL. Winter break becomes one row, not ten. |
 | `is_total` | boolean NOT NULL DEFAULT false | Nobody in the building. **Overrides every exemption and every override** — see §6. |
-| `exempt_event_types` | text[] NOT NULL DEFAULT `'{}'` | For partial closures: event types that carry on regardless. Expected typical value `{private_lesson,rehearsal}`. |
+| `exempt_event_types` | text[] NOT NULL DEFAULT `'{}'` | For partial closures: event types that carry on regardless. Confirmed value `{private_lesson}` (Amanda, 2026-07-30) — **no rehearsal exemption**. |
 
-`closed_date` stays as the range start. A CHECK enforces
-`closed_through IS NULL OR closed_through >= closed_date`.
+`closed_date` stays as the range start. A CHECK enforces `closed_through >= closed_date`.
+
+**Backfill rule (amended 2026-07-30).** `closed_through` is added **NOT NULL**, backfilled
+`closed_through = closed_date` for every existing row. Every closure is therefore a range,
+and no consumer needs a NULL branch or a `coalesce` — a single-day closure is a one-day range.
+
+**The 6 existing Spring Break rows are NOT collapsed into a single 04-06 → 04-11 range.**
+They are past dates; rewriting them is churn with no benefit — nothing reads them, no
+occurrence exists to cancel under them, and merging six rows into one loses the history of
+how they were entered. They stay as six one-day ranges. **Ranged entry applies to new rows
+going forward**, starting with the §15 calendar.
 
 ### `closure_locations` — new join table
 
@@ -174,24 +199,34 @@ and "specific" closures coexist in the same table.
 | `location_id` | uuid → `studio_locations.id` (studio-type) | **Prerequisite** for targeting privates by studio. Without it, no location-scoped enforcement works on privates at all. |
 | `overrides_closure` | boolean NOT NULL DEFAULT false | This private happens even if its studio is closed on its date. Subject to §6. |
 
-**Backfill.** Location is free-text `studio` today — 5 rows, all `"Studio 1"`, all San
-Clemente. Map them to the San Clemente location as part of the schema step. **This
-gets harder the longer it waits:** five rows of a single known value is a trivial
+**The column is `location_id`, not `room_id` — pinned 2026-07-30.** Closures are
+**location-scoped**: Rancho Santa Margarita can close while San Clemente stays open, and
+that is the distinction the closure model has to enforce. A single **room** closing is
+already representable without any new column — it is
+`schedule_instances.event_type = 'room_block'`. Adding `room_id` here would model the case
+that is already handled and miss the case that is not.
+
+`private_sessions.studio` (text) is **retained** as a free-text room hint until rooms are
+properly modelled. It is not authoritative for anything and must not be parsed for location.
+
+**Backfill.** Location is free-text `studio` today — 5 rows, all `"Studio 1"`. All 5 map to
+**San Clemente, `70acde19-bd54-46c2-a4f4-2200b0adb393`**, since "Studio 1" is a room there.
+**This gets harder the longer it waits:** five rows of a single known value is a trivial
 mapping; a year of privates across two studios entered as free text is a
 reconstruction job. Do it now, while the answer is unambiguous.
 
-### `classes` — add
+### `classes` — no change
 
-| Column | Type | Meaning |
-|---|---|---|
-| `closure_exempt` | boolean NOT NULL DEFAULT false | This class runs through a partial closure. Amanda marks adult classes and Pilates once. |
+**`classes.closure_exempt` is withdrawn (2026-07-30).** It was never created — verified
+against the live catalog 2026-07-30 — so there is nothing to add and nothing to drop; the
+proposal is simply retracted. It is unnecessary: **Pilates is a private lesson**, already
+exempt by event type via `exempt_event_types = {private_lesson}`, and **adult classes follow
+closures** with a per-occurrence admin override (§6 rung 4) on the rare day one runs anyway.
 
-**Deliberately not built:** a class-category taxonomy for "adult" or "pilates".
+**Also deliberately not built:** a class-category taxonomy for "adult" or "pilates".
 Neither exists in the catalogue today (0 adult by age or name, 0 Pilates; the
 disciplines are Ballet, Contemporary, Hip Hop, Jazz, Movement, Musical Theater,
-Stretching), `age_min` is 0 on every row, and inventing a taxonomy to express a
-two-item exemption list would be building the wrong thing. The boolean is set
-directly by the person who makes the decision.
+Stretching), and `age_min` is 0 on every row.
 
 ---
 
@@ -224,10 +259,12 @@ decorative.
 
 1. `is_total = true` → cancelled. Nothing below is consulted.
 2. `event_type` ∈ `exempt_event_types` → survives.
-3. Class has `closure_exempt = true` → survives.
-4. Private has `overrides_closure = true` → survives.
-5. Admin has explicitly overridden this class occurrence → survives.
-6. Otherwise → cancelled.
+3. Private has `overrides_closure = true` → survives.
+4. Admin has explicitly overridden this class occurrence → survives.
+5. Otherwise → cancelled.
+
+*(A class-level `closure_exempt` rung sat at position 3 until 2026-07-30. It is removed with
+the column proposal — see §5.)*
 
 ---
 
@@ -238,7 +275,6 @@ decorative.
 | Create / edit / delete a closure (all studios or specific) | admin / super_admin | Buildable now |
 | Mark a closure `is_total` | admin / super_admin | Buildable now |
 | Set `exempt_event_types` on a closure | admin / super_admin | Buildable now |
-| Mark a class `closure_exempt` | admin / super_admin | Buildable now |
 | Override a **private** to run during a closure (`overrides_closure`) | **any teacher who can schedule privates** — no admin gate | Buildable now |
 | Override a **class** to run during a closure | **admin / super_admin only** | Buildable now (was deferred on task 19; the generator exists) |
 | Run `apply_closures` | admin / super_admin | Phase 2 |
@@ -263,7 +299,8 @@ apply_closures(
 ```
 
 For each closure overlapping `[p_from, p_to]` — a closure covers
-`closed_date` through `coalesce(closed_through, closed_date)` inclusive — and each
+`closed_date` through `closed_through` inclusive, and `closed_through` is NOT NULL (§5),
+so no `coalesce` is needed — and each
 occurrence on a covered date whose location is in scope (the closure has
 `all_studios = true`, or the occurrence's `location_id` appears in
 `closure_locations` for that closure):
@@ -345,11 +382,19 @@ ships.
 
 **Phase 1 — schema.** `studio_closures.all_studios`, `closed_through`, `is_total`,
 `exempt_event_types`; the `closed_through >= closed_date` CHECK; `closure_locations`
-join table; `private_sessions.location_id` + `overrides_closure`; `classes.closure_exempt`.
-Backfill: the 6 existing closures get `all_studios = true`, `is_total = false`,
-`exempt_event_types = '{}'`; the 5 privates' free-text `"Studio 1"` → San Clemente
-`location_id`. One migration via `supabase db push` (Regular Terminal), pre-flight
-guards, then type regen and `bam-schema-sync`.
+join table; `private_sessions.location_id` + `overrides_closure`. **No `classes` change** —
+`closure_exempt` is withdrawn (§5).
+
+Backfill, in this order — `closed_through` is NOT NULL, so it must be added nullable,
+backfilled, then set NOT NULL:
+
+- The 6 existing closures get `closed_through = closed_date`, `all_studios = true`,
+  `is_total = false`, `exempt_event_types = '{}'`. **They are not collapsed into a range** (§5).
+- The 5 privates' free-text `"Studio 1"` → San Clemente `70acde19-bd54-46c2-a4f4-2200b0adb393`;
+  `private_sessions.studio` is left in place as a room hint.
+
+One migration via `supabase db push` (Regular Terminal), pre-flight guards, then type regen
+and `bam-schema-sync`.
 
 **Phase 2 — `apply_closures`.** Per §8 and §9, dry-run default.
 
@@ -371,8 +416,11 @@ model that will not be used.
 with per-private `overrides_closure`, editable by any private-scheduling teacher;
 respect the existing `status='cancelled'` exclusion the app already honours.
 
-**Phase 6 — billing.** Switch proration to count non-cancelled occurrences (§4).
-Coordinate with the billing spec; do not change both definitions at once.
+**Phase 6 — billing. Removed 2026-07-30.** This phase was "switch proration to count
+non-cancelled occurrences." `TUITION_MODES.md` supersedes it: tuition is flat monthly under
+`flat_month`, calendar-day-based under `prorated`, and counts occurrences in neither mode
+(§4). **There is no billing phase in this spec.** What remains is a policy question, not a
+computation: see §15.1 and §14 Q7.
 
 ---
 
@@ -391,14 +439,81 @@ Phase 3 above should land before that generation runs.
 
 | # | Question | Source | Blocks |
 |---|---|---|---|
-| 1 | Default `exempt_event_types` for a normal closure — is `{private_lesson,rehearsal}` right, or do rehearsals stop too? **Amanda** | 2026-07-29 | Phase 2 default |
+| 1 | ~~Default `exempt_event_types` — is `{private_lesson,rehearsal}` right, or do rehearsals stop too?~~ **Resolved 2026-07-30: `{private_lesson}`. Rehearsals stop.** | 2026-07-29 | — |
 | 2 | Does a closure at San Clemente ever imply a closure at RSM? Assumed **no** — separate buildings, separate calendars, which is what `all_studios = false` is for | both | Phase 1 |
 | 3 | When a class is cancelled by closure, are parents notified, and by which surface? `notification_sent_at` exists on the occurrence and 88 notifications sit unread with no UI | 2026-07-29 | Phase 4 |
-| 4 | **Does a closed day shorten the season or extend the end date?** A tuition question, not a scheduling one. **Amanda** | 2026-07-29 | Phase 6 |
+| 4 | **Does a closed day shorten the season or extend the end date?** No longer a tuition question (§4) — a calendar and staffing one. **Amanda** | 2026-07-29 | Phase 4 |
 | 5 | For a **recurring** private, does `overrides_closure` apply per occurrence or to the whole recurrence series? | 2026-07-10 | Phase 5 |
 | 6 | Should an admin class override be a column on the occurrence, or an audited action? §6 assumes the former; nothing implements either yet | this merge | Phase 4 |
+| 7 | **Monday families lose 8 teaching days to closures; Friday families lose 4 — and under flat monthly billing both pay the same.** Is that accepted, absorbed by makeups, or corrected? **Amanda** | 2026-07-30 | §15.1 · Makeup policy |
 
-**Question 4 is the one with money attached.** If families pay for a fixed number of
-sessions, a closure either shortens what they received or pushes the season out. Both
-are defensible; the system currently assumes neither, and §4's switch to counting
-non-cancelled occurrences makes the answer directly observable in what gets billed.
+**Question 4 no longer has money attached — Question 7 does.** Under `flat_month` a closed
+day changes no invoice (§4), so "shorten the season or extend the end date" is now a
+calendar and staffing question rather than a billing one. What does have money attached is
+the **weekday asymmetry in §15.1**: flat billing charges every family the same for a
+materially different number of sessions.
+
+---
+
+## 15. The 2026–2027 closure calendar
+
+**Confirmed by Amanda 2026-07-30. 12 rows.** Two corrections came with the confirmation:
+the studio **is** closed on **Veterans Day**, and it is **not** closed on **Lincoln Day** —
+Feb 12 is removed entirely and must not be entered.
+
+These rows do not exist in `studio_closures` yet; §3 still reads "Fall closures on file:
+none," and that stays true until Phase 1 lands and these are entered. They are recorded here
+so the calendar is not reconstructed from memory later.
+
+Every row is `all_studios = true`. Every **partial** row carries
+`exempt_event_types = {private_lesson}` — **no rehearsal exemption anywhere** (§14 Q1).
+Multi-day entries are single ranged rows, per §5.
+
+| `closed_date` | `closed_through` | `reason` | `is_total` |
+|---|---|---|---|
+| 2026-09-07 | 2026-09-07 | Labor Day | false |
+| 2026-11-11 | 2026-11-11 | Veterans Day | false |
+| 2026-11-23 | 2026-11-25 | Fall Recess | false |
+| 2026-11-26 | 2026-11-26 | Thanksgiving Day | **TRUE** |
+| 2026-11-27 | 2026-11-27 | Day after Thanksgiving | false |
+| 2026-12-21 | 2026-12-24 | Winter Recess | false |
+| 2026-12-25 | 2026-12-25 | Christmas Day | **TRUE** |
+| 2026-12-26 | 2027-01-01 | Winter Recess | false |
+| 2027-01-18 | 2027-01-18 | MLK Day | false |
+| 2027-02-15 | 2027-02-15 | Presidents Day | false |
+| 2027-04-05 | 2027-04-09 | Spring Recess | false |
+| 2027-05-31 | 2027-05-31 | Memorial Day | false |
+
+The two `is_total` days are Thanksgiving Day and Christmas Day — nobody in the building,
+privates included (§6). Winter Recess is deliberately **three rows**, not one: Christmas Day
+is total and sits between two partial stretches, and a total day cannot be expressed inside
+a partial range.
+
+### 15.1 Weekday impact — computed 2026-07-30
+
+**25 weekday teaching days are lost across the season**, and they do not fall evenly:
+
+| Day | Lost | Dates |
+|---|---|---|
+| Monday | **8** | Sep 7, Nov 23, Dec 21, Dec 28, Jan 18, Feb 15, Apr 5, May 31 |
+| Tuesday | 4 | Nov 24, Dec 22, Dec 29, Apr 6 |
+| Wednesday | 5 | Nov 11, Nov 25, Dec 23, Dec 30, Apr 7 |
+| Thursday | 4 | Nov 26, Dec 24, Dec 31, Apr 8 |
+| Friday | 4 | Nov 27, Dec 25, Jan 1, Apr 9 |
+
+Mondays carry twice the closure load of any other weekday — American holidays are
+overwhelmingly Mondays, and BAM's recesses add more on top.
+
+**The consequence is a billing fairness problem, and it is the reason the makeup path is
+load-bearing rather than optional.** Under `flat_month` (`TUITION_MODES.md`) tuition does
+not vary with how many sessions land in a month, so **a family whose child takes a Monday
+class pays exactly what a Friday family pays for four fewer sessions across the year.**
+Nothing in the billing engine corrects this, by design — the only mechanism that can is a
+makeup credit per cancelled occurrence (`MAKEUP_POLICY.md`).
+
+That elevates makeups from a courtesy to the thing that makes flat monthly billing
+defensible on a Monday. **Flagged as an open item for Amanda — §14 Q7.** The options are to
+accept the asymmetry, to rely on makeups to absorb it, or to correct it in scheduling
+(a Monday make-up day, or shifting a recess boundary off a Monday).
+
+*(An earlier draft of this count said seven Mondays. It omitted Labor Day. It is eight.)*

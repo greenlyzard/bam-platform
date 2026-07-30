@@ -48,19 +48,32 @@ Defines when a student is eligible for a makeup class, how makeup credits are is
 > **Amended 2026-07-29 — "studio closure for a single day" no longer describes a
 > closure.** When this was written a closure was one flat date. Per
 > `STUDIO_CLOSURES.md` v2 a closure is a **date range** (`closed_through`), is
-> **location-scoped**, and is either **total** (`is_total`) or **partial** (exempting
-> event types via `exempt_event_types` or individual classes via
-> `classes.closure_exempt`). Credit issuance follows the cancelled occurrence, not the
-> closure row, which resolves all three cases below without a policy change:
+> **location-scoped**, and is either **total** (`is_total`) or **partial**. A partial
+> closure exempts an occurrence by one of **two** mechanisms: the occurrence's
+> `event_type` appears in the closure's `exempt_event_types` — the confirmed value is
+> `{private_lesson}`, so privates run through a partial closure and rehearsals do
+> **not** — or an **admin override on that individual class occurrence**
+> (`STUDIO_CLOSURES.md` §6 rung 4, admin/super_admin only). Credit issuance follows the
+> cancelled occurrence, not the closure row, which resolves all three cases below
+> without a policy change:
 >
 > - **A multi-day closure issues one credit per cancelled occurrence, not one per
 >   closure.** If the studio follows Capistrano Unified and closes the full week of
 >   Thanksgiving (Nov 23–27 2026), a class meeting Monday through Friday yields **five**
 >   credits for each affected enrollment.
-> - **A partial closure that exempts a class issues no credit for that class.** The
->   class ran. There is nothing to make up.
+> - **A partial closure that exempts an occurrence issues no credit for it.** The class
+>   ran. There is nothing to make up.
 > - **A location-scoped closure issues credits only for classes at that location.** A
 >   San Clemente closure creates no credit for an RSM class.
+>
+> *Amended 2026-07-30: the third mechanism this note originally cited,
+> `classes.closure_exempt`, is **withdrawn** — the column was never created, verified
+> against the live catalogue, and the proposal is retracted rather than deferred
+> (`STUDIO_CLOSURES.md` §5, decision D1). The two cases it existed to serve are both
+> covered without it: **Pilates is a private lesson**, exempt by event type, so no
+> credit is issued; **adult classes follow closures** and their students receive credits
+> like anyone else, except on the rare day one runs anyway under a per-occurrence admin
+> override, when it issues none.*
 
 ### Student is NOT eligible when:
 - Enrolled in the **Unlimited level** — Unlimited students have open access to sessions; no formal makeup credit is issued
