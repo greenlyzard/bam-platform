@@ -17,10 +17,6 @@
       "schedule": "*/15 * * * *"
     },
     {
-      "path": "/api/cron/schedule-generate",
-      "schedule": "0 8 * * *"
-    },
-    {
       "path": "/api/cron/timesheet-drafts",
       "schedule": "30 8 * * *"
     }
