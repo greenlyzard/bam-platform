@@ -3,7 +3,11 @@ import assert from "node:assert/strict";
 import {
   resolveInstanceLocation,
   formatLocationAddress,
+  formatRoomLabel,
+  locationShortLabel,
+  ROOM_LOCATION_SEPARATOR,
   type LocationRef,
+  type LocationLabelRef,
   type LocationLookup,
   type InstanceLocationFields,
   type ClassLocationFields,
@@ -161,4 +165,130 @@ test("formatLocationAddress handles full, partial, and empty inputs", () => {
     formatLocationAddress({ id: "x", name: "X", address: null, city: null, state: null, zip: null }),
     "",
   );
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Room labels — the rule decided 2026-07-31.
+// ═════════════════════════════════════════════════════════════════════════════
+
+// Mirrors live data: the two `studio` rows carry an abbreviation, the four
+// partner_venue/internal rows are null by design (migration 20260731000001).
+const SC_LABEL: LocationLabelRef = {
+  name: "Ballet Academy and Movement — San Clemente",
+  abbreviation: "SC",
+};
+const RSM_LABEL: LocationLabelRef = {
+  name: "Ballet Academy and Movement — Rancho Santa Margarita",
+  abbreviation: "RSM",
+};
+const PARTNER_VENUE: LocationLabelRef = {
+  name: "San Juan Hills HS Theater",
+  abbreviation: null,
+};
+
+const FILTERED = { locationFilterActive: true };
+const UNFILTERED = { locationFilterActive: false };
+
+// ── Filter ACTIVE -> bare room name ──────────────────────────────────────────
+test("filter active: bare room name, even though the location has an abbreviation", () => {
+  assert.equal(formatRoomLabel("Studio 1", RSM_LABEL, FILTERED), "Studio 1");
+  assert.equal(formatRoomLabel("Studio 1", SC_LABEL, FILTERED), "Studio 1");
+});
+
+test("filter active: bare room name with no location too", () => {
+  assert.equal(formatRoomLabel("Studio 1", null, FILTERED), "Studio 1");
+});
+
+// ── Filter INACTIVE, abbreviation present ────────────────────────────────────
+test("filter inactive with abbreviation: appends the abbreviation", () => {
+  assert.equal(formatRoomLabel("Studio 1", RSM_LABEL, UNFILTERED), "Studio 1 · RSM");
+  assert.equal(formatRoomLabel("Studio 1", SC_LABEL, UNFILTERED), "Studio 1 · SC");
+});
+
+// ── Filter INACTIVE, no abbreviation (partner venue) ─────────────────────────
+test("filter inactive without abbreviation: appends the FULL name, never a split of it", () => {
+  assert.equal(
+    formatRoomLabel("Main Stage", PARTNER_VENUE, UNFILTERED),
+    "Main Stage · San Juan Hills HS Theater",
+  );
+});
+
+test("filter inactive: an em dash in the name is NOT a split point", () => {
+  // The retired behaviour would have produced "Studio 1 · San Clemente" here.
+  // Without an abbreviation the whole name is the label — punctuation is data.
+  const noAbbrev: LocationLabelRef = { ...SC_LABEL, abbreviation: null };
+  assert.equal(
+    formatRoomLabel("Studio 1", noAbbrev, UNFILTERED),
+    "Studio 1 · Ballet Academy and Movement — San Clemente",
+  );
+});
+
+test("filter inactive: whitespace-only abbreviation falls back to the name", () => {
+  assert.equal(
+    formatRoomLabel("Studio 1", { name: "Casa Romantica", abbreviation: "   " }, UNFILTERED),
+    "Studio 1 · Casa Romantica",
+  );
+});
+
+// ── Null location -> bare name, no separator, no "Unassigned" ────────────────
+test("null location: bare name — no separator, no 'Unassigned' suffix", () => {
+  const label = formatRoomLabel("Pilates Room", null, UNFILTERED);
+  assert.equal(label, "Pilates Room");
+  assert.ok(!label.includes(ROOM_LOCATION_SEPARATOR));
+  assert.ok(!label.includes("Unassigned"));
+  assert.ok(!label.includes("No location"));
+});
+
+test("undefined location behaves the same as null", () => {
+  assert.equal(formatRoomLabel("Pilates Room", undefined, UNFILTERED), "Pilates Room");
+});
+
+test("location present but blank on both fields: bare name", () => {
+  assert.equal(
+    formatRoomLabel("Studio 1", { name: "  ", abbreviation: null }, UNFILTERED),
+    "Studio 1",
+  );
+});
+
+// ── Separator ────────────────────────────────────────────────────────────────
+test("separator is space-middot-space, used exactly once", () => {
+  assert.equal(ROOM_LOCATION_SEPARATOR, " · ");
+  const label = formatRoomLabel("Studio 1", RSM_LABEL, UNFILTERED);
+  assert.equal(label.split(ROOM_LOCATION_SEPARATOR).length, 2);
+  assert.equal(label, `Studio 1${ROOM_LOCATION_SEPARATOR}RSM`);
+});
+
+// ── The label must not depend on what else is on screen ──────────────────────
+test("a unique room name still gets the location when unfiltered", () => {
+  // The retired closure appended the location only to names that collided, so
+  // this label changed depending on which other rooms happened to be visible.
+  assert.equal(formatRoomLabel("Pilates Room", SC_LABEL, UNFILTERED), "Pilates Room · SC");
+});
+
+test("identical inputs give identical labels regardless of the surrounding list", () => {
+  const room = { name: "Studio 1", location: SC_LABEL };
+  const alone = [room];
+  const colliding = [room, { name: "Studio 1", location: RSM_LABEL }];
+  const label = (list: typeof alone) =>
+    list.map((r) => formatRoomLabel(r.name, r.location, UNFILTERED));
+  assert.deepEqual(label(alone), ["Studio 1 · SC"]);
+  assert.deepEqual(label(colliding), ["Studio 1 · SC", "Studio 1 · RSM"]);
+});
+
+// ── Room name hygiene ────────────────────────────────────────────────────────
+test("room name is trimmed; a blank room name yields the location alone", () => {
+  assert.equal(formatRoomLabel("  Studio 1  ", RSM_LABEL, UNFILTERED), "Studio 1 · RSM");
+  assert.equal(formatRoomLabel("   ", RSM_LABEL, UNFILTERED), "RSM");
+  assert.equal(formatRoomLabel("   ", null, UNFILTERED), "");
+});
+
+// ── locationShortLabel unit ──────────────────────────────────────────────────
+test("locationShortLabel: abbreviation wins, name is the fallback, null when neither", () => {
+  assert.equal(locationShortLabel(SC_LABEL), "SC");
+  assert.equal(locationShortLabel(PARTNER_VENUE), "San Juan Hills HS Theater");
+  assert.equal(locationShortLabel({ name: "X", abbreviation: " RSM " }), "RSM");
+  assert.equal(locationShortLabel({ name: " Casa Romantica ", abbreviation: null }), "Casa Romantica");
+  assert.equal(locationShortLabel({ name: "", abbreviation: null }), null);
+  assert.equal(locationShortLabel(null), null);
+  assert.equal(locationShortLabel(undefined), null);
 });

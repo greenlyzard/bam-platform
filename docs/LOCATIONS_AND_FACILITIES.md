@@ -75,6 +75,32 @@ resolveInstanceLocation(instance, class):
 
 ---
 
+## 4.1 Room labels — `abbreviation`, and the filter rule
+
+*Added 2026-07-31. Implemented in `lib/locations/resolve.ts` (`formatRoomLabel`, `locationShortLabel`, `ROOM_LOCATION_SEPARATOR`). Not yet adopted by any surface — see the note at the end.*
+
+**`studio_locations.abbreviation`** (nullable text, 1–12 chars when present; migration `20260731000001`) is the location's short form. Live values: `SC`, `RSM`. The four `partner_venue`/`internal` rows are null **by design** — null means "no established short form", not missing data.
+
+**Never derive a short label by splitting `name` on punctuation.** "Ballet Academy and Movement — San Clemente" yielding "San Clemente" was a coincidence of someone typing an em dash, not a rule; it breaks silently on rename, on a hyphen, or on a name with no separator. The column exists to replace that derivation, and the derivation is not retained as a fallback.
+
+**Label source:** `abbreviation` when present, otherwise the **full** `name`.
+
+**The rule:**
+
+| View state | Label |
+|---|---|
+| A location filter is **active** (view scoped to exactly one location) | Bare room name — `Studio 1` |
+| **No** location filter, or more than one location in view | Always append the location — `Studio 1 · RSM` |
+| Room has **no** location | Bare room name. No separator, no "Unassigned" suffix |
+
+**Separator:** ` · ` (space, U+00B7, space) — the portal's existing inline-metadata separator.
+
+**The suffix depends only on whether the view is filtered — never on whether two visible rooms happen to collide.** Collision-conditional labelling (the retired `makeRoomLabeller` closure in `class-management.tsx`) makes a room's label change when an unrelated row appears, and makes the same room read differently on two screens. Predictable within a view, quiet once filtered.
+
+> **Adoption is pending.** The helper and its tests exist; roughly 14 surfaces still roll their own room labelling, including the `shortLocationName` / `makeRoomLabeller` closures in `app/(admin)/admin/classes/class-management.tsx`. Retiring those is a separate change.
+
+---
+
 ## 5. Reconciliation (Build Step 1 — ship first, standalone)
 
 This is a data-integrity fix independent of every new feature and de-risks everything after it. Ship it on its own.

@@ -14,6 +14,14 @@ export type LocationRef = Pick<
   "id" | "name" | "address" | "city" | "state" | "zip"
 >;
 
+/**
+ * The subset of a `studio_locations` row needed to *label* it — the short form
+ * that hangs off a room name in UI chrome. Deliberately narrower than
+ * `LocationRef`: a caller that only needs a label should only have to select
+ * these two columns.
+ */
+export type LocationLabelRef = Pick<StudioLocationRow, "name" | "abbreviation">;
+
 /** The subset of a `schedule_instances` row that determines its location. */
 export type InstanceLocationFields = Pick<
   ScheduleInstanceRow,
@@ -72,6 +80,82 @@ export function formatLocationAddress(loc: LocationRef): string {
     .join(" ");
   if (cityStateZip !== "") parts.push(cityStateZip);
   return parts.join(", ");
+}
+
+/**
+ * Separator between a room name and its location: "Studio 1 · RSM".
+ *
+ * Space-middot-space is the established separator for inline metadata across
+ * the portal (schedule views, class catalog, timesheets, teacher schedule).
+ * This is that same convention, not a new one.
+ */
+export const ROOM_LOCATION_SEPARATOR = " · ";
+
+/**
+ * The short form of a location: its `abbreviation` when it has one, otherwise
+ * its full `name`. Returns null when there is no location, or when neither
+ * field carries text.
+ *
+ * `abbreviation` is nullable **by design** — only the two `studio` rows have
+ * one (SC, RSM); partner venues and internal sites deliberately do not. Null is
+ * "no established short form", not missing data, and the fallback is the whole
+ * name.
+ *
+ * This NEVER derives a short form by splitting the name on punctuation. That
+ * behaviour existed before `studio_locations.abbreviation` did (migration
+ * 20260731000001) and is not kept as a fallback: "Ballet Academy and Movement —
+ * San Clemente" yielding "San Clemente" was a coincidence of someone typing an
+ * em dash, and it breaks silently on rename.
+ */
+export function locationShortLabel(
+  location: LocationLabelRef | null | undefined,
+): string | null {
+  if (!location) return null;
+  if (hasText(location.abbreviation)) return location.abbreviation.trim();
+  if (hasText(location.name)) return location.name.trim();
+  return null;
+}
+
+export type RoomLabelOptions = {
+  /**
+   * True when the view is scoped to exactly one location — a location filter is
+   * applied. The caller collapses "a filter is set" and "only one location is in
+   * view" into this single flag before calling.
+   */
+  locationFilterActive: boolean;
+};
+
+/**
+ * The display label for a room, per the rule decided 2026-07-31:
+ *
+ *   - Location filter ACTIVE  -> bare room name. The user has already said which
+ *     studio they are looking at; repeating it on every column is noise.
+ *   - No filter (or more than one location in view) -> always append the
+ *     location: "Studio 1 · RSM".
+ *   - Room with no location -> bare name. No separator, no "Unassigned" suffix.
+ *
+ * Predictable within a view, quiet once filtered.
+ *
+ * The suffix depends ONLY on whether the view is filtered — never on whether two
+ * visible rooms happen to share a name. A label that changes because an
+ * unrelated row scrolled into view is disorienting, and it makes the same room
+ * read differently on two screens.
+ *
+ * Pure: no I/O, no lookups. Pass the already-resolved location.
+ */
+export function formatRoomLabel(
+  roomName: string,
+  location: LocationLabelRef | null | undefined,
+  { locationFilterActive }: RoomLabelOptions,
+): string {
+  const room = roomName.trim();
+  if (locationFilterActive) return room;
+
+  const locationLabel = locationShortLabel(location);
+  if (locationLabel === null) return room;
+  if (room === "") return locationLabel;
+
+  return `${room}${ROOM_LOCATION_SEPARATOR}${locationLabel}`;
 }
 
 /**
