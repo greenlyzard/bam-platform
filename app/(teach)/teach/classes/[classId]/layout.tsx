@@ -1,4 +1,6 @@
 import { requireTeacher } from "@/lib/auth/guards";
+import { fetchLocationLabels } from "@/lib/locations/queries";
+import { formatRoomLabel } from "@/lib/locations/resolve";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import Link from "next/link";
@@ -52,15 +54,24 @@ export default async function ClassDetailLayout({
 
   if (!assignment) redirect("/teach/classes");
 
-  // Resolve room name
-  let roomName: string | null = null;
+  // Resolve the room and its location. A teacher covering both studios needs to
+  // know which building this class is in, and "Studio 1" alone does not say
+  // (§4.1, §6 Teacher). This header is one class, never a filtered list.
+  let roomLabel: string | null = null;
   if (cls.room_id) {
     const { data: room } = await supabase
       .from("rooms")
-      .select("name")
+      .select("name, location_id")
       .eq("id", cls.room_id)
       .single();
-    roomName = room?.name ?? null;
+    if (room) {
+      const locations = await fetchLocationLabels(supabase, [room.location_id]);
+      roomLabel = formatRoomLabel(
+        room.name,
+        room.location_id ? locations[room.location_id] ?? null : null,
+        { locationFilterActive: false }
+      );
+    }
   }
 
   return (
@@ -90,7 +101,7 @@ export default async function ClassDetailLayout({
               {cls.day_of_week != null && <span> · {DAY_NAMES[cls.day_of_week]}</span>}
               {cls.start_time && <span> · {formatTime(cls.start_time)}</span>}
               {cls.end_time && <span> – {formatTime(cls.end_time)}</span>}
-              {roomName && <span className="text-mist"> · {roomName}</span>}
+              {roomLabel && <span className="text-mist"> · {roomLabel}</span>}
             </p>
             {cls.levels && cls.levels.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-2">

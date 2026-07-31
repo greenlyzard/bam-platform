@@ -1,9 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { formatRoomLabel, type LocationLabelRef } from "@/lib/locations/resolve";
 import Link from "next/link";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+/** No location filter on this view — every studio is in view (§4.1). */
+const UNFILTERED = { locationFilterActive: false } as const;
 
 function formatTime(time: string): string {
   const [h, m] = time.split(":");
@@ -21,6 +25,7 @@ interface MyClass {
   end_time: string | null;
   room: string | null;
   room_id: string | null;
+  location_id: string | null;
   enrolled_count: number;
   max_enrollment: number | null;
 }
@@ -29,11 +34,14 @@ export function DashboardViewToggle({
   isTeacher,
   myClasses,
   roomMap,
+  classLocations,
   adminContent,
 }: {
   isTeacher: boolean;
   myClasses: MyClass[];
-  roomMap: Record<string, string>;
+  roomMap: Record<string, { name: string; location: LocationLabelRef | null }>;
+  /** Class home locations, for legacy free-text `classes.room`. */
+  classLocations: Record<string, LocationLabelRef>;
   adminContent: React.ReactNode;
 }) {
   const [viewMode, setViewMode] = useState<"admin" | "teacher">("admin");
@@ -60,9 +68,15 @@ export function DashboardViewToggle({
     }))
     .filter((g) => g.classes.length > 0);
 
-  function roomName(c: MyClass): string {
-    if (c.room_id && roomMap[c.room_id]) return roomMap[c.room_id];
-    return c.room ?? "";
+  // No location filter on this view, so a room label always names its location
+  // (§4.1). A room row carries its own location; legacy free-text
+  // `classes.room` has no room row, so it falls back to the class's home studio.
+  function roomLabel(c: MyClass): string {
+    const room = c.room_id ? roomMap[c.room_id] : undefined;
+    const homeLocation = c.location_id ? classLocations[c.location_id] ?? null : null;
+    if (room) return formatRoomLabel(room.name, room.location, UNFILTERED);
+    if (c.room) return formatRoomLabel(c.room, homeLocation, UNFILTERED);
+    return "";
   }
 
   return (
@@ -123,7 +137,7 @@ export function DashboardViewToggle({
                       <p className="text-sm text-slate mt-0.5">
                         {c.start_time && formatTime(c.start_time)}
                         {c.end_time && ` – ${formatTime(c.end_time)}`}
-                        {roomName(c) && <span className="text-mist"> · {roomName(c)}</span>}
+                        {roomLabel(c) && <span className="text-mist"> · {roomLabel(c)}</span>}
                         <span className="text-mist"> · {c.enrolled_count}/{c.max_enrollment ?? "—"}</span>
                       </p>
                     </div>
@@ -167,7 +181,7 @@ export function DashboardViewToggle({
                         <span className="text-slate">
                           {c.start_time && formatTime(c.start_time)}
                           {c.end_time && ` – ${formatTime(c.end_time)}`}
-                          {roomName(c) && ` · ${roomName(c)}`}
+                          {roomLabel(c) && ` · ${roomLabel(c)}`}
                         </span>
                       </Link>
                     ))}

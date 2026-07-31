@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import { fetchLocationLabels } from "@/lib/locations/queries";
+import type { LocationLabelRef } from "@/lib/locations/resolve";
 import type {
   ScheduleInstanceWithDetails,
   ScheduleInstanceFilters,
@@ -70,14 +72,22 @@ export async function getScheduleInstances(
   const roomIds = [
     ...new Set(instances.map((i) => i.room_id).filter(Boolean) as string[]),
   ];
+  // Room names carry their location: names are unique only within a location,
+  // so two studios each have a "Studio 1" (LOCATIONS_AND_FACILITIES.md §4.1).
   const roomNames: Record<string, string> = {};
+  const roomLocations: Record<string, LocationLabelRef | null> = {};
   if (roomIds.length > 0) {
     const { data: rooms } = await supabase
       .from("rooms")
-      .select("id, name")
+      .select("id, name, location_id")
       .in("id", roomIds);
+    const locationMap = await fetchLocationLabels(
+      supabase,
+      (rooms ?? []).map((r) => r.location_id)
+    );
     for (const r of rooms ?? []) {
       roomNames[r.id] = r.name;
+      roomLocations[r.id] = r.location_id ? locationMap[r.location_id] ?? null : null;
     }
   }
 
@@ -103,6 +113,7 @@ export async function getScheduleInstances(
       ? (teacherNames[i.substitute_teacher_id] ?? null)
       : null,
     roomName: i.room_id ? (roomNames[i.room_id] ?? null) : null,
+    roomLocation: i.room_id ? (roomLocations[i.room_id] ?? null) : null,
     level: i.class_id ? (classInfo[i.class_id]?.levels?.join(", ") ?? null) : null,
     style: i.class_id ? (classInfo[i.class_id]?.style ?? null) : null,
     ageMin: i.class_id ? (classInfo[i.class_id]?.age_min ?? null) : null,

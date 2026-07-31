@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import { fetchLocationLabels } from "@/lib/locations/queries";
+import type { LocationLabelRef } from "@/lib/locations/resolve";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(
@@ -106,14 +108,23 @@ export async function GET(
     }
   }
 
+  // Room names carry their location. This widget is public and has no location
+  // scoping — `schedule_embeds` has no location column — so a visitor sees both
+  // studios in one list and "Studio 1" alone does not say which (§4.1).
   const roomNames: Record<string, string> = {};
+  const roomLocations: Record<string, LocationLabelRef | null> = {};
   if (roomIds.length > 0) {
     const { data: rooms } = await supabase
       .from("rooms")
-      .select("id, name")
+      .select("id, name, location_id")
       .in("id", roomIds);
+    const locationMap = await fetchLocationLabels(
+      supabase,
+      (rooms ?? []).map((r) => r.location_id)
+    );
     for (const r of rooms ?? []) {
       roomNames[r.id] = r.name;
+      roomLocations[r.id] = r.location_id ? locationMap[r.location_id] ?? null : null;
     }
   }
 
@@ -125,6 +136,7 @@ export async function GET(
       ? (teacherNames[i.substitute_teacher_id] ?? null)
       : null,
     roomName: i.room_id ? (roomNames[i.room_id] ?? null) : null,
+    roomLocation: i.room_id ? (roomLocations[i.room_id] ?? null) : null,
     level: i.class_id ? ((classInfo[i.class_id]?.levels as string[] | null)?.join(", ") ?? null) : null,
     style: i.class_id ? ((classInfo[i.class_id]?.style as string) ?? null) : null,
     ageMin: i.class_id ? ((classInfo[i.class_id]?.age_min as number) ?? null) : null,

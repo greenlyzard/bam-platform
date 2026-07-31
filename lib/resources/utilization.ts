@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { fetchLocationLabels } from "@/lib/locations/queries";
 import type {
   UtilizationGrid,
   DeadTimeBlock,
@@ -125,6 +126,13 @@ export async function getWeeklyUtilization(
     }
   }
 
+  // Room names are unique only within a location (§4.1), so each room carries
+  // its own for labelling.
+  const roomLocations = await fetchLocationLabels(
+    supabase,
+    rooms.map((r) => r.location_id)
+  );
+
   // Build grid for each room
   const roomUtilizations = rooms.map((room) => {
     const slots: UtilizationSlot[] = [];
@@ -215,7 +223,12 @@ export async function getWeeklyUtilization(
     const utilizationPercent =
       totalOpenHours > 0 ? Math.round((occupiedHours / totalOpenHours) * 100) : 0;
 
-    return { room, slots, utilizationPercent };
+    return {
+      room,
+      location: room.location_id ? roomLocations[room.location_id] ?? null : null,
+      slots,
+      utilizationPercent,
+    };
   });
 
   return { weekStart, rooms: roomUtilizations };

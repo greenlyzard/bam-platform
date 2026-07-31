@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SimpleSelect } from "@/components/ui/select";
 import { matchesLocationFilter } from "@/lib/locations/validate";
+import { formatRoomLabel, type LocationLabelRef } from "@/lib/locations/resolve";
 import {
   deriveClassStatus,
   CLASS_STATUS_LABEL,
@@ -279,6 +280,7 @@ export function ClassManagement({
   fieldConfig,
   roomMap = {},
   locationMap = {},
+  locationLabels = {},
   studioLocations = [],
   activeRooms = [],
   privateSessionsRaw = [],
@@ -303,7 +305,10 @@ export function ClassManagement({
   classPhases: ClassPhase[];
   fieldConfig: FieldConfigRow[];
   roomMap?: Record<string, string>;
+  /** id → full location name, for the location column in the class table. */
   locationMap?: Record<string, string>;
+  /** id → the label fields `formatRoomLabel` needs (§4.1). */
+  locationLabels?: Record<string, LocationLabelRef>;
   studioLocations?: Array<{ id: string; name: string }>;
   activeRooms?: Array<{ id: string; name: string; color_hex: string | null; location_id: string | null }>;
   privateSessionsRaw?: Array<{ id: string; session_date: string; start_time: string; end_time: string; status: string; studio: string | null; primary_teacher_id: string | null; student_ids: string[]; notes: string | null; billing_status: string | null; session_rate: number | null }>;
@@ -843,28 +848,20 @@ ${(byDay[d] ?? [])
       : locationScopedRooms.filter(r => r.id === calRoomFilter);
     const roomCount = visibleRooms.length || 1;
 
-    // Room labels: a bare name is fine while it is unique on screen, but
-    // "Studio 1" is ambiguous the moment two locations' Studio 1 are both
-    // visible — which is the default state, since the Location filter starts at
-    // "All Locations". Append the location ONLY to the names that actually
-    // collide, so the common single-location case reads unchanged.
-    const shortLocationName = (locId: string | null) => {
-      const full = locId ? locationMap[locId] : undefined;
-      if (!full) return "No location";
-      const parts = full.split("—");
-      return (parts.length > 1 ? parts[parts.length - 1] : full).trim();
-    };
-    const makeRoomLabeller = (rooms: Array<{ name: string; location_id: string | null }>) => {
-      const duplicated = new Set(
-        rooms.map(r => r.name).filter((n, i, arr) => arr.indexOf(n) !== i)
+    // Room labels (§4.1). The suffix depends ONLY on whether the page's Location
+    // filter is set — never on whether two visible rooms happen to collide. The
+    // collision-conditional labeller this replaces made a room's label change
+    // when an unrelated column scrolled into view, and made the same room read
+    // differently on two screens. It also derived the short form by splitting
+    // the location name on an em dash; `studio_locations.abbreviation` is the
+    // source now, and that derivation is not kept as a fallback.
+    const roomLabelOptions = { locationFilterActive: !!filterLocation };
+    const roomLabel = (room: { name: string; location_id: string | null }) =>
+      formatRoomLabel(
+        room.name,
+        room.location_id ? locationLabels[room.location_id] : null,
+        roomLabelOptions
       );
-      return (room: { name: string; location_id: string | null }) =>
-        duplicated.has(room.name)
-          ? `${room.name} — ${shortLocationName(room.location_id)}`
-          : room.name;
-    };
-    const roomLabel = makeRoomLabeller(visibleRooms);
-    const roomOptionLabel = makeRoomLabeller(locationScopedRooms);
 
     // Time slots 8:00-21:00
     const slots: string[] = [];
@@ -902,7 +899,7 @@ ${(byDay[d] ?? [])
           <div className="flex items-center gap-2">
             <select value={calRoomFilter} onChange={e => setCalRoomFilter(e.target.value)} className="text-sm border border-silver rounded px-2 py-1">
               <option value="all">All Rooms</option>
-              {locationScopedRooms.map(r => <option key={r.id} value={r.id}>{roomOptionLabel(r)}</option>)}
+              {locationScopedRooms.map(r => <option key={r.id} value={r.id}>{roomLabel(r)}</option>)}
             </select>
             <div className="relative">
               <button onClick={() => setShowCalFieldPicker(v => !v)} className="px-3 py-1 text-sm border border-silver rounded hover:bg-cloud">⚙ Fields</button>
@@ -928,7 +925,7 @@ ${(byDay[d] ?? [])
           {locationScopedRooms.map(r => (
             <span key={r.id} className="inline-flex items-center gap-1.5 text-xs text-charcoal px-2 py-1 rounded-full border border-silver/50">
               <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: r.color_hex ?? "#9C8BBF" }} />
-              {roomOptionLabel(r)}
+              {roomLabel(r)}
             </span>
           ))}
         </div>

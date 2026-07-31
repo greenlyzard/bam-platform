@@ -1,6 +1,7 @@
 import { requireAdmin } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { ResourceSettings } from "./resource-settings";
+import { fetchLocationLabels } from "@/lib/locations/queries";
 
 export default async function ResourceSettingsPage() {
   await requireAdmin();
@@ -28,14 +29,28 @@ export default async function ResourceSettingsPage() {
       .order("day_of_week"),
     supabase
       .from("rooms")
-      .select("id, name, capacity, hourly_rate_private")
+      .select("id, name, capacity, hourly_rate_private, location_id")
       .eq("tenant_id", tenant.id)
       .eq("is_bookable", true)
       .order("name"),
   ]);
 
   const hours = hoursResult.data ?? [];
-  const rooms = roomsResult.data ?? [];
+  const roomRows = roomsResult.data ?? [];
+
+  // Room names are unique only within a location (§4.1) — both studios have a
+  // "Studio 1", and this list is not scoped to either.
+  const locationLabels = await fetchLocationLabels(
+    supabase,
+    roomRows.map((r) => r.location_id)
+  );
+  const rooms = roomRows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    capacity: r.capacity,
+    hourly_rate_private: r.hourly_rate_private,
+    location: r.location_id ? locationLabels[r.location_id] ?? null : null,
+  }));
 
   return (
     <div className="space-y-8">

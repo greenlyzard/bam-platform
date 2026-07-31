@@ -4,6 +4,10 @@ import { getPendingApprovalTasks } from "@/lib/calendar/queries";
 import { getUser } from "@/lib/auth/guards";
 import { EVENT_TYPE_COLORS } from "@/lib/calendar/types";
 import type { ScheduleInstanceWithDetails } from "@/lib/calendar/types";
+import { formatRoomLabel } from "@/lib/locations/resolve";
+
+/** This page has no location filter — every studio is in view (§4.1). */
+const UNFILTERED = { locationFilterActive: false } as const;
 
 function formatTime(time: string): string {
   const [h, m] = time.split(":");
@@ -239,7 +243,8 @@ export default async function CalendarPage({
                             {event.roomName && (
                               <span className="text-mist">
                                 {" "}
-                                &middot; {event.roomName}
+                                &middot;{" "}
+                                {formatRoomLabel(event.roomName, event.roomLocation, UNFILTERED)}
                               </span>
                             )}
                           </p>

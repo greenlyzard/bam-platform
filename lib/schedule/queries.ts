@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import { fetchLocationLabels } from "@/lib/locations/queries";
+import type { LocationLabelRef } from "@/lib/locations/resolve";
 
 // Re-export types and constants from types.ts (safe for client imports)
 export type { ScheduleClass, ClassSession, AdminTask, ScheduleInstance } from "./types";
@@ -355,13 +357,32 @@ export async function getProductions(): Promise<Array<{ id: string; name: string
 
 // ── Schedule Instances (actual schedule data) ────────────────
 
-export async function getRooms(): Promise<Array<{ id: string; name: string }>> {
+/**
+ * Rooms for the schedule filter. Carries `is_active` (the archive flag —
+ * LOCATIONS_AND_FACILITIES.md §6.1) and the room's location, because room names
+ * are only unique *within* a location: two studios each have a "Studio 1".
+ */
+export async function getRooms(): Promise<
+  Array<{ id: string; name: string; is_active: boolean; location: LocationLabelRef | null }>
+> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("rooms")
-    .select("id, name")
+    .select("id, name, is_active, location_id")
     .order("name");
-  return data ?? [];
+
+  const rooms = data ?? [];
+  const locationMap = await fetchLocationLabels(
+    supabase,
+    rooms.map((r) => r.location_id)
+  );
+
+  return rooms.map((r) => ({
+    id: r.id,
+    name: r.name,
+    is_active: r.is_active,
+    location: r.location_id ? locationMap[r.location_id] ?? null : null,
+  }));
 }
 
 export async function getScheduleInstances(filters: {
@@ -427,16 +448,24 @@ export async function getScheduleInstances(filters: {
     }
   }
 
-  // Get room names
+  // Get room names + the room's own location. Room names are unique only within
+  // a location — two studios each have a "Studio 1" — so the label needs both.
   const roomIds = [...new Set(instances.map((i) => i.room_id).filter(Boolean) as string[])];
-  const roomMap: Record<string, string> = {};
+  const roomMap: Record<string, { name: string; location: LocationLabelRef | null }> = {};
   if (roomIds.length > 0) {
     const { data: rooms } = await supabase
       .from("rooms")
-      .select("id, name")
+      .select("id, name, location_id")
       .in("id", roomIds);
+    const locationMap = await fetchLocationLabels(
+      supabase,
+      (rooms ?? []).map((r) => r.location_id)
+    );
     for (const r of rooms ?? []) {
-      roomMap[r.id] = r.name;
+      roomMap[r.id] = {
+        name: r.name,
+        location: r.location_id ? locationMap[r.location_id] ?? null : null,
+      };
     }
   }
 
@@ -468,7 +497,8 @@ export async function getScheduleInstances(filters: {
     teacherName: i.teacher_id ? (teacherMap[i.teacher_id]?.name ?? null) : null,
     teacherInitials: i.teacher_id ? (teacherMap[i.teacher_id]?.initials ?? null) : null,
     subTeacherName: i.substitute_teacher_id ? (teacherMap[i.substitute_teacher_id]?.name ?? null) : null,
-    roomName: i.room_id ? (roomMap[i.room_id] ?? null) : null,
+    roomName: i.room_id ? (roomMap[i.room_id]?.name ?? null) : null,
+    roomLocation: i.room_id ? (roomMap[i.room_id]?.location ?? null) : null,
     enrolledCount: i.class_id ? (classMap[i.class_id]?.enrolled_count ?? 0) : 0,
     maxStudents: i.class_id ? (classMap[i.class_id]?.max_students ?? null) : null,
   }));

@@ -1,6 +1,10 @@
 "use client";
 
 import type { UtilizationGrid } from "@/lib/resources/types";
+import { formatRoomLabel } from "@/lib/locations/resolve";
+
+/** This page has no location filter — every studio is in view (§4.1). */
+const UNFILTERED = { locationFilterActive: false } as const;
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -46,7 +50,7 @@ export function ResourceGrid({ grid }: { grid: UtilizationGrid }) {
           <div className="flex items-center justify-between mb-3">
             <div>
               <h3 className="font-semibold text-charcoal">
-                {roomUtil.room.name}
+                {formatRoomLabel(roomUtil.room.name, roomUtil.location, UNFILTERED)}
               </h3>
               <p className="text-xs text-slate">
                 Capacity: {roomUtil.room.capacity ?? "—"} students

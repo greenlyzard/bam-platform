@@ -8,8 +8,21 @@ import type {
 } from "@/lib/calendar/types";
 import { SimpleSelect } from "@/components/ui/select";
 import styles from "./widget.module.css";
+import { formatRoomLabel } from "@/lib/locations/resolve";
 
 // ── Helpers ─────────────────────────────────────────────────
+
+/**
+ * The public widget has no location scoping — `schedule_embeds` carries no
+ * location column — so every studio is in view and a room label always names
+ * its location (§4.1).
+ */
+const UNFILTERED = { locationFilterActive: false } as const;
+
+function roomLabelOf(e: ScheduleInstanceWithDetails): string | null {
+  if (!e.roomName) return null;
+  return formatRoomLabel(e.roomName, e.roomLocation, UNFILTERED);
+}
 
 function getMonday(dateStr?: string): Date {
   const d = dateStr ? new Date(dateStr + "T00:00:00") : new Date();
@@ -280,7 +293,7 @@ export function ScheduleWidget({
                       </td>
                       <td>{levelLabel(e.level)}</td>
                       <td>{e.substituteTeacherName ?? e.teacherName ?? ""}</td>
-                      <td>{e.roomName ?? ""}</td>
+                      <td>{roomLabelOf(e) ?? ""}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -536,7 +549,7 @@ function ClassCard({
       <p className={styles.cardName}>{e.className ?? e.event_type}</p>
       <p className={styles.cardTime}>
         {formatTime(e.start_time)} – {formatTime(e.end_time)}
-        {showRoom && e.roomName && ` · ${e.roomName}`}
+        {showRoom && e.roomName && ` · ${roomLabelOf(e)}`}
       </p>
       {e.ageMin != null && e.ageMax != null && (
         <p className={styles.cardAge}>

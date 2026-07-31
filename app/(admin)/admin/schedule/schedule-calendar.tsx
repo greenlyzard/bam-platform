@@ -23,8 +23,26 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { toLocalDateStr } from "@/lib/dates";
+import { formatRoomLabel, type LocationLabelRef } from "@/lib/locations/resolve";
 
 // ── Helpers ───────────────────────────────────────────────────
+
+/**
+ * This page has no location filter — every studio is in view at once — so a
+ * room label always names its location (LOCATIONS_AND_FACILITIES.md §4.1).
+ *
+ * The Room filter below is not a location filter: it narrows to one room, and
+ * its own options have to name locations to be usable at all. Holding the
+ * suffix constant keeps a room reading the same whether or not that filter is
+ * set, which is the point of the rule.
+ */
+const UNFILTERED = { locationFilterActive: false } as const;
+
+/** The room label for one occurrence, or null when no room is assigned. */
+function roomLabelOf(instance: ScheduleInstance): string | null {
+  if (!instance.roomName) return null;
+  return formatRoomLabel(instance.roomName, instance.roomLocation, UNFILTERED);
+}
 
 function formatTime(time: string): string {
   const [h, m] = time.split(":");
@@ -207,7 +225,7 @@ const VIEW_OPTIONS = [
 interface ScheduleCalendarProps {
   instances: ScheduleInstance[];
   teachers: Array<{ id: string; name: string }>;
-  rooms: Array<{ id: string; name: string }>;
+  rooms: Array<{ id: string; name: string; is_active: boolean; location: LocationLabelRef | null }>;
   levels: string[];
   weekStart: string;
   /** True when no schedule_instances rows exist for the viewed range. */
@@ -253,7 +271,7 @@ function SessionCard({
         ) : null;
       case "room":
         return showField("room") && instance.roomName ? (
-          <span key="room" className="text-mist">{instance.roomName}</span>
+          <span key="room" className="text-mist">{roomLabelOf(instance)}</span>
         ) : null;
       case "enrollment":
         return showField("enrollment") && instance.maxStudents != null ? (
@@ -365,7 +383,7 @@ function DetailPanel({
             <div>
               <div className="text-xs font-medium text-mist uppercase tracking-wide">Room</div>
               <div className="mt-1 text-sm font-medium text-charcoal">
-                {instance.roomName ?? "Not assigned"}
+                {roomLabelOf(instance) ?? "Not assigned"}
               </div>
             </div>
           </div>
@@ -582,13 +600,28 @@ export function ScheduleCalendar({
     byDate[date].sort((a, b) => a.start_time.localeCompare(b.start_time));
   }
 
-  // Group instances by room
-  const byRoom: Record<string, ScheduleInstance[]> = {};
+  // Group instances by room, keyed on room_id — never on the room NAME.
+  // Keying on the name merged the two "Studio 1" rooms (San Clemente's and
+  // RSM's) into a single column with a summed session count: not ambiguous,
+  // wrong. Private sessions carry free-text `roomName` and no room_id, so they
+  // key under a separate `name:` namespace that cannot collide with an id.
+  const byRoom = new Map<string, { label: string; instances: ScheduleInstance[] }>();
   for (const i of instances) {
-    const key = i.roomName ?? "Unassigned";
-    if (!byRoom[key]) byRoom[key] = [];
-    byRoom[key].push(i);
+    const key = i.room_id
+      ? `id:${i.room_id}`
+      : i.roomName
+        ? `name:${i.roomName}`
+        : "unassigned";
+    let group = byRoom.get(key);
+    if (!group) {
+      group = { label: roomLabelOf(i) ?? "Unassigned", instances: [] };
+      byRoom.set(key, group);
+    }
+    group.instances.push(i);
   }
+  const roomGroups = [...byRoom.entries()]
+    .map(([key, group]) => ({ key, ...group }))
+    .sort((a, b) => a.label.localeCompare(b.label));
 
   const today = getTodayStr();
   const weekDates = getWeekDates(weekStart);
@@ -602,9 +635,16 @@ export function ScheduleCalendar({
     { value: "__all__", label: "All Levels" },
     ...levels.map((l) => ({ value: l, label: l })),
   ];
+  // Archived rooms (§6.1 — `is_active = false`) are not selectable: the three
+  // retired orphans are the only ones, and offering them invites filtering the
+  // schedule to a room nothing is scheduled into. The one exception is a room
+  // already named in the URL — dropping it would show "All Rooms" while the
+  // schedule was in fact still filtered, which is worse than listing it.
   const roomOptions = [
     { value: "__all__", label: "All Rooms" },
-    ...rooms.map((r) => ({ value: r.id, label: r.name })),
+    ...rooms
+      .filter((r) => r.is_active || r.id === roomFilter)
+      .map((r) => ({ value: r.id, label: formatRoomLabel(r.name, r.location, UNFILTERED) })),
   ];
   const dayOptions = [
     { value: "__all__", label: "All Days" },
@@ -692,7 +732,7 @@ export function ScheduleCalendar({
                         </div>
                       </div>
                       <div className="mt-1 flex items-center gap-3 text-xs text-mist">
-                        {inst.roomName && <span>{inst.roomName}</span>}
+                        {inst.roomName && <span>{roomLabelOf(inst)}</span>}
                         {inst.teacherName && <span>{inst.teacherName}</span>}
                       </div>
                     </button>
@@ -920,7 +960,7 @@ export function ScheduleCalendar({
                               case "teacher":
                                 return <td key="teacher" className="px-4 py-2.5 text-slate">{inst.teacherName ?? "\u2013"}</td>;
                               case "room":
-                                return <td key="room" className="px-4 py-2.5 text-slate">{inst.roomName ?? "\u2013"}</td>;
+                                return <td key="room" className="px-4 py-2.5 text-slate">{roomLabelOf(inst) ?? "\u2013"}</td>;
                               case "enrollment":
                                 return (
                                   <td key="enrollment" className="px-4 py-2.5 text-right text-slate">
@@ -961,7 +1001,7 @@ export function ScheduleCalendar({
                         {formatTime(inst.start_time)} – {formatTime(inst.end_time)}
                       </div>
                       <div className="mt-1 flex items-center gap-3 text-xs text-mist">
-                        {inst.roomName && <span>{inst.roomName}</span>}
+                        {inst.roomName && <span>{roomLabelOf(inst)}</span>}
                         {inst.teacherName && <span>{inst.teacherName}</span>}
                       </div>
                     </button>
@@ -978,19 +1018,18 @@ export function ScheduleCalendar({
   // ── Room View ───────────────────────────────────────────────
 
   const renderRoomView = () => {
-    const roomNames = Object.keys(byRoom).sort();
     return (
-      <div className={`grid gap-4 ${roomNames.length <= 3 ? `grid-cols-${roomNames.length}` : "grid-cols-3"}`}
-        style={{ gridTemplateColumns: `repeat(${Math.min(roomNames.length, 4)}, minmax(0, 1fr))` }}
+      <div className={`grid gap-4 ${roomGroups.length <= 3 ? `grid-cols-${roomGroups.length}` : "grid-cols-3"}`}
+        style={{ gridTemplateColumns: `repeat(${Math.min(roomGroups.length, 4)}, minmax(0, 1fr))` }}
       >
-        {roomNames.map((roomName) => (
-          <div key={roomName} className="min-h-[200px] print:break-inside-avoid">
+        {roomGroups.map((group) => (
+          <div key={group.key} className="min-h-[200px] print:break-inside-avoid">
             <div className="mb-2 rounded-lg bg-lavender/10 border border-lavender/20 px-3 py-2 text-center">
-              <div className="text-sm font-semibold text-lavender-dark">{roomName}</div>
-              <div className="text-xs text-mist">{byRoom[roomName].length} sessions</div>
+              <div className="text-sm font-semibold text-lavender-dark">{group.label}</div>
+              <div className="text-xs text-mist">{group.instances.length} sessions</div>
             </div>
             <div className="space-y-1.5">
-              {byRoom[roomName]
+              {group.instances
                 .sort((a, b) => {
                   const dateComp = a.event_date.localeCompare(b.event_date);
                   if (dateComp !== 0) return dateComp;
@@ -1012,7 +1051,7 @@ export function ScheduleCalendar({
             </div>
           </div>
         ))}
-        {roomNames.length === 0 && (
+        {roomGroups.length === 0 && (
           <div className="col-span-full rounded-xl border border-dashed border-silver bg-white p-8 text-center text-sm text-mist">
             No classes scheduled this week.
           </div>

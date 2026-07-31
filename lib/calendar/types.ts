@@ -1,3 +1,5 @@
+import type { LocationLabelRef } from "@/lib/locations/resolve";
+
 // ── Event Types ──────────────────────────────────────────
 
 export type ScheduleEventType =
@@ -66,6 +68,7 @@ export interface Room {
   id: string;
   tenant_id: string;
   name: string;
+  location_id: string | null;
   capacity: number | null;
   is_bookable: boolean;
   hourly_rate_private: number | null;
@@ -199,6 +202,8 @@ export interface ScheduleInstanceWithDetails extends ScheduleInstance {
   teacherName: string | null;
   substituteTeacherName: string | null;
   roomName: string | null;
+  /** The room's own location, for `formatRoomLabel`. Null when it has none. */
+  roomLocation: LocationLabelRef | null;
   level: string | null;
   style: string | null;
   ageMin: number | null;

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { SimpleSelect } from "@/components/ui/select";
+import { formatRoomLabel, type LocationLabelRef } from "@/lib/locations/resolve";
 
 interface Rental {
   id: string;
@@ -22,7 +23,12 @@ interface Rental {
 interface Room {
   id: string;
   name: string;
+  /** The room's own location, for `formatRoomLabel`. Null when it has none. */
+  location: LocationLabelRef | null;
 }
+
+/** This page has no location filter — every studio is in view (§4.1). */
+const UNFILTERED = { locationFilterActive: false } as const;
 
 const STATUS_COLORS: Record<string, string> = {
   inquiry: "bg-info/10 text-info",
@@ -34,12 +40,15 @@ const STATUS_COLORS: Record<string, string> = {
 export function RentalsList({
   rentals: initial,
   rooms,
-  roomNames,
 }: {
   rentals: Rental[];
   rooms: Room[];
-  roomNames: Record<string, string>;
 }) {
+  const roomLabels: Record<string, string> = {};
+  for (const r of rooms) {
+    roomLabels[r.id] = formatRoomLabel(r.name, r.location, UNFILTERED);
+  }
+
   const [rentals, setRentals] = useState(initial);
   const [filter, setFilter] = useState<string>("all");
   const [showForm, setShowForm] = useState(false);
@@ -139,7 +148,7 @@ export function RentalsList({
               <SimpleSelect
                 value={formRoomId}
                 onValueChange={setFormRoomId}
-                options={rooms.map((r) => ({ value: r.id, label: r.name }))}
+                options={rooms.map((r) => ({ value: r.id, label: roomLabels[r.id] }))}
                 placeholder="Select room..."
                 className="w-full"
               />
@@ -277,7 +286,7 @@ export function RentalsList({
                     )}
                   </div>
                   <p className="text-sm text-slate">
-                    {roomNames[rental.room_id] ?? "Unknown Room"}
+                    {roomLabels[rental.room_id] ?? "Unknown Room"}
                   </p>
                   <div className="mt-1 flex flex-wrap gap-3 text-xs text-slate">
                     <span>

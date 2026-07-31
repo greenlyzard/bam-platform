@@ -2,6 +2,8 @@
 // Shared types and constants for schedule module.
 // Safe to import from client components.
 
+import type { LocationLabelRef } from "@/lib/locations/resolve";
+
 export interface ScheduleClass {
   id: string;
   tenant_id: string;
@@ -108,6 +110,12 @@ export interface ScheduleInstance {
   teacherInitials?: string | null;
   subTeacherName?: string | null;
   roomName?: string | null;
+  /**
+   * The room's own location, for `formatRoomLabel`. Null when the room has no
+   * location, and null for free-text rooms (private sessions carry
+   * `private_sessions.studio`, which is not a `rooms` row).
+   */
+  roomLocation?: LocationLabelRef | null;
   enrolledCount?: number;
   maxStudents?: number | null;
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import { formatRoomLabel, type LocationLabelRef } from "@/lib/locations/resolve";
+
 const DAY_NAMES = [
   "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
 ];
@@ -17,7 +19,12 @@ interface RoomInfo {
   name: string;
   capacity: number | null;
   hourly_rate_private: number | null;
+  /** The room's own location, for `formatRoomLabel`. Null when it has none. */
+  location: LocationLabelRef | null;
 }
+
+/** This page has no location filter — every studio is in view (§4.1). */
+const UNFILTERED = { locationFilterActive: false } as const;
 
 export function ResourceSettings({
   hours,
@@ -82,7 +89,7 @@ export function ResourceSettings({
               >
                 <div>
                   <span className="text-sm font-medium text-charcoal">
-                    {room.name}
+                    {formatRoomLabel(room.name, room.location, UNFILTERED)}
                   </span>
                   <span className="text-xs text-mist ml-2">
                     Cap: {room.capacity ?? "—"}

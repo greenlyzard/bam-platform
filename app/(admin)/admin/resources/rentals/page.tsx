@@ -1,6 +1,7 @@
 import { requireAdmin } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { RentalsList } from "./rentals-list";
+import { fetchLocationLabels } from "@/lib/locations/queries";
 
 export default async function RentalsPage() {
   await requireAdmin();
@@ -29,20 +30,26 @@ export default async function RentalsPage() {
       .order("start_time", { ascending: false }),
     supabase
       .from("rooms")
-      .select("id, name")
+      .select("id, name, location_id")
       .eq("tenant_id", tenant.id)
       .eq("is_bookable", true)
       .order("name"),
   ]);
 
   const rentals = rentalsResult.data ?? [];
-  const rooms = roomsResult.data ?? [];
+  const roomRows = roomsResult.data ?? [];
 
-  // Build room name map
-  const roomNames: Record<string, string> = {};
-  for (const r of rooms) {
-    roomNames[r.id] = r.name;
-  }
+  // Room names are unique only within a location (§4.1) — both studios have a
+  // "Studio 1", and this list is not scoped to either.
+  const locationLabels = await fetchLocationLabels(
+    supabase,
+    roomRows.map((r) => r.location_id)
+  );
+  const rooms = roomRows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    location: r.location_id ? locationLabels[r.location_id] ?? null : null,
+  }));
 
   return (
     <div className="space-y-8">
@@ -58,7 +65,6 @@ export default async function RentalsPage() {
       <RentalsList
         rentals={rentals}
         rooms={rooms}
-        roomNames={roomNames}
       />
     </div>
   );

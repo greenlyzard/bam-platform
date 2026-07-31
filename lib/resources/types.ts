@@ -1,4 +1,5 @@
 import type { Room } from "@/lib/calendar/types";
+import type { LocationLabelRef } from "@/lib/locations/resolve";
 
 // ── Utilization Types ─────────────────────────────────────
 
@@ -53,6 +54,8 @@ export interface UtilizationSlot {
 
 export interface RoomUtilization {
   room: Room;
+  /** The room's own location, for `formatRoomLabel`. Null when it has none. */
+  location: LocationLabelRef | null;
   slots: UtilizationSlot[];
   utilizationPercent: number;
 }

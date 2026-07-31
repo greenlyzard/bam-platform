@@ -1,4 +1,6 @@
 import { requireAdmin } from "@/lib/auth/guards";
+import { fetchLocationLabels } from "@/lib/locations/queries";
+import type { LocationLabelRef } from "@/lib/locations/resolve";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   getEnrollmentStats,
@@ -40,7 +42,8 @@ export default async function AdminDashboardPage() {
 
   // Fetch teacher's classes if applicable
   let myClasses: any[] = [];
-  let roomMap: Record<string, string> = {};
+  const roomMap: Record<string, { name: string; location: LocationLabelRef | null }> = {};
+  let classLocations: Record<string, LocationLabelRef> = {};
   if (isTeacher) {
     const { data: ctRows } = await supabase
       .from("class_teachers")
@@ -51,17 +54,37 @@ export default async function AdminDashboardPage() {
     if (classIds.length > 0) {
       const { data: classRows } = await supabase
         .from("classes")
-        .select("id, name, day_of_week, start_time, end_time, room, room_id, enrolled_count, max_enrollment")
+        .select("id, name, day_of_week, start_time, end_time, room, room_id, location_id, enrolled_count, max_enrollment")
         .in("id", classIds)
         .eq("is_active", true);
       myClasses = classRows ?? [];
 
-      // Resolve room names
+      // Resolve room names and their locations. Room names are unique only
+      // within a location — both studios have a "Studio 1" (§4.1).
       const roomIds = [...new Set(myClasses.map((c) => c.room_id).filter(Boolean))];
       if (roomIds.length > 0) {
-        const { data: rooms } = await supabase.from("rooms").select("id, name").in("id", roomIds);
-        for (const r of rooms ?? []) roomMap[r.id] = r.name;
+        const { data: rooms } = await supabase
+          .from("rooms")
+          .select("id, name, location_id")
+          .in("id", roomIds);
+        const locationMap = await fetchLocationLabels(
+          supabase,
+          (rooms ?? []).map((r) => r.location_id)
+        );
+        for (const r of rooms ?? []) {
+          roomMap[r.id] = {
+            name: r.name,
+            location: r.location_id ? locationMap[r.location_id] ?? null : null,
+          };
+        }
       }
+
+      // Legacy free-text `classes.room` has no room row to carry a location, so
+      // it falls back to the class's home studio.
+      classLocations = await fetchLocationLabels(
+        supabase,
+        myClasses.map((c) => c.location_id)
+      );
     }
   }
 
@@ -196,6 +219,7 @@ export default async function AdminDashboardPage() {
       isTeacher={isTeacher}
       myClasses={myClasses}
       roomMap={roomMap}
+      classLocations={classLocations}
       adminContent={adminContent}
     />
   );
