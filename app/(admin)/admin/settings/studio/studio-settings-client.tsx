@@ -43,6 +43,14 @@ interface StudioSettings {
 interface Location {
   id: string;
   name: string;
+  /**
+   * Optional short label. Null means the location has no short form and callers
+   * fall back to `name` — see the column comment in
+   * 20260731000001_location_abbreviation.sql. Declared optional (not just
+   * nullable) because the generated types don't carry this column until they're
+   * regenerated after the migration is pushed; tighten to `string | null` then.
+   */
+  abbreviation?: string | null;
   address: string | null;
   city: string | null;
   state: string | null;
@@ -881,6 +889,8 @@ function LocationForm({
   initial?: Location;
   onSave: (data: {
     name: string;
+    /** Empty input is sent as null, never "" — see upsertLocation. */
+    abbreviation: string | null;
     address?: string;
     city?: string;
     state?: string;
@@ -891,6 +901,7 @@ function LocationForm({
   onCancel: () => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
+  const [abbreviation, setAbbreviation] = useState(initial?.abbreviation ?? "");
   const [address, setAddress] = useState(initial?.address ?? "");
   const [city, setCity] = useState(initial?.city ?? "");
   const [state, setState] = useState(initial?.state ?? "");
@@ -903,16 +914,36 @@ function LocationForm({
 
   return (
     <div className="rounded-lg border border-silver bg-white p-4 space-y-3 mb-4">
-      <div>
-        <label className="block text-xs font-medium text-charcoal mb-1">Name</label>
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Studio location name"
-          className="w-full h-9 rounded-lg border border-silver px-3 text-sm text-charcoal focus:border-lavender focus:outline-none focus:ring-1 focus:ring-lavender"
-        />
+      <div className="grid grid-cols-[1fr_7rem] gap-3">
+        <div>
+          <label className="block text-xs font-medium text-charcoal mb-1">Name</label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Studio location name"
+            className="w-full h-9 rounded-lg border border-silver px-3 text-sm text-charcoal focus:border-lavender focus:outline-none focus:ring-1 focus:ring-lavender"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-charcoal mb-1">
+            Abbreviation
+          </label>
+          {/* maxLength mirrors the 12-char database constraint. */}
+          <input
+            type="text"
+            value={abbreviation}
+            onChange={(e) => setAbbreviation(e.target.value)}
+            placeholder="Optional"
+            maxLength={12}
+            className="w-full h-9 rounded-lg border border-silver px-3 text-sm text-charcoal focus:border-lavender focus:outline-none focus:ring-1 focus:ring-lavender"
+          />
+        </div>
       </div>
+      <p className="text-[11px] text-mist -mt-1">
+        Optional short label, up to 12 characters (e.g. <span className="font-medium">SC</span>).
+        Leave it blank and the full name is used.
+      </p>
       <div>
         <label className="block text-xs font-medium text-charcoal mb-1">Type</label>
         <SimpleSelect
@@ -977,7 +1008,16 @@ function LocationForm({
           onClick={async () => {
             if (!name.trim()) return;
             setSaving(true);
-            await onSave({ name, address, city, state, zip, is_primary: isPrimary, location_type: locationType });
+            await onSave({
+              name,
+              abbreviation: abbreviation.trim() || null,
+              address,
+              city,
+              state,
+              zip,
+              is_primary: isPrimary,
+              location_type: locationType,
+            });
             setSaving(false);
           }}
           disabled={saving || !name.trim()}

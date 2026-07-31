@@ -67,7 +67,8 @@ add a deprecation header to the spec and flag it in the next session.
 **Studio:** Ballet Academy and Movement  
 **Founder:** Amanda Cobb — former professional ballerina  
 **Mission:** High-level classical ballet training in a nurturing environment  
-**Location:** 400-C Camino De Estrella, San Clemente, CA 92672  
+**Location — San Clemente (primary):** 400-C Camino De Estrella, San Clemente, CA 92672  
+**Location — Rancho Santa Margarita:** 30372 Esperanza, Rancho Santa Margarita, CA 92688 — under construction, targeting early September 2026  
 **Phone:** (949) 229-0846  
 **Email:** dance@bamsocal.com  
 **Primary domain:** balletacademyandmovement.com  

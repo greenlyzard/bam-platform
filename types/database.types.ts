@@ -8559,6 +8559,7 @@ export type Database = {
       }
       studio_locations: {
         Row: {
+          abbreviation: string | null
           address: string | null
           city: string | null
           created_at: string
@@ -8574,6 +8575,7 @@ export type Database = {
           zip: string | null
         }
         Insert: {
+          abbreviation?: string | null
           address?: string | null
           city?: string | null
           created_at?: string
@@ -8589,6 +8591,7 @@ export type Database = {
           zip?: string | null
         }
         Update: {
+          abbreviation?: string | null
           address?: string | null
           city?: string | null
           created_at?: string

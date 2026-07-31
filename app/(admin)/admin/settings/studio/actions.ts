@@ -51,6 +51,12 @@ export async function updateStudioIdentity(payload: {
 export async function upsertLocation(payload: {
   id?: string;
   name: string;
+  /**
+   * Optional short label. Null means "no short form — fall back to name", and is
+   * a legitimate stored value; an empty or whitespace-only input must land as
+   * NULL, never as "", or the fallback stops firing and callers render a blank.
+   */
+  abbreviation?: string | null;
   address?: string;
   city?: string;
   state?: string;
@@ -70,9 +76,16 @@ export async function upsertLocation(payload: {
       .eq("is_primary", true);
   }
 
+  // A variable, not an inline literal, for the same reason as updateStudioIdentity
+  // above: `abbreviation` exists at runtime after
+  // 20260731000001_location_abbreviation.sql but is absent from the generated
+  // types until they are regenerated.
   const row = {
     tenant_id: TENANT_ID,
     name: payload.name,
+    // Trim first: " " is 1 char and would otherwise pass the length check while
+    // being blank. The DB constraint rejects it; this makes it a null instead.
+    abbreviation: payload.abbreviation?.trim() || null,
     address: payload.address || null,
     city: payload.city || null,
     state: payload.state || null,
