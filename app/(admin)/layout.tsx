@@ -15,7 +15,7 @@ export default async function AdminLayout({
   const { role, full_name, avatar_url } = session.profile;
 
   const supabase = await createClient();
-  const [{ data: settings }, { data: moduleRows }, { data: tenant }, { data: userRoles }] = await Promise.all([
+  const [{ data: settings }, { data: moduleRows }, { data: tenant }, { data: userRoles, error: userRolesError }] = await Promise.all([
     supabase.from("studio_settings").select("logo_url, logo_dark_url, studio_name").limit(1).single(),
     supabase
       .from("platform_modules")
@@ -28,17 +28,39 @@ export default async function AdminLayout({
   ]);
   const logoUrl = settings?.logo_dark_url ?? settings?.logo_url;
   const angelinaEnabled = tenant?.angelina_enabled ?? true;
-  const isTeacher = userRoles?.some((r) => r.role === "teacher") ?? false;
-  const isParent = userRoles?.some((r) => r.role === "parent") ?? false;
+
+  // This is a SECOND profile_roles read — requireRole() above resolved the
+  // session's roles from its own query. Both must fail the same way, or fixing
+  // the resolver alone changes nothing here.
+  //
+  // Every flag below was `?? false`, which silently collapsed a multi-role user
+  // on any read failure: Amanda holds four roles, and a single failed query
+  // dropped her Teacher Portal link (isTeacher) and her timesheets/payroll nav
+  // (canManagePay) with no error anywhere. Losing a nav item is a quiet, wrong
+  // answer to "what may this person do"; throw instead and let app/error.tsx
+  // say so. Zero rows still means false — that is a real answer, not a failure.
+  if (userRolesError) {
+    console.error("[admin-layout] profile_roles read failed", {
+      userId: session.user.id,
+      code: userRolesError.code,
+      message: userRolesError.message,
+    });
+    throw new Error(
+      `Could not read profile_roles for ${session.user.id} (${userRolesError.code || "no code"}): ${userRolesError.message}`
+    );
+  }
+
+  const isTeacher = userRoles.some((r) => r.role === "teacher");
+  const isParent = userRoles.some((r) => r.role === "parent");
   const userEmail = session.user.email;
 
   // Mirrors can_manage_pay() in RLS (20260728000006) and requireFinance() in
   // lib/auth/guards. Computed from the profile_roles rows already fetched
   // above, so hiding the pay nav costs no extra query. Read from profile_roles,
   // never profiles.role — see CLAUDE.md §4.
-  const canManagePay =
-    userRoles?.some((r) => r.role === "finance_admin" || r.role === "super_admin") ??
-    false;
+  const canManagePay = userRoles.some(
+    (r) => r.role === "finance_admin" || r.role === "super_admin"
+  );
 
   const modules: ModuleItem[] = (moduleRows ?? []).map((m) => ({
     key: m.key,

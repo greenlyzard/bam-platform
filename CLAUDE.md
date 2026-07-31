@@ -140,19 +140,33 @@ A full studio management platform that serves BAM first, then white-labels as Sa
 `'super_admin'`, `'parent'`, `'student'`, `'front_desk'`, `'finance_admin'`. Do not cast
 to `::user_role` in a role check — the enum cannot represent every live role (see below).
 
-**Why `profiles.role` is wrong, precisely:** it is a stale **single-role** field, and a person
-can hold several roles at once. It does not reflect the multi-role reality in `profile_roles`,
-and it is demonstrably out of date on live data:
+**Why `profiles.role` is wrong, precisely:** it is a **single-role** field, and a person can hold
+several roles at once. It cannot represent the multi-role reality in `profile_roles`:
 
 | Person | `profiles.role` says | Actual active roles in `profile_roles` |
 |---|---|---|
-| Cara Matchett | `parent` | **admin (primary), teacher** |
-| Katherine Thomas | `parent` | teacher (primary), parent |
-| Amanda Cobb | `super_admin` | super_admin (primary), admin, finance_admin, teacher |
+| Cara Matchett | `admin` | admin (primary), **teacher** |
+| Katherine Thomas | `teacher` | teacher (primary), **parent** |
+| Amanda Cobb | `super_admin` | super_admin (primary), **admin, finance_admin, teacher** |
 
-Verified against live data 2026-07-27: **5 of 23 profiles** have a `profiles.role` that
-disagrees with their primary role in `profile_roles`. Authorizing off it would give Cara a
-parent's access to the admin surface she runs.
+Verified against live data 2026-07-30. The bolded roles are the ones the column silently drops.
+
+Note what this table does *not* claim. As of 2026-07-30, **zero** profiles have a `profiles.role`
+that names the wrong *primary* role — `legacyProfileRole()` in `lib/auth/staff-roles.ts` keeps it
+mirrored on write, so the primary value is usually right. Earlier versions of this file asserted
+otherwise (Cara as `parent`, Katherine as `parent`, and "5 of 26 profiles disagree"); all three
+claims were wrong and are corrected here. The 5 figure was profiles with **no `profile_roles` rows
+at all** — a different thing, and expected: `handle_new_user()` creates a profiles row and no role
+rows, so every new signup starts there.
+
+The argument against the column is **collapse, not staleness**, and it does not depend on the
+mirror ever drifting. 4 of 26 profiles hold more than one role today. Authorizing off
+`profiles.role` reduces Amanda from four roles to one, dropping the `teacher` and `finance_admin`
+access she uses daily — and it would do that even if the column were perfectly maintained,
+because one column cannot hold four values. Two further reasons it cannot be repaired: the
+`user_role` enum has no `finance_admin`/`studio_admin`/`studio_manager` (below), and
+`DELETE /api/admin/roles` removes a role row without updating the mirror, so a revoked role can
+still be named there.
 
 > The `user_role` enum **still exists** and `profiles.role` is still typed `user_role`
 > (verified 2026-07-27 — an earlier version of this file wrongly said the enum was dropped).

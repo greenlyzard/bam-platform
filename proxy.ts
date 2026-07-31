@@ -103,24 +103,39 @@ export async function proxy(request: NextRequest) {
     return redirectWithSession(loginUrl, response);
   }
 
-  // Role-based route protection. Roles live in profile_roles keyed on user_id — profiles.role is
-  // unreliable (CLAUDE.md §4). Fall back to profiles.role only when a user has no active role rows.
+  // Role-based route protection. profile_roles keyed on user_id is the only authoritative source;
+  // profiles.role is a stale single-role mirror and is never read here (CLAUDE.md §4).
+  //
+  // Read fails → throw. Read succeeds with zero rows → ['parent'], which is a real state (a new
+  // signup has a profiles row and no profile_roles rows) and still reaches /portal.
+  //
+  // A throw here is NOT caught by app/error.tsx — proxy runs before the React tree exists, so Next
+  // serves its own 500 for the request. That is the deliberate trade: a hard failure on an
+  // unreadable role source beats silently admitting someone on a guess.
   if (isProtected && user) {
-    const { data: roleRows } = await supabase
+    const { data: roleRows, error: rolesError } = await supabase
       .from("profile_roles")
       .select("role")
       .eq("user_id", user.id)
       .eq("is_active", true);
 
-    let roles: string[] = (roleRows ?? []).map((r) => r.role as string);
-    if (roles.length === 0) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single();
-      roles = [profile?.role ?? "parent"];
+    if (rolesError) {
+      console.error("[proxy] profile_roles read failed", {
+        userId: user.id,
+        pathname,
+        code: rolesError.code,
+        message: rolesError.message,
+      });
+      throw new Error(
+        `Could not read profile_roles for ${user.id} (${rolesError.code || "no code"}): ${rolesError.message}`
+      );
     }
+
+    // Zero rows → parent. Not read from profiles.role: DELETE /api/admin/roles drops a role row
+    // without mirroring the change there, so the stale column can still name a revoked role.
+    const roles: string[] = roleRows.length > 0
+      ? roleRows.map((r) => r.role as string)
+      : ["parent"];
 
     // Allow when ANY active role grants access to this prefix (multi-role users).
     const allowedPrefixes = new Set(roles.flatMap((role) => ROLE_ROUTES[role] ?? []));

@@ -17,8 +17,21 @@ export interface SessionWithRole {
 }
 
 /**
- * Get the authenticated user with their profile role.
- * Checks profile_roles first, falls back to profiles.role.
+ * Get the authenticated user with their roles, from `profile_roles` only.
+ *
+ * Two outcomes, deliberately kept distinct — conflating them was the bug:
+ *
+ *  - The read FAILS  → throw. An auth resolver that cannot reach the
+ *    authoritative source must not guess a role from a stale column.
+ *  - The read SUCCEEDS with zero rows → `['parent']`. This is a real,
+ *    expected state, not a failure (see the comment at the branch).
+ *
+ * `profiles.role` is never consulted. It is a stale single-role mirror typed
+ * as the `user_role` enum, which cannot even represent finance_admin /
+ * studio_admin / studio_manager — see CLAUDE.md §4.
+ *
+ * Callers must be inside an error boundary. `app/error.tsx` is the one that
+ * catches a throw from a route-group layout.
  */
 export async function getSessionWithRole(): Promise<SessionWithRole | null> {
   const supabase = await createClient();
@@ -28,38 +41,57 @@ export async function getSessionWithRole(): Promise<SessionWithRole | null> {
 
   if (!user) return null;
 
+  // Display fields only. `role` is deliberately not selected — nothing in this
+  // resolver may authorize off it.
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role, first_name, last_name, preferred_name, avatar_url")
+    .select("first_name, last_name, preferred_name, avatar_url")
     .eq("id", user.id)
     .single();
 
-  // Try profile_roles (gracefully handle table not existing or RLS errors)
-  let profileRoles: Array<{ role: string; tenant_id: string | null; is_primary: boolean }> | null = null;
-  try {
-    const { data, error } = await supabase
-      .from("profile_roles")
-      .select("role, tenant_id, is_primary")
-      .eq("user_id", user.id)
-      .eq("is_active", true)
-      .order("is_primary", { ascending: false });
-    if (!error) profileRoles = data;
-  } catch {
-    // profile_roles table may not exist yet — fall back to profiles.role
+  // No try/catch: postgrest-js rejects only when .throwOnError() is set (it is
+  // not here), so every failure — including fetch/network errors, which it
+  // catches internally and converts — arrives in `error`. A try/catch around
+  // this is dead code that has never once executed. Do not re-add one.
+  const { data: profileRoles, error: rolesError } = await supabase
+    .from("profile_roles")
+    .select("role, tenant_id, is_primary")
+    .eq("user_id", user.id)
+    .eq("is_active", true)
+    .order("is_primary", { ascending: false });
+
+  if (rolesError) {
+    // This path was 100% silent before, which is why it was never observed.
+    console.error(
+      "[auth:getSessionWithRole] profile_roles read failed",
+      { userId: user.id, code: rolesError.code, message: rolesError.message }
+    );
+    throw new Error(
+      `Could not read profile_roles for ${user.id} (${rolesError.code || "no code"}): ${rolesError.message}`
+    );
   }
 
   let primaryRole: Role;
   let roles: Role[];
   let tenantId: string | null = null;
 
-  if (profileRoles && profileRoles.length > 0) {
+  if (profileRoles.length > 0) {
     roles = profileRoles.map((pr) => pr.role as Role);
     const primary = profileRoles.find((pr) => pr.is_primary);
     primaryRole = (primary?.role ?? profileRoles[0].role) as Role;
     tenantId = primary?.tenant_id ?? profileRoles[0].tenant_id ?? null;
   } else {
-    primaryRole = (profile?.role as Role) ?? "parent";
-    roles = [primaryRole];
+    // Zero active roles is expected, not broken: handle_new_user() inserts a
+    // profiles row and NO profile_roles row, so every new signup lands here
+    // until an admin grants one. Five live profiles are in this state today.
+    //
+    // Resolve to the least privilege we have rather than reading profiles.role.
+    // DELETE /api/admin/roles removes a profile_roles row without mirroring the
+    // change to profiles.role (staff-actions.ts does mirror it; that route does
+    // not — separate ticket). Reading the stale column here would hand a
+    // revoked admin their access back. Defaulting instead closes that.
+    primaryRole = "parent";
+    roles = ["parent"];
   }
 
   return {

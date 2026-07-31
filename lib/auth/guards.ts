@@ -11,6 +11,15 @@ export interface AuthUser {
   roles: UserRole[];
   firstName: string | null;
   lastName: string | null;
+  /**
+   * Tenant from the user's primary `profile_roles` row.
+   *
+   * Null when the user has no active role rows — a real state (new signups).
+   * Roughly twenty call sites spend this as `user.tenantId!`; those assertions
+   * were already unsound and remain so. Failing closed on a read error makes
+   * them *less* exposed, not more: the error case now throws instead of
+   * returning a user with a null tenant. No call site was changed to suit this.
+   */
   tenantId: string | null;
   /**
    * The tenant's IANA timezone, from `tenants.timezone`.
@@ -26,8 +35,22 @@ export interface AuthUser {
 const BAM_TENANT_SLUG = "bam";
 
 /**
- * Get the authenticated user with their roles.
- * Checks profile_roles first, falls back to profiles.role.
+ * Get the authenticated user with their roles, from `profile_roles` only.
+ *
+ * Two outcomes, deliberately kept distinct — conflating them was the bug:
+ *
+ *  - The read FAILS  → throw. An auth resolver that cannot reach the
+ *    authoritative source must not guess a role from a stale column.
+ *  - The read SUCCEEDS with zero rows → `['parent']`. This is a real,
+ *    expected state, not a failure (see the comment at the branch).
+ *
+ * `profiles.role` is never consulted. It is a stale single-role mirror typed
+ * as the `user_role` enum, which cannot even represent finance_admin /
+ * studio_admin / studio_manager — see CLAUDE.md §4.
+ *
+ * Mirrors lib/auth/getSessionWithRole.ts, which resolves roles the same way.
+ * Callers must be inside an error boundary; `app/error.tsx` is the one that
+ * catches a throw from a route-group layout.
  */
 export async function getUser(): Promise<AuthUser | null> {
   const supabase = await createClient();
@@ -38,39 +61,61 @@ export async function getUser(): Promise<AuthUser | null> {
 
   if (!user) return null;
 
+  // Display fields only. `role` is deliberately not selected — nothing in this
+  // resolver may authorize off it.
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role, first_name, last_name")
+    .select("first_name, last_name")
     .eq("id", user.id)
     .single();
 
-  // Try profile_roles table first (gracefully handle table not existing or RLS errors)
-  let profileRoles: Array<{ role: string; tenant_id: string | null; is_primary: boolean }> | null = null;
-  try {
-    const { data, error } = await supabase
-      .from("profile_roles")
-      .select("role, tenant_id, is_primary")
-      .eq("user_id", user.id)
-      .eq("is_active", true)
-      .order("is_primary", { ascending: false });
-    if (!error) profileRoles = data;
-  } catch {
-    // profile_roles table may not exist yet — fall back to profiles.role
+  // No try/catch: postgrest-js rejects only when .throwOnError() is set (it is
+  // not here), so every failure — including fetch/network errors, which it
+  // catches internally and converts — arrives in `error`. A try/catch around
+  // this is dead code that has never once executed. Do not re-add one.
+  const { data: profileRoles, error: rolesError } = await supabase
+    .from("profile_roles")
+    .select("role, tenant_id, is_primary")
+    .eq("user_id", user.id)
+    .eq("is_active", true)
+    .order("is_primary", { ascending: false });
+
+  if (rolesError) {
+    // This path was 100% silent before, which is why it was never observed.
+    console.error("[auth:getUser] profile_roles read failed", {
+      userId: user.id,
+      code: rolesError.code,
+      message: rolesError.message,
+    });
+    throw new Error(
+      `Could not read profile_roles for ${user.id} (${rolesError.code || "no code"}): ${rolesError.message}`
+    );
   }
 
   let roles: UserRole[];
   let primaryRole: UserRole;
   let tenantId: string | null = null;
 
-  if (profileRoles && profileRoles.length > 0) {
+  if (profileRoles.length > 0) {
     roles = profileRoles.map((pr) => pr.role as UserRole);
     const primary = profileRoles.find((pr) => pr.is_primary);
     primaryRole = (primary?.role ?? profileRoles[0].role) as UserRole;
     tenantId = primary?.tenant_id ?? profileRoles[0].tenant_id ?? null;
   } else {
-    // Fallback to profiles.role
-    primaryRole = (profile?.role as UserRole) ?? "parent";
-    roles = [primaryRole];
+    // Zero active roles is expected, not broken: handle_new_user() inserts a
+    // profiles row and NO profile_roles row, so every new signup lands here
+    // until an admin grants one. Five live profiles are in this state today.
+    //
+    // Resolve to the least privilege we have rather than reading profiles.role.
+    // DELETE /api/admin/roles removes a profile_roles row without mirroring the
+    // change to profiles.role (staff-actions.ts does mirror it; that route does
+    // not — separate ticket). Reading the stale column here would hand a
+    // revoked admin their access back. Defaulting instead closes that.
+    //
+    // NOTE: tenantId stays null on this branch, exactly as it did before. See
+    // the tenantId note in the AuthUser docblock.
+    primaryRole = "parent";
+    roles = ["parent"];
   }
 
   const timezone = await getTenantTimezone(supabase, tenantId);
