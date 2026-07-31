@@ -39,6 +39,11 @@ function formatDateLabel(dateStr: string): string {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+function formatFullDate(dateStr: string): string {
+  const d = new Date(dateStr + "T00:00:00");
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
 function getDayName(dateStr: string): string {
   const d = new Date(dateStr + "T00:00:00");
   return d.toLocaleDateString("en-US", { weekday: "short" });
@@ -189,6 +194,14 @@ function SortableFieldRow({
   );
 }
 
+// ── View toggle ───────────────────────────────────────────────
+// "week" is the internal value; the label reads "Calendar" to match the nav item.
+const VIEW_OPTIONS = [
+  { value: "week", label: "Calendar" },
+  { value: "list", label: "List" },
+  { value: "room", label: "Room" },
+] as const;
+
 // ── Types ─────────────────────────────────────────────────────
 
 interface ScheduleCalendarProps {
@@ -197,8 +210,11 @@ interface ScheduleCalendarProps {
   rooms: Array<{ id: string; name: string }>;
   levels: string[];
   weekStart: string;
-  isRecurring?: boolean;
-  closures?: Array<{ closed_date: string; reason: string }>;
+  /** True when no schedule_instances rows exist for the viewed range. */
+  noOccurrences?: boolean;
+  /** The range that actually has generated occurrences, for the empty state. */
+  generatedRange?: { start: string; end: string } | null;
+  closures?: Array<{ closed_date: string; closed_through: string; is_total: boolean; reason: string }>;
   initialFilters: {
     teacher: string;
     level: string;
@@ -433,7 +449,8 @@ export function ScheduleCalendar({
   rooms,
   levels,
   weekStart,
-  isRecurring,
+  noOccurrences,
+  generatedRange,
   closures = [],
   initialFilters,
 }: ScheduleCalendarProps) {
@@ -696,29 +713,53 @@ export function ScheduleCalendar({
 
   // ── Week View ───────────────────────────────────────────────
 
-  const closedDateSet = new Set(closures.map((c) => c.closed_date));
-  const closureReasonMap = new Map(closures.map((c) => [c.closed_date, c.reason]));
+  // Expand each closure across its full [closed_date, closed_through] span so a
+  // multi-day closure marks every day it covers, not only its first. Intersecting
+  // with weekDates clips the span to the days actually on screen.
+  const closureByDate = new Map<string, { reason: string; is_total: boolean }>();
+  const closuresInView = closures
+    .map((c) => ({
+      ...c,
+      datesInView: weekDates.filter((d) => d >= c.closed_date && d <= c.closed_through),
+    }))
+    .filter((c) => c.datesInView.length > 0);
+
+  for (const c of closuresInView) {
+    for (const d of c.datesInView) {
+      closureByDate.set(d, { reason: c.reason, is_total: c.is_total });
+    }
+  }
+
+  const closedDateSet = new Set(closureByDate.keys());
+  const closureLabel = (isTotal: boolean) =>
+    isTotal ? "Studio closed" : "Studio closed, privates running";
 
   const renderWeekView = () => (
     <>
       {/* Closure banner */}
-      {closures.length > 0 && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between gap-2 print:hidden">
-          <div className="flex items-center gap-2">
-            <span className="text-red-500">&#128683;</span>
-            <div>
-              <span className="text-sm font-medium text-red-700">
-                Studio Closed: {closures[0].reason}
-              </span>
-              <span className="text-xs text-red-500 ml-2">
-                {closures.map((c) =>
-                  new Date(c.closed_date + "T00:00:00").toLocaleDateString("en-US", {
-                    weekday: "short",
-                    month: "short",
-                    day: "numeric",
-                  })
-                ).join(", ")}
-              </span>
+      {closuresInView.length > 0 && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start justify-between gap-2 print:hidden">
+          <div className="flex items-start gap-2">
+            <span className="text-red-500 leading-5">&#128683;</span>
+            <div className="space-y-0.5">
+              {closuresInView.map((c) => (
+                <div key={`${c.closed_date}-${c.closed_through}`}>
+                  <span className="text-sm font-medium text-red-700">
+                    {closureLabel(c.is_total)}: {c.reason}
+                  </span>
+                  <span className="text-xs text-red-500 ml-2">
+                    {c.datesInView
+                      .map((d) =>
+                        new Date(d + "T00:00:00").toLocaleDateString("en-US", {
+                          weekday: "short",
+                          month: "short",
+                          day: "numeric",
+                        })
+                      )
+                      .join(", ")}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
           <button
@@ -753,7 +794,10 @@ export function ScheduleCalendar({
               </div>
               {isClosed && (
                 <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-600 text-center font-medium">
-                  &#128683; {closureReasonMap.get(date) ?? "Closed"}
+                  &#128683; {closureByDate.get(date)?.reason ?? "Closed"}
+                  <div className="text-[10px] font-normal text-red-400">
+                    {closureByDate.get(date)?.is_total ? "Fully closed" : "Privates running"}
+                  </div>
                 </div>
               )}
               {(() => {
@@ -766,7 +810,7 @@ export function ScheduleCalendar({
                   <div className="space-y-1.5">
                     {isClosed && !showClosedClasses && privateSessions.length === 0 ? (
                       <div className="text-center text-xs text-red-400 py-4">
-                        Studio closed
+                        {closureLabel(closureByDate.get(date)?.is_total ?? true)}
                       </div>
                     ) : sessionsToShow.length === 0 ? (
                       <div className="rounded-lg border border-dashed border-silver p-3 text-center text-xs text-mist print:hidden">
@@ -776,7 +820,7 @@ export function ScheduleCalendar({
                       <>
                         {isClosed && !showClosedClasses && (
                           <div className="text-center text-xs text-red-400 py-1">
-                            Studio closed
+                            {closureLabel(closureByDate.get(date)?.is_total ?? true)}
                           </div>
                         )}
                         {sessionsToShow.map((inst) => (
@@ -1017,24 +1061,23 @@ export function ScheduleCalendar({
           <h1 className="font-heading text-2xl font-semibold text-charcoal">Schedule</h1>
           <p className="mt-1 text-sm text-slate">
             {getWeekLabel(weekStart)}
-            {isRecurring && <span className="ml-2 text-xs text-mist italic">&middot; Showing recurring weekly schedule</span>}
           </p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
           {/* View Toggle */}
           <div className="flex rounded-lg border border-silver bg-white">
-            {(["week", "list", "room"] as const).map((v) => (
+            {VIEW_OPTIONS.map(({ value, label }) => (
               <button
-                key={v}
-                onClick={() => setView(v)}
+                key={value}
+                onClick={() => setView(value)}
                 className={`px-3 py-1.5 text-sm font-medium transition-colors first:rounded-l-lg last:rounded-r-lg ${
-                  view === v
+                  view === value
                     ? "bg-lavender text-white"
                     : "text-slate hover:bg-cloud"
                 }`}
               >
-                {v.charAt(0).toUpperCase() + v.slice(1)}
+                {label}
               </button>
             ))}
           </div>
@@ -1282,6 +1325,36 @@ export function ScheduleCalendar({
           </span>
         )}
       </div>
+
+      {/* No generated occurrences for this range. We say so rather than
+          synthesising a week from the recurring class rows. */}
+      {noOccurrences && (
+        <div className="mb-4 rounded-lg border border-silver bg-white p-4 print:hidden">
+          <p className="text-sm font-medium text-charcoal">
+            No class occurrences generated for this range
+          </p>
+          <p className="mt-1 text-sm text-slate">
+            {generatedRange ? (
+              <>
+                Occurrences currently exist for{" "}
+                <span className="font-medium text-charcoal">
+                  {formatFullDate(generatedRange.start)}
+                </span>{" "}
+                &ndash;{" "}
+                <span className="font-medium text-charcoal">
+                  {formatFullDate(generatedRange.end)}
+                </span>
+                . Navigate to a week inside that range to see the schedule.
+              </>
+            ) : (
+              <>No occurrences have been generated yet.</>
+            )}
+          </p>
+          <p className="mt-1 text-xs text-mist">
+            Private sessions are unaffected and still shown.
+          </p>
+        </div>
+      )}
 
       {/* Calendar */}
       {view === "week" && renderWeekView()}

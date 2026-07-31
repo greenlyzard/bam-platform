@@ -1,7 +1,56 @@
 import { requireAdmin } from "@/lib/auth/guards";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getScheduleInstances, getClassesAsScheduleInstances, getApprovedTeachers, getRooms, getDistinctLevels } from "@/lib/schedule/queries";
+import { getScheduleInstances, getApprovedTeachers, getRooms, getDistinctLevels } from "@/lib/schedule/queries";
 import { ScheduleCalendar } from "./schedule-calendar";
+
+// ── Occurrence coverage ───────────────────────────────────────
+// `schedule_instances` rows are generated forward from the season start. Weeks
+// outside that generated span get an honest empty state — we do NOT synthesise a
+// week from the recurring `classes` rows, because a synthetic week knows nothing
+// about closures or per-occurrence cancellations and would confidently show
+// classes that are not actually running.
+//
+// 2026-03-15 → 2026-07-22 is a PERMANENT coverage gap: it predates generation and
+// will never have occurrences.
+//
+// Before the gap sit 61 rows dated 2026-03-09 → 2026-03-14. These are NOT strays
+// and must NOT be deleted. They are the disposed orphans from migration
+// 20260729000003 — a deliberate append-only artifact, retained on purpose.
+// Verified 2026-07-30: all 61 have status='cancelled', class_id NULL, and the note
+// "Orphaned occurrence: no class_id. Frozen March 2026 seed week; source class
+// unrecoverable. Disposed by docs/OCCURRENCE_GENERATION.md Phase 3."
+//
+// Those rows are why OCCURRENCE_GAP_END is a constant instead of just reading
+// min(event_date): min() returns 2026-03-09, so the notice would claim a range
+// spanning the four-month hole. The real generated range starts 2026-07-23, which
+// is what we report — the span after the gap, the one that is actually usable.
+const OCCURRENCE_GAP_END = "2026-07-22";
+
+async function getGeneratedOccurrenceRange(
+  supabaseAdmin: ReturnType<typeof createAdminClient>,
+  tenantId: string
+): Promise<{ start: string; end: string } | null> {
+  const [{ data: first }, { data: last }] = await Promise.all([
+    supabaseAdmin
+      .from("schedule_instances")
+      .select("event_date")
+      .eq("tenant_id", tenantId)
+      .gt("event_date", OCCURRENCE_GAP_END)
+      .order("event_date", { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+    supabaseAdmin
+      .from("schedule_instances")
+      .select("event_date")
+      .eq("tenant_id", tenantId)
+      .order("event_date", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  if (!first || !last) return null;
+  return { start: first.event_date, end: last.event_date };
+}
 
 function getWeekRange(weekParam?: string): { startDate: string; endDate: string; weekStart: string } {
   let monday: Date;
@@ -60,18 +109,20 @@ export default async function AdminSchedulePage({
 
   const supabaseAdmin = createAdminClient();
 
-  const [sessionInstances, classInstances, teachers, rooms, levels, { data: closureRows }, { data: privateRows }] = await Promise.all([
+  const [sessionInstances, teachers, rooms, levels, { data: closureRows }, { data: privateRows }] = await Promise.all([
     getScheduleInstances(filterParams),
-    getClassesAsScheduleInstances(filterParams),
     getApprovedTeachers(),
     getRooms(),
     getDistinctLevels(),
+    // Range overlap, not start-date containment: a closure is in view when it
+    // begins on or before the last day shown and ends on or after the first.
+    // `closed_through` is NOT NULL as of migration 20260730000001.
     supabaseAdmin
       .from("studio_closures")
-      .select("closed_date, reason")
+      .select("closed_date, closed_through, is_total, reason")
       .eq("tenant_id", "84d98f72-c82f-414f-8b17-172b802f6993")
-      .gte("closed_date", startDate)
-      .lte("closed_date", endDate),
+      .lte("closed_date", endDate)
+      .gte("closed_through", startDate),
     supabaseAdmin
       .from("private_sessions")
       .select("id, session_date, start_time, end_time, studio, status, session_type, primary_teacher_id, student_ids, session_notes")
@@ -125,10 +176,13 @@ export default async function AdminSchedulePage({
     };
   });
 
-  // Use session instances if available, otherwise fall back to recurring classes
-  const baseInstances = sessionInstances.length > 0 ? sessionInstances : classInstances;
-  const instances = [...baseInstances, ...privateInstances];
-  const isRecurring = sessionInstances.length === 0;
+  // No synthetic fallback — see the OCCURRENCE_GAP_END note above. Private
+  // sessions are real rows and still render; only the class grid goes empty.
+  const instances = [...sessionInstances, ...privateInstances];
+  const generatedRange =
+    sessionInstances.length === 0
+      ? await getGeneratedOccurrenceRange(supabaseAdmin, "84d98f72-c82f-414f-8b17-172b802f6993")
+      : null;
 
   return (
     <div className="min-h-screen bg-cream">
@@ -139,8 +193,14 @@ export default async function AdminSchedulePage({
           rooms={rooms}
           levels={levels}
           weekStart={weekStart}
-          isRecurring={isRecurring}
-          closures={(closureRows ?? []).map(c => ({ closed_date: c.closed_date, reason: c.reason ?? "Closed" }))}
+          noOccurrences={sessionInstances.length === 0}
+          generatedRange={generatedRange}
+          closures={(closureRows ?? []).map(c => ({
+            closed_date: c.closed_date,
+            closed_through: c.closed_through,
+            is_total: c.is_total,
+            reason: c.reason ?? "Closed",
+          }))}
           initialFilters={{
             teacher: params.teacher || "",
             level: params.level || "",
