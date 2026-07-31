@@ -3,6 +3,10 @@
 import { requireAdmin } from "@/lib/auth/guards";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { LocationType } from "@/lib/locations/validate";
+import {
+  describeRoomReferences,
+  type RoomReferenceCounts,
+} from "@/lib/rooms/references";
 
 const TENANT_ID = "84d98f72-c82f-414f-8b17-172b802f6993";
 const STUDIO_SETTINGS_ID = "807cadc5-405f-4d24-9225-ae8458a31577";
@@ -128,6 +132,117 @@ export async function upsertRoom(payload: {
     if (error) return { success: false, error: error.message };
   }
 
+  return { success: true };
+}
+
+/**
+ * Count every row that points at a room, across all three referencing tables.
+ *
+ * Fails closed: an unreadable count is not a zero count. Callers must treat an
+ * error as "unknown, therefore not deletable" — because the FKs are
+ * ON DELETE SET NULL, guessing zero here would destroy history silently.
+ */
+async function countRoomReferences(
+  supabase: ReturnType<typeof createAdminClient>,
+  roomId: string
+): Promise<{ counts: RoomReferenceCounts } | { error: string }> {
+  const [classes, instances, templates] = await Promise.all([
+    supabase
+      .from("classes")
+      .select("id", { count: "exact", head: true })
+      .eq("room_id", roomId),
+    supabase
+      .from("schedule_instances")
+      .select("id", { count: "exact", head: true })
+      .eq("room_id", roomId),
+    supabase
+      .from("schedule_templates")
+      .select("id", { count: "exact", head: true })
+      .eq("room_id", roomId),
+  ]);
+
+  for (const result of [classes, instances, templates]) {
+    if (result.error) return { error: result.error.message };
+    if (result.count === null) {
+      return { error: "Could not read what references this room." };
+    }
+  }
+
+  const counts: RoomReferenceCounts = {
+    classes: classes.count ?? 0,
+    schedule_instances: instances.count ?? 0,
+    schedule_templates: templates.count ?? 0,
+    total: 0,
+  };
+  counts.total =
+    counts.classes + counts.schedule_instances + counts.schedule_templates;
+
+  return { counts };
+}
+
+/**
+ * Reference counts for one room, for the admin UI's delete affordance.
+ *
+ * Deletability is decided here, on the server, and never inferred client-side.
+ */
+export async function getRoomReferenceCounts(
+  roomId: string
+): Promise<
+  | { success: true; counts: RoomReferenceCounts }
+  | { success: false; error: string }
+> {
+  await requireAdmin();
+  const supabase = createAdminClient();
+
+  const result = await countRoomReferences(supabase, roomId);
+  if ("error" in result) return { success: false, error: result.error };
+  return { success: true, counts: result.counts };
+}
+
+/**
+ * Permanently delete a room. Archived rooms only, and only at zero references.
+ *
+ * Two guards, both mandatory:
+ *  1. The room must already be archived (`is_active = false`). Deleting
+ *     straight out of the active list is never offered.
+ *  2. Nothing may reference it. This count is re-read here, immediately before
+ *     the delete, because the client's copy can be minutes stale — a class
+ *     scheduled into this room since the page loaded would otherwise be
+ *     silently unlinked by the ON DELETE SET NULL cascade.
+ *
+ * The re-read narrows the window to the gap between the count and the delete;
+ * it cannot close it entirely without a DB-level constraint (which would need
+ * a migration, and none is added here).
+ */
+export async function deleteRoom(
+  id: string
+): Promise<{ success: boolean; error?: string }> {
+  await requireAdmin();
+  const supabase = createAdminClient();
+
+  const { data: room, error: roomError } = await supabase
+    .from("rooms")
+    .select("id, is_active")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (roomError) return { success: false, error: roomError.message };
+  if (!room) return { success: false, error: "Room not found." };
+  if (room.is_active) {
+    return { success: false, error: "Archive this room before deleting it." };
+  }
+
+  const result = await countRoomReferences(supabase, id);
+  if ("error" in result) return { success: false, error: result.error };
+  if (result.counts.total > 0) {
+    return {
+      success: false,
+      error: `${describeRoomReferences(result.counts)} Cannot be deleted.`,
+    };
+  }
+
+  const { error } = await supabase.from("rooms").delete().eq("id", id);
+  if (error) return { success: false, error: error.message };
   return { success: true };
 }
 

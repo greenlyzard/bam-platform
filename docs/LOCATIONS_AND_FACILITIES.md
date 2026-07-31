@@ -1,7 +1,7 @@
 # Locations & Facilities
 
 **Status:** Approved — canonical
-**Last updated:** 2026-07-09
+**Last updated:** 2026-07-31 (adds §6.1 room lifecycle; withdraws the §5.4 orphan-room deletion)
 **Governs:** `studio_locations`, `rooms`, `location_hours`, `studio_closures`, `schedule_instances` (location fields), `classes.location_id` · admin/teacher/parent location surfaces
 **Supersedes in `_INDEX.md`:** Pending task 11 (locations gap + rooms-vs-studio_resources reconciliation)
 
@@ -82,7 +82,7 @@ This is a data-integrity fix independent of every new feature and de-risks every
 1. **Collapse to one location CRUD.** Make `app/(admin)/admin/settings/studio/actions.ts` the sole writer of `studio_locations`. Strip `createLocation` / `updateLocation` / `toggleLocationActive` from `app/(admin)/admin/resources/manage/actions.ts`. This kills the duplicate write and, critically, the **two independent "clear the primary flag" paths** that can race into zero-or-two primaries.
 2. **Enforce one primary per tenant.** Add a guarantee (partial unique index or trigger) that exactly one `is_primary = true` location exists per tenant, so the bug cannot recur regardless of code path.
 3. **Retire the dead room model.** Remove the "Resources" multi-select in `class-edit-drawer.tsx` (writes to the empty `studio_resource_assignments`). Leave `studio_resources` / `studio_resource_assignments` tables in place, dormant.
-4. **Clean orphan rooms.** Delete the 3 orphan `rooms` rows (`location_id = NULL`, `is_active = false`) — redundant legacy seed, superseded by the assigned active rooms.
+4. **Clean orphan rooms.** ~~Delete the 3 orphan `rooms` rows (`location_id = NULL`, `is_active = false`) — redundant legacy seed, superseded by the assigned active rooms.~~ **Withdrawn 2026-07-31 — do not delete these 3 rows.** They are not free-standing seed: `schedule_instances.room_id` points at them from 61 rows (Studio 1 (retired) 27, Studio 2 (retired) 20, Studio 3 (retired) 14) — the disposed March orphans that migration `20260729000003_dispose_orphan_occurrences.sql` deliberately cancelled-and-kept rather than deleted. Deleting the rooms would null `room_id` on all 61 (the FK is ON DELETE SET NULL) and strip the room from history the platform went out of its way to preserve. They stay, archived (`is_active = false`), and the §6.1 rules govern them. Note they carry **zero classes** — a classes-only emptiness check calls all three deletable, which is why §6.1 counts all three referencing tables.
 
 No new location features land until Step 1 is merged.
 
@@ -122,6 +122,25 @@ All surfaces that render an occurrence's location must call the §4 resolver. En
 
 ---
 
+## 6.1 Room lifecycle — archive, and delete only at zero references
+
+*Added 2026-07-31. Governs `/admin/settings/studio` (`studio-settings-client.tsx` + `actions.ts`) and `lib/rooms/references.ts`.*
+
+**`rooms.is_active` is the archive flag.** There is no separate archived column and none is to be added. Archived = `is_active = false`. The Rooms lists on `/admin/settings/studio` are behind one Active/Archived toggle carrying both counts; every location card and the Unassigned section filter to the selected view.
+
+**Why deletability cannot be inferred from a failed delete.** All three FKs into `rooms` — `classes.room_id`, `schedule_instances.room_id`, `schedule_templates.room_id` — are **ON DELETE SET NULL**. A `DELETE FROM rooms` therefore *never* errors. It succeeds and silently nulls `room_id` on every referencing row. Any "try it and see if it fails" test reports every room as deletable and destroys history on the way. Deletability is decided by **counting references first**, and by counting **all three tables** — the 3 retired orphan rooms have zero classes and 61 `schedule_instances` between them.
+
+Rules:
+
+- **Active room — no delete affordance at all.** Archive first. Archiving is the step that puts the room's usage in front of whoever is about to destroy it.
+- **Archived with references** — delete disabled, with the count stated: *"Used by 27 scheduled occurrences. Cannot be deleted."*
+- **Archived at zero references** — delete offered behind a confirmation requiring the literal string `DELETE`, compared **case-sensitively and untrimmed** (`"delete"` and `" DELETE "` do not pass). The dialog states that the deletion is permanent and cannot be undone.
+- **The server decides.** `getRoomReferenceCounts(roomId)` returns the per-table counts for the UI; `deleteRoom(id)` re-reads them itself immediately before deleting and refuses on a non-zero total. The client's copy can be minutes stale — a class scheduled into the room since page load would otherwise be silently unlinked. Both actions are behind `requireAdmin()`, the same guard as `upsertRoom`.
+- **Fail closed.** An unreadable count is not a zero count: a count error blocks the delete rather than permitting it.
+- Residual gap: the re-read narrows the check-to-delete window but cannot close it. Closing it fully needs a DB-level constraint (a `BEFORE DELETE` trigger raising on any live reference) — deferred, listed in §9.
+
+---
+
 ## 7. Launch gating (RSM → September)
 
 - RSM exists now as a dormant `studio` (`is_active = true`, 0 classes). It is invisible to parents today only because the parent side ignores location and RSM has no classes — this spec makes that intentional, not accidental.
@@ -149,6 +168,7 @@ All surfaces that render an occurrence's location must call the §4 resolver. En
 - **Studio-only class-home constraint — enforcement depth.** Enforced in UI + client `handleSave` only (no server action exists for class writes). DB-level enforcement (trigger, since it's a cross-table rule a CHECK can't express) is deferred hardening — acceptable for single-admin now, revisit before multi-admin or any non-UI class-write path.
 - **Timesheet per-location attribution** — confirm whether v1 payroll attributes hours per location or per-location is report-only. Decide at the timesheet build step.
 - **Per-location roles** — not in v1. Note any place a future "RSM site manager who only sees RSM" would need location in the RLS/permission layer, so we don't build into a corner. Flag-only.
+- **Room delete — DB-level reference guard.** `deleteRoom` re-counts references server-side immediately before deleting (§6.1), which narrows but does not close the check-to-delete window. A `BEFORE DELETE` trigger on `rooms` that raises when any of the three ON DELETE SET NULL references is live would close it and would also protect any future non-UI delete path. Deferred hardening — acceptable while `/admin/settings/studio` is the only delete path. Needs a migration via `db push`.
 - **Equipment booking** — dormant `studio_resources` is the seed. Out of scope here.
 - **Costume inventory** — future system anchors on the `internal` storage location.
 
@@ -156,7 +176,7 @@ All surfaces that render an occurrence's location must call the §4 resolver. En
 
 ## 10. Build sequence (step by step)
 
-1. **Reconciliation (§5)** — collapse CRUD, enforce single primary, retire dead room UI, clean orphan rooms. *Ship standalone first.* ✅ done (Step 1).
+1. **Reconciliation (§5)** — collapse CRUD, enforce single primary, retire dead room UI, ~~clean orphan rooms~~. *Ship standalone first.* ✅ done (Step 1) — **except §5.4, withdrawn 2026-07-31**: the 3 orphan rooms are referenced by 61 preserved `schedule_instances` and are kept, archived, under §6.1.
 2. **Schema migration (§8)** — `location_type`, instance override fields, seed partner/internal locations. Via `db push`. ✅ done (Step 2; partner/internal seeding deferred per §9).
 3. **Location resolver (§4)** — single shared helper used by every surface. ✅ done (Step 3).
 4. **Staff-side assignment (§6 admin)** — 4a: location+room in class builder ✅ done. 4b: instance override UI **⛔ DEFERRED — blocked on the schedule_instances generator (see §6 note + `_INDEX.md` task 19).**

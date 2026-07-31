@@ -1,15 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   updateStudioIdentity,
   upsertLocation,
   upsertRoom,
   toggleLocationActive,
   toggleRoomActive,
+  getRoomReferenceCounts,
+  deleteRoom,
 } from "./actions";
 import { SimpleSelect } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { LOCATION_TYPE_OPTIONS, type LocationType } from "@/lib/locations/validate";
+import {
+  describeRoomReferences,
+  type RoomReferenceCounts,
+} from "@/lib/rooms/references";
 
 interface StudioSettings {
   id: string;
@@ -54,6 +69,12 @@ interface Room {
  * SimpleSelect cannot hold null, so null round-trips through this value.
  */
 const UNASSIGNED_LOCATION = "__none__";
+
+/**
+ * Which rooms the Rooms lists show. `rooms.is_active` is the archive flag —
+ * there is no separate archived column — so Archived is simply is_active false.
+ */
+type RoomView = "active" | "archived";
 
 export function StudioSettingsClient({
   studioSettings,
@@ -337,10 +358,27 @@ function LocationsSection({
   const [editingLocationId, setEditingLocationId] = useState<string | null>(null);
   const [addingRoomForLocation, setAddingRoomForLocation] = useState<string | null>(null);
   const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
+  const [roomView, setRoomView] = useState<RoomView>("active");
+
+  const showArchived = roomView === "archived";
+  const activeRoomCount = rooms.filter((r) => r.is_active).length;
+  const archivedRoomCount = rooms.length - activeRoomCount;
+
+  // Every rooms list on this page — each location card and Unassigned — draws
+  // from the selected view, so a room is never in two places at once.
+  const visibleRooms = rooms.filter((r) => r.is_active !== showArchived);
 
   // Rooms with no location_id belong to no card above, so without their own
-  // section they are invisible and unreachable in this UI.
-  const unassignedRooms = rooms.filter((r) => r.location_id === null);
+  // section they are invisible and unreachable in this UI. All three retired
+  // orphan rooms live here, archived.
+  const unassignedRooms = visibleRooms.filter((r) => r.location_id === null);
+
+  function selectRoomView(view: RoomView) {
+    setRoomView(view);
+    // Any open form belongs to a row the other view does not show.
+    setAddingRoomForLocation(null);
+    setEditingRoomId(null);
+  }
 
   function toggleRoom(room: Room) {
     return async () => {
@@ -349,6 +387,13 @@ function LocationsSection({
       setRooms((prev) =>
         prev.map((r) => (r.id === room.id ? { ...r, is_active: next } : r))
       );
+    };
+  }
+
+  function removeRoom(id: string) {
+    return () => {
+      setRooms((prev) => prev.filter((r) => r.id !== id));
+      setEditingRoomId((prev) => (prev === id ? null : prev));
     };
   }
 
@@ -384,9 +429,38 @@ function LocationsSection({
         />
       )}
 
+      {/* One control for every rooms list below. Both counts are always shown so
+          an empty Archived view reads as empty, not broken. */}
+      <div className="flex items-center gap-3 mb-4">
+        <span className="text-xs font-semibold text-mist uppercase tracking-wide">
+          Rooms
+        </span>
+        <div className="inline-flex rounded-lg border border-silver bg-white p-0.5">
+          <RoomViewTab
+            label="Active"
+            count={activeRoomCount}
+            selected={!showArchived}
+            onSelect={() => selectRoomView("active")}
+          />
+          <RoomViewTab
+            label="Archived"
+            count={archivedRoomCount}
+            selected={showArchived}
+            onSelect={() => selectRoomView("archived")}
+          />
+        </div>
+      </div>
+
+      {showArchived && archivedRoomCount === 0 && (
+        <p className="text-xs text-mist mb-4">
+          No archived rooms. Archiving a room takes it out of scheduling without
+          touching the classes and occurrences that already happened in it.
+        </p>
+      )}
+
       <div className="space-y-4">
         {locations.map((loc) => {
-          const locRooms = rooms.filter((r) => r.location_id === loc.id);
+          const locRooms = visibleRooms.filter((r) => r.location_id === loc.id);
           const isEditing = editingLocationId === loc.id;
 
           return (
@@ -462,18 +536,22 @@ function LocationsSection({
               <div className="border-t border-silver/60 bg-cloud/30 px-5 py-4">
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-xs font-semibold text-mist uppercase tracking-wide">
-                    Rooms ({locRooms.length})
+                    {showArchived ? "Archived Rooms" : "Rooms"} ({locRooms.length})
                   </p>
-                  <button
-                    onClick={() =>
-                      setAddingRoomForLocation(
-                        addingRoomForLocation === loc.id ? null : loc.id
-                      )
-                    }
-                    className="text-xs text-lavender hover:underline"
-                  >
-                    {addingRoomForLocation === loc.id ? "Cancel" : "+ Add Room"}
-                  </button>
+                  {/* A new room is created active, so it would vanish on save
+                      from the Archived view. Offer it only where it lands. */}
+                  {!showArchived && (
+                    <button
+                      onClick={() =>
+                        setAddingRoomForLocation(
+                          addingRoomForLocation === loc.id ? null : loc.id
+                        )
+                      }
+                      className="text-xs text-lavender hover:underline"
+                    >
+                      {addingRoomForLocation === loc.id ? "Cancel" : "+ Add Room"}
+                    </button>
+                  )}
                 </div>
 
                 {addingRoomForLocation === loc.id && (
@@ -492,7 +570,11 @@ function LocationsSection({
                 )}
 
                 {locRooms.length === 0 && (
-                  <p className="text-xs text-mist">No rooms configured.</p>
+                  <p className="text-xs text-mist">
+                    {showArchived
+                      ? "No archived rooms."
+                      : "No rooms configured."}
+                  </p>
                 )}
 
                 <div className="space-y-1.5">
@@ -506,6 +588,7 @@ function LocationsSection({
                         setEditingRoomId(editingRoomId === room.id ? null : room.id)
                       }
                       onToggleActive={toggleRoom(room)}
+                      onDeleted={removeRoom(room.id)}
                     />
                   ))}
                 </div>
@@ -520,7 +603,8 @@ function LocationsSection({
           <div className="rounded-xl border border-dashed border-silver bg-cloud/30 px-5 py-4">
             <div className="mb-3">
               <p className="text-xs font-semibold text-mist uppercase tracking-wide">
-                Unassigned ({unassignedRooms.length})
+                {showArchived ? "Unassigned & Archived" : "Unassigned"} (
+                {unassignedRooms.length})
               </p>
               <p className="text-xs text-mist mt-1">
                 These rooms have no location. Edit a room to assign one.
@@ -538,6 +622,7 @@ function LocationsSection({
                     setEditingRoomId(editingRoomId === room.id ? null : room.id)
                   }
                   onToggleActive={toggleRoom(room)}
+                  onDeleted={removeRoom(room.id)}
                 />
               ))}
             </div>
@@ -548,22 +633,107 @@ function LocationsSection({
   );
 }
 
+// ── Room View Tab ───────────────────────────────────────
+function RoomViewTab({
+  label,
+  count,
+  selected,
+  onSelect,
+}: {
+  label: string;
+  count: number;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={selected}
+      className={`h-7 rounded-md px-3 text-xs font-medium transition-colors ${
+        selected
+          ? "bg-lavender text-white"
+          : "text-mist hover:text-charcoal"
+      }`}
+    >
+      {label} ({count})
+    </button>
+  );
+}
+
 // ── Room Row ────────────────────────────────────────────
 // Shared by the per-location cards and the Unassigned section so both get the
-// same edit affordance.
+// same edit, archive, and delete affordances.
 function RoomRow({
   room,
   locations,
   isEditing,
   onEditToggle,
   onToggleActive,
+  onDeleted,
 }: {
   room: Room;
   locations: Location[];
   isEditing: boolean;
   onEditToggle: () => void;
   onToggleActive: () => void;
+  onDeleted: () => void;
 }) {
+  // `is_active` is the archive flag. An active room gets no delete affordance
+  // at all — archive it first, which is the step that makes someone look at
+  // what the room is still used for.
+  const archived = !room.is_active;
+
+  const [refs, setRefs] = useState<RoomReferenceCounts | null>(null);
+  const [refsError, setRefsError] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // Reference counts come from the server. Every FK to rooms is
+  // ON DELETE SET NULL, so a delete would succeed against a room with 27
+  // occurrences behind it and quietly orphan all 27 — nothing here may guess.
+  // An active room shows no reference line and no delete button, so it needs no
+  // count. Rows are keyed by room id and the view filter unmounts a row the
+  // moment it is archived or restored, so the counts never outlive their room.
+  useEffect(() => {
+    if (!archived) return;
+    let cancelled = false;
+    getRoomReferenceCounts(room.id).then((result) => {
+      if (cancelled) return;
+      if (result.success) {
+        setRefs(result.counts);
+        setRefsError(null);
+      } else {
+        setRefs(null);
+        setRefsError(result.error);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [room.id, archived]);
+
+  // Unknown counts are not zero counts.
+  const deletable = refs !== null && refs.total === 0;
+
+  async function handleDelete() {
+    setDeleting(true);
+    setDeleteError(null);
+    const result = await deleteRoom(room.id);
+    setDeleting(false);
+    if (result.success) {
+      setConfirmOpen(false);
+      onDeleted();
+      return;
+    }
+    setDeleteError(result.error ?? "Delete failed.");
+    // The server refused on a count this row did not have — go get the real one.
+    const refreshed = await getRoomReferenceCounts(room.id);
+    if (refreshed.success) setRefs(refreshed.counts);
+  }
+
   return (
     <div className="rounded-lg bg-white border border-silver/50 px-3 py-2">
       <div className="flex items-center justify-between gap-2">
@@ -581,9 +751,9 @@ function RoomRow({
               {room.notes}
             </span>
           )}
-          {!room.is_active && (
+          {archived && (
             <span className="text-[10px] bg-red-50 text-red-500 rounded-full px-1.5 py-0.5">
-              Inactive
+              Archived
             </span>
           )}
         </div>
@@ -598,10 +768,88 @@ function RoomRow({
             onClick={onToggleActive}
             className={`text-xs ${room.is_active ? "text-red-400 hover:text-red-600" : "text-green-500 hover:text-green-700"}`}
           >
-            {room.is_active ? "Deactivate" : "Activate"}
+            {room.is_active ? "Archive" : "Restore"}
           </button>
+          {archived && (
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmText("");
+                setDeleteError(null);
+                setConfirmOpen(true);
+              }}
+              disabled={!deletable}
+              className="text-xs text-red-500 hover:text-red-700 disabled:text-mist disabled:cursor-not-allowed disabled:hover:text-mist"
+            >
+              Delete
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Why Delete is or is not available, stated with the number. */}
+      {archived && (
+        <p className="text-xs text-mist mt-1.5 pl-6">
+          {refsError
+            ? `Could not check what uses this room (${refsError}) — delete unavailable.`
+            : refs === null
+              ? "Checking what uses this room…"
+              : refs.total > 0
+                ? `${describeRoomReferences(refs)} Cannot be deleted.`
+                : "Not used by any class, scheduled occurrence, or schedule template."}
+        </p>
+      )}
+
+      <AlertDialog
+        open={confirmOpen}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setConfirmOpen(false);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {room.name}</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently deletes the room. It cannot be undone, and there
+              is no way to restore it — restoring is only possible for archived
+              rooms, and this one will no longer exist.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="mt-4 space-y-2">
+            <label className="block text-xs font-medium text-charcoal">
+              Type <span className="font-mono font-semibold">DELETE</span> to
+              confirm.
+            </label>
+            <input
+              type="text"
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              autoComplete="off"
+              spellCheck={false}
+              className="w-full h-9 rounded-lg border border-silver px-3 text-sm font-mono text-charcoal focus:border-red-400 focus:outline-none focus:ring-1 focus:ring-red-400"
+            />
+            {deleteError && (
+              <p className="text-xs text-red-600">{deleteError}</p>
+            )}
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setConfirmOpen(false)}>
+              Cancel
+            </AlertDialogCancel>
+            {/* Exact match: case-sensitive, untrimmed. "delete" is not DELETE. */}
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={confirmText !== "DELETE" || deleting || !deletable}
+              className="rounded-lg bg-red-500 hover:bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {deleting ? "Deleting..." : "Delete Room"}
+            </button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {isEditing && (
         <div className="mt-3">
