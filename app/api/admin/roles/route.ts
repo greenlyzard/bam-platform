@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getUser } from "@/lib/auth/guards";
+import { getUser, type UserRole } from "@/lib/auth/guards";
 import { z } from "zod";
 
 const ADMIN_ROLES = ["super_admin", "admin", "studio_admin"];
@@ -64,9 +64,45 @@ export async function GET() {
 /**
  * POST — assign a role to a user
  */
+/**
+ * The role vocabulary this endpoint may write, bound to `UserRole` in
+ * lib/auth/guards.ts rather than restated independently.
+ *
+ * NOT `STAFF_ROLE_OPTIONS` from lib/auth/staff-roles.ts: that list is the seven
+ * roles the staff UI offers and omits front_desk and student, both of which are
+ * routable (ROLE_ROUTES in proxy.ts) and grantable from /admin/settings/roles.
+ * Validating against it would reject a legitimate grant.
+ *
+ * The two assertions below make drift a compile error in both directions: the
+ * `satisfies` rejects a value that is not a UserRole (a typo), and _NoMissing
+ * fails to compile if UserRole gains a member that is not listed here.
+ */
+const ASSIGNABLE_ROLES = [
+  "super_admin",
+  "admin",
+  "studio_admin",
+  "finance_admin",
+  "studio_manager",
+  "front_desk",
+  "teacher",
+  "parent",
+  "student",
+] as const satisfies readonly UserRole[];
+
+type AssertNever<T extends never> = T;
+type _NoMissingRoles = AssertNever<
+  Exclude<UserRole, (typeof ASSIGNABLE_ROLES)[number]>
+>;
+
 const assignSchema = z.object({
   userId: z.string().uuid(),
-  role: z.string().min(1),
+  // Rejected here with a 400 that names the bad value. Without this the string
+  // reaches the profile_roles upsert, where the profile_roles_role_allowed
+  // CHECK constraint (migration 20260730000004) turns it into a generic 500.
+  role: z.enum(ASSIGNABLE_ROLES, {
+    error: (issue) =>
+      `role must be one of: ${ASSIGNABLE_ROLES.join(", ")} — received ${JSON.stringify(issue.input)}`,
+  }),
   isPrimary: z.boolean().optional(),
 });
 
