@@ -49,6 +49,12 @@ interface Room {
   notes: string | null;
 }
 
+/**
+ * Sentinel for the room Location dropdown. `rooms.location_id` is nullable and
+ * SimpleSelect cannot hold null, so null round-trips through this value.
+ */
+const UNASSIGNED_LOCATION = "__none__";
+
 export function StudioSettingsClient({
   studioSettings,
   locations: initialLocations,
@@ -330,6 +336,21 @@ function LocationsSection({
   const [showAddLocation, setShowAddLocation] = useState(false);
   const [editingLocationId, setEditingLocationId] = useState<string | null>(null);
   const [addingRoomForLocation, setAddingRoomForLocation] = useState<string | null>(null);
+  const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
+
+  // Rooms with no location_id belong to no card above, so without their own
+  // section they are invisible and unreachable in this UI.
+  const unassignedRooms = rooms.filter((r) => r.location_id === null);
+
+  function toggleRoom(room: Room) {
+    return async () => {
+      const next = !room.is_active;
+      await toggleRoomActive(room.id, next);
+      setRooms((prev) =>
+        prev.map((r) => (r.id === room.id ? { ...r, is_active: next } : r))
+      );
+    };
+  }
 
   return (
     <section>
@@ -458,6 +479,7 @@ function LocationsSection({
                 {addingRoomForLocation === loc.id && (
                   <RoomForm
                     locationId={loc.id}
+                    locations={locations}
                     onSave={async (room) => {
                       const result = await upsertRoom(room);
                       if (result.success) {
@@ -475,55 +497,130 @@ function LocationsSection({
 
                 <div className="space-y-1.5">
                   {locRooms.map((room) => (
-                    <div
+                    <RoomRow
                       key={room.id}
-                      className="flex items-center justify-between rounded-lg bg-white border border-silver/50 px-3 py-2"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <span
-                          className="w-4 h-4 rounded-full shrink-0 border border-black/10"
-                          style={{ backgroundColor: room.color_hex ?? "#9C8BBF" }}
-                        />
-                        <span className="text-sm text-charcoal font-medium">
-                          {room.name}
-                        </span>
-                        {room.capacity && (
-                          <span className="text-xs text-mist">
-                            Cap: {room.capacity}
-                          </span>
-                        )}
-                        {room.notes && (
-                          <span className="text-xs text-mist truncate max-w-[150px]">
-                            {room.notes}
-                          </span>
-                        )}
-                        {!room.is_active && (
-                          <span className="text-[10px] bg-red-50 text-red-500 rounded-full px-1.5 py-0.5">
-                            Inactive
-                          </span>
-                        )}
-                      </div>
-                      <button
-                        onClick={async () => {
-                          const next = !room.is_active;
-                          await toggleRoomActive(room.id, next);
-                          setRooms((prev) =>
-                            prev.map((r) => (r.id === room.id ? { ...r, is_active: next } : r))
-                          );
-                        }}
-                        className={`text-xs ${room.is_active ? "text-red-400 hover:text-red-600" : "text-green-500 hover:text-green-700"}`}
-                      >
-                        {room.is_active ? "Deactivate" : "Activate"}
-                      </button>
-                    </div>
+                      room={room}
+                      locations={locations}
+                      isEditing={editingRoomId === room.id}
+                      onEditToggle={() =>
+                        setEditingRoomId(editingRoomId === room.id ? null : room.id)
+                      }
+                      onToggleActive={toggleRoom(room)}
+                    />
                   ))}
                 </div>
               </div>
             </div>
           );
         })}
+
+        {/* Unassigned rooms — surfaced, never auto-assigned. Edit one and pick a
+            Location to file it under a card above. */}
+        {unassignedRooms.length > 0 && (
+          <div className="rounded-xl border border-dashed border-silver bg-cloud/30 px-5 py-4">
+            <div className="mb-3">
+              <p className="text-xs font-semibold text-mist uppercase tracking-wide">
+                Unassigned ({unassignedRooms.length})
+              </p>
+              <p className="text-xs text-mist mt-1">
+                These rooms have no location. Edit a room to assign one.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              {unassignedRooms.map((room) => (
+                <RoomRow
+                  key={room.id}
+                  room={room}
+                  locations={locations}
+                  isEditing={editingRoomId === room.id}
+                  onEditToggle={() =>
+                    setEditingRoomId(editingRoomId === room.id ? null : room.id)
+                  }
+                  onToggleActive={toggleRoom(room)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </section>
+  );
+}
+
+// ── Room Row ────────────────────────────────────────────
+// Shared by the per-location cards and the Unassigned section so both get the
+// same edit affordance.
+function RoomRow({
+  room,
+  locations,
+  isEditing,
+  onEditToggle,
+  onToggleActive,
+}: {
+  room: Room;
+  locations: Location[];
+  isEditing: boolean;
+  onEditToggle: () => void;
+  onToggleActive: () => void;
+}) {
+  return (
+    <div className="rounded-lg bg-white border border-silver/50 px-3 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span
+            className="w-4 h-4 rounded-full shrink-0 border border-black/10"
+            style={{ backgroundColor: room.color_hex ?? "#9C8BBF" }}
+          />
+          <span className="text-sm text-charcoal font-medium">{room.name}</span>
+          {room.capacity && (
+            <span className="text-xs text-mist">Cap: {room.capacity}</span>
+          )}
+          {room.notes && (
+            <span className="text-xs text-mist truncate max-w-[150px]">
+              {room.notes}
+            </span>
+          )}
+          {!room.is_active && (
+            <span className="text-[10px] bg-red-50 text-red-500 rounded-full px-1.5 py-0.5">
+              Inactive
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={onEditToggle}
+            className="text-xs text-lavender hover:underline"
+          >
+            {isEditing ? "Cancel" : "Edit"}
+          </button>
+          <button
+            onClick={onToggleActive}
+            className={`text-xs ${room.is_active ? "text-red-400 hover:text-red-600" : "text-green-500 hover:text-green-700"}`}
+          >
+            {room.is_active ? "Deactivate" : "Activate"}
+          </button>
+        </div>
+      </div>
+
+      {isEditing && (
+        <div className="mt-3">
+          <RoomForm
+            initial={room}
+            locationId={room.location_id}
+            locations={locations}
+            onSave={async (data) => {
+              const result = await upsertRoom({ id: room.id, ...data });
+              if (result.success) {
+                onEditToggle();
+                window.location.reload();
+              }
+            }}
+            onCancel={onEditToggle}
+          />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -653,28 +750,55 @@ function LocationForm({
 
 // ── Room Form ───────────────────────────────────────────
 function RoomForm({
+  initial,
   locationId,
+  locations,
   onSave,
   onCancel,
 }: {
-  locationId: string;
+  initial?: Room;
+  /**
+   * The location this form opens under — the card that was clicked on create, or
+   * null in the Unassigned section. `initial.location_id` wins when editing.
+   */
+  locationId: string | null;
+  locations: Location[];
   onSave: (data: {
     name: string;
     capacity?: number;
     color_hex?: string;
-    location_id: string;
+    location_id: string | null;
     notes?: string;
   }) => Promise<void>;
   onCancel: () => void;
 }) {
-  const [name, setName] = useState("");
-  const [capacity, setCapacity] = useState("");
-  const [colorHex, setColorHex] = useState("#9C8BBF");
-  const [notes, setNotes] = useState("");
+  const [name, setName] = useState(initial?.name ?? "");
+  const [capacity, setCapacity] = useState(
+    initial?.capacity != null ? String(initial.capacity) : ""
+  );
+  const [colorHex, setColorHex] = useState(initial?.color_hex ?? "#9C8BBF");
+  const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [locId, setLocId] = useState<string | null>(
+    initial ? initial.location_id : locationId
+  );
   const [saving, setSaving] = useState(false);
 
   return (
     <div className="rounded-lg border border-silver bg-white p-4 space-y-3 mb-3">
+      <div>
+        <label className="block text-xs font-medium text-charcoal mb-1">Location</label>
+        <SimpleSelect
+          value={locId ?? UNASSIGNED_LOCATION}
+          onValueChange={(val) =>
+            setLocId(val === UNASSIGNED_LOCATION ? null : val)
+          }
+          options={[
+            { value: UNASSIGNED_LOCATION, label: "Unassigned" },
+            ...locations.map((l) => ({ value: l.id, label: l.name })),
+          ]}
+          className="w-full"
+        />
+      </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-medium text-charcoal mb-1">Room Name</label>
@@ -731,7 +855,7 @@ function RoomForm({
               name,
               capacity: capacity ? parseInt(capacity) : undefined,
               color_hex: colorHex,
-              location_id: locationId,
+              location_id: locId,
               notes: notes || undefined,
             });
             setSaving(false);
@@ -739,7 +863,7 @@ function RoomForm({
           disabled={saving || !name.trim()}
           className="h-9 rounded-lg bg-lavender hover:bg-lavender-dark text-white text-sm font-medium px-5 disabled:opacity-50 transition-colors"
         >
-          {saving ? "Saving..." : "Add Room"}
+          {saving ? "Saving..." : initial ? "Update Room" : "Add Room"}
         </button>
         <button
           onClick={onCancel}

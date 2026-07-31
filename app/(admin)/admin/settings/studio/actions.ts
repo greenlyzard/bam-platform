@@ -97,12 +97,15 @@ export async function upsertRoom(payload: {
   name: string;
   capacity?: number;
   color_hex?: string;
-  location_id: string;
+  /** Null is legitimate — a room can sit unassigned until an admin gives it a location. */
+  location_id: string | null;
   notes?: string;
 }): Promise<{ success: boolean; error?: string }> {
   await requireAdmin();
   const supabase = createAdminClient();
 
+  // Only the admin-editable fields. `updated_at` is maintained by the
+  // set_rooms_updated_at trigger, so it is deliberately not written here.
   const row = {
     tenant_id: TENANT_ID,
     name: payload.name,
@@ -110,15 +113,18 @@ export async function upsertRoom(payload: {
     color_hex: payload.color_hex || null,
     location_id: payload.location_id,
     notes: payload.notes || null,
-    is_active: true,
-    is_bookable: true,
   };
 
   if (payload.id) {
+    // `is_active` / `is_bookable` are deliberately omitted from the update: editing a
+    // deactivated room's name or location must not silently resurrect it. Activation
+    // state is owned solely by toggleRoomActive.
     const { error } = await supabase.from("rooms").update(row).eq("id", payload.id);
     if (error) return { success: false, error: error.message };
   } else {
-    const { error } = await supabase.from("rooms").insert(row);
+    const { error } = await supabase
+      .from("rooms")
+      .insert({ ...row, is_active: true, is_bookable: true });
     if (error) return { success: false, error: error.message };
   }
 
