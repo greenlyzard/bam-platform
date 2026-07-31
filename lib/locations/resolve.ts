@@ -70,8 +70,14 @@ function hasText(value: string | null | undefined): value is string {
   return value != null && value.trim() !== "";
 }
 
+/** The subset of a `studio_locations` row needed to render a mailing address. */
+export type LocationAddressRef = Pick<
+  StudioLocationRow,
+  "address" | "city" | "state" | "zip"
+>;
+
 /** Formats a studio location's parts into one line: "addr, City, ST ZIP" (parts omitted if absent). */
-export function formatLocationAddress(loc: LocationRef): string {
+export function formatLocationAddress(loc: LocationAddressRef): string {
   const parts: string[] = [];
   if (hasText(loc.address)) parts.push(loc.address.trim());
   const cityState = [loc.city, loc.state].filter(hasText).join(", ");
@@ -156,6 +162,53 @@ export function formatRoomLabel(
   if (room === "") return locationLabel;
 
   return `${room}${ROOM_LOCATION_SEPARATOR}${locationLabel}`;
+}
+
+/**
+ * The subset of a `studio_locations` row needed for a calendar `LOCATION` field:
+ * the full name plus every address part. Deliberately wider than
+ * `LocationLabelRef` — see `formatCalendarLocation`.
+ */
+export type CalendarLocationRef = Pick<
+  StudioLocationRow,
+  "name" | "address" | "city" | "state" | "zip"
+>;
+
+/**
+ * The `LOCATION` value for a calendar event — the ICS subscription feed, a
+ * downloaded .ics, and the Google Calendar "add event" link.
+ *
+ * **Deliberately not `formatRoomLabel`.** That helper is for UI chrome, where a
+ * person is scanning a list and `abbreviation` is exactly the point. A calendar
+ * app treats `LOCATION` as free text it may hand to a map for directions, so
+ * "RSM" is worthless there and the street address is the whole value:
+ *
+ *   "Studio 1, Ballet Academy and Movement — San Clemente, 400-C Camino De Estrella, San Clemente, CA 92672"
+ *
+ * When the location is unknown this returns the bare room name and nothing else.
+ * It never names a studio it cannot substantiate — the hardcoded
+ * `" - Ballet Academy and Movement"` suffix it replaces did exactly that, and
+ * would have put the wrong studio on every RSM event a parent had synced.
+ *
+ * Callers are responsible for `LOCATION`-field escaping: the comma separators
+ * here are literal text and must be escaped per RFC 5545 before being written
+ * into an ICS body (a URL-encoded query param, as in the Google link, does not
+ * need it).
+ *
+ * Pure: no I/O. Pass the already-resolved location.
+ */
+export function formatCalendarLocation(
+  roomName: string | null | undefined,
+  location: CalendarLocationRef | null | undefined,
+): string {
+  const parts: string[] = [];
+  if (hasText(roomName)) parts.push(roomName.trim());
+  if (location) {
+    if (hasText(location.name)) parts.push(location.name.trim());
+    const address = formatLocationAddress(location);
+    if (address !== "") parts.push(address);
+  }
+  return parts.join(", ");
 }
 
 /**

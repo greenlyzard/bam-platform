@@ -2,6 +2,24 @@
 
 import { useState } from "react";
 import { toLocalDateStr } from "@/lib/dates";
+import {
+  formatCalendarLocation,
+  formatRoomLabel,
+  type CalendarLocationRef,
+  type LocationLabelRef,
+} from "@/lib/locations/resolve";
+
+/**
+ * A class's home location, carrying both what the room label needs
+ * (`abbreviation`) and what the calendar links need (the address parts).
+ */
+export type ClassLocation = LocationLabelRef & CalendarLocationRef;
+
+/**
+ * A parent sees both studios in one list — there is no location filter on this
+ * surface — so the room label always carries its location (§4.1).
+ */
+const UNFILTERED = { locationFilterActive: false } as const;
 
 // ── Helpers ───────────────────────────────────────────────────
 
@@ -33,6 +51,15 @@ function googleCalendarUrl(params: {
   return url.toString();
 }
 
+/**
+ * RFC 5545 text escaping. Required now that LOCATION carries a street address:
+ * its commas are literal and an unescaped one splits the property value.
+ * Mirrors `escapeICS` in app/api/portal/calendar/route.ts.
+ */
+function escapeICS(text: string): string {
+  return text.replace(/[\\;,]/g, (m) => `\\${m}`).replace(/\n/g, "\\n");
+}
+
 function downloadICS(params: {
   id: string;
   title: string;
@@ -50,8 +77,8 @@ function downloadICS(params: {
     `UID:${params.id}@balletacademyandmovement.com`,
     `DTSTART:${dtStart}`,
     `DTEND:${dtEnd}`,
-    `SUMMARY:${params.title}`,
-    params.location ? `LOCATION:${params.location}` : "",
+    `SUMMARY:${escapeICS(params.title)}`,
+    params.location ? `LOCATION:${escapeICS(params.location)}` : "",
     "END:VEVENT",
     "END:VCALENDAR",
   ]
@@ -86,6 +113,7 @@ interface ClassData {
   start_time: string | null;
   end_time: string | null;
   room: string | null;
+  location_id: string | null;
   teacher_id: string | null;
   max_students: number | null;
   enrolled_count: number;
@@ -123,6 +151,8 @@ interface Props {
   instances: Instance[];
   teacherNames: Record<string, string>;
   roomNames: Record<string, string>;
+  /** Home locations keyed by `studio_locations.id`. */
+  locations: Record<string, ClassLocation>;
   recommended: RecommendedClass[];
   hasPrivateLessons: boolean;
 }
@@ -136,6 +166,7 @@ export function PortalScheduleView({
   instances,
   teacherNames,
   roomNames,
+  locations,
   recommended,
   hasPrivateLessons,
 }: Props) {
@@ -162,6 +193,9 @@ export function PortalScheduleView({
 
   const studentMap: Record<string, Student> = {};
   for (const s of students) studentMap[s.id] = s;
+
+  const locationOf = (cls: ClassData | RecommendedClass | undefined | null) =>
+    cls?.location_id ? locations[cls.location_id] ?? null : null;
 
   // ── List View ───────────────────────────────────────────────
 
@@ -202,6 +236,13 @@ export function PortalScheduleView({
                     .map((sid) => studentMap[sid])
                     .filter(Boolean);
                   const roomName = inst.room_id ? roomNames[inst.room_id] : cls?.room;
+                  const location = locationOf(cls);
+                  const roomLabel = roomName
+                    ? formatRoomLabel(roomName, location, UNFILTERED)
+                    : "";
+                  // Calendar apps get the full name + street address, not "RSM".
+                  const calendarLocation =
+                    formatCalendarLocation(roomName, location) || undefined;
                   const teacher = inst.teacher_id ? teacherNames[inst.teacher_id] : cls?.teacher_id ? teacherNames[cls.teacher_id] : null;
 
                   return (
@@ -214,7 +255,7 @@ export function PortalScheduleView({
                           <h4 className="font-semibold text-charcoal">{cls?.name ?? "Class"}</h4>
                           <p className="text-sm text-slate mt-0.5">
                             {formatTime(inst.start_time)} – {formatTime(inst.end_time)}
-                            {roomName && ` · ${roomName}`}
+                            {roomLabel && ` · ${roomLabel}`}
                           </p>
                           {teacher && (
                             <p className="text-xs text-mist mt-0.5">
@@ -239,7 +280,7 @@ export function PortalScheduleView({
                               date: inst.event_date,
                               startTime: inst.start_time,
                               endTime: inst.end_time,
-                              location: roomName ? `${roomName} - Ballet Academy and Movement` : undefined,
+                              location: calendarLocation,
                             })}
                             target="_blank"
                             rel="noopener noreferrer"
@@ -256,7 +297,7 @@ export function PortalScheduleView({
                                 date: inst.event_date,
                                 startTime: inst.start_time,
                                 endTime: inst.end_time,
-                                location: roomName ? `${roomName} - Ballet Academy and Movement` : undefined,
+                                location: calendarLocation,
                               })
                             }
                             className="rounded-lg border border-silver px-2 py-1.5 text-xs text-slate hover:bg-cloud transition-colors"
@@ -378,6 +419,12 @@ export function PortalScheduleView({
       <div className="grid gap-3 sm:grid-cols-2">
         {recommended.map((cls) => {
           const teacher = cls.teacher_id ? teacherNames[cls.teacher_id] : null;
+          // Recommendations span every studio and carry no filter, so the room
+          // label names its location here too — a parent must not enroll at RSM
+          // thinking it is San Clemente.
+          const roomLabel = cls.room
+            ? formatRoomLabel(cls.room, locationOf(cls), UNFILTERED)
+            : "";
           const spotsLeft = cls.max_students ? cls.max_students - cls.enrolled_count : null;
           return (
             <div
@@ -399,7 +446,7 @@ export function PortalScheduleView({
                     </p>
                   )}
                   {teacher && <p className="text-xs text-mist mt-0.5">{teacher}</p>}
-                  {cls.room && <p className="text-xs text-mist">{cls.room}</p>}
+                  {roomLabel && <p className="text-xs text-mist">{roomLabel}</p>}
                   {spotsLeft != null && (
                     <p className={`text-xs mt-1 ${spotsLeft <= 3 ? "text-warning font-medium" : "text-mist"}`}>
                       {spotsLeft} spot{spotsLeft !== 1 ? "s" : ""} left

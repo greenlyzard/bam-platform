@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   resolveInstanceLocation,
   formatLocationAddress,
+  formatCalendarLocation,
   formatRoomLabel,
   locationShortLabel,
   ROOM_LOCATION_SEPARATOR,
@@ -162,7 +163,7 @@ test("formatLocationAddress handles full, partial, and empty inputs", () => {
   );
   assert.equal(formatLocationAddress(RSM), "Rancho Santa Margarita, CA");
   assert.equal(
-    formatLocationAddress({ id: "x", name: "X", address: null, city: null, state: null, zip: null }),
+    formatLocationAddress({ address: null, city: null, state: null, zip: null }),
     "",
   );
 });
@@ -291,4 +292,41 @@ test("locationShortLabel: abbreviation wins, name is the fallback, null when nei
   assert.equal(locationShortLabel({ name: "", abbreviation: null }), null);
   assert.equal(locationShortLabel(null), null);
   assert.equal(locationShortLabel(undefined), null);
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Calendar LOCATION — the field a calendar app may hand to a map.
+// ═════════════════════════════════════════════════════════════════════════════
+
+test("calendar location: full name + street address, never the abbreviation", () => {
+  assert.equal(
+    formatCalendarLocation("Studio 1", SAN_CLEMENTE),
+    "Studio 1, Ballet Academy and Movement — San Clemente, 400-C Camino De Estrella, San Clemente, CA 92672",
+  );
+});
+
+test("calendar location: RSM names RSM — the bug this replaces named San Clemente", () => {
+  const label = formatCalendarLocation("Studio 1", RSM);
+  assert.equal(label, "Studio 1, Ballet Academy and Movement — Rancho Santa Margarita, Rancho Santa Margarita, CA");
+  assert.ok(!label.includes("San Clemente"));
+});
+
+test("calendar location: an address-less location still names itself", () => {
+  assert.equal(
+    formatCalendarLocation("Main Stage", { name: "Casa Romantica", address: null, city: null, state: null, zip: null }),
+    "Main Stage, Casa Romantica",
+  );
+});
+
+// The whole point: an unresolved location must never be filled in with a guess.
+test("calendar location: unknown location yields the bare room, asserting no studio", () => {
+  assert.equal(formatCalendarLocation("Studio 1", null), "Studio 1");
+  assert.equal(formatCalendarLocation("Studio 1", undefined), "Studio 1");
+  assert.equal(formatCalendarLocation(null, SAN_CLEMENTE), "Ballet Academy and Movement — San Clemente, 400-C Camino De Estrella, San Clemente, CA 92672");
+  assert.equal(formatCalendarLocation(null, null), "");
+  assert.equal(formatCalendarLocation("   ", null), "");
+});
+
+test("calendar location: room name is trimmed", () => {
+  assert.equal(formatCalendarLocation("  Studio 2  ", { name: "Casa Romantica", address: null, city: null, state: null, zip: null }), "Studio 2, Casa Romantica");
 });

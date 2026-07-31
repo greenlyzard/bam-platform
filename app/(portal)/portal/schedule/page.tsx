@@ -1,7 +1,7 @@
 import { requireParent } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { getMyStudents } from "@/lib/queries/portal";
-import { PortalScheduleView } from "./schedule-view";
+import { PortalScheduleView, type ClassLocation } from "./schedule-view";
 
 export default async function PortalSchedulePage() {
   const user = await requireParent();
@@ -26,6 +26,7 @@ export default async function PortalSchedulePage() {
       start_time: string | null;
       end_time: string | null;
       room: string | null;
+      location_id: string | null;
       teacher_id: string | null;
       max_students: number | null;
       enrolled_count: number;
@@ -37,7 +38,7 @@ export default async function PortalSchedulePage() {
       .from("enrollments")
       .select(
         `id, student_id, class_id, status,
-         classes (id, name, style, levels, day_of_week, start_time, end_time, room, teacher_id, max_students, enrolled_count)`
+         classes (id, name, style, levels, day_of_week, start_time, end_time, room, location_id, teacher_id, max_students, enrolled_count)`
       )
       .in("student_id", studentIds)
       .in("status", ["active", "trial"]);
@@ -123,6 +124,7 @@ export default async function PortalSchedulePage() {
     start_time: string | null;
     end_time: string | null;
     room: string | null;
+    location_id: string | null;
     teacher_id: string | null;
     max_students: number | null;
     enrolled_count: number;
@@ -133,7 +135,7 @@ export default async function PortalSchedulePage() {
   if (students && students.length > 0) {
     const { data: allClasses } = await supabase
       .from("classes")
-      .select("id, name, style, levels, day_of_week, start_time, end_time, room, teacher_id, max_students, enrolled_count, age_min, age_max")
+      .select("id, name, style, levels, day_of_week, start_time, end_time, room, location_id, teacher_id, max_students, enrolled_count, age_min, age_max")
       .eq("is_active", true)
       .order("name");
 
@@ -176,6 +178,29 @@ export default async function PortalSchedulePage() {
     });
   }
 
+  // Home locations for every class on screen — enrolled and recommended.
+  // Class level, not resolved-instance: LOCATIONS_AND_FACILITIES.md §6/§9 defers the
+  // per-instance location on the occurrence generator.
+  // `abbreviation` drives the room label; the address parts drive the calendar links.
+  const locationIds = [
+    ...new Set(
+      [
+        ...enrollments.map((e) => e.classes?.location_id),
+        ...recommended.map((c) => c.location_id),
+      ].filter(Boolean) as string[]
+    ),
+  ];
+  const locations: Record<string, ClassLocation> = {};
+  if (locationIds.length > 0) {
+    const { data: locationRows } = await supabase
+      .from("studio_locations")
+      .select("id, name, abbreviation, address, city, state, zip")
+      .in("id", locationIds);
+    for (const l of locationRows ?? []) {
+      locations[l.id] = l;
+    }
+  }
+
   // Check if any teacher has private lesson availability
   const { count: privateCount } = await supabase
     .from("classes")
@@ -194,6 +219,7 @@ export default async function PortalSchedulePage() {
         instances={instances}
         teacherNames={teacherNames}
         roomNames={roomNames}
+        locations={locations}
         recommended={recommended}
         hasPrivateLessons={hasPrivateLessons}
       />

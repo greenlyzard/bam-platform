@@ -1,4 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
+import {
+  formatCalendarLocation,
+  type CalendarLocationRef,
+} from "@/lib/locations/resolve";
 import { NextRequest, NextResponse } from "next/server";
 
 function formatICSDate(date: string, time: string): string {
@@ -80,15 +84,39 @@ export async function GET(request: NextRequest) {
     .order("event_date")
     .order("start_time");
 
-  // Get class names
+  // Get class names + home location.
+  // Class level, not resolved-instance: LOCATIONS_AND_FACILITIES.md §6/§9 defers the
+  // per-instance address (and the "location changed" flag) on the occurrence generator.
   const { data: classes } = await supabase
     .from("classes")
-    .select("id, name, room")
+    .select("id, name, room, location_id")
     .in("id", classIds);
 
-  const classMap: Record<string, { name: string; room: string | null }> = {};
+  const classMap: Record<
+    string,
+    { name: string; room: string | null; location_id: string | null }
+  > = {};
   for (const c of classes ?? []) {
-    classMap[c.id] = { name: c.name, room: c.room };
+    classMap[c.id] = { name: c.name, room: c.room, location_id: c.location_id };
+  }
+
+  // Get home locations, with full addresses — a calendar app may hand LOCATION to a map.
+  const locationIds = [
+    ...new Set(
+      Object.values(classMap)
+        .map((c) => c.location_id)
+        .filter(Boolean) as string[],
+    ),
+  ];
+  const locationMap: Record<string, CalendarLocationRef> = {};
+  if (locationIds.length > 0) {
+    const { data: locations } = await supabase
+      .from("studio_locations")
+      .select("id, name, address, city, state, zip")
+      .in("id", locationIds);
+    for (const l of locations ?? []) {
+      locationMap[l.id] = l;
+    }
   }
 
   // Get room names
@@ -111,6 +139,13 @@ export async function GET(request: NextRequest) {
       .map((sid) => studentNames[sid])
       .join(", ");
     const roomName = inst.room_id ? roomMap[inst.room_id] : cls?.room;
+    const location = cls?.location_id
+      ? locationMap[cls.location_id] ?? null
+      : null;
+    // A parent's feed is never scoped to one studio, so the location is always
+    // named — but only ever the resolved one. If it is unknown, the room name
+    // stands alone rather than asserting a studio.
+    const eventLocation = formatCalendarLocation(roomName, location);
 
     return [
       "BEGIN:VEVENT",
@@ -119,7 +154,7 @@ export async function GET(request: NextRequest) {
       `DTEND:${formatICSDate(inst.event_date, inst.end_time)}`,
       `SUMMARY:${escapeICS(cls?.name ?? "Class")}`,
       `DESCRIPTION:${escapeICS(`Dancer(s): ${studentList}`)}`,
-      roomName ? `LOCATION:${escapeICS(roomName + " - Ballet Academy and Movement")}` : "",
+      eventLocation ? `LOCATION:${escapeICS(eventLocation)}` : "",
       "END:VEVENT",
     ]
       .filter(Boolean)
