@@ -517,3 +517,249 @@ accept the asymmetry, to rely on makeups to absorb it, or to correct it in sched
 (a Monday make-up day, or shifting a recess boundary off a Monday).
 
 *(An earlier draft of this count said seven Mondays. It omitted Labor Day. It is eight.)*
+
+---
+
+## 16. Amendment — 2026-08-01
+
+Appended, not merged. Sections 1–15 stand as written; where this amendment
+corrects them it says so explicitly.
+
+### 16.1 Correcting §3 and the status header — Phases 1 and 2 shipped
+
+The header still reads "Draft spec v2 — awaiting approval. Not built." That is no
+longer true, and §3 "Current state — verified 2026-07-29" is stale in five places.
+Verified against the live database 2026-08-01:
+
+| §3 claim | Actual |
+|---|---|
+| `studio_closures` rows: 6 | **18** — the 6 Spring Break rows plus all 12 rows of the §15 calendar, entered exactly as specced |
+| Shape: single date, no location, no range | **`all_studios`, `closed_through`, `is_total`, `exempt_event_types` all present** |
+| Fall closures on file: none | **All present**, including both `is_total` days |
+| `closure_locations` does not exist | **Exists.** 0 rows — every closure is currently `all_studios = true` |
+| `private_sessions`: no `location_id`, no `overrides_closure` | **Both present.** `studio` retained as the room hint, per §5 |
+
+**Phase 2 also shipped.** `apply_closures(p_tenant_id uuid, p_from date, p_to date,
+p_dry_run boolean)` exists with the signature specced in §8.
+
+**Phase 3 did not.** `generate_occurrences` still references `studio_closures` and
+still skips closure dates.
+
+### 16.2 The two mechanisms are live at once — D7
+
+§12 Phase 3 said: *"Land this before that generation runs so the two mechanisms never
+coexist."* They now coexist.
+
+The failure is quiet rather than loud. Generation skips a closed date, so no
+occurrence is written; `apply_closures` then finds nothing to cancel and reports
+zero. The observable result — no class on that date — looks correct. What is lost is
+everything the cancellation model was adopted for:
+
+- No `status='cancelled'` row, so no visible history for parents or billing audit
+- No `cancellation_reason`, so the closure is invisible in the record
+- No un-generate path, which was the §4 argument for the whole model
+- `drafts_removed` and `blocked_by_payroll` never fire, because no draft was ever
+  created against an occurrence that does not exist
+
+**D7 — Phase 3 is now urgent, not merely sequenced.** It must land before
+`OCCURRENCE_GENERATION.md` Phase 4 runs a full season. Until it does, closure
+handling is split across two functions with no single place to reason about it.
+
+### 16.3 `UNIQUE (tenant_id, closed_date)` blocks location scoping — D8
+
+`studio_closures` carries `UNIQUE (tenant_id, closed_date)`. No prior version of this
+spec records it; it predates the location work and was never revisited when
+`closure_locations` was added.
+
+It permits exactly one closure per tenant per date, which makes
+`all_studios = false` unusable for the case it exists to serve. §14 Q2 assumes San
+Clemente and RSM keep separate calendars. Under this constraint they cannot: a
+Labor Day closure at San Clemente and a Labor Day closure at RSM are two rows with
+the same `closed_date` and the insert fails.
+
+The constraint is currently invisible because all 18 rows are `all_studios = true`
+and `closure_locations` is empty. It becomes a hard blocker the first time RSM needs
+a date San Clemente does not, which §16.4 makes likely rather than hypothetical.
+
+**D8 — drop the constraint.** Uniqueness on date is the wrong invariant. The right
+one is that a given location is not covered by two overlapping closures, which is a
+statement about `closure_locations` joined to the date range, not about
+`studio_closures` alone.
+
+```sql
+ALTER TABLE studio_closures
+  DROP CONSTRAINT IF EXISTS studio_closures_tenant_id_closed_date_key;
+```
+
+The replacement overlap guard is deferred — enforcing it needs either a trigger or a
+materialised range column on the join table, and that is a Phase 1b decision rather
+than a one-line migration. Pre-flight check before adding it:
+
+```sql
+DO $$
+DECLARE dupe_count int;
+BEGIN
+  SELECT COUNT(*) INTO dupe_count
+  FROM closure_locations a
+  JOIN studio_closures sa ON sa.id = a.closure_id
+  JOIN closure_locations b ON b.location_id = a.location_id
+                          AND b.closure_id <> a.closure_id
+  JOIN studio_closures sb ON sb.id = b.closure_id
+  WHERE daterange(sa.closed_date, sa.closed_through, '[]')
+     && daterange(sb.closed_date, sb.closed_through, '[]');
+  IF dupe_count > 0 THEN
+    RAISE EXCEPTION 'Found % overlapping closure/location pairs.', dupe_count;
+  END IF;
+END $$;
+```
+
+### 16.4 RSM is served by two school districts
+
+§15's calendar follows Capistrano Unified. That is correct for San Clemente, which
+is CUSD only. It is not sufficient for Rancho Santa Margarita: the city is split
+between **Saddleback Valley Unified** and **Capistrano Unified**, and the two
+calendars do not always align.
+
+So RSM families are themselves split. A CUSD recess is a normal school week for the
+SVUSD half of the RSM roster, and vice versa. There is no single correct RSM
+calendar, only a choice about which half to inconvenience.
+
+This is the concrete case that makes §16.3 load-bearing, and it is a policy question
+before it is a schema one — see Q9.
+
+### 16.5 Production conflicts — a fourth kind of closure — D9
+
+The §15 calendar contains only holiday closures. The studio's actual printed flyers
+contain a case this model does not express: **classes cancelled because the company
+is at the theater for final dress and performances.**
+
+The studio is not closed. Privates run. Rehearsals run — at the venue — and the
+teachers running them are working a full day and must be paid. The parent
+instruction is the opposite of a holiday closure's: not *stay home* but *be at the
+theater*.
+
+§6's precedence ladder handles the enforcement correctly with no new mechanism —
+exempting `rehearsal` and `performance` leaves those occurrences uncancelled, so
+`generate_timesheet_drafts` sees `status='published'` and pays normally. §9 needs no
+carve-out. What is missing is not enforcement but **meaning**: nothing on the row
+distinguishes a production conflict from a holiday break, and the two produce
+different parent-facing copy from the same data.
+
+**D9 — add `closure_type`, alongside `is_total`, not replacing it.**
+
+```sql
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'closure_type') THEN
+    CREATE TYPE closure_type AS ENUM (
+      'holiday_break', 'total_closure', 'production_conflict', 'facility'
+    );
+  END IF;
+END $$;
+
+ALTER TABLE studio_closures
+  ADD COLUMN IF NOT EXISTS closure_type closure_type;
+
+UPDATE studio_closures
+   SET closure_type = CASE WHEN is_total THEN 'total_closure'::closure_type
+                           ELSE 'holiday_break'::closure_type END
+ WHERE closure_type IS NULL;
+
+ALTER TABLE studio_closures ALTER COLUMN closure_type SET NOT NULL;
+```
+
+`is_total` is **retained**. It is rung 1 of the §6 ladder and the flag every
+enforcement path already reads; replacing it would rewrite a precedence model that
+is correct. `closure_type` is the semantic and display layer above it.
+
+**The array remains the only thing enforcement reads.** `closure_type` sets defaults
+at creation and drives copy; it must never be consulted by `apply_closures` or the
+booking guards, or the two will drift.
+
+| Type | `is_total` | Default `exempt_event_types` | Parent instruction |
+|---|---|---|---|
+| `holiday_break` | false | `{private_lesson}` | Stay home. Privates by arrangement. |
+| `total_closure` | true | `{}` | Studio closed entirely. |
+| `production_conflict` | false | **see Q8** | Be at the theater. |
+| `facility` | false | `{}` | One-off; `reason` carries the detail. |
+
+`production_conflict` defaults are deliberately left open. D5 fixed
+`{private_lesson}` with **no rehearsal exemption anywhere** — but that decision was
+taken about holiday breaks, and the theater case was never put to Amanda. Resolving
+it by inference would silently overturn a confirmed decision. See Q8.
+
+### 16.6 `makeup_deadline` — D10
+
+Every closure flyer the studio has printed carries a makeup deadline: "complete
+makeup classes for this closure by Nov. 14," "by Jan. 10." Nothing on
+`studio_closures` holds it, so today it lives only in the Canva file.
+
+§15.1 makes this load-bearing rather than cosmetic. Under `flat_month`, Monday
+families pay the same as Friday families for four fewer sessions, and makeups are
+the only mechanism that corrects it. A deadline that exists only in a flyer cannot
+be enforced, reported on, or used to expire a credit.
+
+**D10 — add `makeup_deadline date`, nullable.**
+
+```sql
+ALTER TABLE studio_closures
+  ADD COLUMN IF NOT EXISTS makeup_deadline date;
+
+ALTER TABLE studio_closures
+  ADD CONSTRAINT studio_closures_makeup_after_close
+  CHECK (makeup_deadline IS NULL OR makeup_deadline > closed_through);
+```
+
+Nullable because total closures generally offer no makeup. Authored rather than
+derived — the observed deadlines are not a consistent offset from `closed_through`.
+See Q10.
+
+### 16.7 Content generation contract — D11
+
+Closure notices are produced by hand in Canva today, one page per closure, with the
+dates typed in. The generator replaces that: one asset set per affected location,
+filled from the closure row.
+
+**D11 — the generator reads the row; it authors nothing.** Every field below is
+derived except `reason`, which is already an authored column.
+
+| Field | Source | Notes |
+|---|---|---|
+| `date_line` | `closed_date`, `closed_through` | Single date or range, display-formatted |
+| `scope_line` | `exempt_event_types` | "NO CLASSES" / "NO CLASSES OR REHEARSALS" |
+| `reason_line` | `reason` | Authored. May be empty. |
+| `privates_policy` | `'private_lesson' = ANY(exempt_event_types)` | Two fixed strings. Never free text. |
+| `makeup_line` | `makeup_deadline` | Omitted entirely when null |
+| `location_line` | `closure_locations` → location name | Omitted when `all_studios` |
+| `accent_colour` | location | Dark Pink SC, Teal RSM, Lavender tenant-wide |
+
+`privates_policy` is the field where a wrong value sends a family to a locked
+building, and it is the one an operator would most naturally want to type. It is
+derived from the same array that `apply_closures` and the §10 booking guard read, so
+the flyer cannot disagree with the booking system.
+
+One asset set per affected location. A closure with `all_studios = true` and no
+divergence may produce a single combined asset; any difference in dates or
+exemptions between locations forces separate assets. Three sizes share the dataset:
+8.5×11 print, web banner, 1080×1350 social.
+
+**Not in scope here:** evaluations and awards, which are per-student and raise media
+release questions this spec does not cover.
+
+### 16.8 Open questions added
+
+| # | Question | Source | Blocks |
+|---|---|---|---|
+| 8 | **Do privates and rehearsals run during a `production_conflict`?** D5 fixed `{private_lesson}` with no rehearsal exemption, but was decided about holiday breaks. A final dress at the theater is the opposite case — the rehearsal is the cause. **Amanda** | this amendment | `closure_type` defaults |
+| 9 | **When SVUSD and CUSD diverge, which calendar governs RSM?** Or does RSM close for both, accepting more lost days than San Clemente? **Amanda** | this amendment | RSM calendar entry |
+| 10 | `makeup_deadline` — authored per closure, or a fixed offset from `closed_through`? Observed values suggest authored | this amendment | D10 |
+| 11 | Does a `production_conflict` leave the studio available for privates, or is the building itself unstaffed? Assumed available | this amendment | Q8 |
+| 12 | Should `closure_type` drive notification copy as well as flyer copy? §14 Q3 is still unresolved and the two share a source | this amendment | Phase 4 |
+
+### 16.9 Revised sequence
+
+1. **Phase 3 first** — remove closure handling from `generate_occurrences` (§16.2). Nothing else should land while two mechanisms are live.
+2. **Phase 1b** — drop the unique constraint (D8), add `closure_type` (D9) and `makeup_deadline` (D10). One migration, pre-flight guarded, type regen, `tsc --noEmit`.
+3. **Amanda** — Q8 and Q9. Both block correct data entry, neither blocks the migration.
+4. **Phase 4** — closure CRUD, now including type and makeup deadline.
+5. **Generator** — §16.7, after Q8 resolves, since `privates_policy` copy depends on it.
