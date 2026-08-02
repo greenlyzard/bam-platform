@@ -811,3 +811,168 @@ and it retains the privates line. Existing practice is therefore: classes
 cancelled, rehearsals and privates running. That is the `production_conflict`
 default. It still wants Amanda's confirmation, but she is confirming an observed
 fact rather than deciding something new.
+
+### 16.11 Amendment — Amanda's decisions and Phase 4 field design, 2026-08-01
+
+Appended. Resolves Q8 and Q9, revises the §15 calendar, and specifies Phase 4
+entry without creating a second module document.
+
+#### Where this content lives — D12
+
+A separate `CLOSURES_MODULE.md` was drafted and **discarded before commit**. It
+would have been the fourth phantom-spec incident: `ANNOUNCEMENT_MODULE_SPEC.md`
+§1 already commits to one module as the system of record for announcements and
+key dates, entered once, generating channel-specific versions with preview and
+approval. A closure notice is an announcement, and print, banner and social are
+channel-specific versions of one.
+
+**D12 — closure content splits across existing documents. Nothing new is created.**
+
+| Content | Home |
+|---|---|
+| Entry fields and per-type recommendations | here, amending §12 Phase 4 |
+| Creative export, CSV, three sizes | `ANNOUNCEMENT_MODULE_SPEC.md`, as a closure announcement type |
+| Cluster warnings and makeup-load surfacing | `ANGELINA_SPEC_V2.md` |
+| Credit issuance and expiry | `MAKEUP_POLICY.md` — already correct, unchanged |
+
+The `ls docs/ | grep` habit did not catch this: the announcement module owns the
+job without using the words "closure" or any column name. Content-grep across the
+whole directory did.
+
+#### `makeup_deadline` is display-only — D13
+
+`MAKEUP_POLICY.md` expires makeup credits at `seasons.end_date`, with a Near
+Expiry flag 14 days out and admin conversion to a private lesson. That is the
+enforced clock.
+
+`studio_closures.makeup_deadline` is not. The printed flyers say "complete makeup
+classes for this closure by Jan. 10" for a December closure — months before season
+end. It is an operational nudge to get families scheduling promptly, not the
+moment a credit dies.
+
+**D13 — `makeup_deadline` feeds `makeup_line` on the creative and nothing else.**
+It must never drive credit expiry, status transitions, or the Near Expiry flag.
+Two expiry systems disagreeing would mean a flyer silently cancelling credits the
+policy says are live.
+
+(Separately: "credits do not expire" in the billing architecture refers to *dollar*
+credits in the ledger. Makeup credits are a different system with their own
+expiry. Same word, different things.)
+
+#### Q8 resolved — production conflicts have two shapes
+
+Amanda, 2026-08-01. The Nutcracker is **November, not December** — the "Dec. TBD"
+flyer is wrong and must not be printed.
+
+| Date | What runs |
+|---|---|
+| Sat Nov 7 | Theater rehearsal. No classes. Rehearsal runs. |
+| Sat Nov 14 | Performance. No classes, no rehearsals. |
+| Sun Nov 15 | Performance. No classes, no rehearsals. |
+
+So `production_conflict` cannot carry one fixed exemption set:
+
+| Sub-case | `exempt_event_types` |
+|---|---|
+| Rehearsal day | `{rehearsal, private_lesson}` |
+| Performance day | `{performance}` |
+
+This is why §16.5 left the defaults open. The form offers both; the admin picks.
+
+**Still open:** whether privates are bookable on performance days. Teachers are at
+the venue. Asked at entry, per production — not defaulted.
+
+#### Q9 resolved — RSM follows Saddleback Valley
+
+Amanda, 2026-08-01. Rancho Santa Margarita follows the **Saddleback Valley
+Unified** calendar. San Clemente continues to follow Capistrano Unified.
+
+This makes D8 immediately load-bearing rather than anticipatory: the two districts
+will diverge, and until `6e00943` dropped `UNIQUE (tenant_id, closed_date)` the
+divergence was unrepresentable.
+
+#### Calendar revision — §15 superseded
+
+The §15 table of 12 rows is superseded. **17 rows**, incorporating the printed
+flyers Amanda confirmed on 2026-08-01.
+
+New rows:
+
+| Range | Reason | Type |
+|---|---|---|
+| 2026-10-31 | Halloween | holiday_break |
+| 2026-11-07 | Nutcracker — Theater Rehearsal | production_conflict |
+| 2026-11-14 → 11-15 | Nutcracker — Performances | production_conflict |
+| 2027-06-03 | Last Day of Capistrano USD | holiday_break |
+| 2027-07-04 | Independence Day | holiday_break |
+
+Extended rows:
+
+| Reason | Was | Now |
+|---|---|---|
+| Day after Thanksgiving | 11-27 | 11-27 → 11-28 |
+| Winter Recess (second block) | 12-26 → 01-01 | 12-26 → 01-02 |
+| Spring Recess | 04-05 → 04-09 | 04-05 → 04-10 |
+
+The studio is **open 2026-12-20**; Winter Recess still starts 12-21. Confirmed.
+
+**Why the extensions matter:** 13 active classes meet on Saturdays and none on
+Sundays. Each unextended range left a Saturday open that the printed flyer says is
+closed. Combined with the five new rows, roughly **87 occurrences** would have run
+on days parents had been told the studio was closed.
+
+**November is now the heaviest month of the season** — nine closed days (7, 11,
+14, 15, 23–28), three of them Saturdays.
+
+#### §15.1 is incomplete — D14
+
+The weekday impact table counts Monday through Friday and omits Saturday
+entirely. With 13 active Saturday classes, Saturday is a teaching day, and
+Saturday cohorts are absent from the Q7 billing-fairness analysis.
+
+**D14 — §15.1 is recomputed after the calendar above is entered.** Amanda's
+position on 2026-08-01 is that Saturday closures have not been a problem
+historically; this is recorded as context, not as a closed question. Revisit if
+makeup load says otherwise.
+
+#### Phase 4 entry design
+
+Amending §12 Phase 4. **The form recommends, the admin decides, the export
+derives.** Those three layers must not blur — a value an operator types must never
+be able to contradict what enforcement reads.
+
+| Field | Control | Notes |
+|---|---|---|
+| `closure_type` | Select | Picked first; drives every recommendation |
+| `closed_date` / `closed_through` | Date range | Single day is a one-day range |
+| `reason` | Text | Authored; becomes `reason_line` |
+| `all_studios` | Toggle | Off reveals location multi-select |
+| `locations` | Multi-select | `location_type = 'studio'` only |
+| `exempt_event_types` | Checkbox group | Pre-checked from recommendation |
+| `is_total` | **Not a control** | Derived from `closure_type`; CHECK enforces agreement |
+| `makeup_deadline` | Date | Pre-filled, clearable, display-only (D13) |
+| `seasonal_graphic` | Image picker | Pre-selected from the reason map (`SEASONAL_GRAPHICS.md`) |
+
+`is_total` is deliberately not exposed. It predates `closure_type`; showing both
+lets an admin build a row the CHECK rejects, with an error a studio operator
+cannot act on.
+
+Recommendations, shown with a one-line rationale, never applied silently:
+
+| Type | Exemptions | Makeup default |
+|---|---|---|
+| `holiday_break` | `{private_lesson}` | close + 21 days |
+| `total_closure` | `{}` | none |
+| `production_conflict` — rehearsal | `{rehearsal, private_lesson}` | close + 21 days |
+| `production_conflict` — performance | `{performance}` | close + 21 days |
+| `facility` | `{}` | close + 21 days |
+
+**21 days is a form starting value, not a computed column.** Observed deadlines on
+the printed flyers run 12 to 33 days past close, which is why D10 made the field
+authored. It gives a busy admin something sane to accept; it is not the deadline
+until saved.
+
+`privates_policy` on the creative is derived from
+`'private_lesson' = ANY(exempt_event_types)` — the same array `apply_closures` and
+the §10 booking guard read. It is never typed. This is the field where a wrong
+value sends a family to a locked building.
