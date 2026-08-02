@@ -328,3 +328,104 @@ create table scanner_access (
 
 ## 13. Open Questions
 - None — all decisions resolved in Session 6.
+
+---
+
+## Amendment — Transferable Comp Blocks, 2026-08-01
+
+**Status:** Decided in conversation. Not specced beyond this section, not built.
+**Amends:** §2.3 Gift / Comp Recipients.
+
+### What §2.3 assumes, and why it is not enough
+
+The existing comp flow assumes a **known recipient**: a claim link goes to a
+person, they enter name and email, a ticket is issued to them. Identity is
+collected at claim time, and every ticket traces to someone.
+
+Amanda's actual practice does not work that way. She gives comps out constantly,
+and a common case is a **block to an organisation** — ten tickets to a school,
+which the school then splits among five families. The studio never learns who
+sits in those seats, and does not need to.
+
+That is not a comp with a missing name. It is a **bearer instrument that can be
+subdivided**, and it needs three properties the current model does not have.
+
+### 1. Custody without identity
+
+A block can be held by the studio, by a named organisation, or by an admin, with
+**no recipient identity at all**. It is not unallocated inventory — it is
+committed to a purpose — but no person is attached.
+
+States a block moves through:
+
+| State | Meaning |
+|---|---|
+| `held` | Allocated to a purpose, no holder yet. Admin is sitting on it. |
+| `assigned` | Given to a named holder — an organisation, a family, a person |
+| `distributed` | The holder has passed some or all of it onward |
+| `redeemed` | Scanned at the door |
+| `expired` | Show ended, never scanned |
+| `revoked` | Pulled back before use |
+
+Identity may be attached at any point, or never.
+
+### 2. Subdivision
+
+A block of ten becomes two fives, or five twos, or ten ones. Each fragment must
+be:
+
+- independently claimable
+- independently revocable
+- traceable back to the block it came from
+
+So a block is a tree, not a row. The parent has to know what became of its
+children, or the reporting below cannot work.
+
+### 3. Chain of custody
+
+For each block, the studio needs to answer: how many were distributed, how many
+were scanned, and how many were never used.
+
+That is the whole point of tracking blocks at all. Without it there is no way to
+tell a school placement that filled seats from one that filled none — which is
+exactly the decision comps exist to inform next season.
+
+### Delivery
+
+A block or fragment can be sent by **SMS or email**, or held by an admin and
+handed over physically. Delivery channel is a property of the transfer, not of
+the ticket.
+
+### The control consequence
+
+**A subdividable bearer ticket is fundamentally harder to control than a claim
+link, and the door scanner becomes the only enforcement point.**
+
+A forwarded link can seat the wrong person. A block split arbitrarily has no
+identity to check against. This is acceptable — it is how paper comps have always
+worked — but the spec must say so plainly rather than implying that identity
+collection provides control it does not provide.
+
+Practical implications:
+
+- Scan-once enforcement matters more here than on paid tickets
+- Revocation must work at fragment level, not only at block level
+- A block should carry a cap so a distribution error cannot exceed the house
+
+### Attribution
+
+`ANNOUNCEMENT_MODULE_SPEC.md` and the UTM work treat a comp as a tracked
+marketing touch. Anonymous blocks weaken that: if a school distributes ten and
+five families attend, the studio learns **the block converted** but not **who
+converted**.
+
+That is likely acceptable — channel-level attribution still tells you the school
+placement worked — but it is a different answer than the named-comp case, and the
+two should not be reported as though they carry the same confidence.
+
+### Open
+
+- Does a fragment inherit the parent's expiry, or carry its own?
+- Can a holder subdivide, or only the studio? A school splitting ten into five is the motivating case, which implies holders can — but that means the studio is not the only party creating tickets.
+- Does an anonymous redemption capture anything at the door — a name, a count, nothing?
+- Are blocks per-performance or per-production? Ten tickets to a school is probably per-performance, since seats are dated.
