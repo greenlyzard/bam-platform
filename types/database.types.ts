@@ -8466,10 +8466,12 @@ export type Database = {
           all_studios: boolean
           closed_date: string
           closed_through: string
+          closure_type: Database["public"]["Enums"]["closure_type"]
           created_at: string | null
           exempt_event_types: string[]
           id: string
           is_total: boolean
+          makeup_deadline: string | null
           reason: string | null
           tenant_id: string
         }
@@ -8477,10 +8479,12 @@ export type Database = {
           all_studios?: boolean
           closed_date: string
           closed_through: string
+          closure_type: Database["public"]["Enums"]["closure_type"]
           created_at?: string | null
           exempt_event_types?: string[]
           id?: string
           is_total?: boolean
+          makeup_deadline?: string | null
           reason?: string | null
           tenant_id: string
         }
@@ -8488,10 +8492,12 @@ export type Database = {
           all_studios?: boolean
           closed_date?: string
           closed_through?: string
+          closure_type?: Database["public"]["Enums"]["closure_type"]
           created_at?: string | null
           exempt_event_types?: string[]
           id?: string
           is_total?: boolean
+          makeup_deadline?: string | null
           reason?: string | null
           tenant_id?: string
         }
@@ -10800,6 +10806,11 @@ export type Database = {
     }
     Enums: {
       billing_status: "unbilled" | "pending" | "charged" | "waived" | "disputed"
+      closure_type:
+        | "holiday_break"
+        | "total_closure"
+        | "production_conflict"
+        | "facility"
       location_type: "studio" | "partner_venue" | "internal"
       user_role:
         | "super_admin"
@@ -10946,6 +10957,12 @@ export const Constants = {
   public: {
     Enums: {
       billing_status: ["unbilled", "pending", "charged", "waived", "disputed"],
+      closure_type: [
+        "holiday_break",
+        "total_closure",
+        "production_conflict",
+        "facility",
+      ],
       location_type: ["studio", "partner_venue", "internal"],
       user_role: [
         "super_admin",
