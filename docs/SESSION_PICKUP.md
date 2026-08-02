@@ -1,8 +1,8 @@
 # SESSION PICKUP
 
-_Last rewritten: 2026-07-31 (end of session)_
+_Last rewritten: 2026-08-01 (end of session)_
 
-**Fall begins 2026-08-15 — 15 days. The Fall critical path is DONE (§2).**
+**Fall begins 2026-08-15 — 14 days. The Fall critical path is DONE (§2).**
 
 ---
 
@@ -14,37 +14,45 @@ Full protocol in `CLAUDE.md`. Short form:
 - **Claude Code:** `/clear` before any work
 - **Schema days:** `supabase migration list` — *and then verify against the catalog*
 - All DDL through `supabase db push` in Regular Terminal
-- `scripts/e2e-*.ts` stay untracked permanently. **They were accidentally committed twice
-  today** — once by a `git add -A`, once by a stray paste. Both caught before pushing. Stage
-  paths explicitly, never `-A`.
+- `scripts/e2e-*.ts` stay untracked permanently
+
+### Two ritual upgrades — 2026-08-01
+
+**`ls docs/ | grep -i <topic>` is not enough.** It only matches filenames. A draft
+`CLOSURES_MODULE.md` was written this session and discarded because
+`ANNOUNCEMENT_MODULE_SPEC.md` §1 already owns channel-specific generation from one
+entry — and never uses the word "closure" or any column name. **Grep the content of
+all of `docs/`, not the filenames**, using column names, table names, and the words
+a different author would have used. The same pass then caught two more overlaps:
+makeup expiry (`MAKEUP_POLICY.md` already expires credits at `seasons.end_date`)
+and season closure (`SEASONS_AND_ARCHIVAL.md:153` already locks attendance
+read-only on archive).
+
+**`git add -A ':!scripts'` was used throughout this session**, against the standing
+"stage paths explicitly, never `-A`" rule. It kept the e2e scripts out, but it also
+staged a stray empty file named `main` created by a mistyped redirect. Caught by
+reading `git status --short` before committing. **`git status --short` before every
+commit, and `git diff --stat` before every doc replacement.**
 
 ### State at close
 
 ```
-4027be6 (HEAD -> main, origin/main)  room labels name their location
+b56fc21 (HEAD -> main, origin/main)  Nutcracker 2026 production, five events, two scoped closures
 ```
 
 **Everything is pushed. Working tree clean apart from the two e2e scripts.**
 
-Fifteen commits today, all on origin:
+Seven commits today, all on origin:
 
 | | |
 |---|---|
-| `1c6f73a` | closures spec amendments |
-| `6e39ada` | closures Phase 1 + 3 |
-| `989b276` | TS occurrence cron unscheduled |
-| `26bedeb` | `apply_closures` |
-| `06e465f` | 12-row closure calendar |
-| `b9b0093` | session pickup (superseded by this file) |
-| `1b7f868` | `/admin/schedule` restored, ranged closure banner, no synthetic weeks |
-| `aeb8afd` | auth resolvers fail closed |
-| `d4ee329` | role vocabulary pinned |
-| `073e204` | room editing |
-| `4ca974d` | room archive + guarded delete |
-| `4a36eb5` | location abbreviation column |
-| `9307368` | shared room-label helper |
-| `77c555b` | parent calendars stop naming the wrong studio |
-| `4027be6` | admin/teacher room labels; By Room stops merging studios |
+| `774712a` | closures §16 amendment — `closure_type`, per-location divergence, generator contract |
+| `a3b130b` | `SEASONAL_GRAPHICS.md` — twelve ring-framed closure illustrations |
+| `8baa610` | retraction of §16.2 and D7 |
+| `6e00943` | closures Phase 1b — `closure_type`, `makeup_deadline`, dropped date uniqueness |
+| `afcc160` | Schedule nav group, standalone Dashboard |
+| `edfd9da` | `TICKETING.md` — transferable comp blocks |
+| `b56fc21` | Nutcracker 2026 — production, five events, two scoped closures |
 
 ### 🟡 MCP write policy — amended 2026-07-30
 
@@ -61,336 +69,332 @@ MCP bypasses the migration file, so the repo stops describing the database.** Th
 
 ---
 
-## 1. 🔴 Parallel running — the deadline changed
+## 1. 🔴 Parallel running — unchanged
 
 **Decided 2026-07-30: BAM stays on Studio Pro for the 2026-27 season.** The platform runs
-alongside it and is beta-tested all season. The driver was billing risk — a defect would have
-meant a family who cannot enrol.
+alongside it and is beta-tested all season. Billing is not Fall-blocking. Valuable now:
+anything that runs without money or rosters — schedule, closures, occurrences, **teacher
+timesheets**, Angelina on the public site.
 
-- **Billing is no longer Fall-blocking.** Vault-only enrolment Phases 1 and 2 stay unshipped
-- **Valuable now:** anything that runs without money or rosters — schedule, closures,
-  occurrences, **teacher timesheets**, Angelina on the public site
+`enrollments` still has **1 row**. Sync classes, not enrolments.
 
-**Sync classes, not enrolments.** Classes are live (153) and change a handful of times a
-season. That is Amanda mentioning a new class, not sync infrastructure. **Explicitly
-rejected:** building sync infrastructure for a system being replaced.
+Two payroll defects still unfixed: **class assistants are unpaid in drafts**, and the
+**substitute default should be $35, not $50**.
 
-`enrollments` still has **1 row**, so anything roster-dependent is testing against empty data.
-A season-start CSV import covers it when needed. A CSV job, not a system.
-
-### The first parallel win: timesheets
-
-Teachers log timesheets in Google Sheets today. Replacing that needs classes, occurrences and
-teachers — all live — needs no rosters, and puts no money at risk.
-`generate_timesheet_drafts` runs nightly at 08:30 UTC and now has occurrences through
-2027-06-15 to draft against instead of stopping at 2026-11-27.
-
-Two defects to fix first: **class assistants are unpaid in drafts** (the generator creates
-entries for the assigned teacher and substitute only), and the **substitute default should be
-$35, not $50**.
-
-**Amanda's payroll UI for two studios is still not spec'd** and was next in the queue when
-2026-07-30 ended. RSM opens September; two locations by hand in Sheets is where errors get
-expensive.
+**Amanda's payroll UI for two studios is still not spec'd.**
 
 ---
 
-## 2. ✅ The Fall critical path is COMPLETE
+## 2. ✅ Fall critical path COMPLETE — plus Phase 1b
 
-| # | Step | Result |
-|---|---|---|
-| 1–2 | Closures Phase 1 + Phase 3, one migration | `6e39ada` |
-| 2.5 | **Unschedule the TS occurrence cron** | `989b276` — see §4 |
-| 3 | Occurrence Phase 4 — generate the season | **2,912 created**, 91 classes |
-| 4 | Closures Phase 2 — `apply_closures` | `26bedeb` |
-| 5 | Load the 12 closure rows | `06e465f` |
-| 6 | Dry run, review, apply | **417 cancelled**, verified |
+§2 as written 2026-07-31 stands: Phases 1–3 of closures, occurrence Phase 4 (2,912 created),
+`apply_closures`, the 12-row calendar, and 417 cancellations applied and verified.
 
-### Live state — verified 2026-07-31
+**Added 2026-08-01 — closures Phase 1b (`6e00943`):**
+
+| Change | Detail |
+|---|---|
+| `closure_type` enum | `holiday_break`, `total_closure`, `production_conflict`, `facility`. NOT NULL. **Alongside `is_total`, not replacing it** — `is_total` is rung 1 of the §6 ladder |
+| `makeup_deadline` | date, nullable, CHECK `> closed_through`. **Display-only** (D23) |
+| `UNIQUE (tenant_id, closed_date)` | **Dropped.** Replaced by a plain index plus a partial unique index on `all_studios = true` |
+
+### Live state — verified 2026-08-01
 
 | Fact | Value |
 |---|---|
-| `schedule_instances` | **3,960** — 3,482 published · 478 cancelled |
-| Cancelled | 61 disposed March orphans + **417 closures** |
-| Span | 2026-03-09 → **2027-06-15** |
-| `studio_closures` | **18** — 6 Spring Break + 12 for 2026-27, 2 `is_total` |
-| `rooms` | **11** — 8 active, **3 unassigned** (the retired orphans) |
-| `studio_locations` | **6** — 2 with an abbreviation (SC, RSM) |
-| `profile_roles` | 27 active rows across 21 people |
-| `enrollments` | **1** |
-| `classes` | 153 active — **62 of them ended weeks ago** (§8) |
-| Coverage gap 2026-03-15 → 07-22 | 0 rows. Never created, not recoverable |
+| `schedule_instances` | **3,965** — the 5 new Nutcracker events |
+| `studio_closures` | **20** — 18 tenant-wide + 2 Nutcracker, San Clemente-scoped |
+| `closure_type` distribution | 16 `holiday_break` · 2 `total_closure` · 2 `production_conflict` |
+| `productions` | **1** — The Nutcracker 2026, `showcase`, not published |
+| `performance` rows | **4** — the first in the system |
+| Rows at a partner venue | **5** — the first ever |
+| `platform_modules` | Schedule group live; Dashboard standalone; ticketing + programs hidden |
 
-Per-closure cancellations: Labor Day 17 · Veterans Day 19 · Fall Recess 54 ·
-**Thanksgiving 21 (total)** · Day after Thanksgiving 6 · Winter Recess 74 ·
-**Christmas 6 (total)** · Winter Recess 89 · MLK 17 · Presidents 17 · Spring Recess 80 ·
-Memorial 17 — **417**.
+**Not applied:** `apply_closures` dry run over November returns **18 to cancel** — 9 on Nov 7,
+9 across Nov 14–15. Applying also generates makeup credits, so it is deliberate:
+
+```sql
+SELECT * FROM apply_closures(
+  '84d98f72-c82f-414f-8b17-172b802f6993'::uuid,
+  '2026-11-01'::date, '2026-11-30'::date, false);
+```
+
+The all-studios November closures were already applied on 2026-07-31, which is why they do not
+appear in the dry run.
 
 ---
 
 ## 3. Decisions
 
-### 2026-07-30
+### 2026-07-30 and 2026-07-31
+
+D1–D20 stand as written in the previous edition. No reversals.
+
+### 2026-08-01
+
 | # | Decision |
 |---|---|
-| D1 | **Parallel running all season.** Studio Pro stays the system of record |
-| D2 | **Closed Veterans Day. NOT closed Lincoln Day** |
-| D3 | `classes.closure_exempt` **withdrawn** — never created |
-| D4 | `private_sessions.location_id`, not `room_id` |
-| D5 | `exempt_event_types = {private_lesson}`. **Rehearsals stop** |
-| D6 | The 6 Spring Break rows are **not** collapsed into a range |
-| D7 | **Attendance window is tenant-level, on/off, warning + countdown** |
-| D8 | **The lock is on the initial snapshot, not the record.** Only a MISSING snapshot escalates |
-| D9 | **Escalation needs a reason** from a picklist. Admin may reopen |
-| D10 | Substitutes, admins, studio_managers and super_admins may all take attendance |
-| D11 | **Two attendance metrics, never blended:** completion and timeliness |
-| D12 | **Grading is emitted, not owned** — a recognition module consumes it |
-| D13 | **Sync classes, not enrolments.** No sync infrastructure |
-| D14 | MCP write policy amended to three tiers |
-
-### 2026-07-31
-| # | Decision |
-|---|---|
-| D15 | **Auth resolvers fail closed.** Read error throws; zero rows resolves to `parent`. `profiles.role` is never read |
-| D16 | **`profile_roles.role` vocabulary is pinned** at the database to nine values |
-| D17 | **Rooms are archived, never deleted, unless nothing references them** — all three FKs are `ON DELETE SET NULL`, so a delete never fails |
-| D18 | **Room label rule:** location filter active → bare name; otherwise always append `Studio 1 · RSM`. **Never collision-conditional** |
-| D19 | **Screen gets the abbreviation, calendars get the address.** `formatRoomLabel` vs `formatCalendarLocation` |
-| D20 | **Never derive a short label by splitting a name on punctuation.** `studio_locations.abbreviation` is the source |
+| D21 | **Drop `UNIQUE (tenant_id, closed_date)`.** It made `all_studios = false` unusable for the case it exists to serve. Was already flagged in §7 of the previous pickup |
+| D22 | **`closure_type` sits alongside `is_total`, never replacing it.** Enforcement reads `exempt_event_types` only; the type is semantic and display |
+| D23 | **`makeup_deadline` is display-only.** `MAKEUP_POLICY.md` expires credits at `seasons.end_date`; the flyer deadline is an operational nudge months earlier. It must never drive expiry or status |
+| D24 | **`production_conflict` has two shapes** — rehearsal day (`{rehearsal, private_lesson}`) and performance day (`{performance}`). It cannot carry one fixed default |
+| D25 | **RSM follows Saddleback Valley Unified.** San Clemente follows Capistrano. RSM is split between both districts, so there is no single RSM calendar (Amanda) |
+| D26 | **Nutcracker is November, not December.** Nov 7 theater rehearsal 10:30–16:30; performances Nov 14 and 15 at 11:00 and 14:30, 105 minutes each. **The "Dec. TBD" flyer is wrong and must not be printed** (Amanda) |
+| D27 | **Performances live in `schedule_instances` with `production_id`**, not in `productions.performance_date`, which is singular and cannot express a four-show run. Closes `CALENDAR_AND_PUBLIC_EVENTS.md` open question 2 |
+| D28 | **Protect production events by location scope, not by exemption.** Exempting `rehearsal` tenant-wide would also spare studio rehearsals — including a 09:45 Princess Petites rehearsal that would run alone while the company is at the theater |
+| D29 | **Costs divide equally by studio, rolling up to tenant total.** `location_id` records where an event physically happened; the split is a reporting rule, not a column (Amanda) |
+| D30 | **Closure content splits across existing docs; nothing new created.** A `CLOSURES_MODULE.md` draft was discarded — see §0 |
+| D31 | **Canva Autofill requires Enterprise.** Not available on Pro or Teams. The platform exports CSV and a human runs Bulk Create — the only path that survives white-labelling |
 
 ---
 
-## 4. 🔴 The finding that mattered most
+## 4. 🔴 The finding that mattered most — carried forward
 
-**There were two occurrence generators. Nobody knew.**
+**There were two occurrence generators.** §4 of the previous edition stands in full. The cron
+is unscheduled, the route and libs retained.
 
-`/api/cron/schedule-generate` — a TypeScript generator in `lib/schedule/generate.ts`, on a
-Vercel cron at `0 8 * * *` — had been running nightly. Nothing to do with the SQL
-`generate_occurrences` every spec is built around.
+**Still owed:** retiring the TS generator is its own spec — deleting the route, `generate.ts`
+and `occurrences.ts`, and resolving **two weekday encodings**. **Do not re-add a cron entry for
+that path until the spec says which generator survives.**
 
-Caught because the Phase 4 dry run produced 2,912 where the day before recorded 2,918. The
-six-row delta was six rows the cron had written that morning.
+### The finding that mattered most today
 
-**Had Phase 4 run before this was found, most of the 2,912 rows would have been deleted by
-08:00 the next morning** — the cron prunes future rows whose `ical_uid` is not in its keep-set,
-and the SQL generator never writes `ical_uid`.
+**A substring match on function source is not a dependency check.**
 
-Four independent conflicts: it rewrote 971 of 986 future rows nightly, re-deriving `teacher_id`
-from the live class; it republished anything `apply_closures` cancelled; it read `closed_date`
-only, so it generated straight through a closure range; and it pruned NULL `ical_uid`.
+`prosrc ILIKE '%studio_closures%'` was used to test whether `generate_occurrences` still
+filtered closures. It matched — on the string `STUDIO_CLOSURES.md` inside a source comment
+referencing the spec. Phase 3 was reported as unshipped, an "urgent" remediation was written
+into the spec as §16.2 and D7, committed, and pushed. **Phase 3 had shipped on 2026-07-29.**
 
-**Resolved:** cron entry removed, deployed, confirmed READY. Route and libs retained but
-unscheduled. Also made the route fail closed on a missing `CRON_SECRET`.
+Retracted in `8baa610`. Use `pg_get_functiondef` and read the CTEs, or query `pg_depend`.
 
-### Still owed
-
-**Retiring the TS generator properly is its own spec** — deleting the route, `generate.ts` and
-`occurrences.ts`, and resolving **two weekday encodings** (`classes.day_of_week` scalar, JS
-0=Sun, in TS; `days_of_week` array, ISO 1=Mon, in SQL). **Do not re-add a cron entry for that
-path until the spec says which generator survives.**
+**A near-miss on the same day:** a v3 rewrite of `STUDIO_CLOSURES.md` would have deleted 405
+lines of a v2 that had never been read. Caught by `git diff --stat` showing deletions where
+only insertions were expected.
 
 ---
 
-## 5. What shipped 2026-07-31
+## 5. What shipped 2026-08-01
 
-### Auth — resolvers stop guessing roles
-`getSessionWithRole`, `guards.getUser` and `proxy.ts` fell back to `profiles.role` when the
-`profile_roles` read errored **or** returned zero rows. Conflating those was the bug.
+### Closures Phase 1b
 
-- read error → **throw**, with the code logged. This path was 100% silent before
-- zero rows → **`['parent']`**. Expected, not broken: `handle_new_user()` creates a profiles
-  row and no role row, so **every new signup lands there**. Throwing would have locked out
-  every family at account creation
+`closure_type`, `makeup_deadline`, dropped date uniqueness. Backfilled 16 `holiday_break` and
+2 `total_closure` from `is_total`, with a CHECK keeping the two in agreement. Partial unique
+index preserves the guard where it is still correct — two tenant-wide closures on one date
+remain an error.
 
-Dropping the fallback also closed a quiet escalation: `DELETE /api/admin/roles` removes a role
-row without mirroring `profiles.role`, so the stale column handed a revoked admin their access
-back.
+### Nutcracker 2026
 
-Added `app/error.tsx` — the **root** boundary is the only one that can catch a throw from a
-route-group layout, since a group-level `error.tsx` renders *inside* the layout that throws.
-`/unauthorized` now renders without a successful role read.
+One production, five events at San Juan Hills, two closures scoped to San Clemente.
 
-**Verified on localhost:** a zero-role account reaches `/portal` and is denied `/admin`; a
-forced PGRST205 produces the branded boundary; `/unauthorized` renders during that failure.
-**Verified in production on Amanda's account** — four roles resolved, Timesheets and Teacher
-Portal both present.
+`teacher_id` is NULL on all five, deliberately. **A show is worked by a crew, not one
+teacher**, and who attends comes out of casting.
 
-**`CLAUDE.md` §4 corrected.** It claimed Cara's `profiles.role` was `parent` (it is `admin`),
-Katherine's was `parent` (it is `teacher`), and 5 of 26 disagree. **Zero disagree** —
-`legacyProfileRole()` keeps the mirror accurate. The 5 were profiles with no role rows at all.
-**The argument against the column is collapse, not staleness:** 4 of 26 hold multiple roles and
-one column cannot hold four values.
+**Curtain times are an envelope, not an attendance record.** Teacher pay spans call to release
+including the gap between shows; role call times vary by cast. Both layer over these rows
+rather than deriving from them.
 
-### Role vocabulary pinned
-`profile_roles.role` was plain text with no CHECK. A typo produced a row matching nothing in
-`is_admin()` and nothing in `ROLE_ROUTES` — granted-looking, no access. Nine-value CHECK added;
-`techer` verified rejected. `POST /api/admin/roles` was `z.string().min(1)`; now `z.enum` bound
-to `UserRole` so drift is a compile error.
+**Location scoping verified working** — the November dry run cancels all 9 Nov 7 occurrences
+including the Princess Petites rehearsal, and leaves all five San Juan Hills events untouched.
 
-### Rooms
-Editing was **unreachable code** — `upsertRoom` had an update branch, `RoomForm` was only ever
-mounted for create. Now editable, including moving a room between locations. Archive/Restore,
-an Archived view, and the three unassigned orphans surfaced.
+### Admin nav regrouped
 
-**Delete is guarded at three layers** because all three FKs are `ON DELETE SET NULL` — a delete
-never fails, it silently nulls `room_id` on every referencing row. Reference count across all
-three tables, archive-first, and a typed `DELETE` confirmation, with the server re-counting
-immediately before deleting.
+Schedule group: Calendar `/admin/schedule`, Classes, Privates, Rehearsals, Productions,
+Seasons. Dashboard standalone above the groups.
 
-**Spec drift caught:** `LOCATIONS_AND_FACILITIES.md` §5.4 instructed deleting exactly the three
-retired rooms as "redundant legacy seed", and §10 marked it **done**. It was never done, and
-doing it would have stripped `room_id` from the **61 preserved disposed orphans**. Struck, and
-§6.1 added.
+**The sidebar renders from `platform_modules`**, so this is a data migration plus a code
+whitelist — `GROUP_ORDER` in `admin-nav.tsx` filters groups and a new group renders nothing
+until listed there.
 
-### Location labels
-`studio_locations.abbreviation` added (SC, RSM; the four partner/internal rows null by design).
-`formatRoomLabel` and `formatCalendarLocation` in `lib/locations/resolve.ts` — which already
-held the resolver and was **dead code with only its own tests as callers**.
+**Fixed a live drift:** the `schedule` row's `href` was still `/admin/classes`, the last
+remnant of the rejected `UNIFIED_SCHEDULE.md` merge. The `next.config.ts` half was reverted
+2026-07-30; the nav data never was, leaving `/admin/schedule` reachable but unlinked for two
+days.
 
-**The parent ICS feed hardcoded `LOCATION:Studio 1 - Ballet Academy and Movement`.** Once RSM
-opens, every RSM class in a parent's synced calendar would have named the wrong studio — not
-ambiguous, false. Fixed, along with the Google and Apple calendar links that rebuilt the same
-string.
+**A second `GROUP_ORDER`** in `ModuleControlGrid.tsx` was used as a filter and would have
+hidden Schedule and Dashboard from the module admin screen. Changed to preferred-ordering with
+unknown groups appended, which also un-hides the long-invisible Parent Portal group.
 
-**`/admin/schedule` By Room grouped on the room NAME**, so the two "Studio 1" rooms merged into
-one column with a **summed session count** — the count was wrong, not just the heading. Now
-keyed on `room_id`.
+Ticketing and programs hidden — both 404 today. **They retain `nav_group = 'Productions'`,
+which no longer exists in the whitelist, so restoring them needs a group change as well as a
+visibility flip.**
 
-`shortLocationName` and `makeRoomLabeller` deleted from `class-management.tsx`.
+### Specs
+
+`SEASONAL_GRAPHICS.md` — twelve ring-framed closure illustrations replacing the stock clipart
+on the current flyers. `TICKETING.md` — transferable comp blocks. `NUTCRACKER_2026_DRY_RUN.md`
+— the November execution path with five nuances to verify during the live test.
 
 ---
 
-## 6. 🟡 `_INDEX.md` is 23+ specs behind
+## 6. 🟡 `_INDEX.md` is 25+ specs behind
 
-**This is the root cause of the recurring failure.** `_INDEX.md` is the collision detector, and
-every "two implementations, neither announcing the conflict" incident traces back to it being
-stale. Indexing is a mechanical afternoon that buys back the thing that keeps costing hours.
+**Still the root cause.** Today added two more to the count: a `CLOSURES_MODULE.md` draft that
+duplicated the announcement module, and a `makeup_deadline` field that nearly duplicated
+`MAKEUP_POLICY.md`'s expiry clock. Both caught by content-grep, neither by `_INDEX.md`.
 
-Today's count of that pattern: the TS cron (§4), the `/admin/schedule` redirect, the
-synthetic-week fallback in two surfaces, fourteen surfaces rendering bare room names while a
-correct resolver sat unused, and a spec instructing a data-destroying delete.
+Indexing is a mechanical afternoon that buys back the thing that keeps costing hours.
 
 ---
 
 ## 7. Spec amendments owed
+
+**Cleared 2026-08-01:**
+
+- ~~`UNIQUE (tenant_id, closed_date)`~~ — dropped, D21
+- ~~`OCCURRENCE_GENERATION.md` Phase 4 is done~~ — still owed the missing event types
+- ~~`CALENDAR_AND_PUBLIC_EVENTS.md` Q2~~ — closed by D27
+
+**Still owed:**
 
 | Spec | Change |
 |---|---|
 | `STUDIO_CLOSURES.md` §11 | **`apply_closures` does not cancel private sessions.** An `is_total` closure stops classes and rehearsals; an already-booked private survives until Phase 5 |
 | `STUDIO_CLOSURES.md` §8 | Scope conflict: `all_studios` reaches partner venues, which §1 and §5 forbid. A real run REFUSES; a dry run reports |
 | `STUDIO_CLOSURES.md` §8 | Return is a superset: adds `dry_run`, `by_closure`, `payroll_conflicts` |
-| `STUDIO_CLOSURES.md` §5 | **`UNIQUE (tenant_id, closed_date)` means one closure per tenant per date, ever.** Two location-scoped closures on one date cannot be represented |
 | `STUDIO_CLOSURES.md` §6 | Rung 3 unreachable — no link between `schedule_instances` and `private_sessions` |
-| `OCCURRENCE_GENERATION.md` | Phase 4 is **done**. Add missing event types |
+| `STUDIO_CLOSURES.md` §15.1 | **Counts Mon–Fri and omits Saturday.** 13 active Saturday classes, zero Sunday. Saturday cohorts are absent from the Q7 fairness analysis. Recompute after the calendar is entered (D14 in §16) |
+| `ANNOUNCEMENT_MODULE_SPEC.md` | Closure notices as an announcement type; the CSV export contract from `STUDIO_CLOSURES.md` §16.7 |
+| `ANGELINA_SPEC_V2.md` | Advisory behaviour on closures — cluster warnings, makeup load, weekday asymmetry. **She surfaces; she never sets a field** |
+| `CALENDAR_AND_PUBLIC_EVENTS.md` | Record Q2 as closed by D27 |
 | `CLAUDE.md` | MCP write policy — three tiers |
-| `CONTRACTS_AND_COMMITMENTS.md` | **Amendment, not new spec** — packages absorb bundles, tiers, unlimited |
-| `PAYROLL_CORRECTNESS_AND_REPORTING.md` | Substitute default $35; **class assistants unpaid in drafts** |
+| `CONTRACTS_AND_COMMITMENTS.md` | Packages absorb bundles, tiers, unlimited |
+| `PAYROLL_CORRECTNESS_AND_REPORTING.md` | Substitute default $35; class assistants unpaid in drafts; **and auto-draft must not fire on `event_type = 'performance'`** |
 | `BILLING_AND_CREDITS.md` (March) | Still defines 1 credit = 1 minute = $1 against the locked dollar model |
 
-**Not yet written:** payroll UI for two studios · teacher onboarding portal · Angelina
-guardrails · TS generator retirement · recognition module · Class Builder · roster CSV import.
-
-**Three dead specs — do not build from them:** `UNIFIED_SCHEDULE.md` (rejected),
+**Three dead specs — do not build from them:** `UNIFIED_SCHEDULE.md` (rejected, but its
+`/admin/schedule` vs `/admin/classes` decision **stands and was re-confirmed today**),
 `CALENDAR_AND_SCHEDULING.md` (deprecated), `SCHEDULING_AND_LMS.md` (phantom `class_sessions`).
+`ROLE_BASED_NAV_SPEC.md` is also deprecated — superseded by `RBAC_AND_PERMISSIONS.md`.
 
 ---
 
 ## 8. Open defects
 
 ### 🔴 Next up
-- **The teacher dashboard shows classes that are not happening.** Verified 2026-07-31: the
-  database had **one** occurrence that week; the dashboard showed seven, mixing classes that
-  ended 2026-06-15 with classes that do not start until 2026-08-15. It synthesises a week from
-  `classes` with no occurrence lookup and no date filter — the **third** synthetic-schedule
-  surface found. An investigation prompt was drafted and never run
-- **62 classes ended weeks ago and still carry `status='active'`** — nothing retires a class at
-  term end. This is what makes the synthetic surfaces look so wrong, and why "1 active class"
-  on the admin dashboard is arithmetically right (it derives from dates) while three notions of
-  "active" disagree by 152 rows
-- **`markAttendance` authorizes on `classes.teacher_id`** — a substitute cannot mark
-  attendance. Blocks `CLASS_OPERATIONS_MODE.md` entirely
-- **The `studio_manager` role has zero rows** — but needs no migration: `profile_roles.role` now
-  permits it, `is_admin()` already accepts it, `ROLE_ROUTES` already routes it. Granting one
-  works today
-- **`/admin/schedule` has no location filter.** Once RSM publishes, the By Room view roughly
-  doubles its columns with no way to narrow. `class-management` has the control to copy
+
+- **Auto-draft will fire on the four Nutcracker performance rows.** One `teacher_id` each, at
+  curtain hours. Wrong crew, wrong hours, and it collides with anything Amanda pre-loads. **Paid
+  entries are immutable — this is cheaper to prevent than to correct.** Deadline: November
+- **The teacher dashboard shows classes that are not happening** — the third synthetic-schedule
+  surface. An investigation prompt was drafted and never run
+- **62 classes ended weeks ago and still carry `status='active'`**
+- **`markAttendance` authorizes on `classes.teacher_id`** — a substitute cannot mark attendance
+- **`/admin/schedule` has no location filter.** Once RSM publishes, By Room roughly doubles its
+  columns with no way to narrow
+- **`/admin/calendar` is orphaned** — a fully built weekly `schedule_instances` grid with
+  `requireAdmin` that no nav entry reaches. Merge, delete, or relink
 
 ### Carried forward
-`app/global-error.tsx` does not exist, so a throw in the root layout is still a bare 500 ·
-hardcoded tenant UUID in `/admin/schedule` (5 sites) · cancelled privates filtered while
-cancelled classes show · `teach/substitute-requests` has no list endpoint, so its room label
-could not be adopted · ~28 API routes authorize off `profiles.role` · `teacher_profiles` is
-`WHERE is_active = true` — **do not deactivate anyone until their final pay has run** ·
-`class_teachers` has no effective dating · `lms_content` has no `tenant_id` · 41 tables lack
-`tenant_id` · `cancelled` vs `canceled` across six tables · `/admin/classes/[id]/report` 404s
-and the whole `[id]` segment is missing · `classes_day_of_week_check` allows 0–6 while
-`days_of_week` is pinned 1–7 — **Sunday is `0` in one and `7` in the other, same table** ·
-`private_session_billing` money columns are `numeric`, not cents · `admin_tasks` does not exist
-· `process-scheduled-releases` still fails open on `CRON_SECRET`; `resource-recommendations`
-and `weekly-digest` compare against `Bearer undefined` · 88 push notifications unread with no
-UI · `confirmation-card.tsx` emits a single studio address from chat config
+
+Unchanged from the previous edition. `app/global-error.tsx` · hardcoded tenant UUID in
+`/admin/schedule` · cancelled privates filtered while cancelled classes show ·
+`teach/substitute-requests` has no list endpoint · ~28 API routes authorize off
+`profiles.role` · `teacher_profiles` is `WHERE is_active = true` — **do not deactivate anyone
+until their final pay has run** · `class_teachers` has no effective dating · `lms_content` has
+no `tenant_id` · 41 tables lack `tenant_id` · `cancelled` vs `canceled` across six tables ·
+`/admin/classes/[id]/report` 404s · `classes_day_of_week_check` allows 0–6 while `days_of_week`
+is pinned 1–7 · `private_session_billing` money columns are `numeric` · `admin_tasks` does not
+exist · `process-scheduled-releases` fails open on `CRON_SECRET` · 88 push notifications unread
+· `confirmation-card.tsx` emits a single studio address
 
 ---
 
 ## 9. Open questions
 
 ### Blocking
+
+Q1–Q4 from the previous edition stand.
+
+### New — 2026-08-01
+
 | # | Question | Blocks |
 |---|---|---|
-| 1 | Attendance window: opens at scheduled start time, or a teacher "start class" action? | Class Operations |
-| 2 | Mid-season low-enrollment cancellation — makeups or prorated refund? | Billing (deferred) |
-| 3 | Package change mid-season — next anchor or mid-month split? | Packages |
-| 4 | Partial-month grid — percentage or dollar? **Percentage recommended** | Tuition |
+| 15 | **Privates on performance days?** Teachers are at the venue. Asked at entry, per production — not defaulted | Closure entry |
+| 16 | What editing a class definition does to occurrences already generated. Same shape as the rate-repricing hazard | Classes page |
+| 17 | Whether an instance edit survives regeneration. `ON CONFLICT DO NOTHING` protects it only while `(class_id, event_date, start_time)` still matches | Classes page |
+| 18 | Can a comp-block holder subdivide? **If a school can split its own block, the studio is no longer the only party creating tickets** | Ticketing |
 
 ### For Amanda
-| # | Question |
-|---|---|
-| 5 | **Monday families lose 8 teaching days, Friday families 4 — flat monthly charges both the same.** Accepted, absorbed by makeups, or corrected in scheduling? |
-| 6 | **417 cancellations generate a makeup credit per affected enrollment.** Is that volume workable? |
-| 7 | Attendance: same window for rehearsals? Who owns the snapshot in a multi-teacher rehearsal? |
-| 8 | Attendance grade window — 30 days, term, or season? |
-| 9 | Can a teacher reopen their own window, or is admin always required? |
-| 10 | Trial students and drop-ins are not on the roster. How do they appear in a snapshot? |
-| 11 | Private pricing sheet — solo rate per teacher per duration |
-| 12 | Do adult students get makeups? The "Adult" season runs to **2030** |
-| 13 | Who teaches the Friday 3:30–6:30 Tricks block? 42 occurrences with no teacher |
-| 14 | Should RSM be added to the seven public-facing docs carrying the SC address? A content decision, not a doc sync |
 
-**For counsel:** payroll deduction of a family balance · whether instructors are mandated
-reporters under §11165.7 · **whether substitution "gold stars" read as a performance incentive
-for 1099 contractors** (AB5).
+Q5–Q14 stand. Q5 (Monday vs Friday families) and Q6 (417 cancellations) are both **now
+understated** — Saturday was omitted from the weekday analysis, and November alone adds 18 more
+cancellations.
 
-**Also still true:** `w9_on_file` false for all 20 teachers; nobody has
-`employment_type = 'contractor_1099'`.
+**Also for Amanda:** the remaining calendar rows. Amanda confirmed the printed flyers on
+2026-08-01, but **only the two Nutcracker closures are entered**. Still to load: Halloween Oct
+31, last day of Capo USD Jun 3, July 4; and three range extensions — day-after-Thanksgiving to
+Nov 28, Winter Recess to Jan 2, Spring Recess to Apr 10. **13 active Saturday classes**, so
+each unextended range leaves a Saturday open that the printed flyer says is closed.
 
 ---
 
 ## 10. Recommended next session
 
-1. **The teacher dashboard synthetic week** — it is showing Amanda classes that do not exist,
-   today, on the surface she opens first
-2. **Retire the 62 ended classes** — the data defect underneath it
-3. **Substitute authorization on `markAttendance`** — small, unblocks Class Operations
-4. **Payroll UI spec for two studios** — the parallel-season win Amanda asked for
+1. **Load the remaining calendar rows** — 3 new closures, 3 range extensions. Amanda has
+   confirmed all of them; this is data entry against a schema that now supports it
+2. **Suppress auto-draft on `event_type = 'performance'`** — has a November deadline and
+   immutable consequences
+3. **The teacher dashboard synthetic week** — carried from last session, still showing Amanda
+   classes that do not exist
+4. **Retire the 62 ended classes**
+5. **Payroll UI spec for two studios** — the parallel-season win Amanda asked for
 
-**Still owed a browser test:** `cda3a64` (attendance keyed on the occurrence) was verified by
-`tsc` and review but never exercised in a browser. It needs a class that meets twice on one
-date — which now exists.
+### Classes and Calendar — designed, not written up
 
-**Also unverified in a browser:** everything shipped today after `1b7f868`. The auth fix was
-confirmed on Amanda's dashboard; the room lifecycle and every room label were not.
+One Classes page with two toggles rather than two pages:
+
+- **Grain:** Class (definition; edits affect all future occurrences) ⇄ Instances (one dated session)
+- **Scope:** All ⇄ Mine
+- **Filters**, instance grain only: needs attendance, has a trial student, unstaffed, cancelled
+
+Calendar stays the operational day — all eight event types side by side, room conflicts
+visible. KPIs default to current week, period selectable, with a next-week forward look.
+Class-grain KPIs carry the Angelina callouts.
+
+Three points already settled by existing specs:
+
+- **"Needs attendance" means locked-and-empty.** `ATTENDANCE.md:134` locks sessions 2 hours
+  past end. Admin-facing; teachers already get the 30-minute nudge
+- **Archived seasons excluded automatically.** `SEASONS_AND_ARCHIVAL.md:153` locks attendance
+  read-only on archive. No "stop tracking" toggle needed
+- **`My Classes` already exists** in `TEACHER_PORTAL.md` §3 and `PORTAL_SURFACES.md:69`.
+  **Unread — check before building the Mine scope**
+
+**Still owed a browser test:** `cda3a64`, plus everything shipped 2026-07-31 after `1b7f868`,
+plus today's nav regroup.
 
 ---
 
-## 11. The pattern, restated
+## 11. Non-repo: Canva
+
+Brand kit live — colours, fonts, brand voice, palette named. Folder plus nine assets (three
+wordmarks, six icons), all renamed `ba-m-`.
+
+**Autofill API requires Canva Enterprise** (D31). CSV export into Bulk Create is the path.
+
+Still open: logo slots, icons and photos into the kit, Marcellus SC upload, location footer
+components, QR codes, and the twelve seasonal graphics.
+
+**The brand style guide is published at `/brand-style-guide/` and was set to noindex — verify
+it saved.** A fetch afterwards still showed `index`, which may be caching or may be an unsaved
+edit. Every asset URL on it still carries a `BAM-` filename, including the `og:image`.
+
+---
+
+## 12. The pattern, restated
 
 2026-07-29: three times, two implementations or specs of one thing, one stale.
 2026-07-30: a fourth — a nightly cron nobody knew was a generator.
-2026-07-31: three more — a redirect implementing a proposal that was rejected four weeks after
-it shipped, a resolver written for the job and never called by anything but its own tests, and
-a spec instructing a delete that would have destroyed 61 preserved rows.
+2026-07-31: three more — a rejected proposal still half-implemented, a resolver called only by
+its own tests, and a spec instructing a destructive delete.
+2026-08-01: two more — a module doc duplicating the announcement module, and a deadline field
+duplicating makeup expiry. **Both caught before commit, by grepping content rather than
+filenames.**
 
 **In every case both looked plausible and neither announced the conflict.**
 
-`ls docs/ | grep -i <topic>` before drafting anything. Check for an existing implementation
-before writing a new one. And when a number is off by six, find out why.
+And one new failure mode: **a check that appears to prove something and does not.** A substring
+match against function source found a doc filename in a comment and reported a live hazard that
+did not exist. When a check returns the answer you expected, confirm it is measuring what you
+think it measures.
