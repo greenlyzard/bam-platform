@@ -16,11 +16,24 @@ interface Module {
   nav_visible: boolean;
 }
 
+/**
+ * Preferred ordering only — NOT a whitelist. Any nav_group not listed here is
+ * still rendered, appended alphabetically after these.
+ *
+ * This screen is the control surface for toggling a module on and off, so a
+ * group it fails to render is a module nobody can reach. It previously filtered
+ * to this list and silently dropped the rest, which is why the "Parent Portal"
+ * group has never appeared here.
+ *
+ * Deliberately independent of GROUP_ORDER in components/layouts/admin-nav.tsx:
+ * that one IS a whitelist (it decides the sidebar), and a module hidden from
+ * the sidebar is exactly the kind of module an admin needs to find here.
+ */
 const GROUP_ORDER = [
-  "Studio",
+  "Dashboard",
+  "Schedule",
   "Students & Families",
   "Staff",
-  "Productions",
   "Communications",
   "Settings",
 ];
@@ -61,7 +74,12 @@ export function ModuleControlGrid({
     grouped[mod.nav_group].push(mod);
   }
 
-  const sortedGroups = GROUP_ORDER.filter((g) => grouped[g]);
+  const sortedGroups = [
+    ...GROUP_ORDER.filter((g) => grouped[g]),
+    ...Object.keys(grouped)
+      .filter((g) => !GROUP_ORDER.includes(g))
+      .sort(),
+  ];
 
   return (
     <div className="space-y-8">

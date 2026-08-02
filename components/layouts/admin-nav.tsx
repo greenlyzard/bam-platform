@@ -24,14 +24,26 @@ interface NavGroup {
 
 const SUPER_EMAIL = "derek@greenlyzard.com";
 
+/**
+ * Sidebar groups, in render order. A `platform_modules.nav_group` value absent
+ * from this array renders nothing — buildNavGroups() filters against it — so
+ * adding a group in the database is a two-part change.
+ *
+ * "Dashboard" is deliberately not here: it renders standalone above the groups
+ * (see DASHBOARD_KEY). "Studio" was dissolved and "Productions" dropped in
+ * 20260801000002; the Ticketing and Programs rows still carry the latter and
+ * are hidden, so re-enabling them needs a nav_group from this list.
+ */
 const GROUP_ORDER = [
-  "Studio",
+  "Schedule",
   "Students & Families",
   "Staff",
-  "Productions",
   "Communications",
   "Settings",
 ];
+
+/** Rendered standalone above the groups rather than inside one. */
+const DASHBOARD_KEY = "dashboard";
 
 /**
  * Modules whose surfaces read compensation and are governed by
@@ -56,6 +68,32 @@ const mobileTabItems = [
   { label: "Students", href: "/admin/students", icon: "♡" },
 ];
 
+function isModuleVisible(
+  mod: ModuleItem,
+  isDerek: boolean,
+  canManagePay: boolean
+): boolean {
+  if (!mod.platform_enabled) return false;
+  if (mod.key === "settings_platform" && !isDerek) return false;
+  // Pay gate runs before the isDerek escape below — Derek's override exists to
+  // preview disabled modules, not to bypass a compensation guard.
+  if (PAY_MANAGER_MODULE_KEYS.has(mod.key) && !canManagePay) return false;
+  const isEnabled = mod.tenant_enabled && mod.nav_visible;
+  if (!isEnabled && !isDerek) return false;
+  return true;
+}
+
+/** The standalone Dashboard link, or null if it is hidden for this user. */
+function findDashboard(
+  modules: ModuleItem[],
+  isDerek: boolean,
+  canManagePay: boolean
+): ModuleItem | null {
+  const mod = modules.find((m) => m.key === DASHBOARD_KEY);
+  if (!mod) return null;
+  return isModuleVisible(mod, isDerek, canManagePay) ? mod : null;
+}
+
 function buildNavGroups(
   modules: ModuleItem[],
   isDerek: boolean,
@@ -63,13 +101,9 @@ function buildNavGroups(
 ): NavGroup[] {
   const groupMap: Record<string, ModuleItem[]> = {};
   for (const mod of modules) {
-    if (!mod.platform_enabled) continue;
-    if (mod.key === "settings_platform" && !isDerek) continue;
-    // Pay gate runs before the isDerek escape below — Derek's override exists to
-    // preview disabled modules, not to bypass a compensation guard.
-    if (PAY_MANAGER_MODULE_KEYS.has(mod.key) && !canManagePay) continue;
-    const isEnabled = mod.tenant_enabled && mod.nav_visible;
-    if (!isEnabled && !isDerek) continue;
+    // Rendered standalone above the groups, so it must not also appear in one.
+    if (mod.key === DASHBOARD_KEY) continue;
+    if (!isModuleVisible(mod, isDerek, canManagePay)) continue;
     if (!groupMap[mod.nav_group]) groupMap[mod.nav_group] = [];
     groupMap[mod.nav_group].push(mod);
   }
@@ -103,6 +137,8 @@ export function AdminNav({
   useEffect(() => {
     setMoreOpen(false);
   }, [pathname]);
+
+  const dashboard = findDashboard(modules, isDerek, canManagePay);
 
   if (mobile) {
     const groups = buildNavGroups(modules, isDerek, canManagePay);
@@ -164,6 +200,21 @@ export function AdminNav({
               </div>
 
               <div className="px-4 py-3 pb-8 space-y-4">
+                {dashboard && (
+                  <a
+                    href={dashboard.href}
+                    className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                      pathname.startsWith(dashboard.href)
+                        ? "bg-lavender/10 text-lavender-dark"
+                        : "text-slate hover:bg-cloud hover:text-charcoal"
+                    }`}
+                  >
+                    <span className="text-base leading-none">
+                      {dashboard.icon}
+                    </span>
+                    {dashboard.label}
+                  </a>
+                )}
                 {groups.map((group) => (
                   <div key={group.label}>
                     <p className="text-xs font-semibold uppercase tracking-wider text-mist mb-1 px-1">
@@ -206,6 +257,19 @@ export function AdminNav({
 
   return (
     <nav className="space-y-1">
+      {dashboard && (
+        <a
+          href={dashboard.href}
+          className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+            pathname.startsWith(dashboard.href)
+              ? "bg-lavender/10 text-lavender-dark"
+              : "text-slate hover:bg-cloud hover:text-charcoal"
+          }`}
+        >
+          <span className="text-base leading-none">{dashboard.icon}</span>
+          {dashboard.label}
+        </a>
+      )}
       {groups.map((group) => (
         <NavGroupSection
           key={group.label}
