@@ -763,3 +763,51 @@ release questions this spec does not cover.
 3. **Amanda** — Q8 and Q9. Both block correct data entry, neither blocks the migration.
 4. **Phase 4** — closure CRUD, now including type and makeup deadline.
 5. **Generator** — §16.7, after Q8 resolves, since `privates_policy` copy depends on it.
+
+### 16.10 Retraction — §16.2 and D7 are wrong
+
+**Phase 3 shipped. `generate_occurrences` does not filter closures.** §16.2 and
+D7 are withdrawn in full. Verified against `pg_get_functiondef` 2026-08-01.
+
+The live function carries no `studio_closures` reference in any CTE, and its
+return signature is `(classes_processed int, occurrences_created int)` — the
+`dates_skipped_closed` column described in §2 and `OCCURRENCE_GENERATION.md` §4
+is gone. The insert block documents the change in its own comment: closures are
+applied afterwards by `apply_closures`, which cancels occurrences rather than
+preventing them.
+
+So all three phases landed. The two mechanisms never coexisted, no closed date
+is silently missing an occurrence, and there is no urgent remediation.
+
+**How the error happened.** The check was
+`prosrc ILIKE '%studio_closures%'`, run against the function body. It matched —
+but on the string `STUDIO_CLOSURES.md`, a reference to *this document* inside a
+source comment, not on a table reference. A doc filename was read as evidence of
+a live dependency.
+
+**The correction to the check.** A substring match against function source cannot
+distinguish a table reference from a comment, a string literal, or a filename.
+Use `pg_get_functiondef` and read the CTEs, or query `pg_depend` for a real
+dependency edge. This applies to every "does function X still touch table Y"
+question, not just this one.
+
+**What §16.1 got right stays right.** Phases 1 and 2 shipping was established
+from `information_schema` and `pg_proc` signatures rather than from string
+matching, and is unaffected. So is D8, which came from a direct
+`table_constraints` query.
+
+**Revised sequence — replacing §16.9:**
+
+1. ~~Phase 3~~ — already shipped. Nothing to do.
+2. **Phase 1b** — drop the unique constraint (D8), add `closure_type` (D9) and `makeup_deadline` (D10). One migration, pre-flight guarded, type regen, `tsc --noEmit`.
+3. **Data reconciliation** — four closures on the printed flyers are absent from `studio_closures` (Halloween Oct 31, Nutcracker Dec TBD, last day of CAPO USD Jun 3, Independence Day Jul 4), and three ranges are narrower in the table than on the flyers, each dropping a Saturday: Fall Recess (Nov 28), Winter Recess (Jan 2) and Spring Recess (Apr 10). The studio runs Saturday classes, so as entered, `apply_closures` would leave three Saturdays live that the printed notices say are closed.
+4. **Amanda** — Q8 and Q9.
+5. **Phase 4** — closure CRUD, including type and makeup deadline.
+6. **Generator** — §16.7, after Q8 resolves.
+
+**Q8 has an evidenced answer already.** The 2026 Nutcracker flyer reads
+"NO CLASSES" where every other flyer in the set reads "NO CLASSES OR REHEARSALS",
+and it retains the privates line. Existing practice is therefore: classes
+cancelled, rehearsals and privates running. That is the `production_conflict`
+default. It still wants Amanda's confirmation, but she is confirming an observed
+fact rather than deciding something new.
