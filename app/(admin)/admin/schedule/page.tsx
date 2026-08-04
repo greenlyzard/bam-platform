@@ -109,7 +109,11 @@ export default async function AdminSchedulePage({
 
   const supabaseAdmin = createAdminClient();
 
-  const [sessionInstances, teachers, rooms, levels, { data: closureRows }, { data: privateRows }] = await Promise.all([
+  // `getScheduleInstances` returns BOTH sources for the week — class occurrences
+  // from `schedule_instances` and private lessons unioned in from
+  // `private_sessions` at read time (PRIVATE_ADD_FROM_CALENDAR.md D1). The page
+  // no longer fetches or maps privates itself.
+  const [instances, teachers, rooms, levels, { data: closureRows }] = await Promise.all([
     getScheduleInstances(filterParams),
     getApprovedTeachers(),
     getRooms(),
@@ -123,64 +127,15 @@ export default async function AdminSchedulePage({
       .eq("tenant_id", "84d98f72-c82f-414f-8b17-172b802f6993")
       .lte("closed_date", endDate)
       .gte("closed_through", startDate),
-    supabaseAdmin
-      .from("private_sessions")
-      .select("id, session_date, start_time, end_time, studio, status, session_type, primary_teacher_id, student_ids, session_notes")
-      .eq("tenant_id", "84d98f72-c82f-414f-8b17-172b802f6993")
-      .neq("status", "cancelled")
-      .gte("session_date", startDate)
-      .lte("session_date", endDate),
   ]);
 
-  // Resolve student names for private sessions
-  const allStudentIds = [...new Set((privateRows ?? []).flatMap((p: any) => p.student_ids ?? []))];
-  const studentNameMap: Record<string, string> = {};
-  if (allStudentIds.length > 0) {
-    const { data: studentRows } = await supabaseAdmin
-      .from("students")
-      .select("id, first_name")
-      .in("id", allStudentIds);
-    for (const s of studentRows ?? []) studentNameMap[s.id] = s.first_name;
-  }
-
-  // Resolve teacher names for private sessions
-  const teacherNameMap: Record<string, string> = {};
-  for (const t of teachers) teacherNameMap[t.id] = t.name;
-
-  // Convert private sessions to ScheduleInstance format
-  const privateInstances = (privateRows ?? []).map((p: any) => {
-    const names = ((p.student_ids as string[]) ?? []).map((id: string) => studentNameMap[id] ?? "Student").join(", ");
-    return {
-      id: p.id,
-      tenant_id: "84d98f72-c82f-414f-8b17-172b802f6993",
-      class_id: null,
-      teacher_id: p.primary_teacher_id,
-      room_id: null,
-      event_type: "private_lesson",
-      event_date: p.session_date,
-      start_time: p.start_time,
-      end_time: p.end_time,
-      status: p.status,
-      cancellation_reason: null,
-      substitute_teacher_id: null,
-      notes: p.session_notes,
-      is_trial_eligible: false,
-      production_id: null,
-      className: `Private: ${names}`,
-      classLevel: null,
-      classStyle: p.session_type,
-      teacherName: teacherNameMap[p.primary_teacher_id] ?? null,
-      roomName: p.studio,
-      enrolledCount: ((p.student_ids as string[]) ?? []).length,
-      maxStudents: null,
-    };
-  });
-
-  // No synthetic fallback — see the OCCURRENCE_GAP_END note above. Private
-  // sessions are real rows and still render; only the class grid goes empty.
-  const instances = [...sessionInstances, ...privateInstances];
+  // "No occurrences" is a statement about the CLASS grid only — see the
+  // OCCURRENCE_GAP_END note above. Privates are real rows from a different
+  // table and still render in a week that has no generated class occurrences,
+  // so they must not suppress the notice.
+  const classInstanceCount = instances.filter((i) => i.event_type !== "private_lesson").length;
   const generatedRange =
-    sessionInstances.length === 0
+    classInstanceCount === 0
       ? await getGeneratedOccurrenceRange(supabaseAdmin, "84d98f72-c82f-414f-8b17-172b802f6993")
       : null;
 
@@ -193,7 +148,7 @@ export default async function AdminSchedulePage({
           rooms={rooms}
           levels={levels}
           weekStart={weekStart}
-          noOccurrences={sessionInstances.length === 0}
+          noOccurrences={classInstanceCount === 0}
           generatedRange={generatedRange}
           closures={(closureRows ?? []).map(c => ({
             closed_date: c.closed_date,

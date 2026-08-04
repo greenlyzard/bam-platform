@@ -10,24 +10,35 @@
 
 ## 1. Problem
 
-An admin cannot add a private lesson from the Calendar, and a private that *is*
-created never appears on the Calendar at all.
+An admin cannot add a private lesson from the Calendar.
+
+> **§1 corrected 2026-08-04 during build (step 1).** The paragraphs below
+> originally also claimed that a private "never appears on the Calendar at all"
+> and that the `private_lesson` render branch was "currently unreachable — no
+> such rows exist, and nothing produces them". **Both were wrong**, and the
+> claim was labelled "verified" — it was not. `app/(admin)/admin/schedule/page.tsx`
+> had unioned `private_sessions` into the feed since commit `ab7e56e` (the
+> "alternative #2" seam in §3), so the purple branch was reachable and privates
+> did render. What the spec got right is the *seam*: the union lived in the page,
+> not the query layer. Step 1 was therefore a **relocate + fix**, not a build
+> from zero — and the code it relocated was leaking student names (see §3.1).
 
 Verified 2026-08-04 against the live code (not assumed — this is the exact spot
 the pickup warns about):
 
-- `lib/schedule/queries.ts::getScheduleInstances` reads `schedule_instances`,
-  `classes`, `productions`, `rooms`, etc. It does **not** read `private_sessions`.
+- `lib/schedule/queries.ts::getScheduleInstances` read `schedule_instances`,
+  `classes`, `productions`, `rooms`, etc. It did **not** read `private_sessions`.
+  **Fixed in step 1** — it now fetches both sources and merges them.
 - `app/(admin)/admin/privates/actions.ts::createPrivateSession` inserts into
   `private_sessions` (+ billing, notifications, credit_transactions). It does
-  **not** write a `schedule_instances` row.
-- `schedule-calendar.tsx` already renders `event_type === 'private_lesson'`
-  (purple `#A855F7`, "Private" label). That branch is currently unreachable —
-  no such rows exist, and nothing produces them.
+  **not** write a `schedule_instances` row. Correct, and stays that way (D1).
+- `schedule-calendar.tsx` renders `event_type === 'private_lesson'`
+  (purple `#A855F7`, "Private" label), and free-text rooms already group into
+  their own `name:` lane (`schedule-calendar.tsx:603-621`), so §3.1's unroomed
+  requirement needed no calendar change.
 
-So `private_sessions` and the Calendar are two islands. This is "rung 3
-unreachable — no link between `schedule_instances` and `private_sessions`" from
-SESSION_PICKUP.md §7.
+The remaining gap is the **write** path: there is still no way to create a
+private *from* the Calendar. That is steps 2–3, not step 1.
 
 The add-private form itself is **not** the problem — it already exists and is
 reused unchanged: `+ New Private` on `/admin/privates` →
@@ -67,11 +78,11 @@ prefer the one that keeps the merge inside the existing query layer:
 | `event_date` | `session_date` | |
 | `start_time` / `end_time` | `start_time` / `end_time` | `duration_minutes` is derivable, not authoritative |
 | `event_type` | constant `'private_lesson'` | drives the purple render + label already in `schedule-calendar.tsx` |
-| room / column | `location_id` → room; else free-text `studio` | privates carry free-text `studio` and often no `room_id` (see `schedule-calendar.tsx:606`). By-Room placement must tolerate a free-text studio that maps to no room column → render in an "Other / unroomed" lane, do not drop it |
-| teacher | `primary_teacher_id` (+ `co_teacher_ids`) | |
-| title (display) | **"Private Reservation — [Teacher]"** | D6. Never student name on the calendar |
-| status filter | exclude `status IN ('cancelled', ...)` as classes do | keep cancelled out of the operational day unless a "show cancelled" filter is on, matching class behavior |
-| id | `private:{private_sessions.id}` | namespaced so click-through routes to the private, not a class |
+| room / column | `(location_id, lower(studio))` → `rooms` row | **Corrected 2026-08-04:** `private_sessions` has **no `room_id` column at all** (not "often no room_id"), and `location_id` alone cannot pick a room — it names a *location*. Resolution is the **pair**: the free-text `studio` matched to an active `rooms` row **at that location**. The pair is required because San Clemente and RSM each have a "Studio 1"; matching on name alone merges them. All 5 live privates resolve this way and sit in the existing Studio 1 (San Clemente) column. An unresolved private keeps its free-text name and lands in the calendar's own `name:` lane (or "Unassigned"), never dropped |
+| teacher | `primary_teacher_id` (+ `co_teacher_ids`) | `co_teacher_ids` is honored by the **teacher filter** (a co-taught private shows when filtering to either teacher); the displayed teacher is the primary |
+| title (display) | **"Private Reservation — [Teacher]"** | D6. Never student name on the calendar. **Unconditional** — not gated on `students.privates_visible_in_group`. That flag exists and governs the BAM PRIVATES *group feed*, where the default is student-name-visible; the calendar has no such default to opt out of (COMMUNICATIONS_HUB.md §6.2 + decision 2). **This fixed a live leak:** the pre-existing union rendered `` `Private: ${student first names}` `` |
+| status filter | exclude `status IN ('cancelled','rescheduled')` | **"as classes do" was wrong** and is withdrawn: classes are *not* excluded — cancelled `schedule_instances` are returned and rendered struck-through, and there is no "show cancelled" filter to turn on. Privates are excluded per the explicit build instruction, matching the prior private behavior. `rescheduled` is excluded too: that row still carries the **old** date/time, so rendering it alongside its replacement double-books the studio. `completed` and `no_show` stay — those sessions happened. ⚠ Open: converge later by adding a real "show cancelled" toggle, or accept the class/private asymmetry |
+| id | `private:{private_sessions.id}` | namespaced so click-through routes to the private, not a class. Currently consumed only as a React key — no click-through target exists yet |
 
 ### 3.2 Recurrence
 
@@ -82,11 +93,28 @@ approach; do not invent a second one. If expansion is non-trivial this phase,
 ship one-off privates first and list recurring expansion as a follow-up (state
 it in the PR, do not silently drop it).
 
+**Step 1 shipped one-off only — recurrence is NOT expanded.** A recurring
+private renders on its seed date and no other week. Stated here rather than
+dropped silently, per the paragraph above. Currently invisible in practice:
+0 of the 5 live rows have `is_recurring = true`. Still owed as a follow-up.
+
 ### 3.3 Location filter
 
-Privates respect the top-right location filter (SC / RSM / All) via
-`location_id`. A private with only free-text `studio` and no `location_id`
-appears under "All" and is flagged, not hidden.
+**Corrected 2026-08-04:** there **is no location filter on `/admin/schedule`**.
+The page's filters are Teacher / Level / Room / Day; the calendar states the
+absence outright (`schedule-calendar.tsx:30-38` — "This page has no location
+filter — every studio is in view at once"). So this section describes a filter
+that does not exist and was a no-op for step 1.
+
+What step 1 did instead, so the filter is cheap to add later: every private
+carries `roomLocation`, resolved from its `location_id`. Room labels therefore
+disambiguate the two "Studio 1"s the same way class labels do, and a future
+SC / RSM / All control has the field it needs already populated.
+
+When that filter is built: a private with only free-text `studio` and no
+`location_id` appears under "All" and is flagged, not hidden. (Live data no
+longer has any such row — all 5 privates carry `location_id`, contra the stale
+claim in `STUDIO_CLOSURES.md` that location is free-text on all of them.)
 
 ---
 
@@ -179,7 +207,9 @@ finding to raise before writing code, not a silent `apply_migration`.)
 
 ## 10. Build order (each its own step; terminal named per commit)
 
-1. Read path (§3) — privates show on the calendar (one-off first).
+1. ✅ **Done 2026-08-04** — Read path (§3), one-off privates, union moved into
+   `getScheduleInstances`. Also fixed the student-name leak (§3.1) and corrected
+   §1 / §3.1 / §3.3 against the live code. Recurrence (§3.2) still outstanding.
 2. Slot-click prefill (§4).
 3. Conflict warn-but-allow (§5).
 4. Recurrence expansion (§3.2) if not folded into step 1.

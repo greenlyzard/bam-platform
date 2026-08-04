@@ -385,6 +385,182 @@ export async function getRooms(): Promise<
   }));
 }
 
+// ── Private sessions on the Calendar ──────────────────────────
+// PRIVATE_ADD_FROM_CALENDAR.md §3, D1: **union at read**. The week feed reads
+// `private_sessions` directly and maps each row into the calendar-event shape.
+// No `schedule_instances` row is ever written for a private — `private_sessions`
+// stays the single source of truth, so an edit/cancel has exactly one place to
+// land and there is no second table to drift.
+
+/**
+ * Private statuses that must not occupy the operational day.
+ *
+ * `cancelled` — the session is off (§3.1).
+ * `rescheduled` — the row still carries the OLD date/time; its replacement is a
+ * separate row, so rendering both double-books the studio.
+ *
+ * `completed` and `no_show` stay: those sessions happened, and the week they
+ * happened in should say so.
+ */
+const PRIVATE_HIDDEN_STATUSES = ["cancelled", "rescheduled"];
+
+/**
+ * The Calendar title for a private — D6 / COMMUNICATIONS_HUB.md §6.2 and its
+ * decision 2: the studio calendar shows "Private Reservation" and the teacher,
+ * **never** the student name. Unconditional, not gated on
+ * `students.privates_visible_in_group` — that flag governs the BAM PRIVATES
+ * group feed, where the default is student-name-visible; the calendar has no
+ * such default to opt out of.
+ */
+function privateReservationTitle(teacherName: string | null): string {
+  return teacherName ? `Private Reservation — ${teacherName}` : "Private Reservation";
+}
+
+/**
+ * Fetch the week's private sessions and map them into `ScheduleInstance`s.
+ *
+ * Room placement (§3.1): privates carry a free-text `studio` ("Studio 1") and no
+ * `room_id`. Where that name resolves to a real `rooms` row **at the private's
+ * own `location_id`**, we attach that `room_id` so the private shares the class
+ * column — the name alone is not enough, since San Clemente and RSM each have a
+ * "Studio 1". Where it does not resolve, the free-text name is kept and the
+ * calendar groups it in its own `name:` lane (or "Unassigned" when there is no
+ * studio at all). A private is never dropped for want of a room.
+ *
+ * Recurrence (§3.2) is NOT expanded yet: a recurring private renders on its seed
+ * date only, not on every week it recurs. Deliberately one-off-first per the
+ * spec, and currently invisible — 0 of the 5 live rows are recurring.
+ */
+async function getPrivateSessionInstances(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  filters: {
+    startDate: string;
+    endDate: string;
+    teacherId?: string;
+    roomId?: string;
+    tenantId?: string;
+  }
+): Promise<ScheduleInstance[]> {
+  let query = supabase
+    .from("private_sessions")
+    .select(
+      "id, tenant_id, session_date, start_time, end_time, status, session_type, studio, location_id, primary_teacher_id, co_teacher_ids, student_ids, session_notes"
+    )
+    .gte("session_date", filters.startDate)
+    .lte("session_date", filters.endDate)
+    .not("status", "in", `(${PRIVATE_HIDDEN_STATUSES.join(",")})`);
+
+  if (filters.tenantId) {
+    query = query.eq("tenant_id", filters.tenantId);
+  }
+
+  const { data: privates, error } = await query;
+
+  if (error) {
+    console.error("[schedule:getPrivates]", {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    });
+    return [];
+  }
+
+  if (!privates || privates.length === 0) return [];
+
+  // Teacher filter runs on the rows, before mapping, so co-teachers can be read
+  // off the row (the mapped shape has one `teacher_id` and would lose them).
+  const rows = filters.teacherId
+    ? privates.filter(
+        (p) =>
+          p.primary_teacher_id === filters.teacherId ||
+          (p.co_teacher_ids ?? []).includes(filters.teacherId!)
+      )
+    : privates;
+
+  if (rows.length === 0) return [];
+
+  // Teacher names come from `profiles` by id — not from `getApprovedTeachers()`,
+  // which filters on `profiles.role` and would silently blank the name of any
+  // teacher whose primary role is something else (CLAUDE.md §4).
+  const teacherIds = [...new Set(rows.map((p) => p.primary_teacher_id).filter(Boolean))];
+  const teacherMap: Record<string, { name: string; initials: string }> = {};
+  if (teacherIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, first_name, last_name")
+      .in("id", teacherIds);
+    for (const p of profiles ?? []) {
+      teacherMap[p.id] = {
+        name: [p.first_name, p.last_name].filter(Boolean).join(" "),
+        initials: [p.first_name?.[0], p.last_name?.[0]].filter(Boolean).join(""),
+      };
+    }
+  }
+
+  // Resolve free-text `studio` → a real room, keyed on (location, lowercased
+  // name) so the two "Studio 1"s stay distinct.
+  const { data: roomRows } = await supabase
+    .from("rooms")
+    .select("id, name, location_id")
+    .eq("is_active", true);
+  const roomByLocationAndName = new Map<string, string>();
+  for (const r of roomRows ?? []) {
+    if (!r.location_id) continue;
+    roomByLocationAndName.set(`${r.location_id}|${r.name.trim().toLowerCase()}`, r.id);
+  }
+
+  const locationMap = await fetchLocationLabels(
+    supabase,
+    rows.map((p) => p.location_id)
+  );
+
+  let instances: ScheduleInstance[] = rows.map((p) => {
+    const teacher = p.primary_teacher_id ? teacherMap[p.primary_teacher_id] : undefined;
+    const roomId = p.location_id && p.studio
+      ? roomByLocationAndName.get(`${p.location_id}|${p.studio.trim().toLowerCase()}`) ?? null
+      : null;
+
+    return {
+      // Namespaced (§3.1) so a click-through can route to the private and never
+      // collide with a `schedule_instances` uuid.
+      id: `private:${p.id}`,
+      tenant_id: p.tenant_id,
+      class_id: null,
+      teacher_id: p.primary_teacher_id,
+      room_id: roomId,
+      event_type: "private_lesson",
+      event_date: p.session_date,
+      start_time: p.start_time,
+      end_time: p.end_time,
+      status: p.status,
+      cancellation_reason: null,
+      substitute_teacher_id: null,
+      notes: p.session_notes,
+      is_trial_eligible: false,
+      production_id: null,
+      className: privateReservationTitle(teacher?.name ?? null),
+      classLevel: null,
+      classStyle: p.session_type,
+      teacherName: teacher?.name ?? null,
+      teacherInitials: teacher?.initials ?? null,
+      subTeacherName: null,
+      roomName: p.studio,
+      roomLocation: p.location_id ? locationMap[p.location_id] ?? null : null,
+      enrolledCount: (p.student_ids ?? []).length,
+      maxStudents: null,
+    };
+  });
+
+  if (filters.roomId) {
+    // An unresolved private is not in the filtered room, so it drops out — the
+    // same way a class in another room does.
+    instances = instances.filter((i) => i.room_id === filters.roomId);
+  }
+
+  return instances;
+}
+
 export async function getScheduleInstances(filters: {
   startDate: string;
   endDate: string;
@@ -415,7 +591,13 @@ export async function getScheduleInstances(filters: {
     query = query.eq("room_id", filters.roomId);
   }
 
-  const { data: instances, error } = await query;
+  // Both sources for the week, in parallel. Privates are a second source, not a
+  // fallback: they render even when the class grid is empty (a week outside the
+  // generated occurrence span still has real privates in it).
+  const [{ data: instances, error }, privateInstances] = await Promise.all([
+    query,
+    getPrivateSessionInstances(supabase, filters),
+  ]);
 
   if (error) {
     console.error("[schedule:getInstances]", {
@@ -424,10 +606,12 @@ export async function getScheduleInstances(filters: {
       details: error.details,
       hint: error.hint,
     });
-    return [];
+    return finalizeWeek([], privateInstances, filters, {});
   }
 
-  if (!instances || instances.length === 0) return [];
+  if (!instances || instances.length === 0) {
+    return finalizeWeek([], privateInstances, filters, {});
+  }
 
   // Get class info for enrichment
   const classIds = [...new Set(instances.map((i) => i.class_id).filter(Boolean) as string[])];
@@ -488,7 +672,7 @@ export async function getScheduleInstances(filters: {
     }
   }
 
-  let enriched: ScheduleInstance[] = instances.map((i) => ({
+  const enriched: ScheduleInstance[] = instances.map((i) => ({
     ...i,
     is_trial_eligible: i.is_trial_eligible ?? false,
     className: i.class_id ? (classMap[i.class_id]?.name ?? null) : null,
@@ -503,27 +687,49 @@ export async function getScheduleInstances(filters: {
     maxStudents: i.class_id ? (classMap[i.class_id]?.max_students ?? null) : null,
   }));
 
-  // Client-side filters that need enriched data
+  return finalizeWeek(enriched, privateInstances, filters, classMap);
+}
+
+/**
+ * Merge the two sources and apply the filters that need enriched data.
+ *
+ * Level and Style are **class-only** filters: they read columns a private does
+ * not have, so a private drops out whenever one is set. That is the honest
+ * reading — "show me Advanced" cannot mean "…plus every private". Day and the
+ * teacher/room filters (applied per-source upstream) narrow both sources alike.
+ */
+function finalizeWeek(
+  classInstances: ScheduleInstance[],
+  privateInstances: ScheduleInstance[],
+  filters: { level?: string; style?: string; dayOfWeek?: string },
+  classMap: Record<string, { levels: string[] | null }>
+): ScheduleInstance[] {
+  let merged = [...classInstances, ...privateInstances];
+
   if (filters.level) {
     const lvl = filters.level.toLowerCase();
-    enriched = enriched.filter(
+    merged = merged.filter(
       (i) => !!i.class_id && (classMap[i.class_id]?.levels ?? []).some((l) => l.toLowerCase() === lvl)
     );
   }
   if (filters.style) {
-    enriched = enriched.filter((i) =>
-      i.classStyle?.toLowerCase().includes(filters.style!.toLowerCase())
-    );
+    const style = filters.style.toLowerCase();
+    merged = merged.filter((i) => !!i.class_id && !!i.classStyle?.toLowerCase().includes(style));
   }
   if (filters.dayOfWeek) {
     const dow = parseInt(filters.dayOfWeek, 10);
-    enriched = enriched.filter((i) => {
+    merged = merged.filter((i) => {
       const d = new Date(i.event_date + "T00:00:00");
       return d.getDay() === dow;
     });
   }
 
-  return enriched;
+  // The DB ordering is lost once two sources are concatenated — restore it, so
+  // every consumer still gets the week in chronological order.
+  return merged.sort(
+    (a, b) =>
+      a.event_date.localeCompare(b.event_date) || a.start_time.localeCompare(b.start_time)
+  );
 }
 
 // ── Map recurring classes to ScheduleInstance[] for a given week ──
