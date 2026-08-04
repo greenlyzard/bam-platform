@@ -381,6 +381,13 @@ export async function createPrivateSession(formData: FormData) {
   const endTime = formData.get("end_time") as string;
   const durationMinutes = parseInt(formData.get("duration_minutes") as string, 10) || null;
   const studio = (formData.get("studio") as string) || null;
+  // `location_id` names the building; `studio` is the free-text room name inside
+  // it. The pair is what resolves a private to a room column on the Calendar
+  // (PRIVATE_ADD_FROM_CALENDAR.md §3.1) — San Clemente and RSM each have a
+  // "Studio 1", so the name alone cannot place it. Persisted since the Day view
+  // can supply the id from the clicked column; still optional, so every existing
+  // caller that omits it behaves exactly as before.
+  const locationId = (formData.get("location_id") as string) || null;
   const locationNotes = (formData.get("location_notes") as string) || null;
   const primaryTeacherId = formData.get("primary_teacher_id") as string;
   const sessionRate = parseFloat(formData.get("session_rate") as string) || 0;
@@ -439,6 +446,7 @@ export async function createPrivateSession(formData: FormData) {
       end_time: endTime,
       duration_minutes: durationMinutes,
       studio,
+      location_id: locationId,
       location_notes: locationNotes,
       student_ids: studentIds,
       primary_teacher_id: primaryTeacherId,
@@ -511,6 +519,7 @@ export async function createPrivateSession(formData: FormData) {
           end_time: endTime,
           duration_minutes: durationMinutes,
           studio,
+          location_id: locationId,
           location_notes: locationNotes,
           student_ids: studentIds,
           primary_teacher_id: primaryTeacherId,

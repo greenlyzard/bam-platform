@@ -99,24 +99,43 @@ function todayStr(): string {
 // Component
 // ---------------------------------------------------------------------------
 
+/**
+ * Prefill (PRIVATE_ADD_FROM_CALENDAR.md §4). Every field is optional and seeds
+ * *initial state only* — the admin can change any of it before saving, and a
+ * caller that passes nothing gets exactly the previous defaults.
+ *
+ * `initialDate` is expected to already be a calendar date in the **tenant's**
+ * timezone. Callers that have it (the Day view passes the clicked column's own
+ * date string; `/admin/privates/new` computes `tenantToday(user.timezone)`
+ * server-side) must pass it, because the `todayStr()` fallback below reads the
+ * *browser's* date and is wrong for a tenant in another zone.
+ */
 export function PrivateSessionForm({
   tenantId,
   defaultTeacherId,
+  initialDate,
+  initialStartTime,
+  initialStudio,
+  initialLocationId,
   onClose,
   onCreated,
 }: {
   tenantId: string;
   defaultTeacherId?: string;
+  initialDate?: string;
+  initialStartTime?: string;
+  initialStudio?: string;
+  initialLocationId?: string;
   onClose: () => void;
   onCreated?: () => void;
 }) {
   // Form state
   const [sessionType, setSessionType] = useState("solo");
-  const [date, setDate] = useState(todayStr());
-  const [startTime, setStartTime] = useState("15:00");
+  const [date, setDate] = useState(initialDate || todayStr());
+  const [startTime, setStartTime] = useState(initialStartTime || "15:00");
   const [duration, setDuration] = useState("60");
-  const [endTime, setEndTime] = useState("16:00");
-  const [studio, setStudio] = useState("Studio 1");
+  const [endTime, setEndTime] = useState(addMinutes(initialStartTime || "15:00", 60));
+  const [studio, setStudio] = useState(initialStudio || "Studio 1");
   const [studentIds, setStudentIds] = useState<string[]>([]);
   const [coTeacherId, setCoTeacherId] = useState("__none__");
   const [isRecurring, setIsRecurring] = useState(false);
@@ -206,6 +225,17 @@ export function PrivateSessionForm({
       .catch(() => setStudioBookings([]));
   }, [date, studio]);
 
+  // Studio options. `STUDIO_OPTIONS` is a fixed list, but a prefilled room name
+  // comes from the `rooms` table and need not be on it (e.g. a room named
+  // something other than "Studio N"). Append it rather than silently rendering a
+  // select whose value matches no option.
+  const studioOptions = useMemo(() => {
+    if (studio && !STUDIO_OPTIONS.some((o) => o.value === studio)) {
+      return [{ value: studio, label: studio }, ...STUDIO_OPTIONS];
+    }
+    return STUDIO_OPTIONS;
+  }, [studio]);
+
   // Filtered students for search
   const filteredStudents = useMemo(() => {
     if (!searchQuery.trim()) return students;
@@ -274,6 +304,11 @@ export function PrivateSessionForm({
       fd.set("end_time", endTime);
       fd.set("duration_minutes", duration === "custom" ? "" : duration);
       fd.set("studio", studio);
+      // The location is the *building* the click came from, so it survives the
+      // admin switching rooms within it. It is only ever set when a caller
+      // prefilled one — this form has no location picker, and an absent value
+      // saves NULL exactly as before.
+      if (initialLocationId) fd.set("location_id", initialLocationId);
       fd.set("primary_teacher_id", teacherId);
       fd.set("student_ids", JSON.stringify(studentIds));
       fd.set("co_teacher_ids", coTeacherId && coTeacherId !== "__none__" ? JSON.stringify([coTeacherId]) : "[]");
@@ -375,7 +410,7 @@ export function PrivateSessionForm({
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Studio</label>
-            <SimpleSelect value={studio} onValueChange={setStudio} options={STUDIO_OPTIONS} placeholder="Studio" />
+            <SimpleSelect value={studio} onValueChange={setStudio} options={studioOptions} placeholder="Studio" />
             {studioBookings.length > 0 && (
               <div className="mt-1 p-2 bg-gray-50 rounded text-xs space-y-1">
                 <div className="font-medium text-mist">Also booked in {studio}:</div>

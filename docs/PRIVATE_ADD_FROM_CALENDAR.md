@@ -120,17 +120,110 @@ claim in `STUDIO_CLOSURES.md` that location is free-text on all of them.)
 
 ## 4. Add-from-slot interaction (D3)
 
-- `schedule-calendar.tsx`: an empty region of a room/day column is clickable.
-  Clicking computes `{ date, start_time, studio/room }` from the cell and opens
-  the New Private flow pre-filled.
-- Prefill transport: query params on the existing route, e.g.
-  `/admin/privates/new?date=YYYY-MM-DD&start=HH:MM&studio=Studio%201&location_id=…`
-  (optionally `&teacher=` when a By-Teacher column is clicked). The form reads
-  these as initial state. A modal over the calendar is acceptable later; the
-  prefilled route is the smaller first step and reuses the page as-is.
-- End time defaults from the form's existing duration auto-calc (default 60 min).
-- Timezone: derive the clicked time in the tenant timezone
-  (TENANT_TIMEZONE_SPEC.md), not the browser's.
+> **§4 corrected 2026-08-04 during build (step 2).** This section originally
+> said "an empty region of a room/day column is clickable", as though such a cell
+> already existed. **It did not.** Verified against `schedule-calendar.tsx`
+> before writing any code:
+>
+> | View | Columns are | A click yields |
+> |---|---|---|
+> | Calendar (`week`) | the six **days**, each a vertical list of `SessionCard`s with no time axis | a **date** |
+> | Room | **rooms**, each spanning the whole week | a **room** |
+> | List | a table | nothing |
+>
+> No view had a room **and** a time axis, so no click could produce
+> `{date, start_time, studio}` together, and **no view had a time axis at all** —
+> `start_time` was not derivable anywhere. What §4 described was not a handler to
+> attach; it was a grid to build.
+
+**Decided with Derek 2026-08-04, and shipped:** add a **fourth view, "Day"
+(rooms × time)**, to the existing view toggle. Two alternatives were rejected:
+putting a time axis on the Calendar view's day columns (rewrites the view Amanda
+uses daily, and a day column mixes all rooms so it still cannot name a studio),
+and wiring two half-prefills — day column → date, Room column → studio — which
+never fills date + time + studio from one click and leaves `start_time` empty.
+
+### 4.1 The Day view, as built
+
+- **Columns are active rooms**, labelled by `formatRoomLabel` exactly as
+  elsewhere. Archived rooms are excluded for the same reason the Room filter
+  excludes them (§6.1 of LOCATIONS_AND_FACILITIES.md): nothing is scheduled into
+  one, and a click that books a private into a retired room is worse than no
+  click. When the Room filter is set the grid narrows to that one room, keyed off
+  the **URL** filter rather than the pending select, because the session data
+  reflects the URL.
+- **Rows are 30-minute slots**, spanning 8:00–21:00 by default, widened (never
+  narrowed) to fit any session outside it.
+- **Overlapping bookings stack into lanes** side by side, so two sessions in one
+  room at one time cannot hide each other.
+- **A trailing "No room" column** catches anything unresolved — an unroomed
+  class, or a private whose free-text `studio` did not match a room at its
+  `location_id` (§3.1). Its cells are deliberately **not clickable**: there is no
+  room to prefill, and silently dropping the studio is a worse answer than no
+  click. Nothing is hidden for want of a room, here as in §3.1.
+- **A closed day reads identically to the Calendar view** — the closure banner
+  and its "Show classes" toggle were extracted into one helper that both views
+  call, so there is one rule and one piece of state, not two that can drift.
+- **Day selection** is the six days already in view; it re-anchors on week
+  navigation.
+- The Calendar, List, and Room views are **unchanged**.
+
+### 4.2 Prefill transport (as specified, and as built)
+
+Query params on the existing route:
+`/admin/privates/new?date=YYYY-MM-DD&start=HH:MM&studio=Studio%201&location_id=…`
+
+`date` and `start` are **validated against `^\d{4}-\d{2}-\d{2}$` and
+`^([01]\d|2[0-3]):[0-5]\d$` before use** — a query param is user input, and a
+malformed one would seed a date/time input with a value it cannot represent. An
+unparseable param is dropped, not corrected.
+
+The route reads them and hands them to the **existing** form as initial state
+(`initialDate` / `initialStartTime` / `initialStudio` / `initialLocationId`), all
+optional — the teacher path passes none and is unchanged. No new form, no modal,
+no second create path. A modal over the calendar stays acceptable later.
+
+**`&teacher=` was NOT built.** The original text offered it "when a By-Teacher
+column is clicked"; there is no by-teacher column in any view, so there is
+nothing to derive it from. Teacher stays a form field.
+
+End time defaults from the form's existing duration auto-calc (default 60 min).
+
+If a clicked room's name is not one of the form's fixed `STUDIO_OPTIONS`, it is
+appended as an option rather than leaving the select on a value matching none.
+
+### 4.3 `location_id` had to become a persisted field
+
+**Found during build:** `createPrivateSession` read `location_notes` and **never
+read `location_id`**, so every private created through this form saved with
+`location_id = NULL`. Without it the prefill is decorative — §3.1 resolves a
+private to a room on the `(location_id, lower(studio))` **pair**, so a session
+booked by clicking "Studio 1 · SC" would have come back on the calendar in a
+free-text lane, not the column that was clicked.
+
+The passthrough is now parsed once and written in **both** inserts — the primary
+session and each recurring instance (a recurring private keeps its room). It
+remains optional, so every existing caller that omits it behaves as before. This
+is a write-path change and is therefore listed in §7.
+
+### 4.4 Timezone
+
+**No clock is read in the click path at all.** `date` is the selected column's
+own date string and `start` is the slot's own label; neither is derived from
+`new Date()`, so neither can be shifted across midnight by the browser's zone.
+
+The one clock read is the new `today` prop, computed server-side in
+`app/(admin)/admin/schedule/page.tsx` as `tenantToday(user.timezone)`
+(TENANT_TIMEZONE_SPEC.md §4.2) and passed into the calendar. Note this changes
+the **whole** calendar, not only the Day view: the "today" highlight and the
+mobile expanded-day default now use the tenant zone instead of the browser's.
+`/admin/privates/new` likewise defaults its date to `tenantToday(user.timezone)`
+when no `date` param is present, in place of the form's browser-local
+`todayStr()` fallback.
+
+Still browser-local and **out of scope here**: `getThisWeekMonday()` behind the
+"Today" button, and `getWeekRange()` in the page — both are
+TENANT_TIMEZONE_SPEC.md Phase C.
 
 ---
 
@@ -165,15 +258,35 @@ claim in `STUDIO_CLOSURES.md` that location is free-text on all of them.)
 
 ## 7. Files to touch
 
-| File | Change |
-|---|---|
-| `lib/schedule/queries.ts` | `getScheduleInstances`: also fetch + map `private_sessions` for the week (§3) |
-| `app/(admin)/admin/schedule/schedule-calendar.tsx` | empty-cell click → open prefilled new-private (§4); confirm private render/placement incl. unroomed lane (§3.1) |
-| `components/admin/private-session-form.tsx` | read `date/start/studio/location_id/teacher` query-param prefill; render conflict warning + "Save anyway" (§4, §5) |
-| `app/(admin)/admin/privates/actions.ts` | add conflict-check helper over both sources (§5); no schedule_instances write |
+**Corrected 2026-08-04 (step 2).** The original list was written before the Day
+view existed and missed four files: `getRooms` had to return `location_id` (the
+label type deliberately carries only `{name, abbreviation}`), the schedule page
+had to supply the tenant-zone `today`, and the prefill has to be read by the
+`new/` route and forwarded by its client wrapper — the form cannot read query
+params itself, it takes props. Steps are marked so a reader can tell what has
+landed from what step 3 still owes.
 
-No DDL. No migration. (If any column is missing for the mapping, that is a
+| File | Change | Step |
+|---|---|---|
+| `lib/schedule/queries.ts` | `getScheduleInstances`: also fetch + map `private_sessions` for the week (§3) | 1 ✅ |
+| `lib/schedule/queries.ts` | `getRooms`: also return `location_id` — the Day view click needs the id, not the label (§4.1) | 2 ✅ |
+| `app/(admin)/admin/schedule/schedule-calendar.tsx` | new **Day view** (rooms × time); empty-cell click → prefilled new-private (§4.1); shared closure banner; `today` prop | 2 ✅ |
+| `app/(admin)/admin/schedule/page.tsx` | pass `today={tenantToday(user.timezone)}` (§4.4) | 2 ✅ |
+| `app/(admin)/admin/privates/new/page.tsx` | read + **validate** `date/start/studio/location_id`; default date to tenant today (§4.2, §4.4) | 2 ✅ |
+| `app/(admin)/admin/privates/new/new-private-client.tsx` | forward the prefill props to the form (§4.2) | 2 ✅ |
+| `components/admin/private-session-form.tsx` | accept `initialDate/initialStartTime/initialStudio/initialLocationId` as initial state; submit `location_id` (§4.2, §4.3) | 2 ✅ |
+| `components/admin/private-session-form.tsx` | render conflict warning + "Save anyway" (§5) | 3 |
+| `app/(admin)/admin/privates/actions.ts` | persist `location_id` in both inserts (§4.3) | 2 ✅ |
+| `app/(admin)/admin/privates/actions.ts` | add conflict-check helper over both sources (§5); no schedule_instances write | 3 |
+
+No DDL. No migration — `private_sessions.location_id` already existed and was
+simply never written. (If any column is missing for the mapping, that is a
 finding to raise before writing code, not a silent `apply_migration`.)
+
+Before building §5, read the form's existing **"Also booked in {studio}"** panel
+(fed by `/api/admin/studio-availability`). It already surfaces same-studio
+clashes on the selected date. Step 3 should extend or replace it, not add a
+second overlapping warning.
 
 ---
 
@@ -181,14 +294,20 @@ finding to raise before writing code, not a silent `apply_migration`.)
 
 1. A one-off private created from the form appears on `/admin/schedule` in the
    correct room/day/time, purple, labeled "Private Reservation — [Teacher]".
-2. Clicking an empty Studio 2 cell at 4:00 PM Monday opens New Private with
-   date = that Monday, start = 4:00 PM, studio = Studio 2 pre-filled.
+2. **On the Day view** (§4.1 — the Calendar view has no room/time cell): with
+   Monday selected, clicking the empty 4:00 PM cell in the Studio 2 column opens
+   New Private with date = that Monday, start = 4:00 PM, studio = Studio 2, and
+   the column's `location_id` pre-filled. Saving it returns it to that same
+   column (§4.3) — the check is the round trip, not the form state.
 3. Saving a private that overlaps an existing class or private in the same room
    or with the same teacher shows a warning naming the clash and a "Save anyway"
    confirm; confirming saves; the private then shows on the calendar.
 4. A student flagged privates-non-visible still renders as "Private Reservation"
    — no student name leaks to the calendar.
-5. The location filter narrows privates by `location_id`.
+5. ~~The location filter narrows privates by `location_id`.~~ **Withdrawn — not
+   verifiable.** §3.3 established there is no location filter on
+   `/admin/schedule`. Reinstate this criterion if and when one is built; until
+   then it cannot pass or fail.
 6. `npx tsc --noEmit` clean.
 
 ---
@@ -210,7 +329,11 @@ finding to raise before writing code, not a silent `apply_migration`.)
 1. ✅ **Done 2026-08-04** — Read path (§3), one-off privates, union moved into
    `getScheduleInstances`. Also fixed the student-name leak (§3.1) and corrected
    §1 / §3.1 / §3.3 against the live code. Recurrence (§3.2) still outstanding.
-2. Slot-click prefill (§4).
+2. ✅ **Done 2026-08-04** — Slot-click prefill (§4), via a new **Day view**
+   (rooms × time) because no room/time cell existed to click. Also persisted
+   `location_id` on create (§4.3) and moved the calendar's "today" onto the
+   tenant timezone (§4.4). Corrected §4 / §7 / §8.2 against what shipped, and
+   withdrew §8.5. Not verified in a browser yet — that is step 5.
 3. Conflict warn-but-allow (§5).
 4. Recurrence expansion (§3.2) if not folded into step 1.
 5. Verify (§8) incl. a browser test screenshot.

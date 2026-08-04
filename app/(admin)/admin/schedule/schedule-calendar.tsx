@@ -52,6 +52,19 @@ function formatTime(time: string): string {
   return `${displayHour}:${m} ${ampm}`;
 }
 
+/** "16:30" / "16:30:00" → minutes past midnight. */
+function toMinutes(time: string): number {
+  const [h, m] = time.split(":");
+  return parseInt(h, 10) * 60 + parseInt(m ?? "0", 10);
+}
+
+/** Minutes past midnight → the "HH:MM" shape both the DB and `<input type="time">` use. */
+function fromMinutes(mins: number): string {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
 function formatDateLabel(dateStr: string): string {
   const d = new Date(dateStr + "T00:00:00");
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -218,16 +231,91 @@ const VIEW_OPTIONS = [
   { value: "week", label: "Calendar" },
   { value: "list", label: "List" },
   { value: "room", label: "Room" },
+  { value: "day", label: "Day" },
 ] as const;
+
+// ── Day view (rooms × time) ───────────────────────────────────
+// The only view with a real room/time cell, which is what
+// PRIVATE_ADD_FROM_CALENDAR.md §4 needs: clicking an empty one knows its date
+// (the selected day), its start time (the slot), and its room — including that
+// room's `location_id`, without which "Studio 1" cannot be told from the other
+// "Studio 1" (§3.1). The Calendar/List/Room views are untouched: their columns
+// are days or rooms, never both, so no click there can carry all four.
+
+const SLOT_MINUTES = 30;
+const SLOT_HEIGHT_PX = 34;
+/** Default visible span, widened (never narrowed) to fit the day's sessions. */
+const DEFAULT_DAY_START_MIN = 8 * 60;
+const DEFAULT_DAY_END_MIN = 21 * 60;
+
+interface DayColumn {
+  key: string;
+  label: string;
+  roomId: string | null;
+  /** The bare room name — what `private_sessions.studio` stores. */
+  studioName: string | null;
+  locationId: string | null;
+}
+
+interface PlacedInstance {
+  instance: ScheduleInstance;
+  startMin: number;
+  endMin: number;
+  lane: number;
+}
+
+/**
+ * Stack a column's sessions into lanes so two bookings in the same room at the
+ * same time sit side by side instead of hiding each other. Greedy: an event
+ * takes the first lane whose previous event has already ended.
+ */
+function layoutColumn(items: ScheduleInstance[]): { placed: PlacedInstance[]; lanes: number } {
+  const laneEnds: number[] = [];
+  const placed = [...items]
+    .sort((a, b) => a.start_time.localeCompare(b.start_time))
+    .map((instance) => {
+      const startMin = toMinutes(instance.start_time);
+      // A zero- or sub-slot-length booking still needs a clickable-sized box.
+      const endMin = Math.max(toMinutes(instance.end_time), startMin + SLOT_MINUTES);
+      let lane = laneEnds.findIndex((end) => end <= startMin);
+      if (lane === -1) {
+        lane = laneEnds.length;
+        laneEnds.push(endMin);
+      } else {
+        laneEnds[lane] = endMin;
+      }
+      return { instance, startMin, endMin, lane };
+    });
+  return { placed, lanes: Math.max(laneEnds.length, 1) };
+}
+
+/** The day the Day view opens on: today when it is in the viewed week, else its Monday. */
+function pickDefaultDay(weekStart: string, today: string): string {
+  const dates = getWeekDates(weekStart);
+  return dates.includes(today) ? today : dates[0];
+}
 
 // ── Types ─────────────────────────────────────────────────────
 
 interface ScheduleCalendarProps {
   instances: ScheduleInstance[];
   teachers: Array<{ id: string; name: string }>;
-  rooms: Array<{ id: string; name: string; is_active: boolean; location: LocationLabelRef | null }>;
+  rooms: Array<{
+    id: string;
+    name: string;
+    is_active: boolean;
+    /** Needed by the Day view's add-a-private click — the label alone cannot identify the studio. */
+    location_id: string | null;
+    location: LocationLabelRef | null;
+  }>;
   levels: string[];
   weekStart: string;
+  /**
+   * Today's date in the **tenant's** timezone, computed server-side
+   * (TENANT_TIMEZONE_SPEC.md §4.2). Falls back to the browser's date, which is
+   * what this component used before and is wrong for a tenant in another zone.
+   */
+  today?: string;
   /** True when no schedule_instances rows exist for the viewed range. */
   noOccurrences?: boolean;
   /** The range that actually has generated occurrences, for the empty state. */
@@ -467,15 +555,24 @@ export function ScheduleCalendar({
   rooms,
   levels,
   weekStart,
+  today: todayProp,
   noOccurrences,
   generatedRange,
   closures = [],
   initialFilters,
 }: ScheduleCalendarProps) {
   const router = useRouter();
-  const [view, setView] = useState<"week" | "list" | "room">("week");
+  const today = todayProp ?? getTodayStr();
+  const [view, setView] = useState<"week" | "list" | "room" | "day">("week");
   const [showClosedClasses, setShowClosedClasses] = useState(false);
   const [selectedInstance, setSelectedInstance] = useState<ScheduleInstance | null>(null);
+  const [selectedDate, setSelectedDate] = useState(() => pickDefaultDay(weekStart, today));
+
+  // Moving to another week re-anchors the Day view, otherwise it would keep
+  // showing a date that is no longer on screen.
+  useEffect(() => {
+    setSelectedDate(pickDefaultDay(weekStart, today));
+  }, [weekStart, today]);
 
   const [teacherFilter, setTeacherFilter] = useState(initialFilters.teacher);
   const [levelFilter, setLevelFilter] = useState(initialFilters.level);
@@ -484,7 +581,7 @@ export function ScheduleCalendar({
 
   // Mobile state
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
-  const [expandedDays, setExpandedDays] = useState<Set<string>>(() => new Set([getTodayStr()]));
+  const [expandedDays, setExpandedDays] = useState<Set<string>>(() => new Set([today]));
 
   // Field picker state
   const [fields, setFields] = useState<FieldConfig[]>(DEFAULT_FIELDS);
@@ -590,6 +687,30 @@ export function ScheduleCalendar({
 
   const hasActiveFilters = teacherFilter || levelFilter || roomFilter || dayFilter;
 
+  /**
+   * Open the existing New Private form, prefilled from a clicked Day-view cell
+   * (PRIVATE_ADD_FROM_CALENDAR.md §4). Prefill rides as query params on the
+   * existing route — no new form, no modal, no second create path.
+   *
+   * **No clock is read here, deliberately.** `date` is the selected column's own
+   * date string and `startMin` is the slot's own label; neither is derived from
+   * `new Date()`, so neither can be shifted into the previous or next day by the
+   * browser's timezone. The one clock read in this component is the `today` prop,
+   * which the server computes in the tenant's zone (TENANT_TIMEZONE_SPEC.md).
+   */
+  const openNewPrivate = useCallback(
+    (column: DayColumn, startMin: number) => {
+      const params = new URLSearchParams({
+        date: selectedDate,
+        start: fromMinutes(startMin),
+      });
+      if (column.studioName) params.set("studio", column.studioName);
+      if (column.locationId) params.set("location_id", column.locationId);
+      router.push(`/admin/privates/new?${params.toString()}`);
+    },
+    [router, selectedDate]
+  );
+
   // Group instances by date, sorted by start_time
   const byDate: Record<string, ScheduleInstance[]> = {};
   for (const i of instances) {
@@ -623,7 +744,6 @@ export function ScheduleCalendar({
     .map(([key, group]) => ({ key, ...group }))
     .sort((a, b) => a.label.localeCompare(b.label));
 
-  const today = getTodayStr();
   const weekDates = getWeekDates(weekStart);
 
   // SimpleSelect option arrays
@@ -774,10 +894,10 @@ export function ScheduleCalendar({
   const closureLabel = (isTotal: boolean) =>
     isTotal ? "Studio closed" : "Studio closed, privates running";
 
-  const renderWeekView = () => (
-    <>
-      {/* Closure banner */}
-      {closuresInView.length > 0 && (
+  // Shared by the Calendar and Day views so a closed day reads identically in
+  // both, including the "Show classes" toggle (one piece of state, one banner).
+  const renderClosureBanner = () =>
+    closuresInView.length > 0 && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start justify-between gap-2 print:hidden">
           <div className="flex items-start gap-2">
             <span className="text-red-500 leading-5">&#128683;</span>
@@ -809,7 +929,11 @@ export function ScheduleCalendar({
             {showClosedClasses ? "Hide classes" : "Show classes"}
           </button>
         </div>
-      )}
+    );
+
+  const renderWeekView = () => (
+    <>
+      {renderClosureBanner()}
 
       {/* Desktop grid */}
       <div className="hidden md:grid grid-cols-6 gap-3 print:grid print:grid-cols-3 print:gap-2">
@@ -1057,6 +1181,205 @@ export function ScheduleCalendar({
           </div>
         )}
       </div>
+    );
+  };
+
+  // ── Day View (rooms × time) ─────────────────────────────────
+
+  const renderDayView = () => {
+    const daySessions = byDate[selectedDate] ?? [];
+    const isClosed = closedDateSet.has(selectedDate);
+    // Same rule as the Calendar view: on a closed day only privates show until
+    // "Show classes" is pressed — a closed day's classes are not running.
+    const sessions =
+      isClosed && !showClosedClasses
+        ? daySessions.filter((s) => s.event_type === "private_lesson")
+        : daySessions;
+
+    // Columns are rooms. Archived rooms are excluded for the same reason the
+    // Room filter excludes them: nothing is scheduled into one, and offering a
+    // click that books a private into a retired room is worse than not offering
+    // it. When the Room filter is set, the grid narrows to that one room — the
+    // URL filter, not the pending select, because the sessions reflect the URL.
+    const columns: DayColumn[] = rooms
+      .filter((r) => (initialFilters.room ? r.id === initialFilters.room : r.is_active))
+      .map((r) => ({
+        key: `id:${r.id}`,
+        label: formatRoomLabel(r.name, r.location, UNFILTERED),
+        roomId: r.id,
+        studioName: r.name,
+        locationId: r.location_id,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+
+    // Anything that did not resolve to one of those rooms still has to be
+    // visible — an unroomed class, or a private whose free-text `studio` did not
+    // match a room at its location (§3.1). It gets a trailing column whose cells
+    // are NOT clickable: there is no room to prefill, and a click that silently
+    // dropped the studio would be a worse answer than no click.
+    const columnRoomIds = new Set(columns.map((c) => c.roomId));
+    const unplaced = sessions.filter((s) => !s.room_id || !columnRoomIds.has(s.room_id));
+
+    let startMin = DEFAULT_DAY_START_MIN;
+    let endMin = DEFAULT_DAY_END_MIN;
+    for (const s of sessions) {
+      startMin = Math.min(startMin, Math.floor(toMinutes(s.start_time) / SLOT_MINUTES) * SLOT_MINUTES);
+      endMin = Math.max(endMin, Math.ceil(toMinutes(s.end_time) / SLOT_MINUTES) * SLOT_MINUTES);
+    }
+    const slots: number[] = [];
+    for (let m = startMin; m < endMin; m += SLOT_MINUTES) slots.push(m);
+    const gridHeight = slots.length * SLOT_HEIGHT_PX;
+
+    const topFor = (min: number) => ((min - startMin) / SLOT_MINUTES) * SLOT_HEIGHT_PX;
+
+    const renderColumnBody = (column: DayColumn | null, items: ScheduleInstance[]) => {
+      const { placed, lanes } = layoutColumn(items);
+      return (
+        <div className="relative border-l border-silver" style={{ height: gridHeight }}>
+          {/* Empty cells. Rendered under the cards, so a click only lands where
+              nothing is booked. */}
+          {slots.map((min) => {
+            const isHour = min % 60 === 0;
+            const cellCls = `absolute inset-x-0 border-t ${isHour ? "border-silver" : "border-silver/40"}`;
+            if (!column) {
+              return <div key={min} className={cellCls} style={{ top: topFor(min), height: SLOT_HEIGHT_PX }} />;
+            }
+            return (
+              <button
+                key={min}
+                type="button"
+                onClick={() => openNewPrivate(column, min)}
+                title={`Add a private — ${column.label}, ${formatTime(fromMinutes(min))}`}
+                className={`${cellCls} group hover:bg-lavender/10 transition-colors`}
+                style={{ top: topFor(min), height: SLOT_HEIGHT_PX }}
+              >
+                <span className="pointer-events-none opacity-0 group-hover:opacity-100 text-[10px] font-medium text-lavender-dark">
+                  + Private
+                </span>
+              </button>
+            );
+          })}
+
+          {/* Booked sessions */}
+          {placed.map(({ instance, startMin: s, endMin: e, lane }) => {
+            const dimmed = isClosed && instance.event_type !== "private_lesson";
+            return (
+              <div
+                key={instance.id}
+                className={`absolute overflow-hidden px-0.5 ${dimmed ? "opacity-40" : ""}`}
+                style={{
+                  top: topFor(s),
+                  height: ((e - s) / SLOT_MINUTES) * SLOT_HEIGHT_PX,
+                  left: `${(lane * 100) / lanes}%`,
+                  width: `${100 / lanes}%`,
+                }}
+              >
+                <SessionCard
+                  instance={instance}
+                  compact
+                  onClick={dimmed ? undefined : () => setSelectedInstance(instance)}
+                  visibleFields={visibleFields}
+                  fieldOrder={fieldOrder}
+                />
+              </div>
+            );
+          })}
+        </div>
+      );
+    };
+
+    return (
+      <>
+        {renderClosureBanner()}
+
+        {/* Day picker — the days of the week already in view */}
+        <div className="mb-3 flex flex-wrap items-center gap-2 print:hidden">
+          {weekDates.map((date) => {
+            const isSelected = date === selectedDate;
+            return (
+              <button
+                key={date}
+                onClick={() => setSelectedDate(date)}
+                className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+                  isSelected
+                    ? "border-lavender bg-lavender text-white"
+                    : closedDateSet.has(date)
+                      ? "border-red-200 bg-red-50 text-red-600 hover:bg-red-100"
+                      : "border-silver bg-white text-slate hover:bg-cloud"
+                }`}
+              >
+                {getDayName(date)} {formatDateLabel(date)}
+                {date === today && <span className={`ml-1 text-xs ${isSelected ? "text-white/70" : "text-mist"}`}>today</span>}
+              </button>
+            );
+          })}
+        </div>
+
+        <p className="mb-2 text-xs text-mist print:hidden">
+          Click an empty slot to schedule a private in that room and time.
+        </p>
+
+        {columns.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-silver bg-white p-8 text-center text-sm text-mist">
+            No rooms to show.
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-silver bg-white">
+            <div className="min-w-max">
+              {/* Header */}
+              <div className="flex border-b border-silver bg-cloud/50">
+                <div className="w-16 shrink-0" />
+                {columns.map((c) => (
+                  <div
+                    key={c.key}
+                    className="w-[150px] shrink-0 border-l border-silver px-2 py-2 text-center text-sm font-semibold text-charcoal"
+                  >
+                    {c.label}
+                  </div>
+                ))}
+                {unplaced.length > 0 && (
+                  <div className="w-[150px] shrink-0 border-l border-silver px-2 py-2 text-center text-sm font-semibold text-mist">
+                    No room
+                  </div>
+                )}
+              </div>
+
+              {/* Body */}
+              <div className="flex">
+                {/* Time gutter */}
+                <div className="relative w-16 shrink-0" style={{ height: gridHeight }}>
+                  {slots.map((min) =>
+                    min % 60 === 0 ? (
+                      <div
+                        key={min}
+                        className="absolute right-2 -translate-y-1/2 text-[11px] text-mist"
+                        style={{ top: topFor(min) }}
+                      >
+                        {formatTime(fromMinutes(min))}
+                      </div>
+                    ) : null
+                  )}
+                </div>
+
+                {columns.map((c) => (
+                  <div key={c.key} className="w-[150px] shrink-0">
+                    {renderColumnBody(
+                      c,
+                      sessions.filter((s) => s.room_id === c.roomId)
+                    )}
+                  </div>
+                ))}
+
+                {unplaced.length > 0 && (
+                  <div className="w-[150px] shrink-0 bg-cloud/20">
+                    {renderColumnBody(null, unplaced)}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </>
     );
   };
 
@@ -1399,6 +1722,7 @@ export function ScheduleCalendar({
       {view === "week" && renderWeekView()}
       {view === "list" && renderListView()}
       {view === "room" && renderRoomView()}
+      {view === "day" && renderDayView()}
 
       {/* Detail Panel */}
       {selectedInstance && (

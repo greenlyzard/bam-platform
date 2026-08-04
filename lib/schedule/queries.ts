@@ -361,9 +361,20 @@ export async function getProductions(): Promise<Array<{ id: string; name: string
  * Rooms for the schedule filter. Carries `is_active` (the archive flag —
  * LOCATIONS_AND_FACILITIES.md §6.1) and the room's location, because room names
  * are only unique *within* a location: two studios each have a "Studio 1".
+ *
+ * `location_id` is returned alongside the label because the Day view's
+ * add-a-private click needs the **id**, not the label: a private resolves back
+ * to a room on the `(location_id, lower(studio))` pair (§3.1), and
+ * `LocationLabelRef` is deliberately only `{name, abbreviation}`.
  */
 export async function getRooms(): Promise<
-  Array<{ id: string; name: string; is_active: boolean; location: LocationLabelRef | null }>
+  Array<{
+    id: string;
+    name: string;
+    is_active: boolean;
+    location_id: string | null;
+    location: LocationLabelRef | null;
+  }>
 > {
   const supabase = await createClient();
   const { data } = await supabase
@@ -381,6 +392,7 @@ export async function getRooms(): Promise<
     id: r.id,
     name: r.name,
     is_active: r.is_active,
+    location_id: r.location_id,
     location: r.location_id ? locationMap[r.location_id] ?? null : null,
   }));
 }

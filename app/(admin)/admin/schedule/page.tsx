@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/lib/auth/guards";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { tenantToday } from "@/lib/dates";
 import { getScheduleInstances, getApprovedTeachers, getRooms, getDistinctLevels } from "@/lib/schedule/queries";
 import { ScheduleCalendar } from "./schedule-calendar";
 
@@ -148,6 +149,10 @@ export default async function AdminSchedulePage({
           rooms={rooms}
           levels={levels}
           weekStart={weekStart}
+          // Today in the studio's zone, not the browser's and not the server's
+          // UTC (TENANT_TIMEZONE_SPEC.md §4.2). Drives the "today" highlight and
+          // which day the Day view opens on.
+          today={tenantToday(user.timezone)}
           noOccurrences={classInstanceCount === 0}
           generatedRange={generatedRange}
           closures={(closureRows ?? []).map(c => ({
