@@ -398,3 +398,72 @@ And one new failure mode: **a check that appears to prove something and does not
 match against function source found a doc filename in a comment and reported a live hazard that
 did not exist. When a check returns the answer you expected, confirm it is measuring what you
 think it measures.
+
+---
+
+## 13. From other chats — not yet in the repo
+
+_Added 2026-08-04. Findings that lived only in conversation. Nothing here has a
+spec, a migration, or a commit._
+
+### 🔴 Quo — live defects in parent-facing SMS (2026-08-03)
+
+Two inboxes under "Ballet Academy & Movement": **(949) 229-0846** carries
+everything; (949) 736-5025 is effectively idle.
+
+**500 participants with activity and 262 messages in the last 30 days, none of it
+in Supabase.** It is the highest-signal dataset BA&M owns and it is entirely
+outside the platform.
+
+Four workflows are jammed into one thread stream: parent lead capture, staff
+recruiting (Dominique, Ava, Marwa, Lola, Paige, Halona, Ellie Iwamoto all
+interviewing by SMS in the same inbox as parents), sales and billing, and noise.
+
+| # | Defect | Evidence |
+|---|---|---|
+| 1 | **Outgoing copy says "Ballet Academy & Movement (BAM)"** | The welcome template. This is the one string the style guide says must never be public, and it is going out by SMS today |
+| 2 | **The drip does not suppress on reply** | A parent confirmed for Saturday still received "🎭 Last reminder: Your FREE trial awaits!" Staff apologised mid-thread. A second parent replied that she had already signed up. **Two cases in one 30-day window is systematic, not incidental** |
+| 3 | **The autoresponder has no gating** | It fires on vendor spam, on parcel-delivery notifications, and on active conversations with enrolled families |
+| 4 | **Pricing is quoted ad hoc** | $125/mo, $50 registration, $35 drop-in, plus prorated tuition hand-computed in text — one thread shows $943.75 total, $315 credit, $628.75 due |
+| 5 | **Studio Pro is the conversion bottleneck** | Every path ends at a `gostudiopro.com` account-creation link; at least one parent reported being locked out |
+| 6 | **Identity is manual** | Staff are texting "could you confirm your daughter's name?" because parent and student are the same record. No contact objects behind these numbers |
+
+Defect 1 is the cheapest to fix and the most exposed — it is a trademark string
+in outbound messaging. Defect 2 is the one costing conversions.
+
+**Related specs that already exist:** `COMMUNICATIONS_TRIAGE.md`,
+`COMMUNICATIONS_INBOX.md`, `CONTACT_CHANNELS.md`. An inbound classifier, Resend
+webhook and Quo SMS handler were built in April. **Check what shipped before
+writing anything new** — this is the §0 content-grep rule.
+
+### 🟡 Public footer NAP is hardcoded to San Clemente
+
+Logged deliberately, deferred to September:
+
+- The public footer address is a static string, not read from `studio_locations`
+- Fix is dynamic + gated for public display, not adding RSM to a hardcoded list
+- **Adding RSM now would leak an unopened location**, undercutting the launch
+  gating already built
+- Open business decision: once RSM opens, does the footer show the primary studio,
+  both, or "now in Rancho Santa Margarita" as a launch beat?
+
+Belongs on the September punch-list with publishing RSM classes and the parent
+filter auto-activating.
+
+### Expansion analysis exists but targets Ladera Ranch
+
+An earlier chat carries a full second-location model — readiness scoring, site
+criteria, break-even at 47–56 students against ~$8,200–9,700/mo fixed costs, and
+a 90/60/30-day launch plan. **It is written for Ladera Ranch, not RSM**, so the
+numbers are indicative rather than current. Worth reconciling against the actual
+RSM lease before it is quoted as a plan.
+
+### What this section is for
+
+Three days elapsed between the 2026-08-01 pickup and this addendum with no
+commits, while material findings accumulated in conversation. **A decision that
+exists only in a chat window is the phantom-spec pattern in a different form** —
+settled to whoever was in the room, invisible to everyone else.
+
+Sweep the other project chats into the pickup at the end of a session, not just
+the one you were working in.
