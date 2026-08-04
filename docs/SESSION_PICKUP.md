@@ -467,3 +467,25 @@ settled to whoever was in the room, invisible to everyone else.
 
 Sweep the other project chats into the pickup at the end of a session, not just
 the one you were working in.
+
+### Admin nav — the grouping shipped, the shape did not
+
+`afcc160` did the *grouping* pass: Dashboard standalone plus five groups
+(Schedule / Students & Families / Staff / Communications / Settings), every group
+rendered expanded.
+
+**The nav shape is still open and is a deliberate decision, not a leftover.** Four
+readings of "two-tier" are materially different:
+
+1. Accordion — one section open at a time, headers are toggles not links
+2. Clickable parent + children
+3. Section tabs in the header + sidebar
+4. Icon rail + flyout panel
+
+**No spec governs admin nav shape.** `ROLE_BASED_NAV_SPEC.md` is deprecated
+(`profiles.role`-based, superseded by `RBAC_AND_PERMISSIONS.md`) and `_INDEX.md`
+has nothing. So this is a product call, and whatever is chosen should be recorded —
+otherwise the next session rediscovers the same four options.
+
+Related and still open: `/admin/calendar` is orphaned, and the Classes ⇄ Instances
+toggle design in §10 has no home yet.
