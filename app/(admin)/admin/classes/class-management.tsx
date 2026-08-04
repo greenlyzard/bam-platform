@@ -338,6 +338,13 @@ export function ClassManagement({
   // Derived-status default: hide ended (past) classes until the admin opts to see them.
   const [showPast, setShowPast] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
+  /**
+   * Classes = one row per class definition (the page's only behaviour to date,
+   * and the default). Instances = dated sessions. The Instances half is NOT
+   * wired to occurrence data — see the panel it renders, which says so rather
+   * than showing invented rows.
+   */
+  const [viewBy, setViewBy] = useState<"classes" | "instances">("classes");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [drawerClass, setDrawerClass] = useState<ClassRecord | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -450,13 +457,19 @@ export function ClassManagement({
   }, []);
 
   // ── Filtering ────────────────────────────────────────
-  // Derived-active classes (running now) — the honest basis for headline counts & open spots,
-  // matching getCapacitySummary. Excludes scheduled / ended / inactive.
-  const derivedActiveClasses = classes.filter(
-    (c) => deriveClassStatus(c) === "active"
-  );
+  // (The old `derivedActiveClasses` — running classes across the whole table,
+  // ignoring the filters — fed the headline counts and was the source of the
+  // "2 active" vs "91 shown" contradiction. The cards now count `runningInView`
+  // instead, which respects the filters and states its denominator.)
 
-  const filtered = classes.filter((c) => {
+  /**
+   * The list's filter predicate, extracted from the `.filter()` call it used to
+   * live in so the meta row can ask it a second question — "how many did the
+   * default hide?" — by running the same test with `includePast` forced on.
+   * Same rules, same order; only the past-class check reads a parameter now.
+   */
+  function matchesFilters(c: ClassRecord, opts?: { includePast?: boolean }): boolean {
+    const includePast = opts?.includePast ?? showPast;
     if (search && !c.name.toLowerCase().includes(search.toLowerCase()))
       return false;
     if (filterSeason && c.season_id !== filterSeason && c.season !== filterSeason)
@@ -502,15 +515,20 @@ export function ClassManagement({
     // Derived-status default: hide 'ended' (past) classes unless "Show past classes" is on — but
     // never hide them when the admin has explicitly filtered to 'ended'.
     if (
-      !showPast &&
+      !includePast &&
       filterStatus !== "ended" &&
       deriveClassStatus(c) === "ended"
     )
       return false;
-    if (filterMyClasses && myClassIds.length > 0 && !myClassIds.includes(c.id))
-      return false;
+    // Scope = Mine. The old `myClassIds.length > 0 &&` guard made this a silent
+    // no-op for a user with no classes — under a visible All/Mine toggle that
+    // would show every class while reading "Mine", so it is gone: no classes
+    // assigned now means Mine is honestly empty.
+    if (filterMyClasses && !myClassIds.includes(c.id)) return false;
     return true;
-  }).sort((a, b) => {
+  }
+
+  const filtered = classes.filter((c) => matchesFilters(c)).sort((a, b) => {
     const aVal = (a as unknown as Record<string, unknown>)[sortKey];
     const bVal = (b as unknown as Record<string, unknown>)[sortKey];
     if (aVal == null && bVal == null) return 0;
@@ -529,6 +547,50 @@ export function ClassManagement({
     const bStr = String(bVal).toLowerCase();
     return sortDir === "asc" ? aStr.localeCompare(bStr) : bStr.localeCompare(aStr);
   });
+
+  // ── Scope of what's on screen ────────────────────────
+  // These exist to stop the page contradicting itself. The old header read
+  // "2 active · 89 inactive" beside a list that said "91 classes shown", and an
+  // "Active Classes" card reading 2 — three different scopes, none labelled.
+  //
+  // Verified against live data 2026-08-04: 153 classes — 2025/2026 has 1 running
+  // + 62 ended, 2026/2027 has 1 running + 89 not yet started. The default hides
+  // ended classes, so 91 is "everything not finished", spanning **two** seasons.
+  // That is why the season label is computed rather than hardcoded to the
+  // newest season: with no season filter set, 91 of these are not all 2026/2027.
+
+  const seasonNameById = new Map(seasons.map((s) => [s.id, s.name] as const));
+
+  function seasonLabelOf(c: ClassRecord): string | null {
+    if (c.season_id) return seasonNameById.get(c.season_id) ?? null;
+    return c.season ?? null;
+  }
+
+  const seasonsInView = new Set(
+    filtered.map(seasonLabelOf).filter((s): s is string => !!s)
+  );
+
+  const seasonScopeLabel = (() => {
+    if (filterSeason) {
+      const named = seasons.find((s) => s.id === filterSeason)?.name ?? filterSeason;
+      return `Season ${named}`;
+    }
+    if (seasonsInView.size === 1) return `Season ${[...seasonsInView][0]}`;
+    if (seasonsInView.size === 0) return "No season set";
+    return "All seasons";
+  })();
+
+  /** Ended classes the "Show past classes" default is holding back, under the filters now set. */
+  const hiddenPastCount = showPast
+    ? 0
+    : classes.filter(
+        (c) =>
+          deriveClassStatus(c) === "ended" && matchesFilters(c, { includePast: true })
+      ).length;
+
+  /** Running *within what is shown* — the number the "Running now" card reports. */
+  const runningInView = filtered.filter((c) => deriveClassStatus(c) === "active");
+  const capacityOf = (c: ClassRecord) => c.max_enrollment ?? c.max_students;
 
   // ── Teacher name helper ──────────────────────────────
   function getTeacherNames(classId: string, legacyName: string | null): string {
@@ -1377,14 +1439,13 @@ ${(byDay[d] ?? [])
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-heading font-semibold text-charcoal">
-            Schedule
+            Classes
           </h1>
           <p className="mt-1 text-sm text-slate">
-            {derivedActiveClasses.length} active ·{" "}
-            {classes.filter((c) => deriveClassStatus(c) === "inactive").length} inactive
+            One row per class definition — an edit here applies to every future occurrence.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -1403,36 +1464,75 @@ ${(byDay[d] ?? [])
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard
-          label="Active Classes"
-          value={derivedActiveClasses.filter((c) => !c.is_hidden).length}
+      {/* Segmented toggles — what the rows are, whose they are, how they're drawn */}
+      <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
+        <Segmented
+          label="View by"
+          hint={viewBy === "instances" ? "every dated session" : "one row per class"}
+          value={viewBy}
+          onChange={(v) => setViewBy(v as "classes" | "instances")}
+          options={[
+            { value: "classes", label: "Classes" },
+            { value: "instances", label: "Instances" },
+          ]}
         />
-        <StatCard
-          label="Total Enrolled"
-          value={classes.reduce((s, c) => s + c.enrolledCount, 0)}
-        />
-        <StatCard
-          label="At Capacity"
-          value={
-            derivedActiveClasses.filter(
-              (c) =>
-                c.enrolledCount >= (c.max_enrollment ?? c.max_students)
-            ).length
+        <Segmented
+          label="Scope"
+          hint={
+            !filterMyClasses
+              ? "everyone's"
+              : !isTeacher
+                ? "you don't teach any classes"
+                : myClassIds.length > 0
+                  ? "just your classes"
+                  : "none assigned to you"
           }
+          value={filterMyClasses ? "mine" : "all"}
+          onChange={(v) => setFilterMyClasses(v === "mine")}
+          options={[
+            { value: "all", label: "All" },
+            { value: "mine", label: "Mine" },
+          ]}
+        />
+        <div className="flex-1" />
+        <Segmented
+          label="Display"
+          value={viewMode}
+          onChange={(v) => setViewMode(v as "list" | "calendar")}
+          options={[
+            { value: "list", label: "List" },
+            { value: "calendar", label: "Calendar" },
+          ]}
+        />
+      </div>
+
+      {/* Stats — every card states its own scope, so none of them can be read
+          against the wrong denominator (that was the old page's whole problem).
+          Hidden under Instances: they all count classes, and Instances is not
+          showing classes. */}
+      <div className={`grid grid-cols-2 sm:grid-cols-4 gap-3 ${viewBy === "instances" ? "hidden" : ""}`}>
+        <StatCard
+          label="Running now"
+          value={runningInView.filter((c) => !c.is_hidden).length}
+          detail={`of ${filtered.length} shown`}
         />
         <StatCard
-          label="Open Spots"
-          value={derivedActiveClasses.reduce(
-            (s, c) =>
-              s +
-              Math.max(
-                0,
-                (c.max_enrollment ?? c.max_students) - c.enrolledCount
-              ),
+          label="Enrolled"
+          value={filtered.reduce((s, c) => s + c.enrolledCount, 0)}
+          detail="active + trial, in view"
+        />
+        <StatCard
+          label="At capacity"
+          value={runningInView.filter((c) => c.enrolledCount >= capacityOf(c)).length}
+          detail={`of ${runningInView.length} running`}
+        />
+        <StatCard
+          label="Open spots"
+          value={runningInView.reduce(
+            (s, c) => s + Math.max(0, capacityOf(c) - c.enrolledCount),
             0
           )}
+          detail="in running classes"
         />
       </div>
 
@@ -1518,18 +1618,8 @@ ${(byDay[d] ?? [])
             filterStatus={filterStatus} setFilterStatus={setFilterStatus}
             seasons={seasons} teachers={teachers} disciplines={disciplines} studioLocations={studioLocations} availableLevels={availableLevels}
           />
-          {isTeacher && myClassIds.length > 0 && (
-            <button
-              onClick={() => setFilterMyClasses(!filterMyClasses)}
-              className={`h-9 rounded-lg px-3 text-xs font-medium transition-colors inline-flex items-center gap-1.5 ${
-                filterMyClasses
-                  ? "bg-lavender text-white"
-                  : "border border-silver bg-white text-slate hover:border-lavender"
-              }`}
-            >
-              My Classes
-            </button>
-          )}
+          {/* "My Classes" used to sit here as a chip. It is now the Scope
+              toggle above — one control per piece of state, not two. */}
           <button
             onClick={() => setShowPast(!showPast)}
             className={`h-9 rounded-lg px-3 text-xs font-medium transition-colors inline-flex items-center gap-1.5 ${
@@ -1577,8 +1667,10 @@ ${(byDay[d] ?? [])
           </div>
         )}
         {/* Event type toggles */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs text-mist">Show:</span>
+        <div className="flex items-center gap-2 flex-wrap border-t border-silver pt-3">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-mist mr-1">
+            Show
+          </span>
           <button
             onClick={() => {
               const next = !showPrivates;
@@ -1606,6 +1698,7 @@ ${(byDay[d] ?? [])
             }`}
           >
             Rehearsals
+            <ChipCount n={filtered.filter((c) => c.is_rehearsal).length} />
           </button>
           <button
             onClick={() => setShowClosedClasses(!showClosedClasses)}
@@ -1616,6 +1709,7 @@ ${(byDay[d] ?? [])
             }`}
           >
             Closed Days
+            <ChipCount n={studioClosures.length} />
           </button>
           <button
             onClick={() => {
@@ -1630,6 +1724,7 @@ ${(byDay[d] ?? [])
             }`}
           >
             Performances
+            <ChipCount n={filtered.filter((c) => c.is_performance).length} />
           </button>
           <button
             onClick={() => {
@@ -1647,8 +1742,37 @@ ${(byDay[d] ?? [])
           </button>
         </div>
 
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-mist hidden sm:block">{filtered.length} classes shown</p>
+      </div>
+
+      {/* Meta row — leads with the count for everything on screen, then says
+          what that set is: which season(s), and what the default is holding
+          back. The three numbers that used to disagree now read as one sentence. */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-slate">
+          {viewBy === "instances" ? (
+            // The count describes classes, and Instances is not showing classes
+            // — so it says nothing rather than something wrong.
+            <span className="text-mist">Instances — not connected to session data yet</span>
+          ) : (
+            <>
+              <b className="font-semibold text-charcoal">{filtered.length}</b>{" "}
+              class{filtered.length === 1 ? "" : "es"} shown
+              {" · "}
+              {seasonScopeLabel}
+              {hiddenPastCount > 0 && (
+                <>
+                  {" · "}
+                  <button
+                    onClick={() => setShowPast(true)}
+                    className="underline decoration-dotted underline-offset-2 hover:text-charcoal"
+                  >
+                    {hiddenPastCount} past hidden
+                  </button>
+                </>
+              )}
+            </>
+          )}
+        </p>
           {/* Columns popover */}
           <div ref={columnsPopoverRef} className="relative hidden sm:block">
             <button
@@ -1690,29 +1814,6 @@ ${(byDay[d] ?? [])
               </div>
             )}
           </div>
-          <div className="flex items-center gap-1 rounded-lg border border-silver overflow-hidden">
-            <button
-              onClick={() => setViewMode("list")}
-              className={`px-3 py-1.5 text-xs font-medium ${
-                viewMode === "list"
-                  ? "bg-lavender text-white"
-                  : "text-slate hover:bg-cloud"
-              }`}
-            >
-              List
-            </button>
-            <button
-              onClick={() => setViewMode("calendar")}
-              className={`px-3 py-1.5 text-xs font-medium ${
-                viewMode === "calendar"
-                  ? "bg-lavender text-white"
-                  : "text-slate hover:bg-cloud"
-              }`}
-            >
-              Calendar
-            </button>
-          </div>
-        </div>
       </div>
 
       {/* Bulk Actions */}
@@ -1732,7 +1833,9 @@ ${(byDay[d] ?? [])
       )}
 
       {/* Content */}
-      {viewMode === "calendar" ? (
+      {viewBy === "instances" ? (
+        <InstancesNotWired onBack={() => setViewBy("classes")} />
+      ) : viewMode === "calendar" ? (
         renderCalendar()
       ) : (
         <div className="rounded-xl border border-silver bg-white overflow-x-auto">
@@ -2028,13 +2131,128 @@ ${(byDay[d] ?? [])
 }
 
 // ── Stat Card ────────────────────────────────────────────
-function StatCard({ label, value }: { label: string; value: number }) {
+/**
+ * `detail` is not decoration — it names the card's denominator. Without it this
+ * page showed "2" next to a list of 91 and left the reader to guess which set
+ * each number described.
+ */
+function StatCard({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: number;
+  detail?: string;
+}) {
   return (
-    <div className="rounded-xl border border-silver bg-white p-4 text-center">
-      <p className="text-2xl font-heading font-semibold text-charcoal">
+    <div className="rounded-xl border border-silver bg-white p-4">
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-mist">
+        {label}
+      </p>
+      <p className="mt-1 text-2xl font-heading font-semibold text-charcoal">
         {value}
       </p>
-      <p className="mt-1 text-xs text-slate">{label}</p>
+      {detail && <p className="mt-0.5 text-xs text-slate">{detail}</p>}
+    </div>
+  );
+}
+
+// ── Segmented control ────────────────────────────────────
+/** Pill segmented toggle: small caps label, the buttons, an optional hint below. */
+function Segmented({
+  label,
+  hint,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  hint?: string;
+  value: string;
+  options: Array<{ value: string; label: string }>;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="pl-0.5 text-[10px] font-semibold uppercase tracking-wider text-mist">
+        {label}
+      </span>
+      <div className="inline-flex rounded-full bg-cloud p-0.5">
+        {options.map((o) => (
+          <button
+            key={o.value}
+            onClick={() => onChange(o.value)}
+            aria-pressed={value === o.value}
+            className={`rounded-full px-4 py-1.5 text-xs font-semibold transition-colors ${
+              value === o.value
+                ? "bg-white text-lavender-dark shadow-sm"
+                : "text-slate hover:text-charcoal"
+            }`}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+      {hint && <span className="pl-0.5 text-[10px] text-mist">{hint}</span>}
+    </div>
+  );
+}
+
+/**
+ * The count inside a Show chip. Rendered only for the counts we actually hold —
+ * Privates and Competitions have none here and get no number rather than a
+ * made-up one — and only when non-zero, so an empty category stays quiet.
+ */
+function ChipCount({ n }: { n: number }) {
+  if (n === 0) return null;
+  return <span className="ml-1.5 text-[10px] font-bold opacity-80">{n}</span>;
+}
+
+// ── Instances — declared, not yet wired ──────────────────
+/**
+ * Deliberately honest. Instances means dated sessions, which live in
+ * `schedule_instances`; this page never queries that table, so there is nothing
+ * to render and inventing rows would be worse than saying so.
+ */
+function InstancesNotWired({ onBack }: { onBack: () => void }) {
+  return (
+    <div className="rounded-xl border border-dashed border-silver bg-white p-8">
+      <h2 className="font-heading text-lg font-semibold text-charcoal">
+        Instances aren&rsquo;t wired up yet
+      </h2>
+      <p className="mt-2 max-w-2xl text-sm text-slate">
+        This view would list every dated session rather than one row per class.
+        Those rows live in <code className="rounded bg-cloud px-1 py-0.5 text-xs">schedule_instances</code>,
+        which this page does not read — so rather than show you invented rows, it
+        shows you this.
+      </p>
+      <p className="mt-3 max-w-2xl text-sm text-slate">What it needs:</p>
+      <ul className="mt-2 max-w-2xl list-disc space-y-1 pl-5 text-sm text-slate">
+        <li>
+          A <code className="rounded bg-cloud px-1 py-0.5 text-xs">schedule_instances</code> query
+          in the page, bounded by a date range — the season is ~91 classes across
+          ten months, so &ldquo;all of it&rdquo; is thousands of rows and needs a
+          window (a week, like the Calendar) or pagination.
+        </li>
+        <li>
+          A second column set. The current columns are driven by{" "}
+          <code className="rounded bg-cloud px-1 py-0.5 text-xs">class_field_config</code>, which
+          describes class fields; instances need Date · Time, Attendance, and
+          Flags, which are not in that table.
+        </li>
+        <li>
+          A decision on the filters. Season, Level and Discipline live on the
+          class, so each instance has to resolve back through its class to stay
+          filterable.
+        </li>
+      </ul>
+      <button
+        onClick={onBack}
+        className="mt-5 rounded-lg border border-silver px-3 py-2 text-sm text-slate hover:bg-cloud"
+      >
+        Back to Classes
+      </button>
     </div>
   );
 }
@@ -2227,7 +2445,10 @@ function FilterSelects({
   availableLevels?: string[];
   stacked?: boolean;
 }) {
-  const cls = stacked ? "w-full" : "w-[140px]";
+  // Inline: size to the label, floor at the old fixed width so the row still
+  // reads as a row of equal-ish controls. A hard `w-[140px]` clipped "All
+  // Disciplines" to "All…", which looked like a bug in the filter bar.
+  const cls = stacked ? "w-full" : "w-auto min-w-[140px]";
   return (
     <>
       <SimpleSelect value={filterSeason || "__all__"} onValueChange={(val) => setFilterSeason(val === "__all__" ? "" : val)} options={[{ value: "__all__", label: "All Seasons" }, ...seasons.map((s) => ({ value: s.id, label: s.name }))]} placeholder="All Seasons" className={cls} />

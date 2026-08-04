@@ -348,10 +348,38 @@ CREATE TABLE IF NOT EXISTS studio_closures (
 
 ### List View (`/admin/classes`)
 
+**Page title is "Classes"** (it read "Schedule" until 2026-08-04 — the same word
+the `/admin/schedule` Calendar uses, for a different surface).
+
 - Search by class name
-- Filters: Season | Teacher | Level | Discipline | Day | Type | Status
-- View toggle: List | Calendar
+- Filters: Season | Location | Teacher | Level | Discipline | Day | Type | Status,
+  plus a "Show past classes" toggle (ended classes are hidden by default)
+- **View by: Classes | Instances** — Classes is one row per class definition and
+  is the default. Instances means dated sessions and is **declared but not
+  wired**: those rows live in `schedule_instances`, which this page does not
+  query, so selecting it renders a panel naming what it needs (a date-bounded
+  `schedule_instances` query, an instance column set — `class_field_config`
+  describes class fields only — and a rule for resolving class-level filters
+  through each instance). It renders no invented rows.
+- **Scope: All | Mine** — Mine filters to the signed-in user's `class_teachers`
+  rows. Replaces the old "My Classes" chip; one control, not two. With no
+  classes assigned, Mine is honestly empty (it used to silently show everything).
+- Display toggle: List | Calendar
 - Bulk select + bulk actions
+
+**Counts must agree.** The header, the stat cards and the list each used to
+report a differently-scoped number with no denominator — "2 active · 89
+inactive" beside an "Active Classes: 2" card beside "91 classes shown". Every
+count is now scoped to what is on screen and states its denominator:
+
+- Meta row leads with the season-wide count: **"91 classes shown · All seasons ·
+  62 past hidden"**. The season label is *computed*, never assumed — it names the
+  filtered season, or the single season in view, or "All seasons". (Live as of
+  2026-08-04 the default 91 spans two seasons: 90 from 2026/2027 plus one
+  2025/2026 class still running, so hardcoding the newest season would be wrong.)
+- Stat cards read Running now (`of N shown`) | Enrolled (`active + trial, in
+  view`) | At capacity (`of N running`) | Open spots (`in running classes`), and
+  are hidden under Instances since they all count classes.
 
 **Columns:** Name | Teacher(s) | Level | Discipline | Day/Time | Season |
 Enrolled | Status badges (NEW / HIDDEN / REHEARSAL) | Online Reg toggle | Actions
