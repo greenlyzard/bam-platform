@@ -429,3 +429,5 @@ two should not be reported as though they carry the same confidence.
 - Can a holder subdivide, or only the studio? A school splitting ten into five is the motivating case, which implies holders can — but that means the studio is not the only party creating tickets.
 - Does an anonymous redemption capture anything at the door — a name, a count, nothing?
 - Are blocks per-performance or per-production? Ten tickets to a school is probably per-performance, since seats are dated.
+
+- **Live stream tickets** are promised in the Nutcracker email sequence — "including live stream tickets for family who can't be there in person." Not modelled in §2. Depends on Cloudflare Stream, whose API token is still unfetched.
